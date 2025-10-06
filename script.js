@@ -768,8 +768,11 @@ function initializeListeners() {
     const searchTableBtn = document.getElementById('searchTableBtn');
     if (searchTableBtn) searchTableBtn.addEventListener('click', searchTable);
 
-    document.getElementById('abrirMesaBtn').addEventListener('click', openTable);
-    document.getElementById('backToPanelFromOrderBtn').addEventListener('click', showPanelScreen);
+    const abrirMesaBtn = document.getElementById('abrirMesaBtn');
+    if(abrirMesaBtn) abrirMesaBtn.addEventListener('click', openTable);
+    
+    const backToPanelFromOrderBtn = document.getElementById('backToPanelFromOrderBtn');
+    if(backToPanelFromOrderBtn) backToPanelFromOrderBtn.addEventListener('click', showPanelScreen);
 
     const toggleReviewBtn = document.getElementById('toggleReviewBtn');
     if (toggleReviewBtn) {
