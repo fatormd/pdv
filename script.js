@@ -240,8 +240,8 @@ function renderOpenTables() {
     });
 }
 
+// CORRIGIDO: A função agora verifica a existência dos elementos antes de tentar manipulá-los
 function renderOrderScreen() {
-    if (!currentOrder) return;
     const currentTableNumber = document.getElementById('current-table-number');
     const openOrderList = document.getElementById('openOrderList');
     const reviewItemsList = document.getElementById('reviewItemsList');
@@ -252,7 +252,10 @@ function renderOrderScreen() {
     const sendOrderButton = document.getElementById('sendOrderButton');
     const openItemsCount = document.getElementById('openItemsCount');
 
-    if (currentTableNumber) currentTableNumber.textContent = currentOrder.tableNumber || `Mesa ${currentOrder.id.replace('MESA_', '')}`;
+    if (currentOrder && currentTableNumber) {
+        currentTableNumber.textContent = currentOrder.tableNumber || `Mesa ${currentOrder.id.replace('MESA_', '')}`;
+    }
+
     if (!openOrderList || !reviewItemsList) return;
 
     const openItems = currentOrder.itemsOpen || [];
@@ -753,6 +756,7 @@ function initializeListeners() {
         });
     });
     
+    // 1. MUDANÇA: Listener para o botão de busca por mesa
     const searchTableBtn = document.getElementById('searchTableBtn');
     if (searchTableBtn) searchTableBtn.addEventListener('click', searchTable);
 
