@@ -12,12 +12,13 @@ import {
 // Estes valores são PLACECES HOLDERS. Você DEVE substitui-los.
 const appId = 'COMANDAS_SMART_APP'; 
 const firebaseConfig = {
-    apiKey: "SUA_CHAVE_API_FIREBASE",
-    authDomain: "SEU_PROJETO.firebaseapp.com",
-    projectId: "SEU_PROJETO-ID",
-    storageBucket: "SEU_PROJETO.appspot.com",
-    messagingSenderId: "SEU_SENDER_ID",
-    appId: "SEU_APP_ID"
+  apiKey: "AIzaSyCiquxozxlU2dmlNCCwUG1sjpZVzOuZd0M",
+  authDomain: "fator-pdv.firebaseapp.com",
+  projectId: "fator-pdv",
+  storageBucket: "fator-pdv.firebasestorage.app",
+  messagingSenderId: "1097659747429",
+  appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c",
+  measurementId: "G-02QWNRXRCV"
 };
 const initialAuthToken = null; // Token de autenticação opcional
 
@@ -753,3 +754,4 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeListeners();
 
 });
+
