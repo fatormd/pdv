@@ -741,17 +741,21 @@ async function finalizeOrder() {
 
 // --- Funções de Inicialização e Listeners de UI ---
 function initializeListeners() {
-    document.getElementById('menuItemsGrid').addEventListener('click', (e) => {
-        const button = e.target.closest('.add-to-order-btn');
-        if (button) {
-            const card = button.closest('.menu-item');
-            addItemToOrder(
-                card.getAttribute('data-item-id'),
-                card.getAttribute('data-item-name'),
-                parseFloat(card.getAttribute('data-price'))
-            );
-        }
-    });
+    // CORRIGIDO: Listener para a caixa de itens do menu
+    const menuItemsGrid = document.getElementById('menuItemsGrid');
+    if (menuItemsGrid) {
+        menuItemsGrid.addEventListener('click', (e) => {
+            const button = e.target.closest('.add-to-order-btn');
+            if (button) {
+                const card = button.closest('.menu-item');
+                addItemToOrder(
+                    card.getAttribute('data-item-id'),
+                    card.getAttribute('data-item-name'),
+                    parseFloat(card.getAttribute('data-price'))
+                );
+            }
+        });
+    }
 
     document.querySelectorAll('.category-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -812,7 +816,8 @@ function initializeListeners() {
     const sendOrderButton = document.getElementById('sendOrderButton');
     if (sendOrderButton) sendOrderButton.addEventListener('click', () => sendOrderToProduction());
 
-    document.getElementById('openChargeModalButton').addEventListener('click', openChargeModal); 
+    const openChargeModalButton = document.getElementById('openChargeModalButton');
+    if (openChargeModalButton) openChargeModalButton.addEventListener('click', openChargeModal); 
 
     const cancelObsBtn = document.getElementById('cancelObsBtn');
     if (cancelObsBtn) cancelObsBtn.addEventListener('click', () => document.getElementById('obsModal').classList.add('hidden'));
