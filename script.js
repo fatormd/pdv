@@ -342,7 +342,8 @@ function renderMenu(category) {
     const menuItemsGrid = document.getElementById('menuItemsGrid');
     if (!menuItemsGrid) return;
     menuItemsGrid.innerHTML = MENU_ITEMS.filter(item => item.category === category).map(item => `
-        <div class="menu-item content-card bg-white p-3 flex flex-col justify-between items-start text-left hover:shadow-lg transition duration-200">
+        <div class="menu-item content-card bg-white p-3 flex flex-col justify-between items-start text-left hover:shadow-lg transition duration-200"
+                data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
             <p class="font-semibold text-gray-800 text-base">${item.name}</p>
             <div class="flex items-center justify-between w-full mt-1">
                 <p class="text-lg font-bold text-indigo-700">${item.price.toFixed(2).replace('.', ',')}</p>
@@ -767,11 +768,8 @@ function initializeListeners() {
     const searchTableBtn = document.getElementById('searchTableBtn');
     if (searchTableBtn) searchTableBtn.addEventListener('click', searchTable);
 
-    const abrirMesaBtn = document.getElementById('abrirMesaBtn');
-    if(abrirMesaBtn) abrirMesaBtn.addEventListener('click', openTable);
-    
-    const backToPanelFromOrderBtn = document.getElementById('backToPanelFromOrderBtn');
-    if(backToPanelFromOrderBtn) backToPanelFromOrderBtn.addEventListener('click', showPanelScreen);
+    document.getElementById('abrirMesaBtn').addEventListener('click', openTable);
+    document.getElementById('backToPanelFromOrderBtn').addEventListener('click', showPanelScreen);
 
     const toggleReviewBtn = document.getElementById('toggleReviewBtn');
     if (toggleReviewBtn) {
