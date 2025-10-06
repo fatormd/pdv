@@ -36,23 +36,23 @@
                             Abrir
                         </button>
                     </div>
-           
                 </div>
 
                 <div class="space-y-3">
                     <div class="flex justify-between items-center mb-3">
                         <h3 class="text-xl font-semibold text-gray-700">Mesas Abertas (<span id="openTablesCount">0</span>)</h3>
-                        <div class="relative">
-                            <input type="text" id="searchTableInput" placeholder="Buscar mesa..." class="pr-8 input-pdv border border-gray-300 rounded-lg text-sm" style="width: 150px;">
-                            <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                        <div class="relative flex items-center">
+                            <input type="number" id="searchTableInput" placeholder="Nº Mesa" class="pr-8 input-pdv border border-gray-300 rounded-lg text-sm" style="width: 120px;">
+                            <button id="searchTableBtn" class="absolute right-0 p-2 text-gray-400 hover:text-indigo-600 transition">
+                                <i class="fas fa-search"></i>
+                            </button>
                         </div>
                     </div>
-  
+                    
                     <div id="openTablesList" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 gap-3">
                         <div class="col-span-2 text-sm text-gray-500 italic p-4 content-card bg-white">Nenhuma mesa aberta.</div>
                     </div>
                 </div>
-      
             </div>
 
             <div id="orderScreen" class="screen-order max-w-md mx-auto">
@@ -97,11 +97,36 @@
                         </div>
                     </div>
                     
-                    <div class="p-4 pt-0">
-                        <button id="openChargeModalButton" class="w-full flex items-center justify-center bg-green-500 text-white font-bold py-4 rounded-xl hover:bg-green-600 transition duration-150 shadow-md disabled:opacity-50 text-xl" disabled>
-                            <i class="fas fa-wallet mr-2"></i>
-                            Fechar Conta / Cobrar
-                        </button>
+                    <div id="chargeInputsAndSummary" class="p-4 pt-0">
+                        <h4 class="text-lg font-semibold text-gray-700 mb-3">Registrar Pagamento</h4>
+                        <div class="space-y-3">
+                            <div id="paymentMethodButtons" class="grid grid-cols-2 gap-2">
+                                <button data-method="Dinheiro" class="payment-method-btn active px-4 py-3 bg-indigo-600 text-white rounded-lg font-semibold transition duration-150 shadow-md hover:bg-indigo-700">
+                                    <i class="fas fa-money-bill-wave mr-1"></i> Dinheiro
+                                </button>
+                                <button data-method="Cartão Débito" class="payment-method-btn px-4 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold transition duration-150 hover:bg-gray-300">
+                                    <i class="fas fa-credit-card mr-1"></i> Débito
+                                </button>
+                                <button data-method="Cartão Crédito" class="payment-method-btn px-4 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold transition duration-150 hover:bg-gray-300">
+                                    <i class="fas fa-credit-card mr-1"></i> Crédito
+                                </button>
+                                <button data-method="PIX" class="payment-method-btn px-4 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold transition duration-150 hover:bg-gray-300">
+                                    <i class="fas fa-qrcode mr-1"></i> PIX
+                                </button>
+                            </div>
+                            <input type="number" id="paymentValueInput" placeholder="Valor Pago" class="w-full p-3 input-pdv border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" min="0.01">
+                            <button id="addPaymentBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition duration-150 text-base disabled:opacity-50">
+                                Adicionar Pagamento
+                            </button>
+                        </div>
+                        <h4 class="text-sm font-semibold text-gray-500 mt-4 mb-2">Pagamentos:</h4>
+                        <div id="paymentSummaryList" class="max-h-24 overflow-y-auto space-y-1 p-2 bg-gray-50 rounded-lg border border-gray-200 text-sm">
+                            </div>
+                    </div>
+
+                    <div class="flex justify-end space-x-3 p-4 pt-0">
+                        <button id="cancelChargeBtn" class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-base">Voltar / Cancelar</button>
+                        <button id="finalizeOrderBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-base disabled:opacity-50" disabled>Finalizar Pedido (Mesa OK)</button>
                     </div>
                 </div>
                 
@@ -121,13 +146,6 @@
                             </div>
                         </div>
                     </div>
-
-                    <div class="px-4 space-y-3">
-                        <button id="sendOrderButton" class="w-full flex items-center justify-center bg-indigo-600 text-white font-bold py-4 rounded-xl hover:bg-indigo-700 transition duration-150 shadow-md disabled:opacity-50 text-xl" disabled>
-                            <i class="fas fa-paper-plane mr-2"></i>
-                            Enviar Pedido
-                        </button>
-                    </div>
                 </div>
 
                 <div id="menuContainer" class="mt-6 transition-container">
@@ -139,7 +157,7 @@
                         </div>
                     </div>
                     
-                    <div class="flex space-x-2 overflow-x-auto pb-2 mb-4 px-4">
+                    <div id="categoryFilters" class="flex space-x-2 overflow-x-auto pb-2 mb-4 px-4">
                         <button class="category-btn px-4 py-3 bg-indigo-600 text-white rounded-full text-base font-semibold whitespace-nowrap" data-category="main">Pratos Principais</button>
                         <button class="category-btn px-4 py-3 bg-white text-gray-700 rounded-full text-base font-semibold border border-gray-300 whitespace-nowrap" data-category="drinks">Bebidas</button>
                         <button class="category-btn px-4 py-3 bg-white text-gray-700 rounded-full text-base font-semibold border border-gray-300 whitespace-nowrap" data-category="desserts">Sobremesas</button>
