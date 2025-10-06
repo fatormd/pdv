@@ -1,15 +1,9 @@
-// Importações do Firebase
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { 
-    getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged 
-} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { 
-    getFirestore, doc, onSnapshot, setDoc, collection, updateDoc 
-} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getFirestore, doc, onSnapshot, setDoc, collection, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // --- Configuração e Variáveis Globais (ATENÇÃO: SUBSTITUA AQUI) ---
-// Estes valores são PLACECES HOLDERS. Você DEVE substitui-los.
+// Substitua o appId com o valor correto do seu firebaseConfig
 const appId = '1:1097659747429:web:8ec0a7c3978c311dbe0a8c'; 
 const firebaseConfig = {
   apiKey: "AIzaSyCiquxozxlU2dmlNCCwUG1sjpZVzOuZd0M",
@@ -20,33 +14,28 @@ const firebaseConfig = {
   appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c",
   measurementId: "G-02QWNRXRCV"
 };
-const initialAuthToken = null; // Token de autenticação opcional
+const initialAuthToken = null;
 
-// Variáveis de Estado
 let app, db, auth;
 let userId = null;
 let tablesData = []; 
 let currentOrder = null; 
 let itemToObserve = null; 
-let currentMode = 0; // Estado: 0 = Pedido Ativo, 2 = Revisão/Conta
-let unsubscribeOrder = null; // Função de cancelamento do listener de comanda
+let currentMode = 0;
+let unsubscribeOrder = null;
 
-// ESTADO GLOBAL DA COBRANÇA (para o Modal de Pagamento Misto)
 let finalCharge = {
     subtotal: 0,
-    taxRate: 0.10, // 10%
+    taxRate: 0.10,
     serviceTaxApplied: true,
     total: 0,
-    payments: [] // Pagamentos registrados: [{ method: 'Dinheiro', value: 50.00 }]
+    payments: []
 };
-let selectedPaymentMethod = 'Dinheiro'; // Método de pagamento ativo
-
-// Estados de inicialização da Aplicação
+let selectedPaymentMethod = 'Dinheiro';
 let isAppLoading = true;
 let isAuthReady = false;
 let appErrorMessage = null; 
 
-// Dados Mock do Cardápio
 const MENU_ITEMS = [
     { id: 'picanha', name: 'Picanha Grelhada', price: 79.90, category: 'main' },
     { id: 'salmao', name: 'Salmão com Ervas', price: 65.00, category: 'main' },
@@ -57,8 +46,6 @@ const MENU_ITEMS = [
 ];
 
 // --- Funções Auxiliares de Cálculo ---
-
-/** Calcula o subtotal (valor dos produtos) da comanda. */
 function calculateSubtotal(order) {
     let subtotal = 0;
     const allItems = [...(order.itemsOpen || []), ...(order.itemsSent || [])];
@@ -67,14 +54,10 @@ function calculateSubtotal(order) {
     });
     return subtotal;
 }
-
-/** Calcula o valor total incluindo ou não a taxa de serviço. */
 function calculateTotal(subtotal, applyServiceTax, taxRate = 0.10) {
     const taxValue = applyServiceTax ? subtotal * taxRate : 0;
     return subtotal + taxValue;
 }
-
-/** Calcula o total já pago. */
 function calculatePaidTotal() {
     return finalCharge.payments.reduce((sum, payment) => sum + payment.value, 0);
 }
@@ -93,10 +76,7 @@ async function initializeFirebase() {
         auth = getAuth(app);
         
         await new Promise((resolve, reject) => {
-            const authPromise = initialAuthToken 
-                ? signInWithCustomToken(auth, initialAuthToken) 
-                : signInAnonymously(auth);
-
+            const authPromise = initialAuthToken ? signInWithCustomToken(auth, initialAuthToken) : signInAnonymously(auth);
             authPromise.then(() => {
                 const unsubscribe = onAuthStateChanged(auth, (user) => {
                     if (user) {
@@ -112,7 +92,6 @@ async function initializeFirebase() {
                 });
             }).catch(reject);
         });
-
     } catch (error) {
         console.error("Erro na inicialização do Firebase:", error);
         appErrorMessage = `Falha ao conectar: ${error.message}`;
@@ -121,8 +100,6 @@ async function initializeFirebase() {
         renderAppStatus();
     }
 }
-
-/** Renderiza o status da aplicação (Carregando, Erro ou Conteúdo Principal) */
 function renderAppStatus() {
     const mainContent = document.getElementById('mainContent');
     const statusScreen = document.getElementById('statusScreen');
@@ -145,14 +122,11 @@ function renderAppStatus() {
     }
 }
 
-
 // --- Funções de Dados e Listener ---
-
 function setupTableListener() {
     if (!db || !userId) return;
     const tablesColRef = collection(db, 'artifacts', appId, 'public', 'data', 'orders',);
     
-    // Listener de Coleção (Painel de Mesas)
     onSnapshot(tablesColRef, (snapshot) => {
         tablesData = [];
         snapshot.forEach(doc => {
@@ -178,7 +152,6 @@ function setupOrderListener(tableId) {
      unsubscribeOrder = onSnapshot(docRef, (docSnap) => {
          if (docSnap.exists()) {
              currentOrder = { id: docSnap.id, ...docSnap.data() };
-             
              if (currentOrder.status !== 'Aberta') {
                  showPanelScreen();
                  return;
@@ -193,14 +166,13 @@ function setupOrderListener(tableId) {
 }
 
 // --- Funções de Renderização e UI ---
-
 function showPanelScreen() {
     document.getElementById('appContainer').style.transform = 'translateX(0)';
     document.getElementById('current-table-number').textContent = '';
     if (unsubscribeOrder) unsubscribeOrder();
     currentOrder = null;
     currentMode = 0;
-    renderOrderScreen(); // Limpa a tela de pedido
+    renderOrderScreen(); 
 }
 
 function showOrderScreen(tableId) {
@@ -213,12 +185,10 @@ function renderOpenTables() {
     const openTablesList = document.getElementById('openTablesList');
     
     openTablesCount.textContent = tablesData.length;
-
     if (tablesData.length === 0) {
         openTablesList.innerHTML = `<div class="col-span-2 text-sm text-gray-500 italic p-4 content-card bg-white">Nenhuma mesa aberta.</div>`;
         return;
     }
-
     openTablesList.innerHTML = tablesData.map(table => {
         const totalText = (table.total || 0).toFixed(2).replace('.', ',');
         const bgColor = 'bg-red-500 text-white';
@@ -247,7 +217,6 @@ function renderOpenTables() {
 
 function renderOrderScreen() {
     if (!currentOrder) return;
-
     const currentTableNumber = document.getElementById('current-table-number');
     const openOrderList = document.getElementById('openOrderList');
     const reviewItemsList = document.getElementById('reviewItemsList');
@@ -259,33 +228,27 @@ function renderOrderScreen() {
     const openItemsCount = document.getElementById('openItemsCount');
 
     currentTableNumber.textContent = currentOrder.tableNumber || `Mesa ${currentOrder.id.replace('MESA_', '')}`;
-
     const openItems = currentOrder.itemsOpen || [];
     const sentItems = currentOrder.itemsSent || [];
 
-    // Calcula os valores
     const subtotal = calculateSubtotal(currentOrder);
     const serviceTaxApplied = currentOrder.serviceTaxApplied !== false; 
     const taxValue = serviceTaxApplied ? subtotal * finalCharge.taxRate : 0;
     const total = subtotal + taxValue;
 
-    // Atualiza os displays de valores
     orderSubtotalDisplay.textContent = `R$ ${subtotal.toFixed(2).replace('.', ',')}`;
     orderServiceTaxDisplay.textContent = `R$ ${taxValue.toFixed(2).replace('.', ',')}`;
     orderTotalDisplay.textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
     
-    // Atualiza o total salvo na comanda no Firestore (para exibição no painel)
     if (currentOrder.total !== total) {
          const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
          updateDoc(docRef, { total: total, serviceTaxApplied: serviceTaxApplied }).catch(console.error);
     }
     
-    // Atualiza os botões de ação
     openItemsCount.textContent = openItems.length;
     sendOrderButton.disabled = openItems.length === 0;
     openChargeModalButton.disabled = openItems.length > 0;
     
-    // Renderizar Itens Abertos
     if (openItems.length > 0) {
         openOrderList.innerHTML = openItems.map(item => `
             <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-indigo-100" data-item-id="${item.id}">
@@ -308,7 +271,6 @@ function renderOrderScreen() {
         openOrderList.innerHTML = `<div class="text-base text-gray-500 italic p-2">Nenhum item selecionado.</div>`;
     }
 
-    // Renderizar Itens Enviados
     if (sentItems.length > 0) {
         reviewItemsList.innerHTML = sentItems.map(item => `
             <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg border-b border-gray-200">
@@ -317,23 +279,28 @@ function renderOrderScreen() {
                     ${item.observation ? `<span class="text-xs text-green-600 italic">Obs: ${item.observation}</span>` : ''}
                 </div>
                 <div class="flex space-x-3">
-                    <button data-item-id="${item.id}" data-action="remove-sent" class="text-red-500 hover:bg-red-100 p-2 rounded-full w-9 h-9" title="Excluir Item"><i class="fas fa-trash-alt text-base"></i></button>
-                    <button data-item-id="${item.id}" data-action="transfer-sent" class="text-indigo-500 hover:bg-indigo-100 p-2 rounded-full w-9 h-9" title="Transferir para outra mesa"><i class="fas fa-exchange-alt text-base"></i></button>
+                    <button data-item-id="${item.id}" data-action="remove-sent" class="remove-sent-btn text-red-500 hover:bg-red-100 p-2 rounded-full w-9 h-9" title="Excluir Item"><i class="fas fa-trash-alt text-base"></i></button>
+                    <button data-item-id="${item.id}" data-action="transfer-sent" class="transfer-sent-btn text-indigo-500 hover:bg-indigo-100 p-2 rounded-full w-9 h-9" title="Transferir para outra mesa"><i class="fas fa-exchange-alt text-base"></i></button>
                 </div>
             </div>
         `).join('');
+        document.querySelectorAll('.remove-sent-btn').forEach(btn => {
+            btn.addEventListener('click', () => removeSentItem(btn.getAttribute('data-item-id')));
+        });
+        document.querySelectorAll('.transfer-sent-btn').forEach(btn => {
+            btn.addEventListener('click', () => transferSentItem(btn.getAttribute('data-item-id')));
+        });
     } else {
         reviewItemsList.innerHTML = `<div class="text-base text-gray-500 italic p-2">Nenhum item enviado.</div>`;
     }
 
-    // Gerencia a visibilidade dos painéis de Pedido/Revisão
     const orderingInputs = document.getElementById('orderingInputs');
     const reviewDetailsContainer = document.getElementById('reviewDetailsContainer');
     
-    if (currentMode === 0) { // Modo Pedido Ativo
+    if (currentMode === 0) {
         orderingInputs.classList.remove('hidden-state');
         reviewDetailsContainer.classList.add('hidden-state');
-    } else if (currentMode === 2) { // Modo Revisão/Conta
+    } else if (currentMode === 2) {
         orderingInputs.classList.add('hidden-state');
         reviewDetailsContainer.classList.remove('hidden-state');
     }
@@ -343,36 +310,30 @@ function renderOrderScreen() {
 
 function renderMenu(category) {
     const menuItemsGrid = document.getElementById('menuItemsGrid');
-    menuItemsGrid.innerHTML = MENU_ITEMS
-        .filter(item => item.category === category)
-        .map(item => `
-            <button class="menu-item content-card bg-white p-3 flex flex-col justify-between items-start text-left hover:shadow-lg transition duration-200"
-                    data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
-                <p class="font-semibold text-gray-800 text-base">${item.name}</p>
-                <p class="text-xl font-bold text-indigo-700 mt-1">R$ ${item.price.toFixed(2).replace('.', ',')}</p>
-                <div class="add-to-order-btn bg-green-500 text-white font-bold w-full mt-2 rounded-md hover:bg-green-600 transition">
-                    <i class="fas fa-plus text-sm mr-1"></i> Add
-                </div>
-            </button>
-        `).join('');
+    menuItemsGrid.innerHTML = MENU_ITEMS.filter(item => item.category === category).map(item => `
+        <button class="menu-item content-card bg-white p-3 flex flex-col justify-between items-start text-left hover:shadow-lg transition duration-200"
+                data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
+            <p class="font-semibold text-gray-800 text-base">${item.name}</p>
+            <p class="text-xl font-bold text-indigo-700 mt-1">R$ ${item.price.toFixed(2).replace('.', ',')}</p>
+            <div class="add-to-order-btn bg-green-500 text-white font-bold w-full mt-2 rounded-md hover:bg-green-600 transition">
+                <i class="fas fa-plus text-sm mr-1"></i> Add
+            </div>
+        </button>
+    `).join('');
 }
 
 // --- Funções de Manipulação de Dados (Criação/Atualização) ---
-
 async function openTable() {
     const mesaInput = document.getElementById('mesaInput');
     const pessoasInput = document.getElementById('pessoasInput');
     const mesaNumber = mesaInput.value.trim();
     const pessoasCount = parseInt(pessoasInput.value);
-
     if (!mesaNumber || pessoasCount < 1) {
         alert("Por favor, preencha o número da mesa e a quantidade de pessoas.");
         return;
     }
-
     const tableId = `MESA_${mesaNumber}`;
     const tableNumberDisplay = `Mesa ${mesaNumber}`;
-
     const newOrder = {
         tableNumber: tableNumberDisplay,
         diners: pessoasCount,
@@ -385,7 +346,6 @@ async function openTable() {
         createdAt: new Date().toISOString(),
         createdBy: userId
     };
-
     try {
         const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', tableId);
         await setDoc(docRef, newOrder);
@@ -397,12 +357,61 @@ async function openTable() {
         console.error("Erro ao abrir mesa: ", e);
     }
 }
+async function removeSentItem(itemId) {
+    if (!currentOrder || !currentOrder.id) return;
+    if (confirm("Tem certeza que deseja remover este item do histórico? Essa ação não pode ser desfeita.")) {
+        const itemsSent = (currentOrder.itemsSent || []).filter(item => item.id !== itemId);
+        try {
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
+            await updateDoc(docRef, { itemsSent: itemsSent });
+            displayMessage('Item removido do histórico com sucesso.', 'success');
+        } catch (e) {
+            console.error("Erro ao remover item enviado:", e);
+            alert(`Erro ao remover item: ${e.message}`);
+        }
+    }
+}
+window.removeSentItem = removeSentItem;
+async function transferSentItem(itemId) {
+    if (!currentOrder || !currentOrder.id) return;
+    const targetTableNumber = prompt("Para qual número de mesa você deseja transferir este item?");
+    if (!targetTableNumber || isNaN(parseInt(targetTableNumber))) {
+        alert("Número de mesa inválido.");
+        return;
+    }
+    const targetTableId = `MESA_${targetTableNumber}`;
+    const targetDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', targetTableId);
+    const itemToTransfer = (currentOrder.itemsSent || []).find(item => item.id === itemId);
+    if (!itemToTransfer) {
+        alert("Item não encontrado para transferência.");
+        return;
+    }
+    const newItemsSent = (currentOrder.itemsSent || []).filter(item => item.id !== itemId);
+    const originDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
+    try {
+        await updateDoc(originDocRef, { itemsSent: newItemsSent });
+        const targetDocSnap = await getDoc(targetDocRef);
+        let targetItemsSent = [];
+        if (targetDocSnap.exists()) {
+            targetItemsSent = targetDocSnap.data().itemsSent || [];
+        } else {
+            alert(`A mesa ${targetTableNumber} não está aberta.`);
+            await updateDoc(originDocRef, { itemsSent: currentOrder.itemsSent }); 
+            return;
+        }
+        const newTargetItemsSent = [...targetItemsSent, itemToTransfer];
+        await updateDoc(targetDocRef, { itemsSent: newTargetItemsSent, lastUpdate: new Date().toISOString() });
+        displayMessage(`Item ${itemToTransfer.name} transferido para a Mesa ${targetTableNumber}.`, 'success');
+    } catch (e) {
+        console.error("Erro ao transferir item:", e);
+        alert(`Erro ao transferir item: ${e.message}`);
+    }
+}
+window.transferSentItem = transferSentItem;
 
 function addItemToOrder(itemId, itemName, price) {
     if (!currentOrder) return;
-
     const itemIndex = currentOrder.itemsOpen.findIndex(item => item.id === itemId);
-
     if (itemIndex > -1) {
         currentOrder.itemsOpen[itemIndex].quantity += 1;
     } else {
@@ -416,13 +425,10 @@ function addItemToOrder(itemId, itemName, price) {
     }
     renderOrderScreen(); 
 }
-
 function updateItemQuantity(itemId, action) {
     if (!currentOrder) return;
-    
     const itemIndex = currentOrder.itemsOpen.findIndex(item => item.id === itemId);
     if (itemIndex === -1) return;
-
     if (action === 'increase') {
         currentOrder.itemsOpen[itemIndex].quantity += 1;
     } else if (action === 'decrease') {
@@ -433,21 +439,16 @@ function updateItemQuantity(itemId, action) {
     }
     renderOrderScreen();
 }
-
 async function sendOrderToProduction() {
     if (!currentOrder || currentOrder.itemsOpen.length === 0) return;
-
     const itemsToSend = currentOrder.itemsOpen.map(item => ({
         ...item,
         status: 'Enviado',
         sentAt: new Date().toISOString()
     }));
-
     const newItemsSent = [...(currentOrder.itemsSent || []), ...itemsToSend];
-
     try {
         const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
-        
         await updateDoc(docRef, {
             itemsSent: newItemsSent,
             itemsOpen: [], 
@@ -460,20 +461,16 @@ async function sendOrderToProduction() {
 }
 
 // --- Funções da Modal de Observação ---
-
 function openObservationModal(itemId, itemName, existingObs) {
     itemToObserve = itemId; 
     document.getElementById('obsItemName').textContent = itemName;
     document.getElementById('obsInput').value = existingObs;
     document.getElementById('obsModal').classList.remove('hidden');
 }
-
 function saveObservation() {
     if (!currentOrder || !itemToObserve) return;
-    
     const obsInput = document.getElementById('obsInput').value.trim();
     const itemIndex = currentOrder.itemsOpen.findIndex(item => item.id === itemToObserve);
-
     if (itemIndex > -1) {
         currentOrder.itemsOpen[itemIndex].observation = obsInput;
         document.getElementById('obsModal').classList.add('hidden');
@@ -481,19 +478,12 @@ function saveObservation() {
         renderOrderScreen(); 
     }
 }
-
-// --- Funções da Modal de Cobrança (Pagamento Misto) ---
-
 function openChargeModal() {
     if (!currentOrder || currentOrder.itemsOpen.length > 0) return;
-
-    // Inicializa o estado de cobrança
     finalCharge.subtotal = calculateSubtotal(currentOrder);
     finalCharge.serviceTaxApplied = currentOrder.serviceTaxApplied !== false;
     finalCharge.payments = currentOrder.payments || [];
-
     updateChargeModalUI();
-
     document.getElementById('chargeModalTitle').textContent = `Cobrança da ${currentOrder.tableNumber}`;
     document.getElementById('chargeModal').classList.remove('hidden');
 }
@@ -505,15 +495,12 @@ function updateChargeModalUI() {
     const paymentSummaryList = document.getElementById('paymentSummaryList');
     const finalizeOrderBtn = document.getElementById('finalizeOrderBtn');
     
-    // 1. Recalcula Totais
     finalCharge.total = calculateTotal(finalCharge.subtotal, finalCharge.serviceTaxApplied, finalCharge.taxRate);
     const paidTotal = calculatePaidTotal();
     let remainingBalance = parseFloat((finalCharge.total - paidTotal).toFixed(2)); 
 
-    // 2. Atualiza Saldo Devedor
     remainingBalanceDisplay.textContent = `R$ ${Math.max(0, remainingBalance).toFixed(2).replace('.', ',')}`;
     
-    // 3. Atualiza Taxa de Serviço UI
     const taxValue = finalCharge.serviceTaxApplied ? finalCharge.subtotal * finalCharge.taxRate : 0;
     serviceTaxValue.textContent = `R$ ${taxValue.toFixed(2).replace('.', ',')}`;
     toggleServiceTaxBtn.textContent = finalCharge.serviceTaxApplied ? 'Aplicado' : 'Removido';
@@ -523,7 +510,6 @@ function updateChargeModalUI() {
     toggleServiceTaxBtn.classList.toggle('hover:bg-red-600', !finalCharge.serviceTaxApplied);
 
 
-    // 4. Renderiza Pagamentos Registrados
     if (finalCharge.payments.length === 0) {
         paymentSummaryList.innerHTML = `<p class="text-xs text-gray-500 italic p-2">Nenhum pagamento registrado.</p>`;
     } else {
@@ -536,13 +522,11 @@ function updateChargeModalUI() {
                 </button>
             </div>
         `).join('');
-        
         document.querySelectorAll('.remove-payment-btn').forEach(btn => {
             btn.addEventListener('click', (e) => removePayment(parseInt(e.currentTarget.getAttribute('data-payment-index'))));
         });
     }
 
-    // 5. Habilita/Desabilita Finalizar Pedido
     finalizeOrderBtn.disabled = remainingBalance > 0.01;
     if (!finalizeOrderBtn.disabled) {
         finalizeOrderBtn.classList.replace('bg-red-600', 'bg-green-600');
@@ -552,7 +536,6 @@ function updateChargeModalUI() {
         finalizeOrderBtn.classList.replace('hover:bg-green-700', 'hover:bg-red-700');
     }
     
-    // Preenche o input de valor com o saldo restante (ou zero)
     document.getElementById('paymentValueInput').value = Math.max(0, remainingBalance).toFixed(2);
 }
 
@@ -612,27 +595,21 @@ function removePayment(index) {
 
 async function finalizeOrder() {
     if (!currentOrder) return;
-    
     const totalDue = calculateTotal(finalCharge.subtotal, finalCharge.serviceTaxApplied, finalCharge.taxRate);
     const paidTotal = calculatePaidTotal();
     let remainingBalance = parseFloat((totalDue - paidTotal).toFixed(2)); 
-
     if (remainingBalance > 0.01) {
         alert("O saldo devedor ainda é maior que zero. Registre mais pagamentos.");
         return;
     }
-    
     const change = parseFloat((paidTotal - totalDue).toFixed(2));
-    
     if (change > 0.01) {
         if (!confirm(`Troco a ser dado: R$ ${change.toFixed(2).replace('.', ',')}. Deseja finalizar a conta?`)) {
             return;
         }
     }
-
     try {
         const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
-        
         await updateDoc(docRef, {
             status: 'Fechada',
             payments: finalCharge.payments,
@@ -642,21 +619,16 @@ async function finalizeOrder() {
             serviceTaxApplied: finalCharge.serviceTaxApplied,
             closedAt: new Date().toISOString()
         });
-        
         document.getElementById('chargeModal').classList.add('hidden');
         showPanelScreen();
-
     } catch (e) {
         alert(`Erro ao finalizar pedido: ${e.message}`);
         console.error("Erro ao finalizar pedido: ", e);
     }
 }
 
-
 // --- Funções de Inicialização e Listeners de UI ---
-
 function initializeListeners() {
-    // Listener principal para botões do menu
     document.getElementById('menuItemsGrid').addEventListener('click', (e) => {
         const itemBtn = e.target.closest('.menu-item');
         if (itemBtn) {
@@ -668,7 +640,6 @@ function initializeListeners() {
         }
     });
 
-    // Listener para botões de categoria do menu
     document.querySelectorAll('.category-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const category = e.currentTarget.getAttribute('data-category');
@@ -682,17 +653,11 @@ function initializeListeners() {
         });
     });
 
-    // Listener para Abrir Mesa
     document.getElementById('abrirMesaBtn').addEventListener('click', openTable);
-
-    // Listener de Voltar (Pedido -> Painel)
     document.getElementById('backToPanelFromOrderBtn').addEventListener('click', showPanelScreen);
-
-    // Listener para alternar entre Pedido e Revisão
     document.getElementById('toggleReviewBtn').addEventListener('click', () => {
         currentMode = (currentMode === 0) ? 2 : 0;
         renderOrderScreen();
-        
         const icon = document.querySelector('#toggleReviewBtn i');
         if (currentMode === 2) {
              icon.classList.remove('fa-tag');
@@ -705,14 +670,11 @@ function initializeListeners() {
         }
     });
 
-    // Listener para Aumentar/Diminuir Quantidade e Abrir Observação
     document.getElementById('openOrderList').addEventListener('click', (e) => {
         const target = e.target.closest('button');
         if (!target) return;
-
         const itemId = target.getAttribute('data-item-id');
         const action = target.getAttribute('data-action');
-        
         if (action === 'increase' || action === 'decrease') {
             updateItemQuantity(itemId, action);
         } else if (target.classList.contains('obs-btn')) {
@@ -722,21 +684,17 @@ function initializeListeners() {
         }
     });
     
-    // Listeners de Ação
     document.getElementById('sendOrderButton').addEventListener('click', () => sendOrderToProduction());
     document.getElementById('openChargeModalButton').addEventListener('click', openChargeModal); 
 
-    // Listeners da Modal de Observação
     document.getElementById('cancelObsBtn').addEventListener('click', () => document.getElementById('obsModal').classList.add('hidden'));
     document.getElementById('saveObsBtn').addEventListener('click', saveObservation);
 
-    // Listeners do Modal de Cobrança (Pagamento Misto)
     document.getElementById('cancelChargeBtn').addEventListener('click', () => document.getElementById('chargeModal').classList.add('hidden'));
     document.getElementById('finalizeOrderBtn').addEventListener('click', finalizeOrder);
     document.getElementById('toggleServiceTaxBtn').addEventListener('click', toggleServiceTax);
     document.getElementById('addPaymentBtn').addEventListener('click', addPayment);
     
-    // Listener para Botões de Pagamento (Seleção)
     document.getElementById('paymentMethodButtons').addEventListener('click', (e) => {
         const btn = e.target.closest('.payment-method-btn');
         if (btn) {
@@ -748,11 +706,7 @@ function initializeListeners() {
     renderMenu('main');
 }
 
-// Inicia a aplicação
 document.addEventListener('DOMContentLoaded', () => {
     initializeFirebase();
     initializeListeners();
-
 });
-
-
