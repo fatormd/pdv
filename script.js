@@ -63,6 +63,28 @@ function calculatePaidTotal() {
     return finalCharge.payments.reduce((sum, payment) => sum + payment.value, 0);
 }
 
+// --- Funções Auxiliares de UI (Movidas para o Escopo Global) ---
+function displayMessage(message, type = 'info') {
+    const messagesEl = document.getElementById('statusMessage');
+    if (!messagesEl) return;
+    
+    messagesEl.textContent = message;
+    messagesEl.classList.remove('hidden', 'text-red-500', 'text-green-500', 'text-indigo-500');
+    
+    if (type === 'error') {
+        messagesEl.classList.add('text-red-500');
+    } else if (type === 'success') {
+        messagesEl.classList.add('text-green-500');
+    } else {
+        messagesEl.classList.add('text-indigo-500');
+    }
+    
+    setTimeout(() => {
+        messagesEl.classList.add('hidden');
+    }, 4000);
+}
+
+
 // --- 1. Inicialização do Firebase e Autenticação ---
 async function initializeFirebase() {
     const userIdDisplay = document.getElementById('user-id-display');
@@ -168,8 +190,12 @@ function setupOrderListener(tableId) {
 
 // --- Funções de Renderização e UI ---
 function showPanelScreen() {
-    document.getElementById('appContainer').style.transform = 'translateX(0)';
-    document.getElementById('current-table-number').textContent = '';
+    const appContainer = document.getElementById('appContainer');
+    if (appContainer) appContainer.style.transform = 'translateX(0)';
+
+    const currentTableNumber = document.getElementById('current-table-number');
+    if (currentTableNumber) currentTableNumber.textContent = '';
+
     if (unsubscribeOrder) unsubscribeOrder();
     currentOrder = null;
     currentMode = 0;
@@ -177,7 +203,8 @@ function showPanelScreen() {
 }
 
 function showOrderScreen(tableId) {
-    document.getElementById('appContainer').style.transform = 'translateX(-100vw)';
+    const appContainer = document.getElementById('appContainer');
+    if (appContainer) appContainer.style.transform = 'translateX(-100vw)';
     setupOrderListener(tableId);
 }
 
@@ -185,7 +212,9 @@ function renderOpenTables() {
     const openTablesCount = document.getElementById('openTablesCount');
     const openTablesList = document.getElementById('openTablesList');
     
-    openTablesCount.textContent = tablesData.length;
+    if(openTablesCount) openTablesCount.textContent = tablesData.length;
+    if (!openTablesList) return;
+    
     if (tablesData.length === 0) {
         openTablesList.innerHTML = `<div class="col-span-2 text-sm text-gray-500 italic p-4 content-card bg-white">Nenhuma mesa aberta.</div>`;
         return;
@@ -211,8 +240,8 @@ function renderOpenTables() {
     });
 }
 
-// CORRIGIDO: A função agora verifica a existência dos elementos antes de tentar manipulá-los
 function renderOrderScreen() {
+    if (!currentOrder) return;
     const currentTableNumber = document.getElementById('current-table-number');
     const openOrderList = document.getElementById('openOrderList');
     const reviewItemsList = document.getElementById('reviewItemsList');
@@ -223,11 +252,8 @@ function renderOrderScreen() {
     const sendOrderButton = document.getElementById('sendOrderButton');
     const openItemsCount = document.getElementById('openItemsCount');
 
-    if (currentOrder && currentTableNumber) {
-        currentTableNumber.textContent = currentOrder.tableNumber || `Mesa ${currentOrder.id.replace('MESA_', '')}`;
-    }
-
-    if (!currentOrder || !openOrderList || !reviewItemsList) return;
+    if (currentTableNumber) currentTableNumber.textContent = currentOrder.tableNumber || `Mesa ${currentOrder.id.replace('MESA_', '')}`;
+    if (!openOrderList || !reviewItemsList) return;
 
     const openItems = currentOrder.itemsOpen || [];
     const sentItems = currentOrder.itemsSent || [];
@@ -566,44 +592,50 @@ function updateChargeModalUI() {
     const paidTotal = calculatePaidTotal();
     let remainingBalance = parseFloat((finalCharge.total - paidTotal).toFixed(2)); 
 
-    remainingBalanceDisplay.textContent = `R$ ${Math.max(0, remainingBalance).toFixed(2).replace('.', ',')}`;
+    if (remainingBalanceDisplay) remainingBalanceDisplay.textContent = `R$ ${Math.max(0, remainingBalance).toFixed(2).replace('.', ',')}`;
     
     const taxValue = finalCharge.serviceTaxApplied ? finalCharge.subtotal * finalCharge.taxRate : 0;
-    serviceTaxValue.textContent = `R$ ${taxValue.toFixed(2).replace('.', ',')}`;
-    toggleServiceTaxBtn.textContent = finalCharge.serviceTaxApplied ? 'Aplicado' : 'Removido';
-    toggleServiceTaxBtn.classList.toggle('bg-green-500', finalCharge.serviceTaxApplied);
-    toggleServiceTaxBtn.classList.toggle('bg-red-500', !finalCharge.serviceTaxApplied);
-    toggleServiceTaxBtn.classList.toggle('hover:bg-green-600', finalCharge.serviceTaxApplied);
-    toggleServiceTaxBtn.classList.toggle('hover:bg-red-600', !finalCharge.serviceTaxApplied);
-
-
-    if (finalCharge.payments.length === 0) {
-        paymentSummaryList.innerHTML = `<p class="text-xs text-gray-500 italic p-2">Nenhum pagamento registrado.</p>`;
-    } else {
-        paymentSummaryList.innerHTML = finalCharge.payments.map((p, index) => `
-            <div class="flex justify-between items-center py-1">
-                <span class="font-medium">${p.method}</span>
-                <span class="font-bold text-gray-800">R$ ${p.value.toFixed(2).replace('.', ',')}</span>
-                <button data-payment-index="${index}" class="remove-payment-btn text-red-500 hover:text-red-700 text-sm" title="Remover Pagamento">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-        `).join('');
-        document.querySelectorAll('.remove-payment-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => removePayment(parseInt(e.currentTarget.getAttribute('data-payment-index'))));
-        });
+    if(serviceTaxValue) serviceTaxValue.textContent = `R$ ${taxValue.toFixed(2).replace('.', ',')}`;
+    if(toggleServiceTaxBtn) {
+        toggleServiceTaxBtn.textContent = finalCharge.serviceTaxApplied ? 'Aplicado' : 'Removido';
+        toggleServiceTaxBtn.classList.toggle('bg-green-500', finalCharge.serviceTaxApplied);
+        toggleServiceTaxBtn.classList.toggle('bg-red-500', !finalCharge.serviceTaxApplied);
+        toggleServiceTaxBtn.classList.toggle('hover:bg-green-600', finalCharge.serviceTaxApplied);
+        toggleServiceTaxBtn.classList.toggle('hover:bg-red-600', !finalCharge.serviceTaxApplied);
     }
 
-    finalizeOrderBtn.disabled = remainingBalance > 0.01;
-    if (!finalizeOrderBtn.disabled) {
-        finalizeOrderBtn.classList.replace('bg-red-600', 'bg-green-600');
-        finalizeOrderBtn.classList.replace('hover:bg-red-700', 'hover:bg-green-700');
-    } else {
-        finalizeOrderBtn.classList.replace('bg-green-600', 'bg-red-600');
-        finalizeOrderBtn.classList.replace('hover:bg-green-700', 'hover:bg-red-700');
+    if (paymentSummaryList) {
+        if (finalCharge.payments.length === 0) {
+            paymentSummaryList.innerHTML = `<p class="text-xs text-gray-500 italic p-2">Nenhum pagamento registrado.</p>`;
+        } else {
+            paymentSummaryList.innerHTML = finalCharge.payments.map((p, index) => `
+                <div class="flex justify-between items-center py-1">
+                    <span class="font-medium">${p.method}</span>
+                    <span class="font-bold text-gray-800">R$ ${p.value.toFixed(2).replace('.', ',')}</span>
+                    <button data-payment-index="${index}" class="remove-payment-btn text-red-500 hover:text-red-700 text-sm" title="Remover Pagamento">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `).join('');
+            document.querySelectorAll('.remove-payment-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => removePayment(parseInt(e.currentTarget.getAttribute('data-payment-index'))));
+            });
+        }
     }
     
-    document.getElementById('paymentValueInput').value = Math.max(0, remainingBalance).toFixed(2);
+    if(finalizeOrderBtn) {
+        finalizeOrderBtn.disabled = remainingBalance > 0.01;
+        if (!finalizeOrderBtn.disabled) {
+            finalizeOrderBtn.classList.replace('bg-red-600', 'bg-green-600');
+            finalizeOrderBtn.classList.replace('hover:bg-red-700', 'hover:bg-green-700');
+        } else {
+            finalizeOrderBtn.classList.replace('bg-green-600', 'bg-red-600');
+            finalizeOrderBtn.classList.replace('hover:bg-green-700', 'hover:bg-red-700');
+        }
+    }
+    
+    const paymentValueInput = document.getElementById('paymentValueInput');
+    if (paymentValueInput) paymentValueInput.value = Math.max(0, remainingBalance).toFixed(2);
 }
 
 function toggleServiceTax() {
@@ -721,7 +753,6 @@ function initializeListeners() {
         });
     });
     
-    // 1. MUDANÇA: Listener para o botão de busca por mesa
     const searchTableBtn = document.getElementById('searchTableBtn');
     if (searchTableBtn) searchTableBtn.addEventListener('click', searchTable);
 
