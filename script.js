@@ -331,8 +331,11 @@ function renderOrderScreen() {
         if(orderingInputs) orderingInputs.classList.add('hidden-state');
         if(reviewDetailsContainer) reviewDetailsContainer.classList.remove('hidden-state');
     }
-
-    renderMenu(document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'main');
+    
+    const menuItemsGrid = document.getElementById('menuItemsGrid');
+    if (menuItemsGrid) {
+        renderMenu(document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'main');
+    }
 }
 
 function renderMenu(category) {
@@ -733,6 +736,7 @@ async function finalizeOrder() {
 
 // --- Funções de Inicialização e Listeners de UI ---
 function initializeListeners() {
+    // CORRIGIDO: Listener para a caixa de itens do menu
     document.getElementById('menuItemsGrid').addEventListener('click', (e) => {
         const button = e.target.closest('.add-to-order-btn');
         if (button) {
@@ -758,7 +762,6 @@ function initializeListeners() {
         });
     });
     
-    // 1. MUDANÇA: Listener para o botão de busca por mesa
     const searchTableBtn = document.getElementById('searchTableBtn');
     if (searchTableBtn) searchTableBtn.addEventListener('click', searchTable);
 
