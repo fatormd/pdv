@@ -242,8 +242,8 @@ function renderOrderScreen() {
     }
     
     openItemsCount.textContent = openItems.length;
-    sendOrderButton.disabled = openItems.length === 0;
-    openChargeModalButton.disabled = openItems.length > 0;
+    if (sendOrderButton) sendOrderButton.disabled = openItems.length === 0;
+    if (openChargeModalButton) openChargeModalButton.disabled = openItems.length > 0;
     
     if (openItems.length > 0) {
         openOrderList.innerHTML = openItems.map(item => `
@@ -294,18 +294,20 @@ function renderOrderScreen() {
     const reviewDetailsContainer = document.getElementById('reviewDetailsContainer');
     
     if (currentMode === 0) {
-        orderingInputs.classList.remove('hidden-state');
-        reviewDetailsContainer.classList.add('hidden-state');
+        if(orderingInputs) orderingInputs.classList.remove('hidden-state');
+        if(reviewDetailsContainer) reviewDetailsContainer.classList.add('hidden-state');
     } else if (currentMode === 2) {
-        orderingInputs.classList.add('hidden-state');
-        reviewDetailsContainer.classList.remove('hidden-state');
+        if(orderingInputs) orderingInputs.classList.add('hidden-state');
+        if(reviewDetailsContainer) reviewDetailsContainer.classList.remove('hidden-state');
     }
 
     renderMenu(document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'main');
 }
 
+// CORRIGIDO: Adicionada a lógica para anexar o listener aos botões de adicionar.
 function renderMenu(category) {
     const menuItemsGrid = document.getElementById('menuItemsGrid');
+    if (!menuItemsGrid) return;
     menuItemsGrid.innerHTML = MENU_ITEMS.filter(item => item.category === category).map(item => `
         <div class="menu-item content-card bg-white p-3 flex flex-col justify-between items-start text-left hover:shadow-lg transition duration-200">
             <p class="font-semibold text-gray-800 text-base">${item.name}</p>
@@ -318,7 +320,7 @@ function renderMenu(category) {
             </div>
         </div>
     `).join('');
-
+    
     document.querySelectorAll('.add-to-order-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -331,26 +333,6 @@ function renderMenu(category) {
         });
     });
 }
-// 1. MUDANÇA: Função de busca por mesa
-function searchTable() {
-    const searchInput = document.getElementById('searchTableInput');
-    const mesaNumber = searchInput.value.trim();
-    if (mesaNumber) {
-        const tableId = `MESA_${mesaNumber}`;
-        const existingTable = tablesData.find(table => table.id === tableId);
-        if (existingTable) {
-            showOrderScreen(tableId);
-        } else {
-            alert(`A Mesa ${mesaNumber} não está aberta.`);
-        }
-    }
-}
-
-// 5. MUDANÇA: O botão de envio de pedido que estava abaixo foi removido do HTML. 
-// A única chamada agora está no cabeçalho do pedido.
-//
-// 11. MUDANÇA: O botão "Fechar Conta" na verdade chama a função de "Finalizar Pedido".
-// A lógica já está correta, a única mudança foi no texto do HTML.
 
 // --- Funções de Manipulação de Dados (Criação/Atualização) ---
 async function openTable() {
@@ -688,7 +670,7 @@ async function finalizeOrder() {
 
 // --- Funções de Inicialização e Listeners de UI ---
 function initializeListeners() {
-    // CORRIGIDO: Listener para a caixa de itens do menu
+    // CORREÇÃO: Listener para a caixa de itens do menu
     document.getElementById('menuItemsGrid').addEventListener('click', (e) => {
         const button = e.target.closest('.add-to-order-btn');
         if (button) {
@@ -712,21 +694,6 @@ function initializeListeners() {
             e.currentTarget.classList.remove('bg-white', 'text-gray-700');
             renderMenu(category);
         });
-    });
-
-    // 1. MUDANÇA: Listener para o botão de busca por mesa
-    document.getElementById('searchTableBtn').addEventListener('click', (e) => {
-        const searchInput = document.getElementById('searchTableInput');
-        const mesaNumber = searchInput.value.trim();
-        if (mesaNumber) {
-            const tableId = `MESA_${mesaNumber}`;
-            const existingTable = tablesData.find(table => table.id === tableId);
-            if (existingTable) {
-                showOrderScreen(tableId);
-            } else {
-                alert(`A Mesa ${mesaNumber} não está aberta.`);
-            }
-        }
     });
 
     document.getElementById('abrirMesaBtn').addEventListener('click', openTable);
