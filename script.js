@@ -736,18 +736,20 @@ async function finalizeOrder() {
 
 // --- Funções de Inicialização e Listeners de UI ---
 function initializeListeners() {
-    // CORRIGIDO: Listener para a caixa de itens do menu
-    document.getElementById('menuItemsGrid').addEventListener('click', (e) => {
-        const button = e.target.closest('.add-to-order-btn');
-        if (button) {
-            const card = button.closest('.menu-item');
-            addItemToOrder(
-                card.getAttribute('data-item-id'),
-                card.getAttribute('data-item-name'),
-                parseFloat(card.getAttribute('data-price'))
-            );
-        }
-    });
+    const menuItemsGrid = document.getElementById('menuItemsGrid');
+    if (menuItemsGrid) {
+        menuItemsGrid.addEventListener('click', (e) => {
+            const button = e.target.closest('.add-to-order-btn');
+            if (button) {
+                const card = button.closest('.menu-item');
+                addItemToOrder(
+                    card.getAttribute('data-item-id'),
+                    card.getAttribute('data-item-name'),
+                    parseFloat(card.getAttribute('data-price'))
+                );
+            }
+        });
+    }
 
     document.querySelectorAll('.category-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
