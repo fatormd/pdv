@@ -52,9 +52,9 @@ function calculateSubtotal(order) {
     const allItems = [...(order.itemsOpen || []), ...(order.itemsSent || [])];
     
     allItems.forEach(item => {
-        // CORREÇÃO: Garante que price e quantity são tratados como 0 se forem nulos ou undefined
-        const price = item.price || 0;
-        const quantity = item.quantity || 0;
+        // CORREÇÃO CRÍTICA: Garante que price e quantity são números válidos (ou 0)
+        const price = Number(item.price) || 0;
+        const quantity = Number(item.quantity) || 0;
         subtotal += (price * quantity);
     });
     return subtotal;
@@ -286,7 +286,7 @@ function renderOrderScreen() {
                 <div class="flex flex-col w-3/4">
                     <span class="font-semibold text-base text-gray-800">${item.name || 'Item (Nome Ausente)'}</span>
                     <div class="flex items-center space-x-2 mt-1">
-                        <button data-item-id="${item.id}" data-item-name="${item.name}" data-obs="${item.observation || ''}" class="obs-btn text-sm ${item.observation ? 'text-green-600 font-bold' : 'text-indigo-600'} hover:text-indigo-800 transition py-2 px-1">
+                        <button data-item-id="${item.id}" data-item-name="${item.name || 'Item (Nome Ausente)'}" data-obs="${item.observation || ''}" class="obs-btn text-sm ${item.observation ? 'text-green-600 font-bold' : 'text-indigo-600'} hover:text-indigo-800 transition py-2 px-1">
                             <i class="fas ${item.observation ? 'fa-check' : 'fa-edit'} mr-1"></i> ${item.observation ? 'Obs: ' + item.observation : 'Add Detalhes'}
                         </button>
                     </div>
@@ -802,8 +802,7 @@ function initializeListeners() {
             if (action === 'increase' || action === 'decrease') {
                 updateItemQuantity(itemId, action);
             } else if (target.classList.contains('obs-btn')) {
-                const card = target.closest('div[data-item-id]');
-                const itemName = card.querySelector('span:first-child').textContent;
+                const itemName = target.getAttribute('data-item-name');
                 const currentObs = target.getAttribute('data-obs');
                 openObservationModal(itemId, itemName, currentObs);
             }
