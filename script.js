@@ -240,8 +240,8 @@ function renderOpenTables() {
     });
 }
 
-// CORRIGIDO: A função agora verifica a existência dos elementos antes de tentar manipulá-los
 function renderOrderScreen() {
+    if (!currentOrder) return;
     const currentTableNumber = document.getElementById('current-table-number');
     const openOrderList = document.getElementById('openOrderList');
     const reviewItemsList = document.getElementById('reviewItemsList');
@@ -252,10 +252,7 @@ function renderOrderScreen() {
     const sendOrderButton = document.getElementById('sendOrderButton');
     const openItemsCount = document.getElementById('openItemsCount');
 
-    if (currentOrder && currentTableNumber) {
-        currentTableNumber.textContent = currentOrder.tableNumber || `Mesa ${currentOrder.id.replace('MESA_', '')}`;
-    }
-
+    if (currentTableNumber) currentTableNumber.textContent = currentOrder.tableNumber || `Mesa ${currentOrder.id.replace('MESA_', '')}`;
     if (!openOrderList || !reviewItemsList) return;
 
     const openItems = currentOrder.itemsOpen || [];
@@ -551,10 +548,13 @@ async function sendOrderToProduction() {
 
 // --- Funções da Modal de Observação ---
 function openObservationModal(itemId, itemName, existingObs) {
+    const obsModal = document.getElementById('obsModal');
+    if (!obsModal) return;
+    
     itemToObserve = itemId; 
     document.getElementById('obsItemName').textContent = itemName;
     document.getElementById('obsInput').value = existingObs;
-    document.getElementById('obsModal').classList.remove('hidden');
+    obsModal.classList.remove('hidden');
 }
 async function saveObservation() {
     if (!currentOrder || !itemToObserve) return;
@@ -580,8 +580,10 @@ function openChargeModal() {
     finalCharge.serviceTaxApplied = currentOrder.serviceTaxApplied !== false;
     finalCharge.payments = currentOrder.payments || [];
     updateChargeModalUI();
-    document.getElementById('chargeModalTitle').textContent = `Cobrança da ${currentOrder.tableNumber}`;
-    document.getElementById('chargeModal').classList.remove('hidden');
+    const chargeModalTitle = document.getElementById('chargeModalTitle');
+    if (chargeModalTitle) chargeModalTitle.textContent = `Cobrança da ${currentOrder.tableNumber}`;
+    const chargeModal = document.getElementById('chargeModal');
+    if (chargeModal) chargeModal.classList.remove('hidden');
 }
 
 function updateChargeModalUI() {
@@ -731,21 +733,17 @@ async function finalizeOrder() {
 
 // --- Funções de Inicialização e Listeners de UI ---
 function initializeListeners() {
-    // CORRIGIDO: Listener para a caixa de itens do menu
-    const menuItemsGrid = document.getElementById('menuItemsGrid');
-    if (menuItemsGrid) {
-        menuItemsGrid.addEventListener('click', (e) => {
-            const button = e.target.closest('.add-to-order-btn');
-            if (button) {
-                const card = button.closest('.menu-item');
-                addItemToOrder(
-                    card.getAttribute('data-item-id'),
-                    card.getAttribute('data-item-name'),
-                    parseFloat(card.getAttribute('data-price'))
-                );
-            }
-        });
-    }
+    document.getElementById('menuItemsGrid').addEventListener('click', (e) => {
+        const button = e.target.closest('.add-to-order-btn');
+        if (button) {
+            const card = button.closest('.menu-item');
+            addItemToOrder(
+                card.getAttribute('data-item-id'),
+                card.getAttribute('data-item-name'),
+                parseFloat(card.getAttribute('data-price'))
+            );
+        }
+    });
 
     document.querySelectorAll('.category-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -760,6 +758,7 @@ function initializeListeners() {
         });
     });
     
+    // 1. MUDANÇA: Listener para o botão de busca por mesa
     const searchTableBtn = document.getElementById('searchTableBtn');
     if (searchTableBtn) searchTableBtn.addEventListener('click', searchTable);
 
