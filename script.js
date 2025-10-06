@@ -307,7 +307,6 @@ function renderOrderScreen() {
     renderMenu(document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'main');
 }
 
-// CORRIGIDO: Agora o evento é delegado para o container principal.
 function renderMenu(category) {
     const menuItemsGrid = document.getElementById('menuItemsGrid');
     menuItemsGrid.innerHTML = MENU_ITEMS.filter(item => item.category === category).map(item => `
@@ -320,6 +319,18 @@ function renderMenu(category) {
             </button>
         </div>
     `).join('');
+    
+    document.querySelectorAll('.add-to-order-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const card = e.currentTarget.closest('.menu-item');
+            addItemToOrder(
+                card.getAttribute('data-item-id'),
+                card.getAttribute('data-item-name'),
+                parseFloat(card.getAttribute('data-price'))
+            );
+        });
+    });
 }
 
 // --- Funções de Manipulação de Dados (Criação/Atualização) ---
@@ -629,7 +640,7 @@ async function finalizeOrder() {
 
 // --- Funções de Inicialização e Listeners de UI ---
 function initializeListeners() {
-    // CORRIGIDO: ANEXA LISTENER AO CONTAINER GERAL DO MENU
+    // CORREÇÃO AQUI: ANEXA LISTENER AO CONTAINER GERAL DO MENU
     document.getElementById('menuItemsGrid').addEventListener('click', (e) => {
         const itemBtn = e.target.closest('.add-to-order-btn');
         if (itemBtn) {
@@ -705,7 +716,6 @@ function initializeListeners() {
         }
     });
 
-    // CORRIGIDO: Apenas renderizamos o menu inicial, o listener já foi anexado
     renderMenu('main');
 }
 
