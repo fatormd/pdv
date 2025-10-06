@@ -310,15 +310,15 @@ function renderMenu(category) {
         <div class="menu-item content-card bg-white p-3 flex flex-col justify-between items-start text-left hover:shadow-lg transition duration-200">
             <p class="font-semibold text-gray-800 text-base">${item.name}</p>
             <div class="flex items-center justify-between w-full mt-1">
-                <p class="text-xl font-bold text-indigo-700">${item.price.toFixed(2).replace('.', ',')}</p>
-                <button class="add-to-order-btn bg-green-500 text-white font-bold p-2 rounded-md hover:bg-green-600 transition">
+                <p class="text-lg font-bold text-indigo-700">${item.price.toFixed(2).replace('.', ',')}</p>
+                <button class="add-to-order-btn bg-green-500 text-white font-bold p-2 rounded-md hover:bg-green-600 transition"
+                        data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
                     <i class="fas fa-plus text-sm"></i>
                 </button>
             </div>
         </div>
     `).join('');
-    
-    // ANEXANDO O EVENT LISTENER CORRIGIDO PARA OS BOTÕES DE ADD
+
     document.querySelectorAll('.add-to-order-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -331,6 +331,26 @@ function renderMenu(category) {
         });
     });
 }
+// 1. MUDANÇA: Função de busca por mesa
+function searchTable() {
+    const searchInput = document.getElementById('searchTableInput');
+    const mesaNumber = searchInput.value.trim();
+    if (mesaNumber) {
+        const tableId = `MESA_${mesaNumber}`;
+        const existingTable = tablesData.find(table => table.id === tableId);
+        if (existingTable) {
+            showOrderScreen(tableId);
+        } else {
+            alert(`A Mesa ${mesaNumber} não está aberta.`);
+        }
+    }
+}
+
+// 5. MUDANÇA: O botão de envio de pedido que estava abaixo foi removido do HTML. 
+// A única chamada agora está no cabeçalho do pedido.
+//
+// 11. MUDANÇA: O botão "Fechar Conta" na verdade chama a função de "Finalizar Pedido".
+// A lógica já está correta, a única mudança foi no texto do HTML.
 
 // --- Funções de Manipulação de Dados (Criação/Atualização) ---
 async function openTable() {
@@ -668,18 +688,16 @@ async function finalizeOrder() {
 
 // --- Funções de Inicialização e Listeners de UI ---
 function initializeListeners() {
-    // CORREÇÃO: Delegando o evento para o container principal
+    // CORRIGIDO: Listener para a caixa de itens do menu
     document.getElementById('menuItemsGrid').addEventListener('click', (e) => {
         const button = e.target.closest('.add-to-order-btn');
         if (button) {
             const card = button.closest('.menu-item');
-            if (card) {
-                addItemToOrder(
-                    card.getAttribute('data-item-id'),
-                    card.getAttribute('data-item-name'),
-                    parseFloat(card.getAttribute('data-price'))
-                );
-            }
+            addItemToOrder(
+                card.getAttribute('data-item-id'),
+                card.getAttribute('data-item-name'),
+                parseFloat(card.getAttribute('data-price'))
+            );
         }
     });
 
@@ -698,11 +716,16 @@ function initializeListeners() {
 
     // 1. MUDANÇA: Listener para o botão de busca por mesa
     document.getElementById('searchTableBtn').addEventListener('click', (e) => {
-        const mesaInput = document.getElementById('searchTableInput');
-        const mesaNumber = mesaInput.value.trim();
+        const searchInput = document.getElementById('searchTableInput');
+        const mesaNumber = searchInput.value.trim();
         if (mesaNumber) {
             const tableId = `MESA_${mesaNumber}`;
-            showOrderScreen(tableId);
+            const existingTable = tablesData.find(table => table.id === tableId);
+            if (existingTable) {
+                showOrderScreen(tableId);
+            } else {
+                alert(`A Mesa ${mesaNumber} não está aberta.`);
+            }
         }
     });
 
@@ -737,7 +760,6 @@ function initializeListeners() {
         }
     });
     
-    // 2. MUDANÇA: O botão de envio do pedido que estava abaixo foi removido do HTML
     document.getElementById('sendOrderButton').addEventListener('click', () => sendOrderToProduction());
     document.getElementById('openChargeModalButton').addEventListener('click', openChargeModal); 
 
