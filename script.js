@@ -50,8 +50,12 @@ const GERENTE_SENHA = 'gerente2025';
 function calculateSubtotal(order) {
     let subtotal = 0;
     const allItems = [...(order.itemsOpen || []), ...(order.itemsSent || [])];
+    
     allItems.forEach(item => {
-        subtotal += (item.price * item.quantity);
+        // CORREÇÃO: Garante que price e quantity são tratados como 0 se forem nulos ou undefined
+        const price = item.price || 0;
+        const quantity = item.quantity || 0;
+        subtotal += (price * quantity);
     });
     return subtotal;
 }
@@ -282,7 +286,7 @@ function renderOrderScreen() {
                 <div class="flex flex-col w-3/4">
                     <span class="font-semibold text-base text-gray-800">${item.name || 'Item (Nome Ausente)'}</span>
                     <div class="flex items-center space-x-2 mt-1">
-                        <button data-item-id="${item.id}" data-item-name="${item.name || 'Item (Nome Ausente)'}" data-obs="${item.observation || ''}" class="obs-btn text-sm ${item.observation ? 'text-green-600 font-bold' : 'text-indigo-600'} hover:text-indigo-800 transition py-2 px-1">
+                        <button data-item-id="${item.id}" data-item-name="${item.name}" data-obs="${item.observation || ''}" class="obs-btn text-sm ${item.observation ? 'text-green-600 font-bold' : 'text-indigo-600'} hover:text-indigo-800 transition py-2 px-1">
                             <i class="fas ${item.observation ? 'fa-check' : 'fa-edit'} mr-1"></i> ${item.observation ? 'Obs: ' + item.observation : 'Add Detalhes'}
                         </button>
                     </div>
@@ -737,21 +741,17 @@ async function finalizeOrder() {
 
 // --- Funções de Inicialização e Listeners de UI ---
 function initializeListeners() {
-    // CORRIGIDO: Listener para a caixa de itens do menu (adicionando verificação robusta)
-    const menuItemsGrid = document.getElementById('menuItemsGrid');
-    if (menuItemsGrid) {
-        menuItemsGrid.addEventListener('click', (e) => {
-            const button = e.target.closest('.add-to-order-btn');
-            if (button) {
-                const card = button.closest('.menu-item');
-                addItemToOrder(
-                    card.getAttribute('data-item-id'),
-                    card.getAttribute('data-item-name'),
-                    parseFloat(card.getAttribute('data-price'))
-                );
-            }
-        });
-    }
+    document.getElementById('menuItemsGrid').addEventListener('click', (e) => {
+        const button = e.target.closest('.add-to-order-btn');
+        if (button) {
+            const card = button.closest('.menu-item');
+            addItemToOrder(
+                card.getAttribute('data-item-id'),
+                card.getAttribute('data-item-name'),
+                parseFloat(card.getAttribute('data-price'))
+            );
+        }
+    });
 
     document.querySelectorAll('.category-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -802,7 +802,8 @@ function initializeListeners() {
             if (action === 'increase' || action === 'decrease') {
                 updateItemQuantity(itemId, action);
             } else if (target.classList.contains('obs-btn')) {
-                const itemName = target.getAttribute('data-item-name');
+                const card = target.closest('div[data-item-id]');
+                const itemName = card.querySelector('span:first-child').textContent;
                 const currentObs = target.getAttribute('data-obs');
                 openObservationModal(itemId, itemName, currentObs);
             }
@@ -812,8 +813,7 @@ function initializeListeners() {
     const sendOrderButton = document.getElementById('sendOrderButton');
     if (sendOrderButton) sendOrderButton.addEventListener('click', () => sendOrderToProduction());
 
-    const openChargeModalButton = document.getElementById('openChargeModalButton');
-    if (openChargeModalButton) openChargeModalButton.addEventListener('click', openChargeModal); 
+    document.getElementById('openChargeModalButton').addEventListener('click', openChargeModal); 
 
     const cancelObsBtn = document.getElementById('cancelObsBtn');
     if (cancelObsBtn) cancelObsBtn.addEventListener('click', () => document.getElementById('obsModal').classList.add('hidden'));
