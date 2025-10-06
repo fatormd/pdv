@@ -3,7 +3,6 @@ import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged }
 import { getFirestore, doc, onSnapshot, setDoc, collection, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // --- Configuração e Variáveis Globais (ATENÇÃO: SUBSTITUA AQUI) ---
-// Substitua o appId com o valor correto do seu firebaseConfig
 const appId = '1:1097659747429:web:8ec0a7c3978c311dbe0a8c'; 
 const firebaseConfig = {
   apiKey: "AIzaSyCiquxozxlU2dmlNCCwUG1sjpZVzOuZd0M",
@@ -320,6 +319,18 @@ function renderMenu(category) {
             </div>
         </button>
     `).join('');
+    
+    // ANEXANDO O EVENT LISTENER CORRIGIDO PARA OS BOTÕES DE ADD
+    document.querySelectorAll('.add-to-order-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Previne que o evento do card pai seja ativado
+            const card = e.currentTarget.closest('.menu-item');
+            const itemId = card.getAttribute('data-item-id');
+            const itemName = card.getAttribute('data-item-name');
+            const itemPrice = parseFloat(card.getAttribute('data-price'));
+            addItemToOrder(itemId, itemName, itemPrice);
+        });
+    });
 }
 
 // --- Funções de Manipulação de Dados (Criação/Atualização) ---
