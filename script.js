@@ -331,7 +331,7 @@ function renderOrderScreen() {
         if(orderingInputs) orderingInputs.classList.add('hidden-state');
         if(reviewDetailsContainer) reviewDetailsContainer.classList.remove('hidden-state');
     }
-    
+
     const menuItemsGrid = document.getElementById('menuItemsGrid');
     if (menuItemsGrid) {
         renderMenu(document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'main');
@@ -578,15 +578,15 @@ async function saveObservation() {
     }
 }
 function openChargeModal() {
-    if (!currentOrder || currentOrder.itemsOpen.length > 0) return;
+    const chargeModal = document.getElementById('chargeModal');
+    if (!currentOrder || currentOrder.itemsOpen.length > 0 || !chargeModal) return;
     finalCharge.subtotal = calculateSubtotal(currentOrder);
     finalCharge.serviceTaxApplied = currentOrder.serviceTaxApplied !== false;
     finalCharge.payments = currentOrder.payments || [];
     updateChargeModalUI();
     const chargeModalTitle = document.getElementById('chargeModalTitle');
     if (chargeModalTitle) chargeModalTitle.textContent = `Cobrança da ${currentOrder.tableNumber}`;
-    const chargeModal = document.getElementById('chargeModal');
-    if (chargeModal) chargeModal.classList.remove('hidden');
+    chargeModal.classList.remove('hidden');
 }
 
 function updateChargeModalUI() {
@@ -736,6 +736,7 @@ async function finalizeOrder() {
 
 // --- Funções de Inicialização e Listeners de UI ---
 function initializeListeners() {
+    // CORRIGIDO: Adicionando checagem de existência em todos os listeners
     const menuItemsGrid = document.getElementById('menuItemsGrid');
     if (menuItemsGrid) {
         menuItemsGrid.addEventListener('click', (e) => {
@@ -790,24 +791,28 @@ function initializeListeners() {
         });
     }
     
-    document.getElementById('openOrderList').addEventListener('click', (e) => {
-        const target = e.target.closest('button');
-        if (!target) return;
-        const itemId = target.getAttribute('data-item-id');
-        const action = target.getAttribute('data-action');
-        if (action === 'increase' || action === 'decrease') {
-            updateItemQuantity(itemId, action);
-        } else if (target.classList.contains('obs-btn')) {
-            const itemName = target.getAttribute('data-item-name');
-            const currentObs = target.getAttribute('data-obs');
-            openObservationModal(itemId, itemName, currentObs);
-        }
-    });
+    const openOrderList = document.getElementById('openOrderList');
+    if (openOrderList) {
+        openOrderList.addEventListener('click', (e) => {
+            const target = e.target.closest('button');
+            if (!target) return;
+            const itemId = target.getAttribute('data-item-id');
+            const action = target.getAttribute('data-action');
+            if (action === 'increase' || action === 'decrease') {
+                updateItemQuantity(itemId, action);
+            } else if (target.classList.contains('obs-btn')) {
+                const itemName = target.getAttribute('data-item-name');
+                const currentObs = target.getAttribute('data-obs');
+                openObservationModal(itemId, itemName, currentObs);
+            }
+        });
+    }
     
     const sendOrderButton = document.getElementById('sendOrderButton');
     if (sendOrderButton) sendOrderButton.addEventListener('click', () => sendOrderToProduction());
 
-    document.getElementById('openChargeModalButton').addEventListener('click', openChargeModal); 
+    const openChargeModalButton = document.getElementById('openChargeModalButton');
+    if (openChargeModalButton) openChargeModalButton.addEventListener('click', openChargeModal); 
 
     const cancelObsBtn = document.getElementById('cancelObsBtn');
     if (cancelObsBtn) cancelObsBtn.addEventListener('click', () => document.getElementById('obsModal').classList.add('hidden'));
