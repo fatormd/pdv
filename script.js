@@ -44,6 +44,8 @@ const MENU_ITEMS = [
     { id: 'petit', name: 'Petit Gateau', price: 22.00, category: 'desserts' }
 ];
 
+const GERENTE_SENHA = 'gerente2025'; // 9. MUDANÇA: Senha de gerente para exclusão
+
 // --- Funções Auxiliares de Cálculo ---
 function calculateSubtotal(order) {
     let subtotal = 0;
@@ -419,10 +421,11 @@ window.transferSentItem = transferSentItem;
 async function addItemToOrder(itemId, itemName, price) {
     if (!currentOrder) return;
     const itemIndex = currentOrder.itemsOpen.findIndex(item => item.id === itemId);
+    const openItems = [...(currentOrder.itemsOpen || [])];
     if (itemIndex > -1) {
-        currentOrder.itemsOpen[itemIndex].quantity += 1;
+        openItems[itemIndex].quantity += 1;
     } else {
-        currentOrder.itemsOpen.push({
+        openItems.push({
             id: itemId,
             name: itemName,
             price: price,
@@ -432,8 +435,8 @@ async function addItemToOrder(itemId, itemName, price) {
     }
     try {
         const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
-        await updateDoc(docRef, { itemsOpen: currentOrder.itemsOpen });
-        // A renderização de tela é feita automaticamente pelo listener do Firestore
+        await updateDoc(docRef, { itemsOpen: openItems });
+        // A renderização de tela é feita automaticamente pelo listener do Firestore.
     } catch (e) {
         console.error("Erro ao adicionar item:", e);
         alert(`Erro ao adicionar item: ${e.message}`);
@@ -442,19 +445,20 @@ async function addItemToOrder(itemId, itemName, price) {
 // CORRIGIDO: Adicionada a chamada assíncrona para o Firestore
 async function updateItemQuantity(itemId, action) {
     if (!currentOrder) return;
-    const itemIndex = currentOrder.itemsOpen.findIndex(item => item.id === itemId);
+    const openItems = [...(currentOrder.itemsOpen || [])];
+    const itemIndex = openItems.findIndex(item => item.id === itemId);
     if (itemIndex === -1) return;
     if (action === 'increase') {
-        currentOrder.itemsOpen[itemIndex].quantity += 1;
+        openItems[itemIndex].quantity += 1;
     } else if (action === 'decrease') {
-        currentOrder.itemsOpen[itemIndex].quantity -= 1;
-        if (currentOrder.itemsOpen[itemIndex].quantity <= 0) {
-            currentOrder.itemsOpen.splice(itemIndex, 1);
+        openItems[itemIndex].quantity -= 1;
+        if (openItems[itemIndex].quantity <= 0) {
+            openItems.splice(itemIndex, 1);
         }
     }
     try {
         const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
-        await updateDoc(docRef, { itemsOpen: currentOrder.itemsOpen });
+        await updateDoc(docRef, { itemsOpen: openItems });
     } catch (e) {
         console.error("Erro ao atualizar quantidade:", e);
         alert(`Erro ao atualizar quantidade: ${e.message}`);
@@ -488,15 +492,22 @@ function openObservationModal(itemId, itemName, existingObs) {
     document.getElementById('obsInput').value = existingObs;
     document.getElementById('obsModal').classList.remove('hidden');
 }
-function saveObservation() {
+async function saveObservation() {
     if (!currentOrder || !itemToObserve) return;
     const obsInput = document.getElementById('obsInput').value.trim();
-    const itemIndex = currentOrder.itemsOpen.findIndex(item => item.id === itemToObserve);
+    const openItems = [...(currentOrder.itemsOpen || [])];
+    const itemIndex = openItems.findIndex(item => item.id === itemToObserve);
     if (itemIndex > -1) {
-        currentOrder.itemsOpen[itemIndex].observation = obsInput;
-        document.getElementById('obsModal').classList.add('hidden');
-        itemToObserve = null;
-        renderOrderScreen(); 
+        openItems[itemIndex].observation = obsInput;
+        try {
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
+            await updateDoc(docRef, { itemsOpen: openItems });
+            document.getElementById('obsModal').classList.add('hidden');
+            itemToObserve = null;
+        } catch (e) {
+            console.error("Erro ao salvar observação:", e);
+            alert(`Erro ao salvar observação: ${e.message}`);
+        }
     }
 }
 function openChargeModal() {
