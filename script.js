@@ -302,7 +302,6 @@ function renderOrderScreen() {
     renderMenu(document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'main');
 }
 
-// CORRIGIDO: Agora o evento é delegado para o container principal.
 function renderMenu(category) {
     const menuItemsGrid = document.getElementById('menuItemsGrid');
     menuItemsGrid.innerHTML = MENU_ITEMS.filter(item => item.category === category).map(item => `
@@ -316,7 +315,6 @@ function renderMenu(category) {
         </div>
     `).join('');
     
-    // ANEXANDO O EVENT LISTENER CORRIGIDO PARA OS BOTÕES DE ADD
     document.querySelectorAll('.add-to-order-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -417,7 +415,8 @@ async function transferSentItem(itemId) {
 }
 window.transferSentItem = transferSentItem;
 
-function addItemToOrder(itemId, itemName, price) {
+// CORRIGIDO: Adicionada a chamada assíncrona para o Firestore
+async function addItemToOrder(itemId, itemName, price) {
     if (!currentOrder) return;
     const itemIndex = currentOrder.itemsOpen.findIndex(item => item.id === itemId);
     if (itemIndex > -1) {
@@ -431,10 +430,17 @@ function addItemToOrder(itemId, itemName, price) {
             observation: ''
         });
     }
-    // AQUI ESTÁ A CHAMA QUE FALTAVA
-    updateComandaInFirestore();
+    try {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
+        await updateDoc(docRef, { itemsOpen: currentOrder.itemsOpen });
+        // A renderização de tela é feita automaticamente pelo listener do Firestore
+    } catch (e) {
+        console.error("Erro ao adicionar item:", e);
+        alert(`Erro ao adicionar item: ${e.message}`);
+    }
 }
-function updateItemQuantity(itemId, action) {
+// CORRIGIDO: Adicionada a chamada assíncrona para o Firestore
+async function updateItemQuantity(itemId, action) {
     if (!currentOrder) return;
     const itemIndex = currentOrder.itemsOpen.findIndex(item => item.id === itemId);
     if (itemIndex === -1) return;
@@ -446,8 +452,13 @@ function updateItemQuantity(itemId, action) {
             currentOrder.itemsOpen.splice(itemIndex, 1);
         }
     }
-    // E AQUI TAMBÉM
-    updateComandaInFirestore();
+    try {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
+        await updateDoc(docRef, { itemsOpen: currentOrder.itemsOpen });
+    } catch (e) {
+        console.error("Erro ao atualizar quantidade:", e);
+        alert(`Erro ao atualizar quantidade: ${e.message}`);
+    }
 }
 async function sendOrderToProduction() {
     if (!currentOrder || currentOrder.itemsOpen.length === 0) return;
@@ -469,19 +480,6 @@ async function sendOrderToProduction() {
         console.error("Erro ao enviar pedido: ", e);
     }
 }
-
-// --- NOVAS FUNÇÕES DE PERSISTÊNCIA NO FIRESTORE ---
-async function updateComandaInFirestore() {
-    if (!currentOrder || !currentOrder.id) return;
-    try {
-        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
-        await updateDoc(docRef, { itemsOpen: currentOrder.itemsOpen });
-    } catch (e) {
-        console.error("Erro ao atualizar a comanda no Firestore:", e);
-        alert(`Erro ao salvar item: ${e.message}`);
-    }
-}
-
 
 // --- Funções da Modal de Observação ---
 function openObservationModal(itemId, itemName, existingObs) {
@@ -652,7 +650,6 @@ async function finalizeOrder() {
 
 // --- Funções de Inicialização e Listeners de UI ---
 function initializeListeners() {
-    // CORREÇÃO AQUI: Agora o evento é delegado para o container principal.
     document.getElementById('menuItemsGrid').addEventListener('click', (e) => {
         const itemBtn = e.target.closest('.add-to-order-btn');
         if (itemBtn) {
@@ -728,7 +725,6 @@ function initializeListeners() {
         }
     });
 
-    // CORRIGIDO: Apenas renderizamos o menu inicial, o listener já foi anexado
     renderMenu('main');
 }
 
