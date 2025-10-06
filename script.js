@@ -751,4 +751,5 @@ function initializeListeners() {
 document.addEventListener('DOMContentLoaded', () => {
     initializeFirebase();
     initializeListeners();
+
 });
