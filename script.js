@@ -309,18 +309,20 @@ function renderMenu(category) {
     menuItemsGrid.innerHTML = MENU_ITEMS.filter(item => item.category === category).map(item => `
         <div class="menu-item content-card bg-white p-3 flex flex-col justify-between items-start text-left hover:shadow-lg transition duration-200">
             <p class="font-semibold text-gray-800 text-base">${item.name}</p>
-            <p class="text-xl font-bold text-indigo-700 mt-1">R$ ${item.price.toFixed(2).replace('.', ',')}</p>
-            <button class="add-to-order-btn bg-green-500 text-white font-bold w-full mt-2 rounded-md hover:bg-green-600 transition"
-                    data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
-                <i class="fas fa-plus text-sm mr-1"></i> Add
-            </button>
+            <div class="flex items-center justify-between w-full mt-1">
+                <p class="text-xl font-bold text-indigo-700">${item.price.toFixed(2).replace('.', ',')}</p>
+                <button class="add-to-order-btn bg-green-500 text-white font-bold p-2 rounded-md hover:bg-green-600 transition">
+                    <i class="fas fa-plus text-sm"></i>
+                </button>
+            </div>
         </div>
     `).join('');
     
+    // ANEXANDO O EVENT LISTENER CORRIGIDO PARA OS BOTÕES DE ADD
     document.querySelectorAll('.add-to-order-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const card = e.currentTarget;
+            const card = e.currentTarget.closest('.menu-item');
             addItemToOrder(
                 card.getAttribute('data-item-id'),
                 card.getAttribute('data-item-name'),
@@ -358,7 +360,7 @@ async function openTable() {
         const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', tableId);
         await setDoc(docRef, newOrder);
         mesaInput.value = '';
-        pessoasInput.value = '1';
+        pessoasInput.value = '';
         showOrderScreen(tableId);
     } catch (e) {
         alert(`Erro ao abrir mesa: ${e.message}`);
@@ -367,21 +369,29 @@ async function openTable() {
 }
 async function removeSentItem(itemId) {
     if (!currentOrder || !currentOrder.id) return;
-    if (confirm("Tem certeza que deseja remover este item do histórico? Essa ação não pode ser desfeita.")) {
-        const itemsSent = (currentOrder.itemsSent || []).filter(item => item.id !== itemId);
-        try {
-            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
-            await updateDoc(docRef, { itemsSent: itemsSent });
-            displayMessage('Item removido do histórico com sucesso.', 'success');
-        } catch (e) {
-            console.error("Erro ao remover item enviado:", e);
-            alert(`Erro ao remover item: ${e.message}`);
-        }
+    const senha = prompt("Insira a senha do gerente para confirmar:");
+    if (senha !== GERENTE_SENHA) {
+        alert("Senha incorreta. Ação cancelada.");
+        return;
+    }
+    const itemsSent = (currentOrder.itemsSent || []).filter(item => item.id !== itemId);
+    try {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
+        await updateDoc(docRef, { itemsSent: itemsSent });
+        displayMessage('Item removido do histórico com sucesso.', 'success');
+    } catch (e) {
+        console.error("Erro ao remover item enviado:", e);
+        alert(`Erro ao remover item: ${e.message}`);
     }
 }
 window.removeSentItem = removeSentItem;
 async function transferSentItem(itemId) {
     if (!currentOrder || !currentOrder.id) return;
+    const senha = prompt("Insira a senha do gerente para confirmar:");
+    if (senha !== GERENTE_SENHA) {
+        alert("Senha incorreta. Ação cancelada.");
+        return;
+    }
     const targetTableNumber = prompt("Para qual número de mesa você deseja transferir este item?");
     if (!targetTableNumber || isNaN(parseInt(targetTableNumber))) {
         alert("Número de mesa inválido.");
@@ -417,7 +427,6 @@ async function transferSentItem(itemId) {
 }
 window.transferSentItem = transferSentItem;
 
-// CORRIGIDO: Adicionada a chamada assíncrona para o Firestore
 async function addItemToOrder(itemId, itemName, price) {
     if (!currentOrder) return;
     const itemIndex = currentOrder.itemsOpen.findIndex(item => item.id === itemId);
@@ -436,13 +445,11 @@ async function addItemToOrder(itemId, itemName, price) {
     try {
         const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
         await updateDoc(docRef, { itemsOpen: openItems });
-        // A renderização de tela é feita automaticamente pelo listener do Firestore.
     } catch (e) {
         console.error("Erro ao adicionar item:", e);
         alert(`Erro ao adicionar item: ${e.message}`);
     }
 }
-// CORRIGIDO: Adicionada a chamada assíncrona para o Firestore
 async function updateItemQuantity(itemId, action) {
     if (!currentOrder) return;
     const openItems = [...(currentOrder.itemsOpen || [])];
@@ -661,15 +668,18 @@ async function finalizeOrder() {
 
 // --- Funções de Inicialização e Listeners de UI ---
 function initializeListeners() {
+    // CORREÇÃO: Delegando o evento para o container principal
     document.getElementById('menuItemsGrid').addEventListener('click', (e) => {
-        const itemBtn = e.target.closest('.add-to-order-btn');
-        if (itemBtn) {
-            const card = itemBtn.closest('.menu-item');
-            addItemToOrder(
-                card.getAttribute('data-item-id'),
-                card.getAttribute('data-item-name'),
-                parseFloat(card.getAttribute('data-price'))
-            );
+        const button = e.target.closest('.add-to-order-btn');
+        if (button) {
+            const card = button.closest('.menu-item');
+            if (card) {
+                addItemToOrder(
+                    card.getAttribute('data-item-id'),
+                    card.getAttribute('data-item-name'),
+                    parseFloat(card.getAttribute('data-price'))
+                );
+            }
         }
     });
 
@@ -684,6 +694,16 @@ function initializeListeners() {
             e.currentTarget.classList.remove('bg-white', 'text-gray-700');
             renderMenu(category);
         });
+    });
+
+    // 1. MUDANÇA: Listener para o botão de busca por mesa
+    document.getElementById('searchTableBtn').addEventListener('click', (e) => {
+        const mesaInput = document.getElementById('searchTableInput');
+        const mesaNumber = mesaInput.value.trim();
+        if (mesaNumber) {
+            const tableId = `MESA_${mesaNumber}`;
+            showOrderScreen(tableId);
+        }
     });
 
     document.getElementById('abrirMesaBtn').addEventListener('click', openTable);
@@ -717,6 +737,7 @@ function initializeListeners() {
         }
     });
     
+    // 2. MUDANÇA: O botão de envio do pedido que estava abaixo foi removido do HTML
     document.getElementById('sendOrderButton').addEventListener('click', () => sendOrderToProduction());
     document.getElementById('openChargeModalButton').addEventListener('click', openChargeModal); 
 
