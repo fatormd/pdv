@@ -731,17 +731,21 @@ async function finalizeOrder() {
 
 // --- Funções de Inicialização e Listeners de UI ---
 function initializeListeners() {
-    document.getElementById('menuItemsGrid').addEventListener('click', (e) => {
-        const button = e.target.closest('.add-to-order-btn');
-        if (button) {
-            const card = button.closest('.menu-item');
-            addItemToOrder(
-                card.getAttribute('data-item-id'),
-                card.getAttribute('data-item-name'),
-                parseFloat(card.getAttribute('data-price'))
-            );
-        }
-    });
+    // CORRIGIDO: Listener para a caixa de itens do menu
+    const menuItemsGrid = document.getElementById('menuItemsGrid');
+    if (menuItemsGrid) {
+        menuItemsGrid.addEventListener('click', (e) => {
+            const button = e.target.closest('.add-to-order-btn');
+            if (button) {
+                const card = button.closest('.menu-item');
+                addItemToOrder(
+                    card.getAttribute('data-item-id'),
+                    card.getAttribute('data-item-name'),
+                    parseFloat(card.getAttribute('data-price'))
+                );
+            }
+        });
+    }
 
     document.querySelectorAll('.category-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -756,27 +760,32 @@ function initializeListeners() {
         });
     });
     
-    // 1. MUDANÇA: Listener para o botão de busca por mesa
     const searchTableBtn = document.getElementById('searchTableBtn');
     if (searchTableBtn) searchTableBtn.addEventListener('click', searchTable);
 
     document.getElementById('abrirMesaBtn').addEventListener('click', openTable);
     document.getElementById('backToPanelFromOrderBtn').addEventListener('click', showPanelScreen);
-    document.getElementById('toggleReviewBtn').addEventListener('click', () => {
-        currentMode = (currentMode === 0) ? 2 : 0;
-        renderOrderScreen();
-        const icon = document.querySelector('#toggleReviewBtn i');
-        if (currentMode === 2) {
-             icon.classList.remove('fa-tag');
-             icon.classList.add('fa-shopping-cart');
-             document.getElementById('toggleReviewBtn').classList.replace('bg-gray-500', 'bg-green-600');
-        } else {
-             icon.classList.remove('fa-shopping-cart');
-             icon.classList.add('fa-tag');
-             document.getElementById('toggleReviewBtn').classList.replace('bg-green-600', 'bg-gray-500');
-        }
-    });
 
+    const toggleReviewBtn = document.getElementById('toggleReviewBtn');
+    if (toggleReviewBtn) {
+        toggleReviewBtn.addEventListener('click', () => {
+            currentMode = (currentMode === 0) ? 2 : 0;
+            renderOrderScreen();
+            const icon = document.querySelector('#toggleReviewBtn i');
+            if (icon) {
+                if (currentMode === 2) {
+                    icon.classList.remove('fa-tag');
+                    icon.classList.add('fa-shopping-cart');
+                    document.getElementById('toggleReviewBtn').classList.replace('bg-gray-500', 'bg-green-600');
+                } else {
+                    icon.classList.remove('fa-shopping-cart');
+                    icon.classList.add('fa-tag');
+                    document.getElementById('toggleReviewBtn').classList.replace('bg-green-600', 'bg-gray-500');
+                }
+            }
+        });
+    }
+    
     document.getElementById('openOrderList').addEventListener('click', (e) => {
         const target = e.target.closest('button');
         if (!target) return;
