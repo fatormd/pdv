@@ -211,8 +211,8 @@ function renderOpenTables() {
     });
 }
 
+// CORRIGIDO: A função agora verifica a existência dos elementos antes de tentar manipulá-los
 function renderOrderScreen() {
-    if (!currentOrder) return;
     const currentTableNumber = document.getElementById('current-table-number');
     const openOrderList = document.getElementById('openOrderList');
     const reviewItemsList = document.getElementById('reviewItemsList');
@@ -223,7 +223,12 @@ function renderOrderScreen() {
     const sendOrderButton = document.getElementById('sendOrderButton');
     const openItemsCount = document.getElementById('openItemsCount');
 
-    currentTableNumber.textContent = currentOrder.tableNumber || `Mesa ${currentOrder.id.replace('MESA_', '')}`;
+    if (currentOrder && currentTableNumber) {
+        currentTableNumber.textContent = currentOrder.tableNumber || `Mesa ${currentOrder.id.replace('MESA_', '')}`;
+    }
+
+    if (!currentOrder || !openOrderList || !reviewItemsList) return;
+
     const openItems = currentOrder.itemsOpen || [];
     const sentItems = currentOrder.itemsSent || [];
 
@@ -232,18 +237,18 @@ function renderOrderScreen() {
     const taxValue = serviceTaxApplied ? subtotal * finalCharge.taxRate : 0;
     const total = subtotal + taxValue;
 
-    orderSubtotalDisplay.textContent = `R$ ${subtotal.toFixed(2).replace('.', ',')}`;
-    orderServiceTaxDisplay.textContent = `R$ ${taxValue.toFixed(2).replace('.', ',')}`;
-    orderTotalDisplay.textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
+    if(orderSubtotalDisplay) orderSubtotalDisplay.textContent = `R$ ${subtotal.toFixed(2).replace('.', ',')}`;
+    if(orderServiceTaxDisplay) orderServiceTaxDisplay.textContent = `R$ ${taxValue.toFixed(2).replace('.', ',')}`;
+    if(orderTotalDisplay) orderTotalDisplay.textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
     
     if (currentOrder.total !== total) {
          const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
          updateDoc(docRef, { total: total, serviceTaxApplied: serviceTaxApplied }).catch(console.error);
     }
     
-    openItemsCount.textContent = openItems.length;
-    if (sendOrderButton) sendOrderButton.disabled = openItems.length === 0;
-    if (openChargeModalButton) openChargeModalButton.disabled = openItems.length > 0;
+    if(openItemsCount) openItemsCount.textContent = openItems.length;
+    if(sendOrderButton) sendOrderButton.disabled = openItems.length === 0;
+    if(openChargeModalButton) openChargeModalButton.disabled = openItems.length > 0;
     
     if (openItems.length > 0) {
         openOrderList.innerHTML = openItems.map(item => `
@@ -304,7 +309,6 @@ function renderOrderScreen() {
     renderMenu(document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'main');
 }
 
-// CORRIGIDO: Adicionada a lógica para anexar o listener aos botões de adicionar.
 function renderMenu(category) {
     const menuItemsGrid = document.getElementById('menuItemsGrid');
     if (!menuItemsGrid) return;
@@ -320,19 +324,41 @@ function renderMenu(category) {
             </div>
         </div>
     `).join('');
-    
+
     document.querySelectorAll('.add-to-order-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const card = e.currentTarget.closest('.menu-item');
-            addItemToOrder(
-                card.getAttribute('data-item-id'),
-                card.getAttribute('data-item-name'),
-                parseFloat(card.getAttribute('data-price'))
-            );
+            if (card) {
+                addItemToOrder(
+                    card.getAttribute('data-item-id'),
+                    card.getAttribute('data-item-name'),
+                    parseFloat(card.getAttribute('data-price'))
+                );
+            }
         });
     });
 }
+// 1. MUDANÇA: Função de busca por mesa
+function searchTable() {
+    const searchInput = document.getElementById('searchTableInput');
+    const mesaNumber = searchInput.value.trim();
+    if (mesaNumber) {
+        const tableId = `MESA_${mesaNumber}`;
+        const existingTable = tablesData.find(table => table.id === tableId);
+        if (existingTable) {
+            showOrderScreen(tableId);
+        } else {
+            alert(`A Mesa ${mesaNumber} não está aberta.`);
+        }
+    }
+}
+
+// 5. MUDANÇA: O botão de envio de pedido que estava abaixo foi removido do HTML. 
+// A única chamada agora está no cabeçalho do pedido.
+//
+// 11. MUDANÇA: O botão "Fechar Conta" na verdade chama a função de "Finalizar Pedido".
+// A lógica já está correta, a única mudança foi no texto do HTML.
 
 // --- Funções de Manipulação de Dados (Criação/Atualização) ---
 async function openTable() {
@@ -670,7 +696,6 @@ async function finalizeOrder() {
 
 // --- Funções de Inicialização e Listeners de UI ---
 function initializeListeners() {
-    // CORREÇÃO: Listener para a caixa de itens do menu
     document.getElementById('menuItemsGrid').addEventListener('click', (e) => {
         const button = e.target.closest('.add-to-order-btn');
         if (button) {
@@ -695,6 +720,10 @@ function initializeListeners() {
             renderMenu(category);
         });
     });
+    
+    // 1. MUDANÇA: Listener para o botão de busca por mesa
+    const searchTableBtn = document.getElementById('searchTableBtn');
+    if (searchTableBtn) searchTableBtn.addEventListener('click', searchTable);
 
     document.getElementById('abrirMesaBtn').addEventListener('click', openTable);
     document.getElementById('backToPanelFromOrderBtn').addEventListener('click', showPanelScreen);
@@ -727,18 +756,31 @@ function initializeListeners() {
         }
     });
     
-    document.getElementById('sendOrderButton').addEventListener('click', () => sendOrderToProduction());
+    const sendOrderButton = document.getElementById('sendOrderButton');
+    if (sendOrderButton) sendOrderButton.addEventListener('click', () => sendOrderToProduction());
+
     document.getElementById('openChargeModalButton').addEventListener('click', openChargeModal); 
 
-    document.getElementById('cancelObsBtn').addEventListener('click', () => document.getElementById('obsModal').classList.add('hidden'));
-    document.getElementById('saveObsBtn').addEventListener('click', saveObservation);
+    const cancelObsBtn = document.getElementById('cancelObsBtn');
+    if (cancelObsBtn) cancelObsBtn.addEventListener('click', () => document.getElementById('obsModal').classList.add('hidden'));
 
-    document.getElementById('cancelChargeBtn').addEventListener('click', () => document.getElementById('chargeModal').classList.add('hidden'));
-    document.getElementById('finalizeOrderBtn').addEventListener('click', finalizeOrder);
-    document.getElementById('toggleServiceTaxBtn').addEventListener('click', toggleServiceTax);
-    document.getElementById('addPaymentBtn').addEventListener('click', addPayment);
+    const saveObsBtn = document.getElementById('saveObsBtn');
+    if (saveObsBtn) saveObsBtn.addEventListener('click', saveObservation);
+
+    const cancelChargeBtn = document.getElementById('cancelChargeBtn');
+    if (cancelChargeBtn) cancelChargeBtn.addEventListener('click', () => document.getElementById('chargeModal').classList.add('hidden'));
     
-    document.getElementById('paymentMethodButtons').addEventListener('click', (e) => {
+    const finalizeOrderBtn = document.getElementById('finalizeOrderBtn');
+    if (finalizeOrderBtn) finalizeOrderBtn.addEventListener('click', finalizeOrder);
+    
+    const toggleServiceTaxBtn = document.getElementById('toggleServiceTaxBtn');
+    if (toggleServiceTaxBtn) toggleServiceTaxBtn.addEventListener('click', toggleServiceTax);
+    
+    const addPaymentBtn = document.getElementById('addPaymentBtn');
+    if (addPaymentBtn) addPaymentBtn.addEventListener('click', addPayment);
+    
+    const paymentMethodButtons = document.getElementById('paymentMethodButtons');
+    if (paymentMethodButtons) paymentMethodButtons.addEventListener('click', (e) => {
         const btn = e.target.closest('.payment-method-btn');
         if (btn) {
             const method = btn.getAttribute('data-method');
