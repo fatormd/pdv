@@ -10,7 +10,7 @@ import {
 
 // --- Configuração e Variáveis Globais (ATENÇÃO: SUBSTITUA AQUI) ---
 // Estes valores são PLACECES HOLDERS. Você DEVE substitui-los.
-const appId = 'COMANDAS_SMART_APP'; 
+const appId = '1:1097659747429:web:8ec0a7c3978c311dbe0a8c'; 
 const firebaseConfig = {
   apiKey: "AIzaSyCiquxozxlU2dmlNCCwUG1sjpZVzOuZd0M",
   authDomain: "fator-pdv.firebaseapp.com",
@@ -754,4 +754,5 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeListeners();
 
 });
+
 
