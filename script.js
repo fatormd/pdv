@@ -188,23 +188,18 @@ function renderOpenTables() {
         openTablesList.innerHTML = `<div class="col-span-2 text-sm text-gray-500 italic p-4 content-card bg-white">Nenhuma mesa aberta.</div>`;
         return;
     }
-    openTablesList.innerHTML = tablesData.map(table => {
-        const totalText = (table.total || 0).toFixed(2).replace('.', ',');
-        const bgColor = 'bg-red-500 text-white';
-
-        return `
-            <button class="table-card table-card-panel ${table.total > 0 ? 'bg-red-500 text-white' : 'bg-green-500 text-white'} p-3 content-card shadow-lg hover:opacity-90 transition duration-150" data-table-id="${table.id}">
-                <div class="flex flex-col items-center">
-                    <p class="text-4xl font-extrabold mb-1">${table.tableNumber.replace('Mesa ', '')}</p>
-                    <p class="text-sm">${table.diners} Pessoas</p>
-                </div>
-                <div class="mt-2">
-                    <p class="text-base font-bold">R$ ${totalText}</p>
-                    <p class="text-xs opacity-80">${(table.itemsSent || []).length} Itens Enviados</p>
-                </div>
-            </button>
-        `;
-    }).join('');
+    openTablesList.innerHTML = tablesData.map(table => `
+        <button class="table-card table-card-panel ${table.total > 0 ? 'bg-red-500 text-white' : 'bg-green-500 text-white'} p-3 content-card shadow-lg hover:opacity-90 transition duration-150" data-table-id="${table.id}">
+            <div class="flex flex-col items-center">
+                <p class="text-4xl font-extrabold mb-1">${table.tableNumber.replace('Mesa ', '')}</p>
+                <p class="text-sm">${table.diners} Pessoas</p>
+            </div>
+            <div class="mt-2">
+                <p class="text-base font-bold">R$ ${table.total.toFixed(2).replace('.', ',')}</p>
+                <p class="text-xs opacity-80">${(table.itemsSent || []).length} Itens Enviados</p>
+            </div>
+        </button>
+    `).join('');
 
     document.querySelectorAll('.table-card').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -307,23 +302,25 @@ function renderOrderScreen() {
     renderMenu(document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'main');
 }
 
+// CORRIGIDO: Agora o evento é delegado para o container principal.
 function renderMenu(category) {
     const menuItemsGrid = document.getElementById('menuItemsGrid');
     menuItemsGrid.innerHTML = MENU_ITEMS.filter(item => item.category === category).map(item => `
-        <div class="menu-item content-card bg-white p-3 flex flex-col justify-between items-start text-left hover:shadow-lg transition duration-200"
-                data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
+        <div class="menu-item content-card bg-white p-3 flex flex-col justify-between items-start text-left hover:shadow-lg transition duration-200">
             <p class="font-semibold text-gray-800 text-base">${item.name}</p>
             <p class="text-xl font-bold text-indigo-700 mt-1">R$ ${item.price.toFixed(2).replace('.', ',')}</p>
-            <button class="add-to-order-btn bg-green-500 text-white font-bold w-full mt-2 rounded-md hover:bg-green-600 transition">
+            <button class="add-to-order-btn bg-green-500 text-white font-bold w-full mt-2 rounded-md hover:bg-green-600 transition"
+                    data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
                 <i class="fas fa-plus text-sm mr-1"></i> Add
             </button>
         </div>
     `).join('');
     
+    // ANEXANDO O EVENT LISTENER CORRIGIDO PARA OS BOTÕES DE ADD
     document.querySelectorAll('.add-to-order-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const card = e.currentTarget.closest('.menu-item');
+            const card = e.currentTarget;
             addItemToOrder(
                 card.getAttribute('data-item-id'),
                 card.getAttribute('data-item-name'),
@@ -434,7 +431,8 @@ function addItemToOrder(itemId, itemName, price) {
             observation: ''
         });
     }
-    renderOrderScreen(); 
+    // AQUI ESTÁ A CHAMA QUE FALTAVA
+    updateComandaInFirestore();
 }
 function updateItemQuantity(itemId, action) {
     if (!currentOrder) return;
@@ -448,7 +446,8 @@ function updateItemQuantity(itemId, action) {
             currentOrder.itemsOpen.splice(itemIndex, 1);
         }
     }
-    renderOrderScreen();
+    // E AQUI TAMBÉM
+    updateComandaInFirestore();
 }
 async function sendOrderToProduction() {
     if (!currentOrder || currentOrder.itemsOpen.length === 0) return;
@@ -470,6 +469,19 @@ async function sendOrderToProduction() {
         console.error("Erro ao enviar pedido: ", e);
     }
 }
+
+// --- NOVAS FUNÇÕES DE PERSISTÊNCIA NO FIRESTORE ---
+async function updateComandaInFirestore() {
+    if (!currentOrder || !currentOrder.id) return;
+    try {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
+        await updateDoc(docRef, { itemsOpen: currentOrder.itemsOpen });
+    } catch (e) {
+        console.error("Erro ao atualizar a comanda no Firestore:", e);
+        alert(`Erro ao salvar item: ${e.message}`);
+    }
+}
+
 
 // --- Funções da Modal de Observação ---
 function openObservationModal(itemId, itemName, existingObs) {
@@ -640,7 +652,7 @@ async function finalizeOrder() {
 
 // --- Funções de Inicialização e Listeners de UI ---
 function initializeListeners() {
-    // CORREÇÃO AQUI: ANEXA LISTENER AO CONTAINER GERAL DO MENU
+    // CORREÇÃO AQUI: Agora o evento é delegado para o container principal.
     document.getElementById('menuItemsGrid').addEventListener('click', (e) => {
         const itemBtn = e.target.closest('.add-to-order-btn');
         if (itemBtn) {
@@ -716,6 +728,7 @@ function initializeListeners() {
         }
     });
 
+    // CORRIGIDO: Apenas renderizamos o menu inicial, o listener já foi anexado
     renderMenu('main');
 }
 
