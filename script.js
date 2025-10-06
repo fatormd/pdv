@@ -44,7 +44,7 @@ const MENU_ITEMS = [
     { id: 'petit', name: 'Petit Gateau', price: 22.00, category: 'desserts' }
 ];
 
-const GERENTE_SENHA = 'gerente2025'; // 9. MUDANÇA: Senha de gerente para exclusão
+const GERENTE_SENHA = 'gerente2025';
 
 // --- Funções Auxiliares de Cálculo ---
 function calculateSubtotal(order) {
