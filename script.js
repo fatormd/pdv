@@ -332,7 +332,10 @@ function renderOrderScreen() {
         if(reviewDetailsContainer) reviewDetailsContainer.classList.remove('hidden-state');
     }
 
-    renderMenu(document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'main');
+    const menuItemsGrid = document.getElementById('menuItemsGrid');
+    if (menuItemsGrid) {
+        renderMenu(document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'main');
+    }
 }
 
 function renderMenu(category) {
