@@ -406,41 +406,16 @@ function openCalculator() {
     }
 }
 
-function renderAppStatus() {
-    const mainContent = document.getElementById('mainContent');
-    const statusScreen = document.getElementById('statusScreen');
-    const statusContent = document.getElementById('statusContent');
-    const userIdDisplay = document.getElementById('user-id-display');
-
-    if (isAppLoading) {
-        mainContent.classList.add('hidden');
-        statusScreen.classList.remove('hidden');
-        statusContent.innerHTML = `<div class="loading-spinner mb-4"></div><p class="text-lg font-medium text-gray-700">Iniciando sistema...</p><p class="text-sm text-gray-500 mt-1">Conectando ao Firebase e autenticando.</p>`;
-    } else if (appErrorMessage || !isAuthReady) {
-        mainContent.classList.add('hidden');
-        statusScreen.classList.remove('hidden');
-        statusContent.innerHTML = `<i class="fas fa-exclamation-triangle text-red-600 text-3xl mb-4"></i><h1 class="text-xl font-bold text-red-700">ERRO CRÍTICO</h1><p class="mt-2 text-center text-sm text-gray-600 max-w-sm">${appErrorMessage || 'Autenticação falhou ou as regras de segurança estão impedindo o acesso.'}</p><p class="mt-4 text-xs font-semibold text-red-500">Configuração: <span class="font-mono">${firebaseConfig && firebaseConfig.apiKey !== "SUA_CHAVE_API_FIREBASE" ? 'ENCONTRADA' : 'AUSENTE'}</span>.</p>`;
-        userIdDisplay.textContent = `Usuário ID: FALHA`;
-    } else {
-        statusScreen.classList.add('hidden');
-        mainContent.classList.remove('hidden');
-        userIdDisplay.classList.remove('hidden');
-    }
-}
-
-function renderMenu(category) {
-    const menuItemsGrid = document.getElementById('menuItemsGrid');
-    if (!menuItemsGrid) return;
-    
+function searchProducts() {
     const searchInputEl = document.getElementById('searchProductInput');
     const searchValue = (searchInputEl ? searchInputEl.value : "").toLowerCase();
-
-    const itemsToRender = category === 'all' ? MENU_ITEMS : MENU_ITEMS.filter(item => item.category === category);
-    
-    const filteredItems = itemsToRender.filter(item => 
+    const currentCategory = document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'all';
+    const menuItemsGrid = document.getElementById('menuItemsGrid');
+    if (!menuItemsGrid) return;
+    const itemsToFilter = currentCategory === 'all' ? MENU_ITEMS : MENU_ITEMS.filter(item => item.category === currentCategory);
+    const filteredItems = itemsToFilter.filter(item =>
         item.name.toLowerCase().includes(searchValue)
     );
-
     menuItemsGrid.innerHTML = filteredItems.map(item => `
         <div class="menu-item content-card bg-white p-3 flex flex-col justify-between items-start text-left hover:shadow-lg transition duration-200"
                  data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
@@ -455,20 +430,7 @@ function renderMenu(category) {
         </div>
     `).join('');
 }
-
-function searchTable() {
-    const searchInput = document.getElementById('searchTableInput');
-    const mesaNumber = searchInput.value.trim();
-    if (mesaNumber) {
-        const tableId = `MESA_${mesaNumber}`;
-        const existingTable = tablesData.find(table => table.id === tableId);
-        if (existingTable) {
-            showOrderScreen(tableId);
-        } else {
-            alert(`A Mesa ${mesaNumber} não está aberta.`);
-        }
-    }
-}
+// --- Funções de Inicialização e Listeners de UI ---
 function initializeListeners() {
     document.body.addEventListener('click', (e) => {
         const addButton = e.target.closest('.add-to-order-btn');
