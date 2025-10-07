@@ -417,7 +417,6 @@ function searchProducts() {
     `).join('');
 }
 
-
 // --- Funções de Manipulação de Dados (Criação/Atualização) ---
 async function openTable() {
     const mesaInput = document.getElementById('mesaInput');
@@ -843,6 +842,7 @@ function openCalculator() {
         paymentValueInput.value = total.toFixed(2);
     }
 }
+
 
 function initializeListeners() {
     document.body.addEventListener('click', (e) => {
