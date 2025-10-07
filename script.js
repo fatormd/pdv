@@ -20,7 +20,7 @@ let userId = null;
 let tablesData = [];
 let currentOrder = null;
 let itemToObserve = null;
-let currentMode = 0;
+let currentMode = 0; // 0 = Painel de Mesas, 1 = Pedido, 2 = Pagamento
 let unsubscribeOrder = null;
 
 let finalCharge = {
@@ -194,20 +194,24 @@ function setupOrderListener(tableId) {
 function showPanelScreen() {
     const appContainer = document.getElementById('appContainer');
     if (appContainer) appContainer.style.transform = 'translateX(0)';
-
-    const currentTableNumber = document.getElementById('current-table-number');
-    if (currentTableNumber) currentTableNumber.textContent = '';
-
+    currentMode = 0;
     if (unsubscribeOrder) unsubscribeOrder();
     currentOrder = null;
-    currentMode = 0;
     renderOrderScreen();
 }
 
 function showOrderScreen(tableId) {
     const appContainer = document.getElementById('appContainer');
     if (appContainer) appContainer.style.transform = 'translateX(-100vw)';
+    currentMode = 1;
     setupOrderListener(tableId);
+}
+
+function showPaymentScreen() {
+    const appContainer = document.getElementById('appContainer');
+    if (appContainer) appContainer.style.transform = 'translateX(-200vw)';
+    currentMode = 2;
+    renderOrderScreen();
 }
 
 function renderOpenTables() {
@@ -218,7 +222,7 @@ function renderOpenTables() {
     if (!openTablesList) return;
     
     if (tablesData.length === 0) {
-        openTablesList.innerHTML = `<div class="col-span-2 text-sm text-gray-500 italic p-4 content-card bg-white">Nenhuma mesa aberta.</div>`;
+        openTablesList.innerHTML = `<div class="col-span-full text-sm text-gray-500 italic p-4 content-card bg-white">Nenhuma mesa aberta.</div>`;
         return;
     }
     openTablesList.innerHTML = tablesData.map(table => `
@@ -250,8 +254,6 @@ function renderOrderScreen() {
     const orderSubtotalDisplay = document.getElementById('orderSubtotalDisplay');
     const orderServiceTaxDisplay = document.getElementById('orderServiceTaxDisplay');
     const orderTotalDisplay = document.getElementById('orderTotalDisplay');
-    const openChargeModalButton = document.getElementById('openChargeModalButton');
-    const sendOrderButton = document.getElementById('sendOrderButton');
     const openItemsCount = document.getElementById('openItemsCount');
 
     if (currentTableNumber) currentTableNumber.textContent = currentOrder.tableNumber || `Mesa ${currentOrder.id.replace('MESA_', '')}`;
@@ -269,11 +271,8 @@ function renderOrderScreen() {
     if(orderServiceTaxDisplay) orderServiceTaxDisplay.textContent = `R$ ${taxValue.toFixed(2).replace('.', ',')}`;
     if(orderTotalDisplay) orderTotalDisplay.textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
     
-    // 4. MUDANÇA: Calcula e exibe o valor restante
-    const remainingBalanceDisplay = document.getElementById('remainingBalanceDisplay');
-    const paidTotal = finalCharge.payments.reduce((sum, p) => p.value, 0);
+    const paidTotal = calculatePaidTotal();
     let remaining = total - paidTotal;
-    if(remainingBalanceDisplay) remainingBalanceDisplay.textContent = `R$ ${Math.max(0, remaining).toFixed(2).replace('.', ',')}`;
     
     if (currentOrder.total !== total) {
         const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
@@ -281,8 +280,8 @@ function renderOrderScreen() {
     }
     
     if(openItemsCount) openItemsCount.textContent = openItems.length;
+    const sendOrderButton = document.getElementById('sendOrderButton');
     if(sendOrderButton) sendOrderButton.disabled = openItems.length === 0;
-    if(openChargeModalButton) openChargeModalButton.disabled = openItems.length > 0;
     
     if (openItems.length > 0) {
         openOrderList.innerHTML = openItems.map(item => `
@@ -332,14 +331,26 @@ function renderOrderScreen() {
     const orderingInputs = document.getElementById('orderingInputs');
     const reviewDetailsContainer = document.getElementById('reviewDetailsContainer');
     
-    if (currentMode === 0) {
-        if(orderingInputs) orderingInputs.classList.remove('hidden-state');
-        if(reviewDetailsContainer) reviewDetailsContainer.classList.add('hidden-state');
+    if (currentMode === 1) {
+        if(orderingInputs) orderingInputs.classList.remove('hidden');
+        if(reviewDetailsContainer) reviewDetailsContainer.classList.add('hidden');
     } else if (currentMode === 2) {
-        if(orderingInputs) orderingInputs.classList.add('hidden-state');
-        if(reviewDetailsContainer) reviewDetailsContainer.classList.remove('hidden-state');
+        if(orderingInputs) orderingInputs.classList.add('hidden');
+        if(reviewDetailsContainer) reviewDetailsContainer.classList.remove('hidden');
     }
+    
+    // Atualiza o display da tela de pagamento
+    const orderSubtotalDisplayPayment = document.getElementById('orderSubtotalDisplayPayment');
+    const orderServiceTaxDisplayPayment = document.getElementById('orderServiceTaxDisplayPayment');
+    const orderTotalDisplayPayment = document.getElementById('orderTotalDisplayPayment');
+    const paymentTableNumber = document.getElementById('payment-table-number');
 
+    if (orderSubtotalDisplayPayment) orderSubtotalDisplayPayment.textContent = `R$ ${subtotal.toFixed(2).replace('.', ',')}`;
+    if (orderServiceTaxDisplayPayment) orderServiceTaxDisplayPayment.textContent = `R$ ${taxValue.toFixed(2).replace('.', ',')}`;
+    if (orderTotalDisplayPayment) orderTotalDisplayPayment.textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
+    if (paymentTableNumber) paymentTableNumber.textContent = currentOrder.tableNumber || `Mesa ${currentOrder.id.replace('MESA_', '')}`;
+    
+    // Efetua a renderização dos itens do menu
     const menuItemsGrid = document.getElementById('menuItemsGrid');
     if (menuItemsGrid) {
         renderMenu(document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'main');
@@ -377,12 +388,6 @@ function searchTable() {
         }
     }
 }
-
-// 5. MUDANÇA: O botão de envio de pedido que estava abaixo foi removido do HTML.
-// A única chamada agora está no cabeçalho do pedido.
-//
-// 11. MUDANÇA: O botão "Fechar Conta" na verdade chama a função de "Finalizar Pedido".
-// A lógica já está correta, a única mudança foi no texto do HTML.
 
 // --- Funções de Manipulação de Dados (Criação/Atualização) ---
 async function openTable() {
@@ -586,42 +591,56 @@ function openChargeModal() {
 }
 
 function updateChargeModalUI() {
-    const remainingBalanceDisplay = document.getElementById('remainingBalanceDisplay');
-    const serviceTaxValue = document.getElementById('orderServiceTaxDisplay');
-    const toggleServiceTaxBtn = document.getElementById('toggleServiceTaxBtn');
-    const paymentSummaryList = document.getElementById('paymentSummaryList');
-    const finalizeOrderBtn = document.getElementById('finalizeOrderBtn');
-    
+    // --- Lógica de cálculo dos valores ---
+    finalCharge.subtotal = calculateSubtotal(currentOrder);
+    finalCharge.serviceTaxApplied = currentOrder.serviceTaxApplied !== false;
     finalCharge.total = calculateTotal(finalCharge.subtotal, finalCharge.serviceTaxApplied, finalCharge.taxRate);
     const paidTotal = calculatePaidTotal();
-    let remainingBalance = parseFloat((finalCharge.total - paidTotal).toFixed(2));
+    const remainingBalance = parseFloat((finalCharge.total - paidTotal).toFixed(2));
     
-    if(remainingBalanceDisplay) remainingBalanceDisplay.textContent = `R$ ${Math.max(0, remainingBalance).toFixed(2).replace('.', ',')}`;
-    
-    const taxValue = finalCharge.serviceTaxApplied ? finalCharge.subtotal * finalCharge.taxRate : 0;
-    if(serviceTaxValue) serviceTaxValue.textContent = `R$ ${taxValue.toFixed(2).replace('.', ',')}`;
-    if(toggleServiceTaxBtn) {
-        toggleServiceTaxBtn.textContent = finalCharge.serviceTaxApplied ? 'Aplicado' : 'Removido';
-        toggleServiceTaxBtn.classList.toggle('bg-green-500', finalCharge.serviceTaxApplied);
-        toggleServiceTaxBtn.classList.toggle('bg-red-500', !finalCharge.serviceTaxApplied);
-        toggleServiceTaxBtn.classList.toggle('hover:bg-green-600', finalCharge.serviceTaxApplied);
-        toggleServiceTaxBtn.classList.toggle('hover:bg-red-600', !finalCharge.serviceTaxApplied);
-    }
+    // --- Atualização da UI ---
+    const orderSubtotalDisplayPayment = document.getElementById('orderSubtotalDisplayPayment');
+    const orderServiceTaxDisplayPayment = document.getElementById('orderServiceTaxDisplayPayment');
+    const orderTotalDisplayPayment = document.getElementById('orderTotalDisplayPayment');
+    const remainingBalanceDisplay = document.getElementById('remainingBalanceDisplay');
+    const serviceTaxBtn = document.getElementById('toggleServiceTaxBtn');
+    const finalizeOrderBtn = document.getElementById('finalizeOrderBtn');
+    const paymentSummaryList = document.getElementById('paymentSummaryList');
 
+    if (orderSubtotalDisplayPayment) orderSubtotalDisplayPayment.textContent = `R$ ${finalCharge.subtotal.toFixed(2).replace('.', ',')}`;
+    if (orderServiceTaxDisplayPayment) orderServiceTaxDisplayPayment.textContent = `R$ ${(finalCharge.total - finalCharge.subtotal).toFixed(2).replace('.', ',')}`;
+    if (orderTotalDisplayPayment) orderTotalDisplayPayment.textContent = `R$ ${finalCharge.total.toFixed(2).replace('.', ',')}`;
+    
+    // Atualiza o botão de serviço
+    if (serviceTaxBtn) {
+        serviceTaxBtn.textContent = finalCharge.serviceTaxApplied ? 'Aplicado' : 'Removido';
+        serviceTaxBtn.classList.toggle('bg-green-500', finalCharge.serviceTaxApplied);
+        serviceTaxBtn.classList.toggle('bg-red-500', !finalCharge.serviceTaxApplied);
+        serviceTaxBtn.classList.toggle('hover:bg-green-600', finalCharge.serviceTaxApplied);
+        serviceTaxBtn.classList.toggle('hover:bg-red-600', !finalCharge.serviceTaxApplied);
+    }
+    
+    // Renderiza a lista de pagamentos e o valor restante no final
     if (paymentSummaryList) {
-        let paymentsHtml = finalCharge.payments.map((p, index) => `
-            <div class="flex justify-between items-center py-1">
-                <span class="font-medium">${p.method}</span>
-                <span class="font-bold text-gray-800">R$ ${p.value.toFixed(2).replace('.', ',')}</span>
-                <button data-payment-index="${index}" class="remove-payment-btn text-red-500 hover:text-red-700 text-sm" title="Remover Pagamento">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-        `).join('');
-        
-        if (finalCharge.payments.length === 0) {
-            paymentsHtml = `<p class="text-xs text-gray-500 italic p-2">Nenhum pagamento registrado.</p>`;
+        let paymentsHtml = '';
+        if (finalCharge.payments.length > 0) {
+            paymentsHtml = finalCharge.payments.map((p, index) => `
+                <div class="flex justify-between items-center py-1">
+                    <span class="font-medium">${p.method}</span>
+                    <span class="font-bold text-gray-800">R$ ${p.value.toFixed(2).replace('.', ',')}</span>
+                    <button data-payment-index="${index}" class="remove-payment-btn text-red-500 hover:text-red-700 text-sm" title="Remover Pagamento">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `).join('');
         }
+        
+        paymentsHtml += `
+            <div class="flex justify-between items-center py-1 font-bold border-t border-gray-200 mt-2 pt-2">
+                <span>VALOR RESTANTE:</span>
+                <span class="text-red-600">${remainingBalance > 0 ? `R$ ${remainingBalance.toFixed(2).replace('.', ',')}` : 'R$ 0,00'}</span>
+            </div>
+        `;
         
         paymentSummaryList.innerHTML = paymentsHtml;
         
@@ -629,7 +648,8 @@ function updateChargeModalUI() {
             btn.addEventListener('click', (e) => removePayment(parseInt(e.currentTarget.getAttribute('data-payment-index'))));
         });
     }
-    
+
+    // Lógica para habilitar/desabilitar o botão de fechar conta
     if(finalizeOrderBtn) {
         finalizeOrderBtn.disabled = remainingBalance > 0.01;
         if (!finalizeOrderBtn.disabled) {
@@ -641,6 +661,7 @@ function updateChargeModalUI() {
         }
     }
     
+    // Pré-preenche o valor do input de pagamento
     const paymentValueInput = document.getElementById('paymentValueInput');
     if (paymentValueInput) paymentValueInput.value = Math.max(0, remainingBalance).toFixed(2);
 }
@@ -654,10 +675,10 @@ function selectPaymentMethod(method) {
     selectedPaymentMethod = method;
     document.querySelectorAll('.payment-method-btn').forEach(btn => {
         if (btn.getAttribute('data-method') === method) {
-            btn.classList.add('active');
+            btn.classList.add('active', 'bg-indigo-600', 'text-white');
             btn.classList.remove('bg-gray-200', 'text-gray-700');
         } else {
-            btn.classList.remove('active');
+            btn.classList.remove('active', 'bg-indigo-600', 'text-white');
             btn.classList.add('bg-gray-200', 'text-gray-700');
         }
     });
@@ -789,24 +810,26 @@ function initializeListeners() {
             showPanelScreen();
             return;
         }
-        const toggleReviewBtn = document.getElementById('toggleReviewBtn');
-        if (toggleReviewBtn && e.target.closest('#toggleReviewBtn')) {
-            currentMode = (currentMode === 0) ? 2 : 0;
-            renderOrderScreen();
-            const icon = document.querySelector('#toggleReviewBtn i');
-            if (icon) {
-                if (currentMode === 2) {
-                    icon.classList.remove('fa-tag');
-                    icon.classList.add('fa-shopping-cart');
-                    document.getElementById('toggleReviewBtn').classList.replace('bg-gray-500', 'bg-green-600');
-                } else {
-                    icon.classList.remove('fa-shopping-cart');
-                    icon.classList.add('fa-tag');
-                    document.getElementById('toggleReviewBtn').classList.replace('bg-green-600', 'bg-gray-500');
-                }
-            }
+        
+        // Listener para ir para a tela de pagamento
+        const goToPaymentBtn = document.getElementById('goToPaymentBtn');
+        if (goToPaymentBtn && e.target.closest('#goToPaymentBtn')) {
+             // Atualiza o estado da cobrança antes de ir para a tela de pagamento
+            finalCharge.subtotal = calculateSubtotal(currentOrder);
+            finalCharge.serviceTaxApplied = currentOrder.serviceTaxApplied !== false;
+            finalCharge.payments = currentOrder.payments || [];
+            updateChargeModalUI();
+            showPaymentScreen();
             return;
         }
+        
+        // Listener para voltar da tela de pagamento para a de pedido
+        const backToOrderFromPaymentBtn = document.getElementById('backToOrderFromPaymentBtn');
+        if(backToOrderFromPaymentBtn && e.target.closest('#backToOrderFromPaymentBtn')) {
+            showOrderScreen(currentOrder.id);
+            return;
+        }
+
         const cancelObsBtn = document.getElementById('cancelObsBtn');
         if (cancelObsBtn && e.target.closest('#cancelObsBtn')) {
             document.getElementById('obsModal').classList.add('hidden');
@@ -878,7 +901,6 @@ function initializeListeners() {
             renderMenu(category);
         }
         
-        // NOVO CÓDIGO: Listener para o botão de enviar pedido
         const sendOrderButton = e.target.closest('#sendOrderButton');
         if (sendOrderButton) {
             sendOrderToProduction();
