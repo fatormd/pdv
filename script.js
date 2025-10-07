@@ -807,19 +807,24 @@ async function finalizeOrder() {
     }
 }
 
+function openCalculator() {
+    const paymentValueInput = document.getElementById('paymentValueInput');
+    if (paymentValueInput) {
+        const total = calculateTotal(finalCharge.subtotal, finalCharge.serviceTaxApplied, finalCharge.taxRate);
+        paymentValueInput.value = total.toFixed(2);
+    }
+}
+
 function searchProducts() {
-    const searchInput = document.getElementById('searchProductInput').value.toLowerCase();
+    const searchInputEl = document.getElementById('searchProductInput');
+    const searchValue = (searchInputEl ? searchInputEl.value : "").toLowerCase();
     const currentCategory = document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'all';
     const menuItemsGrid = document.getElementById('menuItemsGrid');
-
     if (!menuItemsGrid) return;
-
     const itemsToFilter = currentCategory === 'all' ? MENU_ITEMS : MENU_ITEMS.filter(item => item.category === currentCategory);
-    
-    const filteredItems = itemsToFilter.filter(item => 
-        item.name.toLowerCase().includes(searchInput)
+    const filteredItems = itemsToFilter.filter(item =>
+        item.name.toLowerCase().includes(searchValue)
     );
-
     menuItemsGrid.innerHTML = filteredItems.map(item => `
         <div class="menu-item content-card bg-white p-3 flex flex-col justify-between items-start text-left hover:shadow-lg transition duration-200"
                  data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
@@ -833,14 +838,6 @@ function searchProducts() {
             </div>
         </div>
     `).join('');
-}
-
-function openCalculator() {
-    const paymentValueInput = document.getElementById('paymentValueInput');
-    if (paymentValueInput) {
-        const total = calculateTotal(finalCharge.subtotal, finalCharge.serviceTaxApplied, finalCharge.taxRate);
-        paymentValueInput.value = total.toFixed(2);
-    }
 }
 
 function initializeListeners() {
