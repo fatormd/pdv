@@ -354,7 +354,7 @@ function renderMenu(category) {
                  data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
             <p class="font-semibold text-gray-800 text-base">${item.name}</p>
             <div class="flex items-center justify-between w-full mt-1">
-                <p class="text-lg font-bold text-indigo-700">${item.price.toFixed(2).replace('.', ',')}</p>
+                <p class="text-lg font-bold text-indigo-700">R$ ${item.price.toFixed(2).replace('.', ',')}</p>
                 <button class="add-to-order-btn bg-green-500 text-white font-bold p-2 rounded-md hover:bg-green-600 transition"
                          data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
                     <i class="fas fa-plus text-sm"></i>
