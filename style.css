@@ -7,15 +7,15 @@ html { font-family: 'Inter', sans-serif; scroll-behavior: smooth; }
     border-radius: 0.75rem;
 }
 
-/* Contêiner principal para transição de telas (Layout de duas colunas) */
+/* Contêiner principal para transição de telas (Layout de três colunas) */
 #appContainer {
     display: flex;
-    width: 200vw; /* Duas telas (Painel + Pedido) */
+    width: 300vw; /* Três telas (Painel + Pedido + Pagamento) */
     transition: transform 0.3s ease-out; /* Efeito de deslizamento */
 }
 
 /* Cada tela ocupa 100vw */
-.screen-panel, .screen-order {
+.screen-panel, .screen-order, #paymentScreen {
     width: 100vw;
     max-width: 100%;
     flex-shrink: 0;
