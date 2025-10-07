@@ -177,18 +177,18 @@ function setupOrderListener(tableId) {
      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', tableId);
      
      unsubscribeOrder = onSnapshot(docRef, (docSnap) => {
-         if (docSnap.exists()) {
-             currentOrder = { id: docSnap.id, ...docSnap.data() };
-             if (currentOrder.status !== 'Aberta') {
-                 showPanelScreen();
-                 return;
-             }
-             renderOrderScreen();
-         } else {
-             showPanelScreen();
-         }
+          if (docSnap.exists()) {
+              currentOrder = { id: docSnap.id, ...docSnap.data() };
+              if (currentOrder.status !== 'Aberta') {
+                  showPanelScreen();
+                  return;
+              }
+              renderOrderScreen();
+          } else {
+              showPanelScreen();
+          }
      }, (error) => {
-         console.error(`Erro no onSnapshot da comanda ${tableId}:`, error);
+          console.error(`Erro no onSnapshot da comanda ${tableId}:`, error);
      });
 }
 
@@ -278,8 +278,8 @@ function renderOrderScreen() {
     if(remainingBalanceDisplay) remainingBalanceDisplay.textContent = `R$ ${Math.max(0, remaining).toFixed(2).replace('.', ',')}`;
     
     if (currentOrder.total !== total) {
-         const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
-         updateDoc(docRef, { total: total, serviceTaxApplied: serviceTaxApplied }).catch(console.error);
+          const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
+          updateDoc(docRef, { total: total, serviceTaxApplied: serviceTaxApplied }).catch(console.error);
     }
     
     if(openItemsCount) openItemsCount.textContent = openItems.length;
@@ -356,7 +356,7 @@ function renderMenu(category) {
                 data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
             <p class="font-semibold text-gray-800 text-base">${item.name}</p>
             <div class="flex items-center justify-between w-full mt-1">
-                <p class="text-lg font-bold text-indigo-700">${item.price.toFixed(2).replace('.', ',')}</p>
+                <p class="text-lg font-bold text-indigo-700">R$ ${item.price.toFixed(2).replace('.', ',')}</p>
                 <button class="add-to-order-btn bg-green-500 text-white font-bold p-2 rounded-md hover:bg-green-600 transition"
                         data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
                     <i class="fas fa-plus text-sm"></i>
