@@ -358,20 +358,6 @@ function renderMenu(category) {
             </div>
         </div>
     `).join('');
-
-    document.querySelectorAll('.add-to-order-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const card = e.currentTarget.closest('.menu-item');
-            if (card) {
-                addItemToOrder(
-                    card.getAttribute('data-item-id'),
-                    card.getAttribute('data-item-name'),
-                    parseFloat(card.getAttribute('data-price'))
-                );
-            }
-        });
-    });
 }
 // 1. MUDANÇA: Função de busca por mesa
 function searchTable() {
@@ -680,7 +666,7 @@ function addPayment() {
     
     const totalDue = calculateTotal(finalCharge.subtotal, finalCharge.serviceTaxApplied, finalCharge.taxRate);
     const paidTotal = calculatePaidTotal();
-    const remainingBefore = parseFloat((totalDue - paidTotal).toFixed(2));
+    let remainingBefore = parseFloat((totalDue - paidTotal).toFixed(2));
     
     if (paymentValue > remainingBefore + 0.01 && remainingBefore > 0.01) {
         if (!confirm(`O valor de R$ ${paymentValue.toFixed(2).replace('.', ',')} é maior que o saldo de R$ ${remainingBefore.toFixed(2).replace('.', ',')}. Deseja registrar este valor e dar troco?`)) {
@@ -741,65 +727,41 @@ async function finalizeOrder() {
 
 // --- Funções de Inicialização e Listeners de UI ---
 function initializeListeners() {
-    // ⚠️ CRÍTICO: Delegação de eventos no BODY para elementos dinâmicos
-    document.body.addEventListener('click', (e) => {
-        // --- Lógica de Pedidos/Menu ---
-        const addButton = e.target.closest('.add-to-order-btn');
-        if (addButton) {
-            const card = addButton.closest('.menu-item');
-            if (card) {
-                addItemToOrder(
-                    card.getAttribute('data-item-id'),
-                    card.getAttribute('data-item-name'),
-                    parseFloat(card.getAttribute('data-price'))
-                );
-            }
-            return;
+    // CORRIGIDO: Listener para a caixa de itens do menu
+    document.getElementById('menuItemsGrid').addEventListener('click', (e) => {
+        const button = e.target.closest('.add-to-order-btn');
+        if (button) {
+            const card = button.closest('.menu-item');
+            addItemToOrder(
+                card.getAttribute('data-item-id'),
+                card.getAttribute('data-item-name'),
+                parseFloat(card.getAttribute('data-price'))
+            );
         }
+    });
 
-        // --- Lógica de Modais/Ações de Item Selecionado (+ / - / Obs) ---
-        const qtyButton = e.target.closest('.qty-btn');
-        if (qtyButton) {
-            const itemId = qtyButton.getAttribute('data-item-id');
-            const action = qtyButton.getAttribute('data-action');
-            if (action === 'increase' || action === 'decrease') {
-                updateItemQuantity(itemId, action);
-            }
-            return;
-        }
+    document.querySelectorAll('.category-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const category = e.currentTarget.getAttribute('data-category');
+            document.querySelectorAll('.category-btn').forEach(b => {
+                b.classList.remove('bg-indigo-600', 'text-white', 'border-0');
+                b.classList.add('bg-white', 'text-gray-700', 'border', 'border-gray-300');
+            });
+            e.currentTarget.classList.add('bg-indigo-600', 'text-white');
+            e.currentTarget.classList.remove('bg-white', 'text-gray-700');
+            renderMenu(category);
+        });
+    });
+    
+    const searchTableBtn = document.getElementById('searchTableBtn');
+    if (searchTableBtn) searchTableBtn.addEventListener('click', searchTable);
 
-        const obsButton = e.target.closest('.obs-btn');
-        if (obsButton) {
-            const card = obsButton.closest('div[data-item-id]');
-            const itemId = card.getAttribute('data-item-id');
-            const itemName = card.querySelector('span:first-child').textContent;
-            const currentObs = obsButton.getAttribute('data-obs');
-            openObservationModal(itemId, itemName, currentObs);
-            return;
-        }
+    document.getElementById('abrirMesaBtn').addEventListener('click', openTable);
+    document.getElementById('backToPanelFromOrderBtn').addEventListener('click', showPanelScreen);
 
-        // --- Lógica de Navegação e Painel ---
-        
-        const searchTableBtn = document.getElementById('searchTableBtn');
-        if (searchTableBtn && e.target.closest('#searchTableBtn')) {
-            searchTable();
-            return;
-        }
-
-        const abrirMesaBtn = document.getElementById('abrirMesaBtn');
-        if(abrirMesaBtn && e.target.closest('#abrirMesaBtn')) {
-            openTable();
-            return;
-        }
-
-        const backToPanelFromOrderBtn = document.getElementById('backToPanelFromOrderBtn');
-        if(backToPanelFromOrderBtn && e.target.closest('#backToPanelFromOrderBtn')) {
-            showPanelScreen();
-            return;
-        }
-
-        const toggleReviewBtn = document.getElementById('toggleReviewBtn');
-        if (toggleReviewBtn && e.target.closest('#toggleReviewBtn')) {
+    const toggleReviewBtn = document.getElementById('toggleReviewBtn');
+    if (toggleReviewBtn) {
+        toggleReviewBtn.addEventListener('click', () => {
             currentMode = (currentMode === 0) ? 2 : 0;
             renderOrderScreen();
             const icon = document.querySelector('#toggleReviewBtn i');
@@ -814,74 +776,60 @@ function initializeListeners() {
                     document.getElementById('toggleReviewBtn').classList.replace('bg-green-600', 'bg-gray-500');
                 }
             }
-            return;
-        }
-        
-        // --- Listeners de Modal ---
+        });
+    }
+    
+    const openOrderList = document.getElementById('openOrderList');
+    if (openOrderList) {
+        openOrderList.addEventListener('click', (e) => {
+            const target = e.target.closest('button');
+            if (!target) return;
+            const itemId = target.getAttribute('data-item-id');
+            const action = target.getAttribute('data-action');
+            if (action === 'increase' || action === 'decrease') {
+                updateItemQuantity(itemId, action);
+            } else if (target.classList.contains('obs-btn')) {
+                const itemName = target.getAttribute('data-item-name');
+                const currentObs = target.getAttribute('data-obs');
+                openObservationModal(itemId, itemName, currentObs);
+            }
+        });
+    }
+    
+    const sendOrderButton = document.getElementById('sendOrderButton');
+    if (sendOrderButton) sendOrderButton.addEventListener('click', () => sendOrderToProduction());
 
-        const cancelObsBtn = document.getElementById('cancelObsBtn');
-        if (cancelObsBtn && e.target.closest('#cancelObsBtn')) {
-            document.getElementById('obsModal').classList.add('hidden');
-            return;
-        }
-        
-        const saveObsBtn = document.getElementById('saveObsBtn');
-        if (saveObsBtn && e.target.closest('#saveObsBtn')) {
-            saveObservation();
-            return;
-        }
-        
-        const openChargeModalButton = document.getElementById('openChargeModalButton');
-        if (openChargeModalButton && e.target.closest('#openChargeModalButton')) {
-            openChargeModal();
-            return;
-        }
+    const openChargeModalButton = document.getElementById('openChargeModalButton');
+    if (openChargeModalButton) openChargeModalButton.addEventListener('click', openChargeModal); 
 
-        const cancelChargeBtn = document.getElementById('cancelChargeBtn');
-        if (cancelChargeBtn && e.target.closest('#cancelChargeBtn')) {
-            document.getElementById('chargeModal').classList.add('hidden');
-            return;
-        }
-        
-        const finalizeOrderBtn = document.getElementById('finalizeOrderBtn');
-        if (finalizeOrderBtn && e.target.closest('#finalizeOrderBtn')) {
-            finalizeOrder();
-            return;
-        }
-        
-        const toggleServiceTaxBtn = document.getElementById('toggleServiceTaxBtn');
-        if (toggleServiceTaxBtn && e.target.closest('#toggleServiceTaxBtn')) {
-            toggleServiceTax();
-            return;
-        }
+    const cancelObsBtn = document.getElementById('cancelObsBtn');
+    if (cancelObsBtn) cancelObsBtn.addEventListener('click', () => document.getElementById('obsModal').classList.add('hidden'));
 
-        const addPaymentBtn = document.getElementById('addPaymentBtn');
-        if (addPaymentBtn && e.target.closest('#addPaymentBtn')) {
-            addPayment();
-            return;
-        }
-        
-        const paymentMethodButtons = document.getElementById('paymentMethodButtons');
-        if (paymentMethodButtons && e.target.closest('.payment-method-btn')) {
-            const btn = e.target.closest('.payment-method-btn');
+    const saveObsBtn = document.getElementById('saveObsBtn');
+    if (saveObsBtn) saveObsBtn.addEventListener('click', saveObservation);
+
+    const cancelChargeBtn = document.getElementById('cancelChargeBtn');
+    if (cancelChargeBtn) cancelChargeBtn.addEventListener('click', () => document.getElementById('chargeModal').classList.add('hidden'));
+    
+    const finalizeOrderBtn = document.getElementById('finalizeOrderBtn');
+    if (finalizeOrderBtn) finalizeOrderBtn.addEventListener('click', finalizeOrder);
+    
+    const toggleServiceTaxBtn = document.getElementById('toggleServiceTaxBtn');
+    if (toggleServiceTaxBtn) toggleServiceTaxBtn.addEventListener('click', toggleServiceTax);
+    
+    const addPaymentBtn = document.getElementById('addPaymentBtn');
+    if (addPaymentBtn) addPaymentBtn.addEventListener('click', addPayment);
+    
+    const paymentMethodButtons = document.getElementById('paymentMethodButtons');
+    if (paymentMethodButtons) paymentMethodButtons.addEventListener('click', (e) => {
+        const btn = e.target.closest('.payment-method-btn');
+        if (btn) {
             const method = btn.getAttribute('data-method');
             selectPaymentMethod(method);
-            return;
-        }
-
-        // --- Listeners de Categoria ---
-        const categoryBtn = e.target.closest('.category-btn');
-        if (categoryBtn) {
-            const category = categoryBtn.getAttribute('data-category');
-            document.querySelectorAll('.category-btn').forEach(b => {
-                b.classList.remove('bg-indigo-600', 'text-white', 'border-0');
-                b.classList.add('bg-white', 'text-gray-700', 'border', 'border-gray-300');
-            });
-            categoryBtn.classList.add('bg-indigo-600', 'text-white');
-            categoryBtn.classList.remove('bg-white', 'text-gray-700');
-            renderMenu(category);
         }
     });
+
+    renderMenu('main');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
