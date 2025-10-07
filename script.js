@@ -351,14 +351,17 @@ function renderOrderScreen() {
     
     const menuItemsGrid = document.getElementById('menuItemsGrid');
     if (menuItemsGrid) {
-        renderMenu(document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'main');
+        renderMenu(document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'all');
     }
 }
 
 function renderMenu(category) {
     const menuItemsGrid = document.getElementById('menuItemsGrid');
     if (!menuItemsGrid) return;
-    menuItemsGrid.innerHTML = MENU_ITEMS.filter(item => item.category === category || category === 'all').map(item => `
+    
+    const itemsToRender = category === 'all' ? MENU_ITEMS : MENU_ITEMS.filter(item => item.category === category);
+
+    menuItemsGrid.innerHTML = itemsToRender.map(item => `
         <div class="menu-item content-card bg-white p-3 flex flex-col justify-between items-start text-left hover:shadow-lg transition duration-200"
                  data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
             <p class="font-semibold text-gray-800 text-base">${item.name}</p>
@@ -390,7 +393,7 @@ function searchTable() {
 // NOVO: Função para buscar produtos no cardápio
 function searchProducts() {
     const searchInput = document.getElementById('searchProductInput').value.toLowerCase();
-    const currentCategory = document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'main';
+    const currentCategory = document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'all';
     const menuItemsGrid = document.getElementById('menuItemsGrid');
 
     if (!menuItemsGrid) return;
@@ -947,17 +950,17 @@ function initializeListeners() {
             document.getElementById('confirmCloseModal').classList.add('hidden');
             return;
         }
-        const toggleServiceTaxBtn = document.getElementById('toggleServiceTaxBtn');
-        if (toggleServiceTaxBtn && e.target.closest('#toggleServiceTaxBtn')) {
+        const toggleServiceTaxBtn = e.target.closest('#toggleServiceTaxBtn');
+        if (toggleServiceTaxBtn) {
             toggleServiceTax();
             return;
         }
-        const addPaymentBtn = document.getElementById('addPaymentBtn');
-        if (addPaymentBtn && e.target.closest('#addPaymentBtn')) {
+        const addPaymentBtn = e.target.closest('#addPaymentBtn');
+        if (addPaymentBtn) {
             addPayment();
             return;
         }
-        const paymentMethodButtons = document.getElementById('paymentMethodButtons');
+        const paymentMethodButtons = e.target.closest('#paymentMethodButtons');
         if (paymentMethodButtons && e.target.closest('.payment-method-btn')) {
             const btn = e.target.closest('.payment-method-btn');
             const method = btn.getAttribute('data-method');
