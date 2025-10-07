@@ -702,14 +702,12 @@ function updateChargeModalUI() {
     if (paymentValueInput) paymentValueInput.value = Math.max(0, remainingBalance).toFixed(2);
 }
 
-// NOVO: Função para alternar a taxa de serviço e persistir a mudança
 async function toggleServiceTax() {
     if (!currentOrder) return;
     const newServiceTaxState = !currentOrder.serviceTaxApplied;
     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
     try {
         await updateDoc(docRef, { serviceTaxApplied: newServiceTaxState });
-        // O onSnapshot vai atualizar a UI, então não é necessário chamar updateChargeModalUI() aqui.
     } catch (e) {
         console.error("Erro ao alternar a taxa de serviço:", e);
         alert(`Erro ao alternar a taxa de serviço: ${e.message}`);
@@ -809,10 +807,9 @@ async function finalizeOrder() {
     }
 }
 
-// NOVO: Função para buscar produtos no cardápio
 function searchProducts() {
     const searchInput = document.getElementById('searchProductInput').value.toLowerCase();
-    const currentCategory = document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'main';
+    const currentCategory = document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'all';
     const menuItemsGrid = document.getElementById('menuItemsGrid');
 
     if (!menuItemsGrid) return;
@@ -838,7 +835,6 @@ function searchProducts() {
     `).join('');
 }
 
-// NOVO: Funcao para preencher o input de pagamento com o valor total
 function openCalculator() {
     const paymentValueInput = document.getElementById('paymentValueInput');
     if (paymentValueInput) {
@@ -848,7 +844,6 @@ function openCalculator() {
 }
 
 
-// --- Funções de Inicialização e Listeners de UI ---
 function initializeListeners() {
     document.body.addEventListener('click', (e) => {
         const addButton = e.target.closest('.add-to-order-btn');
@@ -925,7 +920,6 @@ function initializeListeners() {
             saveObservation();
             return;
         }
-
         const finalizeOrderBtn = document.getElementById('finalizeOrderBtn');
         if (finalizeOrderBtn && e.target.closest('#finalizeOrderBtn')) {
             const totalDue = calculateTotal(finalCharge.subtotal, finalCharge.serviceTaxApplied, finalCharge.taxRate);
@@ -980,7 +974,7 @@ function initializeListeners() {
             categoryBtn.classList.add('bg-indigo-600', 'text-white');
             categoryBtn.classList.remove('bg-white', 'text-gray-700');
             renderMenu(category);
-            searchProducts(); // Chama a busca para a nova categoria
+            searchProducts();
             return;
         }
         
