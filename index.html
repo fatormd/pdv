@@ -4,12 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestão de Comandas (PDV Touch) - Smart Card</title>
-    <!-- Carregamento do Tailwind CSS (CDN para simplicidade no GitHub Pages) -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Carregamento de Ícones Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     
-    <!-- CSS Personalizado para Layout (Local) -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="bg-gray-100 min-h-screen"> 
@@ -20,20 +17,15 @@
         </div>
     </div>
     
-    <!-- Tela de Status (Carregamento / Erro) -->
     <div id="statusScreen" class="absolute inset-0 bg-gray-100 z-50 flex items-center justify-center p-6 hidden">
         <div id="statusContent" class="flex flex-col items-center content-card bg-white p-8 max-w-sm w-full text-center">
-            <!-- Conteúdo de status injetado pelo JS -->
-        </div>
+            </div>
     </div>
 
     <main id="mainContent" class="relative overflow-hidden hidden">
         <div id="appContainer">
-            <!-- ========== TELA 1: PAINEL DE MESAS ========== -->
-            
             <div id="panelScreen" class="screen-panel max-w-md mx-auto">
                 
-                <!-- Caixa de Abertura de Mesa -->
                 <div class="content-card bg-white p-4 mb-6">
                     <h3 class="text-lg font-semibold text-indigo-700 mb-3">Abrir Nova Mesa</h3>
             
@@ -46,7 +38,6 @@
                     </div>
                 </div>
 
-                <!-- Exibição de Mesas Abertas -->
                 <div class="space-y-3">
                     <div class="flex justify-between items-center mb-3">
                         <h3 class="text-xl font-semibold text-gray-700">Mesas Abertas (<span id="openTablesCount">0</span>)</h3>
@@ -64,9 +55,7 @@
                 </div>
             </div>
 
-            <!-- ========== TELA 2: GESTÃO DE PEDIDO ========== -->
             <div id="orderScreen" class="screen-order max-w-md mx-auto">
-                <!-- Barra de Título do Pedido -->
                 <div class="flex items-center justify-between mb-4">
                 
                     <div class="flex items-center text-indigo-700">
@@ -81,15 +70,12 @@
                     </button>
                 </div>
 
-                <!-- 1. CAIXA DE REVISÃO (Etiqueta) - ÍTENS ENVIADOS E PAGAMENTO -->
                 <div id="reviewDetailsContainer" class="content-card bg-white transition-container hidden-state review-box">
                     <div class="p-4">
                         <h2 class="text-xl font-semibold text-green-700 mb-4">Itens Enviados</h2>
                         <div id="reviewItemsList" class="space-y-3 pt-2">
-                            <!-- Itens enviados serão renderizados aqui -->
-                        </div>
+                            </div>
                         
-                        <!-- Totais da Conta -->
                         <div class="flex justify-between items-center border-t border-gray-200 pt-4 mt-4">
                             <div>
                                 <span class="text-xl font-bold text-gray-800">SUBTOTAL:</span>
@@ -98,14 +84,13 @@
                             <span class="text-2xl font-bold text-indigo-700" id="orderSubtotalDisplay">R$ 0,00</span>
                         </div>
    
-                        <!-- Taxa de Serviço e Chave Opcional -->
                         <div class="flex justify-between items-center border-b border-gray-200 pb-2">
                             <div>
-                                <span class="text-xl font-bold text-green-700">SERVIÇO (10%):</span>
+                                <span class="text-lg font-bold text-green-700">SERVIÇO (10%):</span>
                                 <p class="text-xs text-gray-500">Taxa opcional de serviço.</p>
                             </div>
                             <div class="flex items-center space-x-2">
-                                <span class="text-xl font-bold text-green-700" id="orderServiceTaxDisplay">R$ 0,00</span>
+                                <span class="text-lg font-bold text-green-700" id="orderServiceTaxDisplay">R$ 0,00</span>
                                 <button id="toggleServiceTaxBtn" class="px-2 py-1 text-xs rounded-full transition duration-150 bg-green-500 text-white hover:bg-green-600">
                                     Aplicado
                                 </button>
@@ -117,14 +102,12 @@
                             <span class="text-3xl font-extrabold text-indigo-700" id="orderTotalDisplay">R$ 0,00</span>
                         </div>
                         
-                        <!-- VALOR RESTANTE -->
                         <div class="flex justify-between items-center pt-1 border-t border-dashed border-gray-300 mt-2">
                             <span class="text-lg font-semibold text-red-600">VALOR RESTANTE:</span>
                             <span class="text-xl font-extrabold text-red-600" id="remainingBalanceDisplay">R$ 0,00</span>
                         </div>
                     </div>
                     
-                    <!-- Sessão de Pagamentos no Painel de Resumo -->
                     <div id="chargeInputsAndSummary" class="p-4 pt-0">
                         <h4 class="text-lg font-semibold text-gray-700 mb-3">Registrar Pagamento</h4>
                         <div class="space-y-3">
@@ -149,38 +132,31 @@
                                 </button>
                             </div>
 
-                            <!-- Input de Valor -->
                             <div class="flex space-x-2">
                                 <input type="number" id="paymentValueInput" placeholder="Valor Pago" class="w-full p-3 input-pdv border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" min="0.01">
-                                <!-- Botão Calculadora (Opcional) -->
                                 <button class="bg-gray-200 text-gray-700 font-bold py-3 px-4 rounded-lg hover:bg-gray-300 transition text-base disabled:opacity-50" id="openCalculatorBtn" title="Abrir Calculadora">
                                     <i class="fas fa-calculator"></i>
                                 </button>
                             </div>
                             
-                            <!-- Botão Adicionar Pagamento -->
                             <button id="addPaymentBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition duration-150 text-base disabled:opacity-50">
                                 Adicionar Pagamento
                             </button>
                         </div>
                         
-                        <!-- Resumo dos Pagamentos Registrados -->
                         <h4 class="text-sm font-semibold text-gray-500 mt-4 mb-2">Pagamentos:</h4>
                         <div id="paymentSummaryList" class="max-h-24 overflow-y-auto space-y-1 p-2 bg-gray-50 rounded-lg border border-gray-200 text-sm">
-                            <!-- Pagamentos registrados aparecerão aqui -->
-                        </div>
+                            </div>
                     </div>
 
-                    <div class="flex justify-center space-x-3 p-4 pt-0">
-                        <!-- 6. MUDANÇA: Botão Fechar Conta -->
-                        <button id="finalizeOrderBtn" class="w-full px-4 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition text-base disabled:opacity-50" disabled>
+                    <div class="flex justify-end space-x-3 p-4 pt-0">
+                        <button id="finalizeOrderBtn" class="px-4 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition text-base disabled:opacity-50" disabled>
                             Fechar Conta
                         </button>
                     </div>
                 </div>
                 
  
-                <!-- 2. INPUTS DE PEDIDO ATIVO E BOTÃO ENVIAR - MODO PADRÃO -->
                 <div id="orderingInputs" class="transition-container space-y-4">
                     <div class="p-4">
                         <div id="newOrderContainer" class="content-card bg-white p-4">
@@ -191,7 +167,6 @@
                                 </button>
                             </div>
                             
-                            <!-- Lista de Itens Abertos -->
                             <div id="openOrderList" class="space-y-3 mb-4">
                                 <div class="text-base text-gray-500 italic p-2">Nenhum item selecionado.</div>
                             </div>
@@ -199,7 +174,6 @@
                     </div>
                 </div>
 
-                <!-- 3. MENU DO RESTAURANTE -->
                 <div id="menuContainer" class="mt-6 transition-container">
                     <div class="flex justify-between items-center mb-4 px-4">
                         <h2 class="text-xl font-bold text-gray-800">Cardápio</h2>
@@ -209,24 +183,20 @@
                         </div>
                     </div>
                     
-                    <!-- Filtros de Categoria (Título) -->
                     <div id="categoryFilters" class="flex space-x-2 overflow-x-auto pb-2 mb-4 px-4">
                         <button class="category-btn px-4 py-3 bg-indigo-600 text-white rounded-full text-base font-semibold whitespace-nowrap" data-category="main">Pratos Principais</button>
                         <button class="category-btn px-4 py-3 bg-white text-gray-700 rounded-full text-base font-semibold border border-gray-300 whitespace-nowrap" data-category="drinks">Bebidas</button>
                         <button class="category-btn px-4 py-3 bg-white text-gray-700 rounded-full text-base font-semibold border border-gray-300 whitespace-nowrap" data-category="desserts">Sobremesas</button>
                     </div>
                     
-                    <!-- Lista de Itens do Cardápio (Responsivo) -->
                     <div id="menuItemsGrid" class="px-4 grid grid-cols-2 md:grid-cols-3 gap-4">
-                        <!-- Itens renderizados via JS -->
-                    </div>
+                        </div>
                 </div>
             </div>
         </div>
     </main>
 
   
-    <!-- Modal de Observação -->
     <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 class="text-xl font-bold mb-4 text-indigo-700">Detalhes do Item</h3>
@@ -240,7 +210,6 @@
         </div>
     </div>
     
-    <!-- Modal de Confirmação de Fechamento de Conta (Com NF-e) -->
     <div id="confirmCloseModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md">
             <h3 class="text-2xl font-bold mb-4 text-indigo-700">Fechar Conta</h3>
@@ -269,7 +238,6 @@
     <div id="statusMessage" class="mt-4 text-center text-sm hidden"></div>
 
 
-    <!-- Script de Lógica da Aplicação (Local) -->
     <script type="module" src="script.js"></script>
 </body>
 </html>
