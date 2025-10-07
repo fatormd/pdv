@@ -358,7 +358,7 @@ function renderOrderScreen() {
 function renderMenu(category) {
     const menuItemsGrid = document.getElementById('menuItemsGrid');
     if (!menuItemsGrid) return;
-    menuItemsGrid.innerHTML = MENU_ITEMS.filter(item => item.category === category).map(item => `
+    menuItemsGrid.innerHTML = MENU_ITEMS.filter(item => item.category === category || category === 'all').map(item => `
         <div class="menu-item content-card bg-white p-3 flex flex-col justify-between items-start text-left hover:shadow-lg transition duration-200"
                  data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
             <p class="font-semibold text-gray-800 text-base">${item.name}</p>
@@ -395,8 +395,10 @@ function searchProducts() {
 
     if (!menuItemsGrid) return;
 
-    const filteredItems = MENU_ITEMS.filter(item => 
-        item.category === currentCategory && item.name.toLowerCase().includes(searchInput)
+    const itemsToFilter = currentCategory === 'all' ? MENU_ITEMS : MENU_ITEMS.filter(item => item.category === currentCategory);
+    
+    const filteredItems = itemsToFilter.filter(item => 
+        item.name.toLowerCase().includes(searchInput)
     );
 
     menuItemsGrid.innerHTML = filteredItems.map(item => `
@@ -604,8 +606,6 @@ async function saveObservation() {
         }
     }
 }
-
-// Esta é a função que estava faltando, agora está no lugar correto.
 async function handleCloseTable(taxId, paidTotal, totalDue, change) {
     if (!currentOrder) return;
     try {
@@ -702,9 +702,18 @@ function updateChargeModalUI() {
     if (paymentValueInput) paymentValueInput.value = Math.max(0, remainingBalance).toFixed(2);
 }
 
-function toggleServiceTax() {
-    finalCharge.serviceTaxApplied = !finalCharge.serviceTaxApplied;
-    updateChargeModalUI();
+// NOVO: Função para alternar a taxa de serviço e persistir a mudança
+async function toggleServiceTax() {
+    if (!currentOrder) return;
+    const newServiceTaxState = !currentOrder.serviceTaxApplied;
+    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
+    try {
+        await updateDoc(docRef, { serviceTaxApplied: newServiceTaxState });
+        // O onSnapshot vai atualizar a UI, então não é necessário chamar updateChargeModalUI() aqui.
+    } catch (e) {
+        console.error("Erro ao alternar a taxa de serviço:", e);
+        alert(`Erro ao alternar a taxa de serviço: ${e.message}`);
+    }
 }
 
 function selectPaymentMethod(method) {
@@ -792,13 +801,52 @@ async function finalizeOrder() {
             serviceTaxApplied: finalCharge.serviceTaxApplied,
             closedAt: new Date().toISOString()
         });
-        document.getElementById('chargeModal').classList.add('hidden');
+        document.getElementById('confirmCloseModal').classList.add('hidden');
         showPanelScreen();
     } catch (e) {
         alert(`Erro ao finalizar pedido: ${e.message}`);
         console.error("Erro ao finalizar pedido: ", e);
     }
 }
+
+// NOVO: Função para buscar produtos no cardápio
+function searchProducts() {
+    const searchInput = document.getElementById('searchProductInput').value.toLowerCase();
+    const currentCategory = document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'main';
+    const menuItemsGrid = document.getElementById('menuItemsGrid');
+
+    if (!menuItemsGrid) return;
+
+    const itemsToFilter = currentCategory === 'all' ? MENU_ITEMS : MENU_ITEMS.filter(item => item.category === currentCategory);
+    
+    const filteredItems = itemsToFilter.filter(item => 
+        item.name.toLowerCase().includes(searchInput)
+    );
+
+    menuItemsGrid.innerHTML = filteredItems.map(item => `
+        <div class="menu-item content-card bg-white p-3 flex flex-col justify-between items-start text-left hover:shadow-lg transition duration-200"
+                 data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
+            <p class="font-semibold text-gray-800 text-base">${item.name}</p>
+            <div class="flex items-center justify-between w-full mt-1">
+                <p class="text-lg font-bold text-indigo-700">R$ ${item.price.toFixed(2).replace('.', ',')}</p>
+                <button class="add-to-order-btn bg-green-500 text-white font-bold p-2 rounded-md hover:bg-green-600 transition"
+                         data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
+                    <i class="fas fa-plus text-sm"></i>
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// NOVO: Funcao para preencher o input de pagamento com o valor total
+function openCalculator() {
+    const paymentValueInput = document.getElementById('paymentValueInput');
+    if (paymentValueInput) {
+        const total = calculateTotal(finalCharge.subtotal, finalCharge.serviceTaxApplied, finalCharge.taxRate);
+        paymentValueInput.value = total.toFixed(2);
+    }
+}
+
 
 // --- Funções de Inicialização e Listeners de UI ---
 function initializeListeners() {
@@ -849,11 +897,15 @@ function initializeListeners() {
         
         const goToPaymentBtn = document.getElementById('goToPaymentBtn');
         if (goToPaymentBtn && e.target.closest('#goToPaymentBtn')) {
-             finalCharge.subtotal = calculateSubtotal(currentOrder);
-            finalCharge.serviceTaxApplied = currentOrder.serviceTaxApplied !== false;
-            finalCharge.payments = currentOrder.payments || [];
-            updateChargeModalUI();
-            showPaymentScreen();
+            if (currentOrder && currentOrder.itemsSent.length > 0) {
+                 finalCharge.subtotal = calculateSubtotal(currentOrder);
+                finalCharge.serviceTaxApplied = currentOrder.serviceTaxApplied !== false;
+                finalCharge.payments = currentOrder.payments || [];
+                updateChargeModalUI();
+                showPaymentScreen();
+            } else {
+                alert("Nenhum item enviado para a produção. Envie o pedido antes de ir para o pagamento.");
+            }
             return;
         }
         
@@ -873,11 +925,7 @@ function initializeListeners() {
             saveObservation();
             return;
         }
-        const cancelChargeBtn = document.getElementById('cancelChargeBtn');
-        if (cancelChargeBtn && e.target.closest('#cancelChargeBtn')) {
-            document.getElementById('chargeModal').classList.add('hidden');
-            return;
-        }
+
         const finalizeOrderBtn = document.getElementById('finalizeOrderBtn');
         if (finalizeOrderBtn && e.target.closest('#finalizeOrderBtn')) {
             const totalDue = calculateTotal(finalCharge.subtotal, finalCharge.serviceTaxApplied, finalCharge.taxRate);
@@ -932,11 +980,19 @@ function initializeListeners() {
             categoryBtn.classList.add('bg-indigo-600', 'text-white');
             categoryBtn.classList.remove('bg-white', 'text-gray-700');
             renderMenu(category);
+            searchProducts(); // Chama a busca para a nova categoria
+            return;
         }
         
         const sendOrderButton = e.target.closest('#sendOrderButton');
         if (sendOrderButton) {
             sendOrderToProduction();
+            return;
+        }
+        
+        const openCalculatorBtn = e.target.closest('#openCalculatorBtn');
+        if (openCalculatorBtn) {
+            openCalculator();
             return;
         }
     });
