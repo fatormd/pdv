@@ -10,7 +10,7 @@ const firebaseConfig = {
     projectId: "fator-pdv",
     storageBucket: "fator-pdv.firebasestorage.app",
     messagingSenderId: "1097659747429",
-    appId: "1:1097659747429:web:8ec0a7c3977c311dbe0a8c",
+    appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c",
     measurementId: "G-02QWNRXRCV"
 };
 const initialAuthToken = null;
@@ -87,7 +87,135 @@ function displayMessage(message, type = 'info') {
     }, 4000);
 }
 
-// --- Funções de Manipulação de Dados (Criação/Atualização) ---
+// --- 1. Inicialização do Firebase e Autenticação ---
+async function initializeFirebase() {
+    const userIdDisplay = document.getElementById('user-id-display');
+
+    try {
+        if (!firebaseConfig || !firebaseConfig.apiKey || firebaseConfig.apiKey.includes("SUA_CHAVE_API_FIREBASE")) {
+            throw new Error("Configuração do Firebase ausente ou com valores placeholder. Atualize o script.js.");
+        }
+
+        app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+        
+        await new Promise((resolve, reject) => {
+            const authPromise = initialAuthToken ? signInWithCustomToken(auth, initialAuthToken) : signInAnonymously(auth);
+            authPromise.then(() => {
+                const unsubscribe = onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        userIdDisplay.textContent = `Usuário ID: ${userId}`;
+                        isAuthReady = true;
+                        setupTableListener();
+                    } else {
+                        reject(new Error("Falha na autenticação do Firebase."));
+                    }
+                    unsubscribe();
+                    resolve();
+                });
+            }).catch(reject);
+        });
+    } catch (error) {
+        console.error("Erro na inicialização do Firebase:", error);
+        appErrorMessage = `Falha ao conectar: ${error.message}`;
+    } finally {
+        isAppLoading = false;
+        renderAppStatus();
+    }
+}
+function renderAppStatus() {
+    const mainContent = document.getElementById('mainContent');
+    const statusScreen = document.getElementById('statusScreen');
+    const statusContent = document.getElementById('statusContent');
+    const userIdDisplay = document.getElementById('user-id-display');
+
+    if (isAppLoading) {
+        mainContent.classList.add('hidden');
+        statusScreen.classList.remove('hidden');
+        statusContent.innerHTML = `<div class="loading-spinner mb-4"></div><p class="text-lg font-medium text-gray-700">Iniciando sistema...</p><p class="text-sm text-gray-500 mt-1">Conectando ao Firebase e autenticando.</p>`;
+    } else if (appErrorMessage || !isAuthReady) {
+        mainContent.classList.add('hidden');
+        statusScreen.classList.remove('hidden');
+        statusContent.innerHTML = `<i class="fas fa-exclamation-triangle text-red-600 text-3xl mb-4"></i><h1 class="text-xl font-bold text-red-700">ERRO CRÍTICO</h1><p class="mt-2 text-center text-sm text-gray-600 max-w-sm">${appErrorMessage || 'Autenticação falhou ou as regras de segurança estão impedindo o acesso.'}</p><p class="mt-4 text-xs font-semibold text-red-500">Configuração: <span class="font-mono">${firebaseConfig && firebaseConfig.apiKey !== "SUA_CHAVE_API_FIREBASE" ? 'ENCONTRADA' : 'AUSENTE'}</span>.</p>`;
+        userIdDisplay.textContent = `Usuário ID: FALHA`;
+    } else {
+        statusScreen.classList.add('hidden');
+        mainContent.classList.remove('hidden');
+        userIdDisplay.classList.remove('hidden');
+    }
+}
+
+// --- Funções de Dados e Listener ---
+function setupTableListener() {
+    if (!db || !userId) return;
+    const tablesColRef = collection(db, 'artifacts', appId, 'public', 'data', 'orders',);
+    
+    onSnapshot(tablesColRef, (snapshot) => {
+        tablesData = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.status === 'Aberta') {
+                const subtotal = calculateSubtotal(data);
+                const total = calculateTotal(subtotal, data.serviceTaxApplied !== false);
+                tablesData.push({ id: doc.id, ...data, total });
+            }
+        });
+        renderOpenTables();
+    }, (error) => {
+        console.error("Erro no onSnapshot de Mesas:", error);
+    });
+}
+
+function setupOrderListener(tableId) {
+     if (unsubscribeOrder) unsubscribeOrder();
+     if (!db || !tableId) return;
+     
+     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', tableId);
+     
+     unsubscribeOrder = onSnapshot(docRef, (docSnap) => {
+         if (docSnap.exists()) {
+             currentOrder = { id: docSnap.id, ...docSnap.data() };
+             if (currentOrder.status !== 'Aberta') {
+                 showPanelScreen();
+                 return;
+             }
+             renderOrderScreen();
+         } else {
+             showPanelScreen();
+         }
+     }, (error) => {
+         console.error(`Erro no onSnapshot da comanda ${tableId}:`, error);
+     });
+}
+
+// --- Funções de Navegação de Telas ---
+function showPanelScreen() {
+    const appContainer = document.getElementById('appContainer');
+    if (appContainer) appContainer.style.transform = 'translateX(0)';
+    currentMode = 0;
+    if (unsubscribeOrder) unsubscribeOrder();
+    currentOrder = null;
+    renderOrderScreen();
+}
+
+function showOrderScreen(tableId) {
+    const appContainer = document.getElementById('appContainer');
+    if (appContainer) appContainer.style.transform = 'translateX(-100vw)';
+    currentMode = 1;
+    setupOrderListener(tableId);
+}
+
+function showPaymentScreen() {
+    const appContainer = document.getElementById('appContainer');
+    if (appContainer) appContainer.style.transform = 'translateX(-200vw)';
+    currentMode = 2;
+    renderOrderScreen();
+}
+
+// --- FUNÇÕES DE MANIPULAÇÃO DE PEDIDOS (CORREÇÃO DE ESCOPO) ---
+
 async function addItemToOrder(itemId, itemName, price) {
     if (!currentOrder) return;
     const itemIndex = currentOrder.itemsOpen.findIndex(item => item.id === itemId);
@@ -316,8 +444,6 @@ async function toggleServiceTax() {
         alert(`Erro ao alternar a taxa de serviço: ${e.message}`);
     }
 }
-
-// --- Funções da Modal de Observação ---
 function openObservationModal(itemId, itemName, existingObs) {
     const obsModal = document.getElementById('obsModal');
     if (!obsModal) return;
@@ -345,50 +471,6 @@ async function saveObservation() {
         }
     }
 }
-
-
-function renderMenu(category) {
-    const menuItemsGrid = document.getElementById('menuItemsGrid');
-    if (!menuItemsGrid) return;
-    
-    const searchInputEl = document.getElementById('searchProductInput');
-    const searchValue = (searchInputEl ? searchInputEl.value : "").toLowerCase();
-
-    const itemsToRender = category === 'all' ? MENU_ITEMS : MENU_ITEMS.filter(item => item.category === category);
-    
-    const filteredItems = itemsToRender.filter(item => 
-        item.name.toLowerCase().includes(searchValue)
-    );
-
-    menuItemsGrid.innerHTML = filteredItems.map(item => `
-        <div class="menu-item content-card bg-white p-3 flex flex-col justify-between items-start text-left hover:shadow-lg transition duration-200"
-                 data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
-            <p class="font-semibold text-gray-800 text-base">${item.name}</p>
-            <div class="flex items-center justify-between w-full mt-1">
-                <p class="text-lg font-bold text-indigo-700">R$ ${item.price.toFixed(2).replace('.', ',')}</p>
-                <button class="add-to-order-btn bg-green-500 text-white font-bold p-2 rounded-md hover:bg-green-600 transition"
-                         data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
-                    <i class="fas fa-plus text-sm"></i>
-                </button>
-            </div>
-        </div>
-    `).join('');
-}
-
-function searchTable() {
-    const searchInput = document.getElementById('searchTableInput');
-    const mesaNumber = searchInput.value.trim();
-    if (mesaNumber) {
-        const tableId = `MESA_${mesaNumber}`;
-        const existingTable = tablesData.find(table => table.id === tableId);
-        if (existingTable) {
-            showOrderScreen(tableId);
-        } else {
-            alert(`A Mesa ${mesaNumber} não está aberta.`);
-        }
-    }
-}
-
 function updateChargeModalUI() {
     finalCharge.subtotal = calculateSubtotal(currentOrder);
     finalCharge.serviceTaxApplied = currentOrder.serviceTaxApplied !== false;
@@ -517,40 +599,6 @@ function removePayment(index) {
     }
 }
 
-async function finalizeOrder() {
-    if (!currentOrder) return;
-    const totalDue = calculateTotal(finalCharge.subtotal, finalCharge.serviceTaxApplied, finalCharge.taxRate);
-    const paidTotal = calculatePaidTotal();
-    let remainingBalance = parseFloat((totalDue - paidTotal).toFixed(2));
-    if (remainingBalance > 0.01) {
-        alert("O saldo devedor ainda é maior que zero. Registre mais pagamentos.");
-        return;
-    }
-    const change = parseFloat((paidTotal - totalDue).toFixed(2));
-    if (change > 0.01) {
-        if (!confirm(`Troco a ser dado: R$ ${change.toFixed(2).replace('.', ',')}. Deseja finalizar a conta?`)) {
-            return;
-        }
-    }
-    try {
-        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
-        await updateDoc(docRef, {
-            status: 'Fechada',
-            payments: finalCharge.payments,
-            totalPaid: paidTotal,
-            totalDue: totalDue,
-            change: change,
-            serviceTaxApplied: finalCharge.serviceTaxApplied,
-            closedAt: new Date().toISOString()
-        });
-        document.getElementById('confirmCloseModal').classList.add('hidden');
-        showPanelScreen();
-    } catch (e) {
-        alert(`Erro ao finalizar pedido: ${e.message}`);
-        console.error("Erro ao finalizar pedido: ", e);
-    }
-}
-
 function openCalculator() {
     const paymentValueInput = document.getElementById('paymentValueInput');
     if (paymentValueInput) {
@@ -559,9 +607,33 @@ function openCalculator() {
     }
 }
 
+function searchProducts() {
+    const searchInputEl = document.getElementById('searchProductInput');
+    const searchValue = (searchInputEl ? searchInputEl.value : "").toLowerCase();
+    const currentCategory = document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'all';
+    const menuItemsGrid = document.getElementById('menuItemsGrid');
+    if (!menuItemsGrid) return;
+    const itemsToFilter = currentCategory === 'all' ? MENU_ITEMS : MENU_ITEMS.filter(item => item.category === currentCategory);
+    const filteredItems = itemsToFilter.filter(item =>
+        item.name.toLowerCase().includes(searchValue)
+    );
+    menuItemsGrid.innerHTML = filteredItems.map(item => `
+        <div class="menu-item content-card bg-white p-3 flex flex-col justify-between items-start text-left hover:shadow-lg transition duration-200"
+                 data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
+            <p class="font-semibold text-gray-800 text-base">${item.name}</p>
+            <div class="flex items-center justify-between w-full mt-1">
+                <p class="text-lg font-bold text-indigo-700">R$ ${item.price.toFixed(2).replace('.', ',')}</p>
+                <button class="add-to-order-btn bg-green-500 text-white font-bold p-2 rounded-md hover:bg-green-600 transition"
+                         data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
+                    <i class="fas fa-plus text-sm"></i>
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
 function initializeListeners() {
     document.body.addEventListener('click', (e) => {
-        // --- Lógica do Botão Adicionar Item (Ícone +) ---
         const addButton = e.target.closest('.add-to-order-btn');
         if (addButton) {
             const card = addButton.closest('.menu-item');
@@ -572,7 +644,6 @@ function initializeListeners() {
             );
             return;
         }
-        
         const qtyButton = e.target.closest('.qty-btn');
         if (qtyButton) {
             const itemId = qtyButton.getAttribute('data-item-id');
@@ -690,7 +761,7 @@ function initializeListeners() {
             });
             categoryBtn.classList.add('bg-indigo-600', 'text-white');
             categoryBtn.classList.remove('bg-white', 'text-gray-700');
-            renderMenu(category); // Renderiza o menu da nova categoria com o filtro de busca aplicado
+            renderMenu(category);
             return;
         }
         
@@ -709,9 +780,7 @@ function initializeListeners() {
 
     const searchProductInput = document.getElementById('searchProductInput');
     if (searchProductInput) {
-        // O evento de 'input' chama renderMenu, que já contém a lógica de filtragem
         searchProductInput.addEventListener('input', () => {
-             // Obtém a categoria atualmente selecionada ou usa 'all' como padrão
             const currentCategory = document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'all';
             renderMenu(currentCategory);
         });
