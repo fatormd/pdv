@@ -843,7 +843,6 @@ function openCalculator() {
     }
 }
 
-
 function initializeListeners() {
     document.body.addEventListener('click', (e) => {
         const addButton = e.target.closest('.add-to-order-btn');
