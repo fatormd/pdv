@@ -604,6 +604,8 @@ async function saveObservation() {
         }
     }
 }
+
+// Esta é a função que estava faltando, agora está no lugar correto.
 async function handleCloseTable(taxId, paidTotal, totalDue, change) {
     if (!currentOrder) return;
     try {
@@ -629,15 +631,14 @@ async function handleCloseTable(taxId, paidTotal, totalDue, change) {
         console.error("Erro ao finalizar pedido: ", e);
     }
 }
+
 function updateChargeModalUI() {
-    // --- Lógica de cálculo dos valores ---
     finalCharge.subtotal = calculateSubtotal(currentOrder);
     finalCharge.serviceTaxApplied = currentOrder.serviceTaxApplied !== false;
     finalCharge.total = calculateTotal(finalCharge.subtotal, finalCharge.serviceTaxApplied, finalCharge.taxRate);
     const paidTotal = calculatePaidTotal();
     const remainingBalance = parseFloat((finalCharge.total - paidTotal).toFixed(2));
     
-    // --- Atualização da UI ---
     const orderSubtotalDisplayPayment = document.getElementById('orderSubtotalDisplayPayment');
     const orderServiceTaxDisplayPayment = document.getElementById('orderServiceTaxDisplayPayment');
     const orderTotalDisplayPayment = document.getElementById('orderTotalDisplayPayment');
@@ -846,11 +847,9 @@ function initializeListeners() {
             return;
         }
         
-        // Listener para ir para a tela de pagamento
         const goToPaymentBtn = document.getElementById('goToPaymentBtn');
         if (goToPaymentBtn && e.target.closest('#goToPaymentBtn')) {
-             // Atualiza o estado da cobrança antes de ir para a tela de pagamento
-            finalCharge.subtotal = calculateSubtotal(currentOrder);
+             finalCharge.subtotal = calculateSubtotal(currentOrder);
             finalCharge.serviceTaxApplied = currentOrder.serviceTaxApplied !== false;
             finalCharge.payments = currentOrder.payments || [];
             updateChargeModalUI();
@@ -858,7 +857,6 @@ function initializeListeners() {
             return;
         }
         
-        // Listener para voltar da tela de pagamento para a de pedido
         const backToOrderFromPaymentBtn = document.getElementById('backToOrderFromPaymentBtn');
         if(backToOrderFromPaymentBtn && e.target.closest('#backToOrderFromPaymentBtn')) {
             showOrderScreen(currentOrder.id);
