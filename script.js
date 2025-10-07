@@ -339,18 +339,16 @@ function renderOrderScreen() {
         if(reviewDetailsContainer) reviewDetailsContainer.classList.remove('hidden');
     }
     
-    // Atualiza o display da tela de pagamento
     const orderSubtotalDisplayPayment = document.getElementById('orderSubtotalDisplayPayment');
     const orderServiceTaxDisplayPayment = document.getElementById('orderServiceTaxDisplayPayment');
     const orderTotalDisplayPayment = document.getElementById('orderTotalDisplayPayment');
     const paymentTableNumber = document.getElementById('payment-table-number');
 
     if (orderSubtotalDisplayPayment) orderSubtotalDisplayPayment.textContent = `R$ ${subtotal.toFixed(2).replace('.', ',')}`;
-    if (orderServiceTaxDisplayPayment) orderServiceTaxDisplayPayment.textContent = `R$ ${taxValue.toFixed(2).replace('.', ',')}`;
+    if (orderServiceTaxDisplayPayment) orderServiceTaxDisplayPayment.textContent = `R$ ${(total - subtotal).toFixed(2).replace('.', ',')}`;
     if (orderTotalDisplayPayment) orderTotalDisplayPayment.textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
     if (paymentTableNumber) paymentTableNumber.textContent = currentOrder.tableNumber || `Mesa ${currentOrder.id.replace('MESA_', '')}`;
     
-    // Efetua a renderização dos itens do menu
     const menuItemsGrid = document.getElementById('menuItemsGrid');
     if (menuItemsGrid) {
         renderMenu(document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'main');
@@ -388,6 +386,34 @@ function searchTable() {
         }
     }
 }
+
+// NOVO: Função para buscar produtos no cardápio
+function searchProducts() {
+    const searchInput = document.getElementById('searchProductInput').value.toLowerCase();
+    const currentCategory = document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'main';
+    const menuItemsGrid = document.getElementById('menuItemsGrid');
+
+    if (!menuItemsGrid) return;
+
+    const filteredItems = MENU_ITEMS.filter(item => 
+        item.category === currentCategory && item.name.toLowerCase().includes(searchInput)
+    );
+
+    menuItemsGrid.innerHTML = filteredItems.map(item => `
+        <div class="menu-item content-card bg-white p-3 flex flex-col justify-between items-start text-left hover:shadow-lg transition duration-200"
+                 data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
+            <p class="font-semibold text-gray-800 text-base">${item.name}</p>
+            <div class="flex items-center justify-between w-full mt-1">
+                <p class="text-lg font-bold text-indigo-700">R$ ${item.price.toFixed(2).replace('.', ',')}</p>
+                <button class="add-to-order-btn bg-green-500 text-white font-bold p-2 rounded-md hover:bg-green-600 transition"
+                         data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
+                    <i class="fas fa-plus text-sm"></i>
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
 
 // --- Funções de Manipulação de Dados (Criação/Atualização) ---
 async function openTable() {
@@ -578,18 +604,31 @@ async function saveObservation() {
         }
     }
 }
-function openChargeModal() {
-    const chargeModal = document.getElementById('chargeModal');
-    if (!currentOrder || currentOrder.itemsOpen.length > 0 || !chargeModal) return;
-    finalCharge.subtotal = calculateSubtotal(currentOrder);
-    finalCharge.serviceTaxApplied = currentOrder.serviceTaxApplied !== false;
-    finalCharge.payments = currentOrder.payments || [];
-    updateChargeModalUI();
-    const chargeModalTitle = document.getElementById('chargeModalTitle');
-    if (chargeModalTitle) chargeModalTitle.textContent = `Cobrança da ${currentOrder.tableNumber}`;
-    chargeModal.classList.remove('hidden');
+async function handleCloseTable(taxId, paidTotal, totalDue, change) {
+    if (!currentOrder) return;
+    try {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
+        
+        await updateDoc(docRef, {
+            status: 'Fechada',
+            payments: finalCharge.payments,
+            totalPaid: paidTotal,
+            totalDue: totalDue,
+            change: change,
+            taxId: taxId || null,
+            serviceTaxApplied: finalCharge.serviceTaxApplied,
+            closedAt: new Date().toISOString()
+        });
+        
+        displayMessage('Conta finalizada com sucesso!', 'success');
+        document.getElementById('confirmCloseModal').classList.add('hidden');
+        showPanelScreen();
+        
+    } catch (e) {
+        alert(`Erro ao finalizar pedido: ${e.message}`);
+        console.error("Erro ao finalizar pedido: ", e);
+    }
 }
-
 function updateChargeModalUI() {
     // --- Lógica de cálculo dos valores ---
     finalCharge.subtotal = calculateSubtotal(currentOrder);
@@ -611,7 +650,6 @@ function updateChargeModalUI() {
     if (orderServiceTaxDisplayPayment) orderServiceTaxDisplayPayment.textContent = `R$ ${(finalCharge.total - finalCharge.subtotal).toFixed(2).replace('.', ',')}`;
     if (orderTotalDisplayPayment) orderTotalDisplayPayment.textContent = `R$ ${finalCharge.total.toFixed(2).replace('.', ',')}`;
     
-    // Atualiza o botão de serviço
     if (serviceTaxBtn) {
         serviceTaxBtn.textContent = finalCharge.serviceTaxApplied ? 'Aplicado' : 'Removido';
         serviceTaxBtn.classList.toggle('bg-green-500', finalCharge.serviceTaxApplied);
@@ -620,7 +658,6 @@ function updateChargeModalUI() {
         serviceTaxBtn.classList.toggle('hover:bg-red-600', !finalCharge.serviceTaxApplied);
     }
     
-    // Renderiza a lista de pagamentos e o valor restante no final
     if (paymentSummaryList) {
         let paymentsHtml = '';
         if (finalCharge.payments.length > 0) {
@@ -649,7 +686,6 @@ function updateChargeModalUI() {
         });
     }
 
-    // Lógica para habilitar/desabilitar o botão de fechar conta
     if(finalizeOrderBtn) {
         finalizeOrderBtn.disabled = remainingBalance > 0.01;
         if (!finalizeOrderBtn.disabled) {
@@ -661,7 +697,6 @@ function updateChargeModalUI() {
         }
     }
     
-    // Pré-preenche o valor do input de pagamento
     const paymentValueInput = document.getElementById('paymentValueInput');
     if (paymentValueInput) paymentValueInput.value = Math.max(0, remainingBalance).toFixed(2);
 }
@@ -907,6 +942,11 @@ function initializeListeners() {
             return;
         }
     });
+
+    const searchProductInput = document.getElementById('searchProductInput');
+    if (searchProductInput) {
+        searchProductInput.addEventListener('input', searchProducts);
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
