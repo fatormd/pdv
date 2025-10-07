@@ -214,6 +214,75 @@ function showPaymentScreen() {
     renderOrderScreen();
 }
 
+// --- FUNÇÕES DE MANIPULAÇÃO DE PEDIDOS (CORREÇÃO DE ESCOPO) ---
+
+async function addItemToOrder(itemId, itemName, price) {
+    if (!currentOrder) return;
+    const itemIndex = currentOrder.itemsOpen.findIndex(item => item.id === itemId);
+    const openItems = [...(currentOrder.itemsOpen || [])];
+    if (itemIndex > -1) {
+        openItems[itemIndex].quantity += 1;
+    } else {
+        openItems.push({
+            id: itemId,
+            name: itemName,
+            price: price,
+            quantity: 1,
+            observation: ''
+        });
+    }
+    try {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
+        await updateDoc(docRef, { itemsOpen: openItems });
+    } catch (e) {
+        console.error("Erro ao adicionar item:", e);
+        alert(`Erro ao adicionar item: ${e.message}`);
+    }
+}
+async function updateItemQuantity(itemId, action) {
+    if (!currentOrder) return;
+    const openItems = [...(currentOrder.itemsOpen || [])];
+    const itemIndex = openItems.findIndex(item => item.id === itemId);
+    if (itemIndex === -1) return;
+    if (action === 'increase') {
+        openItems[itemIndex].quantity += 1;
+    } else if (action === 'decrease') {
+        openItems[itemIndex].quantity -= 1;
+        if (openItems[itemIndex].quantity <= 0) {
+            openItems.splice(itemIndex, 1);
+        }
+    }
+    try {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
+        await updateDoc(docRef, { itemsOpen: openItems });
+    } catch (e) {
+        console.error("Erro ao atualizar quantidade:", e);
+        alert(`Erro ao atualizar quantidade: ${e.message}`);
+    }
+}
+async function sendOrderToProduction() {
+    if (!currentOrder || currentOrder.itemsOpen.length === 0) return;
+    const itemsToSend = currentOrder.itemsOpen.map(item => ({
+        ...item,
+        status: 'Enviado',
+        sentAt: new Date().toISOString()
+    }));
+    const newItemsSent = [...(currentOrder.itemsSent || []), ...itemsToSend];
+    try {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
+        await updateDoc(docRef, {
+            itemsSent: newItemsSent,
+            itemsOpen: [],
+            lastSent: new Date().toISOString()
+        });
+        displayMessage('Pedido enviado para a produção!', 'success');
+    } catch (e) {
+        alert(`Erro ao enviar pedido: ${e.message}`);
+        console.error("Erro ao enviar pedido: ", e);
+    }
+}
+
+
 // --- Funções de Renderização e Lógica da UI ---
 
 function renderOpenTables() {
@@ -351,7 +420,6 @@ function renderOrderScreen() {
     if (orderTotalDisplayPayment) orderTotalDisplayPayment.textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
     if (paymentTableNumber) paymentTableNumber.textContent = currentOrder.tableNumber || `Mesa ${currentOrder.id.replace('MESA_', '')}`;
     
-    // NOVO: Chama o renderMenu com o filtro de busca aplicado
     const menuItemsGrid = document.getElementById('menuItemsGrid');
     if (menuItemsGrid) {
         renderMenu(document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'all');
@@ -386,7 +454,6 @@ function renderMenu(category) {
         </div>
     `).join('');
 }
-
 function searchTable() {
     const searchInput = document.getElementById('searchTableInput');
     const mesaNumber = searchInput.value.trim();
@@ -401,396 +468,6 @@ function searchTable() {
     }
 }
 
-// --- Funções de Manipulação de Dados (Criação/Atualização) ---
-async function openTable() {
-    const mesaInput = document.getElementById('mesaInput');
-    const pessoasInput = document.getElementById('pessoasInput');
-    const mesaNumber = mesaInput.value.trim();
-    const pessoasCount = parseInt(pessoasInput.value);
-    if (!mesaNumber || pessoasCount < 1) {
-        alert("Por favor, preenra o número da mesa e a quantidade de pessoas.");
-        return;
-    }
-    const tableId = `MESA_${mesaNumber}`;
-    const tableNumberDisplay = `Mesa ${mesaNumber}`;
-    const newOrder = {
-        tableNumber: tableNumberDisplay,
-        diners: pessoasCount,
-        itemsOpen: [],
-        itemsSent: [],
-        status: 'Aberta',
-        serviceTaxApplied: true,
-        payments: [],
-        total: 0,
-        createdAt: new Date().toISOString(),
-        createdBy: userId
-    };
-    try {
-        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', tableId);
-        await setDoc(docRef, newOrder);
-        mesaInput.value = '';
-        pessoasInput.value = '';
-        showOrderScreen(tableId);
-    } catch (e) {
-        alert(`Erro ao abrir mesa: ${e.message}`);
-        console.error("Erro ao abrir mesa: ", e);
-    }
-}
-async function removeSentItem(itemId) {
-    if (!currentOrder || !currentOrder.id) return;
-    const senha = prompt("Insira a senha do gerente para confirmar:");
-    if (senha !== GERENTE_SENHA) {
-        alert("Senha incorreta. Ação cancelada.");
-        return;
-    }
-    const itemsSent = (currentOrder.itemsSent || []).filter(item => item.id !== itemId);
-    try {
-        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
-        await updateDoc(docRef, { itemsSent: itemsSent });
-        displayMessage('Item removido do histórico com sucesso.', 'success');
-    } catch (e) {
-        console.error("Erro ao remover item enviado:", e);
-        alert(`Erro ao remover item: ${e.message}`);
-    }
-}
-window.removeSentItem = removeSentItem;
-async function transferSentItem(itemId) {
-    if (!currentOrder || !currentOrder.id) return;
-    const senha = prompt("Insira a senha do gerente para confirmar:");
-    if (senha !== GERENTE_SENHA) {
-        alert("Senha incorreta. Ação cancelada.");
-        return;
-    }
-    const targetTableNumber = prompt("Para qual número de mesa você deseja transferir este item?");
-    if (!targetTableNumber || isNaN(parseInt(targetTableNumber))) {
-        alert("Número de mesa inválido.");
-        return;
-    }
-    const targetTableId = `MESA_${targetTableNumber}`;
-    const targetDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', targetTableId);
-    const itemToTransfer = (currentOrder.itemsSent || []).find(item => item.id === itemId);
-    if (!itemToTransfer) {
-        alert("Item não encontrado para transferência.");
-        return;
-    }
-    const newItemsSent = (currentOrder.itemsSent || []).filter(item => item.id !== itemId);
-    const originDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
-    try {
-        await updateDoc(originDocRef, { itemsSent: newItemsSent });
-        const targetDocSnap = await getDoc(targetDocRef);
-        let targetItemsSent = [];
-        if (targetDocSnap.exists()) {
-            targetItemsSent = targetDocSnap.data().itemsSent || [];
-        } else {
-            alert(`A mesa ${targetTableNumber} não está aberta.`);
-            await updateDoc(originDocRef, { itemsSent: currentOrder.itemsSent });
-            return;
-        }
-        const newTargetItemsSent = [...targetItemsSent, itemToTransfer];
-        await updateDoc(targetDocRef, { itemsSent: newTargetItemsSent, lastUpdate: new Date().toISOString() });
-        displayMessage(`Item ${itemToTransfer.name} transferido para a Mesa ${targetTableNumber}.`, 'success');
-    } catch (e) {
-        console.error("Erro ao transferir item:", e);
-        alert(`Erro ao transferir item: ${e.message}`);
-    }
-}
-window.transferSentItem = transferSentItem;
-
-async function addItemToOrder(itemId, itemName, price) {
-    if (!currentOrder) return;
-    const itemIndex = currentOrder.itemsOpen.findIndex(item => item.id === itemId);
-    const openItems = [...(currentOrder.itemsOpen || [])];
-    if (itemIndex > -1) {
-        openItems[itemIndex].quantity += 1;
-    } else {
-        openItems.push({
-            id: itemId,
-            name: itemName,
-            price: price,
-            quantity: 1,
-            observation: ''
-        });
-    }
-    try {
-        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
-        await updateDoc(docRef, { itemsOpen: openItems });
-    } catch (e) {
-        console.error("Erro ao adicionar item:", e);
-        alert(`Erro ao adicionar item: ${e.message}`);
-    }
-}
-async function updateItemQuantity(itemId, action) {
-    if (!currentOrder) return;
-    const openItems = [...(currentOrder.itemsOpen || [])];
-    const itemIndex = openItems.findIndex(item => item.id === itemId);
-    if (itemIndex === -1) return;
-    if (action === 'increase') {
-        openItems[itemIndex].quantity += 1;
-    } else if (action === 'decrease') {
-        openItems[itemIndex].quantity -= 1;
-        if (openItems[itemIndex].quantity <= 0) {
-            openItems.splice(itemIndex, 1);
-        }
-    }
-    try {
-        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
-        await updateDoc(docRef, { itemsOpen: openItems });
-    } catch (e) {
-        console.error("Erro ao atualizar quantidade:", e);
-        alert(`Erro ao atualizar quantidade: ${e.message}`);
-    }
-}
-async function sendOrderToProduction() {
-    if (!currentOrder || currentOrder.itemsOpen.length === 0) return;
-    const itemsToSend = currentOrder.itemsOpen.map(item => ({
-        ...item,
-        status: 'Enviado',
-        sentAt: new Date().toISOString()
-    }));
-    const newItemsSent = [...(currentOrder.itemsSent || []), ...itemsToSend];
-    try {
-        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
-        await updateDoc(docRef, {
-            itemsSent: newItemsSent,
-            itemsOpen: [],
-            lastSent: new Date().toISOString()
-        });
-        displayMessage('Pedido enviado para a produção!', 'success');
-    } catch (e) {
-        alert(`Erro ao enviar pedido: ${e.message}`);
-        console.error("Erro ao enviar pedido: ", e);
-    }
-}
-
-// --- Funções da Modal de Observação ---
-function openObservationModal(itemId, itemName, existingObs) {
-    const obsModal = document.getElementById('obsModal');
-    if (!obsModal) return;
-    
-    itemToObserve = itemId;
-    document.getElementById('obsItemName').textContent = itemName;
-    document.getElementById('obsInput').value = existingObs;
-    obsModal.classList.remove('hidden');
-}
-async function saveObservation() {
-    if (!currentOrder || !itemToObserve) return;
-    const obsInput = document.getElementById('obsInput').value.trim();
-    const openItems = [...(currentOrder.itemsOpen || [])];
-    const itemIndex = openItems.findIndex(item => item.id === itemToObserve);
-    if (itemIndex > -1) {
-        openItems[itemIndex].observation = obsInput;
-        try {
-            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
-            await updateDoc(docRef, { itemsOpen: openItems });
-            document.getElementById('obsModal').classList.add('hidden');
-            itemToObserve = null;
-        } catch (e) {
-            console.error("Erro ao salvar observação:", e);
-            alert(`Erro ao salvar observação: ${e.message}`);
-        }
-    }
-}
-async function handleCloseTable(taxId, paidTotal, totalDue, change) {
-    if (!currentOrder) return;
-    try {
-        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
-        
-        await updateDoc(docRef, {
-            status: 'Fechada',
-            payments: finalCharge.payments,
-            totalPaid: paidTotal,
-            totalDue: totalDue,
-            change: change,
-            taxId: taxId || null,
-            serviceTaxApplied: finalCharge.serviceTaxApplied,
-            closedAt: new Date().toISOString()
-        });
-        
-        displayMessage('Conta finalizada com sucesso!', 'success');
-        document.getElementById('confirmCloseModal').classList.add('hidden');
-        showPanelScreen();
-        
-    } catch (e) {
-        alert(`Erro ao finalizar pedido: ${e.message}`);
-        console.error("Erro ao finalizar pedido: ", e);
-    }
-}
-
-function updateChargeModalUI() {
-    finalCharge.subtotal = calculateSubtotal(currentOrder);
-    finalCharge.serviceTaxApplied = currentOrder.serviceTaxApplied !== false;
-    finalCharge.total = calculateTotal(finalCharge.subtotal, finalCharge.serviceTaxApplied, finalCharge.taxRate);
-    const paidTotal = calculatePaidTotal();
-    const remainingBalance = parseFloat((finalCharge.total - paidTotal).toFixed(2));
-    
-    const orderSubtotalDisplayPayment = document.getElementById('orderSubtotalDisplayPayment');
-    const orderServiceTaxDisplayPayment = document.getElementById('orderServiceTaxDisplayPayment');
-    const orderTotalDisplayPayment = document.getElementById('orderTotalDisplayPayment');
-    const remainingBalanceDisplay = document.getElementById('remainingBalanceDisplay');
-    const serviceTaxBtn = document.getElementById('toggleServiceTaxBtn');
-    const finalizeOrderBtn = document.getElementById('finalizeOrderBtn');
-    const paymentSummaryList = document.getElementById('paymentSummaryList');
-
-    if (orderSubtotalDisplayPayment) orderSubtotalDisplayPayment.textContent = `R$ ${finalCharge.subtotal.toFixed(2).replace('.', ',')}`;
-    if (orderServiceTaxDisplayPayment) orderServiceTaxDisplayPayment.textContent = `R$ ${(finalCharge.total - finalCharge.subtotal).toFixed(2).replace('.', ',')}`;
-    if (orderTotalDisplayPayment) orderTotalDisplayPayment.textContent = `R$ ${finalCharge.total.toFixed(2).replace('.', ',')}`;
-    
-    if (serviceTaxBtn) {
-        serviceTaxBtn.textContent = finalCharge.serviceTaxApplied ? 'Aplicado' : 'Removido';
-        serviceTaxBtn.classList.toggle('bg-green-500', finalCharge.serviceTaxApplied);
-        serviceTaxBtn.classList.toggle('bg-red-500', !finalCharge.serviceTaxApplied);
-        serviceTaxBtn.classList.toggle('hover:bg-green-600', finalCharge.serviceTaxApplied);
-        serviceTaxBtn.classList.toggle('hover:bg-red-600', !finalCharge.serviceTaxApplied);
-    }
-    
-    if (paymentSummaryList) {
-        let paymentsHtml = '';
-        if (finalCharge.payments.length > 0) {
-            paymentsHtml = finalCharge.payments.map((p, index) => `
-                <div class="flex justify-between items-center py-1">
-                    <span class="font-medium">${p.method}</span>
-                    <span class="font-bold text-gray-800">R$ ${p.value.toFixed(2).replace('.', ',')}</span>
-                    <button data-payment-index="${index}" class="remove-payment-btn text-red-500 hover:text-red-700 text-sm" title="Remover Pagamento">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            `).join('');
-        }
-        
-        paymentsHtml += `
-            <div class="flex justify-between items-center py-1 font-bold border-t border-gray-200 mt-2 pt-2">
-                <span>VALOR RESTANTE:</span>
-                <span class="text-red-600">${remainingBalance > 0 ? `R$ ${remainingBalance.toFixed(2).replace('.', ',')}` : 'R$ 0,00'}</span>
-            </div>
-        `;
-        
-        paymentSummaryList.innerHTML = paymentsHtml;
-        
-        document.querySelectorAll('.remove-payment-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => removePayment(parseInt(e.currentTarget.getAttribute('data-payment-index'))));
-        });
-    }
-
-    if(finalizeOrderBtn) {
-        finalizeOrderBtn.disabled = remainingBalance > 0.01;
-        if (!finalizeOrderBtn.disabled) {
-            finalizeOrderBtn.classList.replace('bg-red-600', 'bg-green-600');
-            finalizeOrderBtn.classList.replace('hover:bg-red-700', 'hover:bg-green-700');
-        } else {
-            finalizeOrderBtn.classList.replace('bg-green-600', 'bg-red-600');
-            finalizeOrderBtn.classList.replace('hover:bg-green-700', 'hover:bg-red-700');
-        }
-    }
-    
-    const paymentValueInput = document.getElementById('paymentValueInput');
-    if (paymentValueInput) paymentValueInput.value = Math.max(0, remainingBalance).toFixed(2);
-}
-
-async function toggleServiceTax() {
-    if (!currentOrder) return;
-    const newServiceTaxState = !currentOrder.serviceTaxApplied;
-    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
-    try {
-        await updateDoc(docRef, { serviceTaxApplied: newServiceTaxState });
-    } catch (e) {
-        console.error("Erro ao alternar a taxa de serviço:", e);
-        alert(`Erro ao alternar a taxa de serviço: ${e.message}`);
-    }
-}
-
-function selectPaymentMethod(method) {
-    selectedPaymentMethod = method;
-    document.querySelectorAll('.payment-method-btn').forEach(btn => {
-        if (btn.getAttribute('data-method') === method) {
-            btn.classList.add('active', 'bg-indigo-600', 'text-white');
-            btn.classList.remove('bg-gray-200', 'text-gray-700');
-        } else {
-            btn.classList.remove('active', 'bg-indigo-600', 'text-white');
-            btn.classList.add('bg-gray-200', 'text-gray-700');
-        }
-    });
-}
-
-function addPayment() {
-    const valueInput = document.getElementById('paymentValueInput');
-    const paymentValue = parseFloat(valueInput.value);
-
-    if (isNaN(paymentValue) || paymentValue <= 0) {
-        alert("Insira um valor de pagamento válido.");
-        return;
-    }
-    
-    const totalDue = calculateTotal(finalCharge.subtotal, finalCharge.serviceTaxApplied, finalCharge.taxRate);
-    const paidTotal = calculatePaidTotal();
-    const remainingBefore = parseFloat((totalDue - paidTotal).toFixed(2));
-    
-    if (paymentValue > remainingBefore + 0.01 && remainingBefore > 0.01) {
-        if (!confirm(`O valor de R$ ${paymentValue.toFixed(2).replace('.', ',')} é maior que o saldo de R$ ${remainingBefore.toFixed(2).replace('.', ',')}. Deseja registrar este valor e dar troco?`)) {
-            return;
-        }
-    }
-
-    finalCharge.payments.push({
-        method: selectedPaymentMethod,
-        value: paymentValue,
-        timestamp: new Date().toISOString()
-    });
-    
-    valueInput.value = '';
-    updateChargeModalUI();
-}
-
-function removePayment(index) {
-    if (!confirm('Deseja realmente remover este pagamento?')) {
-        return;
-    }
-    
-    const senha = prompt("Insira a senha do gerente para confirmar a remoção:");
-    if (senha !== GERENTE_SENHA) {
-        alert("Senha incorreta. Ação cancelada.");
-        return;
-    }
-
-    if (index >= 0 && index < finalCharge.payments.length) {
-        finalCharge.payments.splice(index, 1);
-        updateChargeModalUI();
-    }
-}
-
-async function finalizeOrder() {
-    if (!currentOrder) return;
-    const totalDue = calculateTotal(finalCharge.subtotal, finalCharge.serviceTaxApplied, finalCharge.taxRate);
-    const paidTotal = calculatePaidTotal();
-    let remainingBalance = parseFloat((totalDue - paidTotal).toFixed(2));
-    if (remainingBalance > 0.01) {
-        alert("O saldo devedor ainda é maior que zero. Registre mais pagamentos.");
-        return;
-    }
-    const change = parseFloat((paidTotal - totalDue).toFixed(2));
-    if (change > 0.01) {
-        if (!confirm(`Troco a ser dado: R$ ${change.toFixed(2).replace('.', ',')}. Deseja finalizar a conta?`)) {
-            return;
-        }
-    }
-    try {
-        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
-        await updateDoc(docRef, {
-            status: 'Fechada',
-            payments: finalCharge.payments,
-            totalPaid: paidTotal,
-            totalDue: totalDue,
-            change: change,
-            serviceTaxApplied: finalCharge.serviceTaxApplied,
-            closedAt: new Date().toISOString()
-        });
-        document.getElementById('confirmCloseModal').classList.add('hidden');
-        showPanelScreen();
-    } catch (e) {
-        alert(`Erro ao finalizar pedido: ${e.message}`);
-        console.error("Erro ao finalizar pedido: ", e);
-    }
-}
-
 function openCalculator() {
     const paymentValueInput = document.getElementById('paymentValueInput');
     if (paymentValueInput) {
@@ -798,106 +475,6 @@ function openCalculator() {
         paymentValueInput.value = total.toFixed(2);
     }
 }
-
-// A função searchProducts foi embutida em renderMenu para eliminar a duplicidade
-// e evitar conflitos de escopo.
-
-// --- Funções de Manipulação de Dados (Criação/Atualização) ---
-
-async function addItemToOrder(itemId, itemName, price) {
-    if (!currentOrder) return;
-    const itemIndex = currentOrder.itemsOpen.findIndex(item => item.id === itemId);
-    const openItems = [...(currentOrder.itemsOpen || [])];
-    if (itemIndex > -1) {
-        openItems[itemIndex].quantity += 1;
-    } else {
-        openItems.push({
-            id: itemId,
-            name: itemName,
-            price: price,
-            quantity: 1,
-            observation: ''
-        });
-    }
-    try {
-        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
-        await updateDoc(docRef, { itemsOpen: openItems });
-    } catch (e) {
-        console.error("Erro ao adicionar item:", e);
-        alert(`Erro ao adicionar item: ${e.message}`);
-    }
-}
-async function updateItemQuantity(itemId, action) {
-    if (!currentOrder) return;
-    const openItems = [...(currentOrder.itemsOpen || [])];
-    const itemIndex = openItems.findIndex(item => item.id === itemId);
-    if (itemIndex === -1) return;
-    if (action === 'increase') {
-        openItems[itemIndex].quantity += 1;
-    } else if (action === 'decrease') {
-        openItems[itemIndex].quantity -= 1;
-        if (openItems[itemIndex].quantity <= 0) {
-            openItems.splice(itemIndex, 1);
-        }
-    }
-    try {
-        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
-        await updateDoc(docRef, { itemsOpen: openItems });
-    } catch (e) {
-        console.error("Erro ao atualizar quantidade:", e);
-        alert(`Erro ao atualizar quantidade: ${e.message}`);
-    }
-}
-async function sendOrderToProduction() {
-    if (!currentOrder || currentOrder.itemsOpen.length === 0) return;
-    const itemsToSend = currentOrder.itemsOpen.map(item => ({
-        ...item,
-        status: 'Enviado',
-        sentAt: new Date().toISOString()
-    }));
-    const newItemsSent = [...(currentOrder.itemsSent || []), ...itemsToSend];
-    try {
-        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
-        await updateDoc(docRef, {
-            itemsSent: newItemsSent,
-            itemsOpen: [],
-            lastSent: new Date().toISOString()
-        });
-        displayMessage('Pedido enviado para a produção!', 'success');
-    } catch (e) {
-        alert(`Erro ao enviar pedido: ${e.message}`);
-        console.error("Erro ao enviar pedido: ", e);
-    }
-}
-// --- Funções da Modal de Observação ---
-function openObservationModal(itemId, itemName, existingObs) {
-    const obsModal = document.getElementById('obsModal');
-    if (!obsModal) return;
-    
-    itemToObserve = itemId;
-    document.getElementById('obsItemName').textContent = itemName;
-    document.getElementById('obsInput').value = existingObs;
-    obsModal.classList.remove('hidden');
-}
-async function saveObservation() {
-    if (!currentOrder || !itemToObserve) return;
-    const obsInput = document.getElementById('obsInput').value.trim();
-    const openItems = [...(currentOrder.itemsOpen || [])];
-    const itemIndex = openItems.findIndex(item => item.id === itemToObserve);
-    if (itemIndex > -1) {
-        openItems[itemIndex].observation = obsInput;
-        try {
-            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
-            await updateDoc(docRef, { itemsOpen: openItems });
-            document.getElementById('obsModal').classList.add('hidden');
-            itemToObserve = null;
-        } catch (e) {
-            console.error("Erro ao salvar observação:", e);
-            alert(`Erro ao salvar observação: ${e.message}`);
-        }
-    }
-}
-
 
 function initializeListeners() {
     document.body.addEventListener('click', (e) => {
@@ -931,7 +508,7 @@ function initializeListeners() {
             openObservationModal(itemId, itemName, currentObs);
             return;
         }
-        const searchTableBtn = document.getElementById('searchTableBtn');
+        const searchTableBtn = document.getElementById('searchTableInput');
         if (searchTableBtn && e.target.closest('#searchTableBtn')) {
             searchTable();
             return;
@@ -1031,7 +608,8 @@ function initializeListeners() {
             });
             categoryBtn.classList.add('bg-indigo-600', 'text-white');
             categoryBtn.classList.remove('bg-white', 'text-gray-700');
-            renderMenu(category); // Renderiza o menu da nova categoria com o filtro de busca aplicado
+            // NOVO: Chamamos renderMenu, que já aplica a busca e renderiza o menu
+            renderMenu(category);
             return;
         }
         
@@ -1050,9 +628,8 @@ function initializeListeners() {
 
     const searchProductInput = document.getElementById('searchProductInput');
     if (searchProductInput) {
-        // O evento de 'input' chama renderMenu, que já contém a lógica de filtragem
         searchProductInput.addEventListener('input', () => {
-             // Obtém a categoria atualmente selecionada ou usa 'all' como padrão
+             // NOVO: Ao digitar, chamamos renderMenu para a categoria atual.
             const currentCategory = document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'all';
             renderMenu(currentCategory);
         });
