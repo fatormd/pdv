@@ -215,7 +215,6 @@ function showPaymentScreen() {
 }
 
 // --- FUNÇÕES DE MANIPULAÇÃO DE PEDIDOS (CORREÇÃO DE ESCOPO) ---
-
 async function addItemToOrder(itemId, itemName, price) {
     if (!currentOrder) return;
     const itemIndex = currentOrder.itemsOpen.findIndex(item => item.id === itemId);
@@ -607,31 +606,6 @@ function openCalculator() {
     }
 }
 
-function searchProducts() {
-    const searchInputEl = document.getElementById('searchProductInput');
-    const searchValue = (searchInputEl ? searchInputEl.value : "").toLowerCase();
-    const currentCategory = document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'all';
-    const menuItemsGrid = document.getElementById('menuItemsGrid');
-    if (!menuItemsGrid) return;
-    const itemsToFilter = currentCategory === 'all' ? MENU_ITEMS : MENU_ITEMS.filter(item => item.category === currentCategory);
-    const filteredItems = itemsToFilter.filter(item =>
-        item.name.toLowerCase().includes(searchValue)
-    );
-    menuItemsGrid.innerHTML = filteredItems.map(item => `
-        <div class="menu-item content-card bg-white p-3 flex flex-col justify-between items-start text-left hover:shadow-lg transition duration-200"
-                 data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
-            <p class="font-semibold text-gray-800 text-base">${item.name}</p>
-            <div class="flex items-center justify-between w-full mt-1">
-                <p class="text-lg font-bold text-indigo-700">R$ ${item.price.toFixed(2).replace('.', ',')}</p>
-                <button class="add-to-order-btn bg-green-500 text-white font-bold p-2 rounded-md hover:bg-green-600 transition"
-                         data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
-                    <i class="fas fa-plus text-sm"></i>
-                </button>
-            </div>
-        </div>
-    `).join('');
-}
-
 function initializeListeners() {
     document.body.addEventListener('click', (e) => {
         const addButton = e.target.closest('.add-to-order-btn');
@@ -761,7 +735,7 @@ function initializeListeners() {
             });
             categoryBtn.classList.add('bg-indigo-600', 'text-white');
             categoryBtn.classList.remove('bg-white', 'text-gray-700');
-            renderMenu(category);
+            renderMenu(category); // Renderiza o menu da nova categoria com o filtro de busca aplicado
             return;
         }
         
@@ -781,6 +755,7 @@ function initializeListeners() {
     const searchProductInput = document.getElementById('searchProductInput');
     if (searchProductInput) {
         searchProductInput.addEventListener('input', () => {
+             // Obtém a categoria atualmente selecionada ou usa 'all' como padrão
             const currentCategory = document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'all';
             renderMenu(currentCategory);
         });
