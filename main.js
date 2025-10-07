@@ -190,7 +190,7 @@ function setupOrderListener(tableId) {
      });
 }
 
-// --- Funções de Renderização e UI ---
+// --- Funções de Navegação de Telas ---
 function showPanelScreen() {
     const appContainer = document.getElementById('appContainer');
     if (appContainer) appContainer.style.transform = 'translateX(0)';
@@ -213,6 +213,8 @@ function showPaymentScreen() {
     currentMode = 2;
     renderOrderScreen();
 }
+
+// --- Funções de Renderização e Lógica da UI ---
 
 function renderOpenTables() {
     const openTablesCount = document.getElementById('openTablesCount');
@@ -349,6 +351,7 @@ function renderOrderScreen() {
     if (orderTotalDisplayPayment) orderTotalDisplayPayment.textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
     if (paymentTableNumber) paymentTableNumber.textContent = currentOrder.tableNumber || `Mesa ${currentOrder.id.replace('MESA_', '')}`;
     
+    // NOVO: Chama o renderMenu com o filtro de busca aplicado
     const menuItemsGrid = document.getElementById('menuItemsGrid');
     if (menuItemsGrid) {
         renderMenu(document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'all');
@@ -359,11 +362,12 @@ function renderMenu(category) {
     const menuItemsGrid = document.getElementById('menuItemsGrid');
     if (!menuItemsGrid) return;
     
+    // Obtém o valor atual da busca
     const searchInputEl = document.getElementById('searchProductInput');
     const searchValue = (searchInputEl ? searchInputEl.value : "").toLowerCase();
 
     const itemsToRender = category === 'all' ? MENU_ITEMS : MENU_ITEMS.filter(item => item.category === category);
-    
+
     const filteredItems = itemsToRender.filter(item => 
         item.name.toLowerCase().includes(searchValue)
     );
@@ -382,6 +386,7 @@ function renderMenu(category) {
         </div>
     `).join('');
 }
+
 function searchTable() {
     const searchInput = document.getElementById('searchTableInput');
     const mesaNumber = searchInput.value.trim();
@@ -794,8 +799,109 @@ function openCalculator() {
     }
 }
 
+// A função searchProducts foi embutida em renderMenu para eliminar a duplicidade
+// e evitar conflitos de escopo.
+
+// --- Funções de Manipulação de Dados (Criação/Atualização) ---
+
+async function addItemToOrder(itemId, itemName, price) {
+    if (!currentOrder) return;
+    const itemIndex = currentOrder.itemsOpen.findIndex(item => item.id === itemId);
+    const openItems = [...(currentOrder.itemsOpen || [])];
+    if (itemIndex > -1) {
+        openItems[itemIndex].quantity += 1;
+    } else {
+        openItems.push({
+            id: itemId,
+            name: itemName,
+            price: price,
+            quantity: 1,
+            observation: ''
+        });
+    }
+    try {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
+        await updateDoc(docRef, { itemsOpen: openItems });
+    } catch (e) {
+        console.error("Erro ao adicionar item:", e);
+        alert(`Erro ao adicionar item: ${e.message}`);
+    }
+}
+async function updateItemQuantity(itemId, action) {
+    if (!currentOrder) return;
+    const openItems = [...(currentOrder.itemsOpen || [])];
+    const itemIndex = openItems.findIndex(item => item.id === itemId);
+    if (itemIndex === -1) return;
+    if (action === 'increase') {
+        openItems[itemIndex].quantity += 1;
+    } else if (action === 'decrease') {
+        openItems[itemIndex].quantity -= 1;
+        if (openItems[itemIndex].quantity <= 0) {
+            openItems.splice(itemIndex, 1);
+        }
+    }
+    try {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
+        await updateDoc(docRef, { itemsOpen: openItems });
+    } catch (e) {
+        console.error("Erro ao atualizar quantidade:", e);
+        alert(`Erro ao atualizar quantidade: ${e.message}`);
+    }
+}
+async function sendOrderToProduction() {
+    if (!currentOrder || currentOrder.itemsOpen.length === 0) return;
+    const itemsToSend = currentOrder.itemsOpen.map(item => ({
+        ...item,
+        status: 'Enviado',
+        sentAt: new Date().toISOString()
+    }));
+    const newItemsSent = [...(currentOrder.itemsSent || []), ...itemsToSend];
+    try {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
+        await updateDoc(docRef, {
+            itemsSent: newItemsSent,
+            itemsOpen: [],
+            lastSent: new Date().toISOString()
+        });
+        displayMessage('Pedido enviado para a produção!', 'success');
+    } catch (e) {
+        alert(`Erro ao enviar pedido: ${e.message}`);
+        console.error("Erro ao enviar pedido: ", e);
+    }
+}
+// --- Funções da Modal de Observação ---
+function openObservationModal(itemId, itemName, existingObs) {
+    const obsModal = document.getElementById('obsModal');
+    if (!obsModal) return;
+    
+    itemToObserve = itemId;
+    document.getElementById('obsItemName').textContent = itemName;
+    document.getElementById('obsInput').value = existingObs;
+    obsModal.classList.remove('hidden');
+}
+async function saveObservation() {
+    if (!currentOrder || !itemToObserve) return;
+    const obsInput = document.getElementById('obsInput').value.trim();
+    const openItems = [...(currentOrder.itemsOpen || [])];
+    const itemIndex = openItems.findIndex(item => item.id === itemToObserve);
+    if (itemIndex > -1) {
+        openItems[itemIndex].observation = obsInput;
+        try {
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
+            await updateDoc(docRef, { itemsOpen: openItems });
+            document.getElementById('obsModal').classList.add('hidden');
+            itemToObserve = null;
+        } catch (e) {
+            console.error("Erro ao salvar observação:", e);
+            alert(`Erro ao salvar observação: ${e.message}`);
+        }
+    }
+}
+
+
 function initializeListeners() {
     document.body.addEventListener('click', (e) => {
+        // --- Lógica do Botão Adicionar Item (Ícone +) ---
         const addButton = e.target.closest('.add-to-order-btn');
         if (addButton) {
             const card = addButton.closest('.menu-item');
@@ -806,6 +912,7 @@ function initializeListeners() {
             );
             return;
         }
+        
         const qtyButton = e.target.closest('.qty-btn');
         if (qtyButton) {
             const itemId = qtyButton.getAttribute('data-item-id');
@@ -840,6 +947,7 @@ function initializeListeners() {
             return;
         }
         
+        // --- Lógica do Botão Ir para Pagamento (Ícone de Moeda) ---
         const goToPaymentBtn = document.getElementById('goToPaymentBtn');
         if (goToPaymentBtn && e.target.closest('#goToPaymentBtn')) {
             if (currentOrder && currentOrder.itemsSent.length > 0) {
@@ -923,12 +1031,7 @@ function initializeListeners() {
             });
             categoryBtn.classList.add('bg-indigo-600', 'text-white');
             categoryBtn.classList.remove('bg-white', 'text-gray-700');
-            renderMenu(category);
-            // Chama a busca quando a categoria muda para filtrar os resultados
-            const searchInput = document.getElementById('searchProductInput').value.toLowerCase();
-            if (searchInput) {
-                 searchProducts();
-            }
+            renderMenu(category); // Renderiza o menu da nova categoria com o filtro de busca aplicado
             return;
         }
         
@@ -947,8 +1050,11 @@ function initializeListeners() {
 
     const searchProductInput = document.getElementById('searchProductInput');
     if (searchProductInput) {
+        // O evento de 'input' chama renderMenu, que já contém a lógica de filtragem
         searchProductInput.addEventListener('input', () => {
-            renderMenu(document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'all');
+             // Obtém a categoria atualmente selecionada ou usa 'all' como padrão
+            const currentCategory = document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'all';
+            renderMenu(currentCategory);
         });
     }
 }
