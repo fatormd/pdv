@@ -273,7 +273,7 @@ function renderOrderScreen() {
     
     // 4. MUDANÇA: Calcula e exibe o valor restante
     const remainingBalanceDisplay = document.getElementById('remainingBalanceDisplay');
-    const paidTotal = finalCharge.payments.reduce((sum, p) => sum + p.value, 0);
+    const paidTotal = finalCharge.payments.reduce((sum, p) => p.value, 0);
     let remaining = total - paidTotal;
     if(remainingBalanceDisplay) remainingBalanceDisplay.textContent = `R$ ${Math.max(0, remaining).toFixed(2).replace('.', ',')}`;
     
@@ -743,6 +743,7 @@ async function finalizeOrder() {
 
 // --- Funções de Inicialização e Listeners de UI ---
 function initializeListeners() {
+    // ⚠️ CRÍTICO: Delegação de eventos no BODY para elementos dinâmicos
     document.body.addEventListener('click', (e) => {
         // --- Lógica de Pedidos/Menu ---
         const addButton = e.target.closest('.add-to-order-btn');
@@ -891,7 +892,6 @@ function initializeListeners() {
             return;
         }
 
-        // --- Listeners de Categoria ---
         const categoryBtn = e.target.closest('.category-btn');
         if (categoryBtn) {
             const category = categoryBtn.getAttribute('data-category');
