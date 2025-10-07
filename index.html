@@ -23,9 +23,8 @@
     </div>
 
     <main id="mainContent" class="relative overflow-hidden hidden">
-        <div id="appContainer">
-            <div id="panelScreen" class="screen-panel max-w-md mx-auto">
-                
+        <div id="appContainer" class="flex w-[300vw] transition-transform duration-300 ease-out">
+            <div id="panelScreen" class="w-[100vw] max-w-full flex-shrink-0 p-4">
                 <div class="content-card bg-white p-4 mb-6">
                     <h3 class="text-lg font-semibold text-indigo-700 mb-3">Abrir Nova Mesa</h3>
             
@@ -50,14 +49,14 @@
                     </div>
                     
                     <div id="openTablesList" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 gap-3">
-                        <div class="col-span-2 text-sm text-gray-500 italic p-4 content-card bg-white">Nenhuma mesa aberta.</div>
+                        <div class="col-span-full text-sm text-gray-500 italic p-4 content-card bg-white">Nenhuma mesa aberta.</div>
                     </div>
                 </div>
             </div>
 
-            <div id="orderScreen" class="screen-order max-w-md mx-auto">
+            <div id="orderScreen" class="w-[100vw] max-w-full flex-shrink-0 p-4">
                 <div class="flex items-center justify-between mb-4">
-                
+            
                     <div class="flex items-center text-indigo-700">
                         <button id="backToPanelFromOrderBtn" class="mr-2 text-3xl p-2 hover:text-indigo-900 transition duration-150">
                             <i class="fas fa-arrow-left"></i>
@@ -65,101 +64,14 @@
                         <span class="text-2xl font-semibold mr-3" id="current-table-number">Mesa 2</span>
                     </div>
                     
-                    <button id="toggleReviewBtn" class="rounded-full bg-gray-500 p-3 text-white shadow-lg hover:bg-green-600 transition duration-150 w-12 h-12 flex items-center justify-center">
-                        <i class="fas fa-tag text-xl"></i>
+                    <button id="goToPaymentBtn" class="rounded-full bg-gray-500 p-3 text-white shadow-lg hover:bg-green-600 transition duration-150 w-12 h-12 flex items-center justify-center">
+                        <i class="fas fa-money-bill-wave text-xl"></i>
                     </button>
                 </div>
 
-                <div id="reviewDetailsContainer" class="content-card bg-white transition-container hidden-state review-box">
-                    <div class="p-4">
-                        <h2 class="text-xl font-semibold text-green-700 mb-4">Itens Enviados</h2>
-                        <div id="reviewItemsList" class="space-y-3 pt-2">
-                            </div>
-                        
-                        <div class="flex justify-between items-center border-t border-gray-200 pt-4 mt-4">
-                            <div>
-                                <span class="text-xl font-bold text-gray-800">SUBTOTAL:</span>
-                                <p class="text-xs text-gray-500">Valor dos produtos consumidos.</p>
-                            </div>
-                            <span class="text-2xl font-bold text-indigo-700" id="orderSubtotalDisplay">R$ 0,00</span>
-                        </div>
-   
-                        <div class="flex justify-between items-center border-b border-gray-200 pb-2">
-                            <div>
-                                <span class="text-lg font-bold text-green-700">SERVIÇO (10%):</span>
-                                <p class="text-xs text-gray-500">Taxa opcional de serviço.</p>
-                            </div>
-                            <div class="flex items-center space-x-2">
-                                <span class="text-lg font-bold text-green-700" id="orderServiceTaxDisplay">R$ 0,00</span>
-                                <button id="toggleServiceTaxBtn" class="px-2 py-1 text-xs rounded-full transition duration-150 bg-green-500 text-white hover:bg-green-600">
-                                    Aplicado
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="flex justify-between items-center pt-2">
-                            <span class="text-xl font-bold text-gray-800">TOTAL GERAL:</span>
-                            <span class="text-3xl font-extrabold text-indigo-700" id="orderTotalDisplay">R$ 0,00</span>
-                        </div>
-                        
-                        <div class="flex justify-between items-center pt-1 border-t border-dashed border-gray-300 mt-2">
-                            <span class="text-lg font-semibold text-red-600">VALOR RESTANTE:</span>
-                            <span class="text-xl font-extrabold text-red-600" id="remainingBalanceDisplay">R$ 0,00</span>
-                        </div>
-                    </div>
-                    
-                    <div id="chargeInputsAndSummary" class="p-4 pt-0">
-                        <h4 class="text-lg font-semibold text-gray-700 mb-3">Registrar Pagamento</h4>
-                        <div class="space-y-3">
-                            <div id="paymentMethodButtons" class="grid grid-cols-3 gap-2">
-                                <button data-method="Dinheiro" class="payment-method-btn active px-4 py-3 bg-indigo-600 text-white rounded-lg font-semibold transition duration-150 shadow-md hover:bg-indigo-700">
-                                    <i class="fas fa-money-bill-wave mr-1"></i> Dinheiro
-                                </button>
-                                <button data-method="Cartão Débito" class="payment-method-btn px-4 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold transition duration-150 hover:bg-gray-300">
-                                    <i class="fas fa-credit-card mr-1"></i> Débito
-                                </button>
-                                <button data-method="Cartão Crédito" class="payment-method-btn px-4 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold transition duration-150 hover:bg-gray-300">
-                                    <i class="fas fa-credit-card mr-1"></i> Crédito
-                                </button>
-                                <button data-method="PIX" class="payment-method-btn px-4 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold transition duration-150 hover:bg-gray-300">
-                                    <i class="fas fa-qrcode mr-1"></i> PIX
-                                </button>
-                                <button data-method="Vale-Refeição" class="payment-method-btn px-4 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold transition duration-150 hover:bg-gray-300">
-                                    <i class="fas fa-utensils mr-1"></i> Vale-Refeição
-                                </button>
-                                <button data-method="Voucher/Cupom" class="payment-method-btn px-4 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold transition duration-150 hover:bg-gray-300">
-                                    <i class="fas fa-tag mr-1"></i> Voucher
-                                </button>
-                            </div>
-
-                            <div class="flex space-x-2">
-                                <input type="number" id="paymentValueInput" placeholder="Valor Pago" class="w-full p-3 input-pdv border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" min="0.01">
-                                <button class="bg-gray-200 text-gray-700 font-bold py-3 px-4 rounded-lg hover:bg-gray-300 transition text-base disabled:opacity-50" id="openCalculatorBtn" title="Abrir Calculadora">
-                                    <i class="fas fa-calculator"></i>
-                                </button>
-                            </div>
-                            
-                            <button id="addPaymentBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition duration-150 text-base disabled:opacity-50">
-                                Adicionar Pagamento
-                            </button>
-                        </div>
-                        
-                        <h4 class="text-sm font-semibold text-gray-500 mt-4 mb-2">Pagamentos:</h4>
-                        <div id="paymentSummaryList" class="max-h-24 overflow-y-auto space-y-1 p-2 bg-gray-50 rounded-lg border border-gray-200 text-sm">
-                            </div>
-                    </div>
-
-                    <div class="flex justify-end space-x-3 p-4 pt-0">
-                        <button id="finalizeOrderBtn" class="px-4 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition text-base disabled:opacity-50" disabled>
-                            Fechar Conta
-                        </button>
-                    </div>
-                </div>
-                
- 
-                <div id="orderingInputs" class="transition-container space-y-4">
-                    <div class="p-4">
-                        <div id="newOrderContainer" class="content-card bg-white p-4">
+                <div id="orderingInputs" class="space-y-4">
+                    <div class="p-4 content-card bg-white">
+                        <div id="newOrderContainer">
                             <div class="flex justify-between items-center mb-4">
                                 <h2 class="text-xl font-semibold text-gray-700">Itens Selecionados (<span id="openItemsCount">0</span>)</h2>
                                 <button id="sendOrderButton" class="bg-indigo-600 text-white p-3 rounded-full hover:bg-indigo-700 transition duration-150 disabled:opacity-50" disabled>
@@ -174,7 +86,7 @@
                     </div>
                 </div>
 
-                <div id="menuContainer" class="mt-6 transition-container">
+                <div id="menuContainer" class="mt-6">
                     <div class="flex justify-between items-center mb-4 px-4">
                         <h2 class="text-xl font-bold text-gray-800">Cardápio</h2>
                         <div class="relative">
@@ -193,10 +105,103 @@
                         </div>
                 </div>
             </div>
+            
+            <div id="paymentScreen" class="w-[100vw] max-w-full flex-shrink-0 p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center text-indigo-700">
+                        <button id="backToOrderFromPaymentBtn" class="mr-2 text-3xl p-2 hover:text-indigo-900 transition duration-150">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <span class="text-2xl font-semibold mr-3" id="payment-table-number">Mesa 2</span>
+                    </div>
+                </div>
+
+                <div class="content-card bg-white p-4 mb-6">
+                    <h2 class="text-xl font-semibold text-green-700 mb-4">Resumo da Conta</h2>
+                    <div id="reviewItemsList" class="space-y-3 pt-2">
+                    </div>
+                    
+                    <div class="flex justify-between items-center border-t border-gray-200 pt-4 mt-4">
+                        <div>
+                            <span class="text-xl font-bold text-gray-800">SUBTOTAL:</span>
+                            <p class="text-xs text-gray-500">Valor dos produtos consumidos.</p>
+                        </div>
+                        <span class="text-2xl font-bold text-indigo-700" id="orderSubtotalDisplayPayment">R$ 0,00</span>
+                    </div>
+
+                    <div class="flex justify-between items-center border-b border-gray-200 pb-2">
+                        <div>
+                            <span class="text-lg font-bold text-green-700">SERVIÇO (10%):</span>
+                            <p class="text-xs text-gray-500">Taxa opcional de serviço.</p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-lg font-bold text-green-700" id="orderServiceTaxDisplayPayment">R$ 0,00</span>
+                            <button id="toggleServiceTaxBtn" class="px-2 py-1 text-xs rounded-full transition duration-150 bg-green-500 text-white hover:bg-green-600">
+                                Aplicado
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between items-center pt-2">
+                        <span class="text-xl font-bold text-gray-800">TOTAL GERAL:</span>
+                        <span class="text-3xl font-extrabold text-indigo-700" id="orderTotalDisplayPayment">R$ 0,00</span>
+                    </div>
+                </div>
+                
+                <div id="chargeInputsAndSummary" class="p-4 pt-0 content-card bg-white">
+                    <h4 class="text-lg font-semibold text-gray-700 mb-3">Registrar Pagamento</h4>
+                    <div class="space-y-3">
+                        <div id="paymentMethodButtons" class="grid grid-cols-3 gap-2">
+                            <button data-method="Dinheiro" class="payment-method-btn px-4 py-3 bg-indigo-600 text-white rounded-lg font-semibold transition duration-150 shadow-md hover:bg-indigo-700">
+                                <i class="fas fa-money-bill-wave mr-1"></i> Dinheiro
+                            </button>
+                            <button data-method="Cartão Débito" class="payment-method-btn px-4 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold transition duration-150 hover:bg-gray-300">
+                                <i class="fas fa-credit-card mr-1"></i> Débito
+                            </button>
+                            <button data-method="Cartão Crédito" class="payment-method-btn px-4 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold transition duration-150 hover:bg-gray-300">
+                                <i class="fas fa-credit-card mr-1"></i> Crédito
+                            </button>
+                            <button data-method="PIX" class="payment-method-btn px-4 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold transition duration-150 hover:bg-gray-300">
+                                <i class="fas fa-qrcode mr-1"></i> PIX
+                            </button>
+                            <button data-method="Vale-Refeição" class="payment-method-btn px-4 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold transition duration-150 hover:bg-gray-300">
+                                <i class="fas fa-utensils mr-1"></i> Vale-Refeição
+                            </button>
+                            <button data-method="Voucher/Cupom" class="payment-method-btn px-4 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold transition duration-150 hover:bg-gray-300">
+                                <i class="fas fa-tag mr-1"></i> Voucher
+                            </button>
+                        </div>
+                        <div class="flex space-x-2">
+                            <input type="number" id="paymentValueInput" placeholder="Valor Pago" class="w-full p-3 input-pdv border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" min="0.01">
+                            <button class="bg-gray-200 text-gray-700 font-bold py-3 px-4 rounded-lg hover:bg-gray-300 transition text-base disabled:opacity-50" id="openCalculatorBtn" title="Abrir Calculadora">
+                                <i class="fas fa-calculator"></i>
+                            </button>
+                        </div>
+                        <button id="addPaymentBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition duration-150 text-base disabled:opacity-50">
+                            Adicionar Pagamento
+                        </button>
+                    </div>
+                    
+                    <h4 class="text-sm font-semibold text-gray-500 mt-4 mb-2">Pagamentos:</h4>
+                    <div id="paymentSummaryList" class="max-h-24 overflow-y-auto space-y-1 p-2 bg-gray-50 rounded-lg border border-gray-200 text-sm">
+                        <p class="text-xs text-gray-500 italic p-2">Nenhum pagamento registrado.</p>
+                        <div class="flex justify-between items-center py-1 font-bold border-t border-gray-200 mt-2 pt-2">
+                            <span>VALOR RESTANTE:</span>
+                            <span id="remainingBalanceDisplay" class="text-red-600">R$ 0,00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3 p-4 pt-0">
+                    <button id="finalizeOrderBtn" class="px-4 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition text-base disabled:opacity-50" disabled>
+                        Fechar Conta
+                    </button>
+                </div>
+            </div>
         </div>
     </main>
 
-  
+    
     <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 class="text-xl font-bold mb-4 text-indigo-700">Detalhes do Item</h3>
