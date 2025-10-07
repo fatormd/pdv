@@ -3,23 +3,23 @@ import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged }
 import { getFirestore, doc, onSnapshot, setDoc, collection, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // --- Configuração e Variáveis Globais (ATENÇÃO: SUBSTITUA AQUI) ---
-const appId = '1:1097659747429:web:8ec0a7c3978c311dbe0a8c'; 
+const appId = '1:1097659747429:web:8ec0a7c3978c311dbe0a8c';
 const firebaseConfig = {
-  apiKey: "AIzaSyCiquxozxlU2dmlNCCwUG1sjpZVzOuZd0M",
-  authDomain: "fator-pdv.firebaseapp.com",
-  projectId: "fator-pdv",
-  storageBucket: "fator-pdv.firebasestorage.app",
-  messagingSenderId: "1097659747429",
-  appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c",
-  measurementId: "G-02QWNRXRCV"
+    apiKey: "AIzaSyCiquxozxlU2dmlNCCwUG1sjpZVzOuZd0M",
+    authDomain: "fator-pdv.firebaseapp.com",
+    projectId: "fator-pdv",
+    storageBucket: "fator-pdv.firebasestorage.app",
+    messagingSenderId: "1097659747429",
+    appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c",
+    measurementId: "G-02QWNRXRCV"
 };
 const initialAuthToken = null;
 
 let app, db, auth;
 let userId = null;
-let tablesData = []; 
-let currentOrder = null; 
-let itemToObserve = null; 
+let tablesData = [];
+let currentOrder = null;
+let itemToObserve = null;
 let currentMode = 0;
 let unsubscribeOrder = null;
 
@@ -33,7 +33,7 @@ let finalCharge = {
 let selectedPaymentMethod = 'Dinheiro';
 let isAppLoading = true;
 let isAuthReady = false;
-let appErrorMessage = null; 
+let appErrorMessage = null;
 
 const MENU_ITEMS = [
     { id: 'picanha', name: 'Picanha Grelhada', price: 79.90, category: 'main' },
@@ -52,7 +52,6 @@ function calculateSubtotal(order) {
     const allItems = [...(order.itemsOpen || []), ...(order.itemsSent || [])];
     
     allItems.forEach(item => {
-        // CORREÇÃO CRÍTICA: Garante que price e quantity são números válidos (ou 0)
         const price = Number(item.price) || 0;
         const quantity = Number(item.quantity) || 0;
         subtotal += (price * quantity);
@@ -64,7 +63,7 @@ function calculateTotal(subtotal, applyServiceTax, taxRate = 0.10) {
     return subtotal + taxValue;
 }
 function calculatePaidTotal() {
-    return finalCharge.payments.reduce((sum, payment) => payment.value, 0);
+    return finalCharge.payments.reduce((sum, payment) => sum + payment.value, 0);
 }
 
 // --- Funções Auxiliares de UI (Movidas para o Escopo Global) ---
@@ -88,7 +87,6 @@ function displayMessage(message, type = 'info') {
     }, 4000);
 }
 
-
 // --- 1. Inicialização do Firebase e Autenticação ---
 async function initializeFirebase() {
     const userIdDisplay = document.getElementById('user-id-display');
@@ -110,7 +108,7 @@ async function initializeFirebase() {
                         userId = user.uid;
                         userIdDisplay.textContent = `Usuário ID: ${userId}`;
                         isAuthReady = true;
-                        setupTableListener(); 
+                        setupTableListener();
                     } else {
                         reject(new Error("Falha na autenticação do Firebase."));
                     }
@@ -145,7 +143,7 @@ function renderAppStatus() {
     } else {
         statusScreen.classList.add('hidden');
         mainContent.classList.remove('hidden');
-        userIdDisplay.classList.remove('hidden'); 
+        userIdDisplay.classList.remove('hidden');
     }
 }
 
@@ -160,7 +158,7 @@ function setupTableListener() {
             const data = doc.data();
             if (data.status === 'Aberta') {
                 const subtotal = calculateSubtotal(data);
-                const total = calculateTotal(subtotal, data.serviceTaxApplied !== false); 
+                const total = calculateTotal(subtotal, data.serviceTaxApplied !== false);
                 tablesData.push({ id: doc.id, ...data, total });
             }
         });
@@ -203,7 +201,7 @@ function showPanelScreen() {
     if (unsubscribeOrder) unsubscribeOrder();
     currentOrder = null;
     currentMode = 0;
-    renderOrderScreen(); 
+    renderOrderScreen();
 }
 
 function showOrderScreen(tableId) {
@@ -263,7 +261,7 @@ function renderOrderScreen() {
     const sentItems = currentOrder.itemsSent || [];
 
     const subtotal = calculateSubtotal(currentOrder);
-    const serviceTaxApplied = currentOrder.serviceTaxApplied !== false; 
+    const serviceTaxApplied = currentOrder.serviceTaxApplied !== false;
     const taxValue = serviceTaxApplied ? subtotal * finalCharge.taxRate : 0;
     const total = subtotal + taxValue;
 
@@ -278,8 +276,8 @@ function renderOrderScreen() {
     if(remainingBalanceDisplay) remainingBalanceDisplay.textContent = `R$ ${Math.max(0, remaining).toFixed(2).replace('.', ',')}`;
     
     if (currentOrder.total !== total) {
-         const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
-         updateDoc(docRef, { total: total, serviceTaxApplied: serviceTaxApplied }).catch(console.error);
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
+        updateDoc(docRef, { total: total, serviceTaxApplied: serviceTaxApplied }).catch(console.error);
     }
     
     if(openItemsCount) openItemsCount.textContent = openItems.length;
@@ -353,12 +351,12 @@ function renderMenu(category) {
     if (!menuItemsGrid) return;
     menuItemsGrid.innerHTML = MENU_ITEMS.filter(item => item.category === category).map(item => `
         <div class="menu-item content-card bg-white p-3 flex flex-col justify-between items-start text-left hover:shadow-lg transition duration-200"
-                data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
+                 data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
             <p class="font-semibold text-gray-800 text-base">${item.name}</p>
             <div class="flex items-center justify-between w-full mt-1">
                 <p class="text-lg font-bold text-indigo-700">${item.price.toFixed(2).replace('.', ',')}</p>
                 <button class="add-to-order-btn bg-green-500 text-white font-bold p-2 rounded-md hover:bg-green-600 transition"
-                        data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
+                         data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
                     <i class="fas fa-plus text-sm"></i>
                 </button>
             </div>
@@ -380,7 +378,7 @@ function searchTable() {
     }
 }
 
-// 5. MUDANÇA: O botão de envio de pedido que estava abaixo foi removido do HTML. 
+// 5. MUDANÇA: O botão de envio de pedido que estava abaixo foi removido do HTML.
 // A única chamada agora está no cabeçalho do pedido.
 //
 // 11. MUDANÇA: O botão "Fechar Conta" na verdade chama a função de "Finalizar Pedido".
@@ -401,11 +399,11 @@ async function openTable() {
     const newOrder = {
         tableNumber: tableNumberDisplay,
         diners: pessoasCount,
-        itemsOpen: [], 
-        itemsSent: [], 
+        itemsOpen: [],
+        itemsSent: [],
         status: 'Aberta',
         serviceTaxApplied: true,
-        payments: [], 
+        payments: [],
         total: 0,
         createdAt: new Date().toISOString(),
         createdBy: userId
@@ -468,7 +466,7 @@ async function transferSentItem(itemId) {
             targetItemsSent = targetDocSnap.data().itemsSent || [];
         } else {
             alert(`A mesa ${targetTableNumber} não está aberta.`);
-            await updateDoc(originDocRef, { itemsSent: currentOrder.itemsSent }); 
+            await updateDoc(originDocRef, { itemsSent: currentOrder.itemsSent });
             return;
         }
         const newTargetItemsSent = [...targetItemsSent, itemToTransfer];
@@ -537,9 +535,10 @@ async function sendOrderToProduction() {
         const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
         await updateDoc(docRef, {
             itemsSent: newItemsSent,
-            itemsOpen: [], 
+            itemsOpen: [],
             lastSent: new Date().toISOString()
         });
+        displayMessage('Pedido enviado para a produção!', 'success');
     } catch (e) {
         alert(`Erro ao enviar pedido: ${e.message}`);
         console.error("Erro ao enviar pedido: ", e);
@@ -551,7 +550,7 @@ function openObservationModal(itemId, itemName, existingObs) {
     const obsModal = document.getElementById('obsModal');
     if (!obsModal) return;
     
-    itemToObserve = itemId; 
+    itemToObserve = itemId;
     document.getElementById('obsItemName').textContent = itemName;
     document.getElementById('obsInput').value = existingObs;
     obsModal.classList.remove('hidden');
@@ -588,16 +587,16 @@ function openChargeModal() {
 
 function updateChargeModalUI() {
     const remainingBalanceDisplay = document.getElementById('remainingBalanceDisplay');
-    const serviceTaxValue = document.getElementById('serviceTaxValue');
+    const serviceTaxValue = document.getElementById('orderServiceTaxDisplay');
     const toggleServiceTaxBtn = document.getElementById('toggleServiceTaxBtn');
     const paymentSummaryList = document.getElementById('paymentSummaryList');
     const finalizeOrderBtn = document.getElementById('finalizeOrderBtn');
     
     finalCharge.total = calculateTotal(finalCharge.subtotal, finalCharge.serviceTaxApplied, finalCharge.taxRate);
     const paidTotal = calculatePaidTotal();
-    let remainingBalance = parseFloat((finalCharge.total - paidTotal).toFixed(2)); 
-
-    if (remainingBalanceDisplay) remainingBalanceDisplay.textContent = `R$ ${Math.max(0, remainingBalance).toFixed(2).replace('.', ',')}`;
+    let remainingBalance = parseFloat((finalCharge.total - paidTotal).toFixed(2));
+    
+    if(remainingBalanceDisplay) remainingBalanceDisplay.textContent = `R$ ${Math.max(0, remainingBalance).toFixed(2).replace('.', ',')}`;
     
     const taxValue = finalCharge.serviceTaxApplied ? finalCharge.subtotal * finalCharge.taxRate : 0;
     if(serviceTaxValue) serviceTaxValue.textContent = `R$ ${taxValue.toFixed(2).replace('.', ',')}`;
@@ -610,22 +609,25 @@ function updateChargeModalUI() {
     }
 
     if (paymentSummaryList) {
+        let paymentsHtml = finalCharge.payments.map((p, index) => `
+            <div class="flex justify-between items-center py-1">
+                <span class="font-medium">${p.method}</span>
+                <span class="font-bold text-gray-800">R$ ${p.value.toFixed(2).replace('.', ',')}</span>
+                <button data-payment-index="${index}" class="remove-payment-btn text-red-500 hover:text-red-700 text-sm" title="Remover Pagamento">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `).join('');
+        
         if (finalCharge.payments.length === 0) {
-            paymentSummaryList.innerHTML = `<p class="text-xs text-gray-500 italic p-2">Nenhum pagamento registrado.</p>`;
-        } else {
-            paymentSummaryList.innerHTML = finalCharge.payments.map((p, index) => `
-                <div class="flex justify-between items-center py-1">
-                    <span class="font-medium">${p.method}</span>
-                    <span class="font-bold text-gray-800">R$ ${p.value.toFixed(2).replace('.', ',')}</span>
-                    <button data-payment-index="${index}" class="remove-payment-btn text-red-500 hover:text-red-700 text-sm" title="Remover Pagamento">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            `).join('');
-            document.querySelectorAll('.remove-payment-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => removePayment(parseInt(e.currentTarget.getAttribute('data-payment-index'))));
-            });
+            paymentsHtml = `<p class="text-xs text-gray-500 italic p-2">Nenhum pagamento registrado.</p>`;
         }
+        
+        paymentSummaryList.innerHTML = paymentsHtml;
+        
+        document.querySelectorAll('.remove-payment-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => removePayment(parseInt(e.currentTarget.getAttribute('data-payment-index'))));
+        });
     }
     
     if(finalizeOrderBtn) {
@@ -686,7 +688,7 @@ function addPayment() {
         timestamp: new Date().toISOString()
     });
     
-    valueInput.value = ''; 
+    valueInput.value = '';
     updateChargeModalUI();
 }
 
@@ -711,7 +713,7 @@ async function finalizeOrder() {
     if (!currentOrder) return;
     const totalDue = calculateTotal(finalCharge.subtotal, finalCharge.serviceTaxApplied, finalCharge.taxRate);
     const paidTotal = calculatePaidTotal();
-    let remainingBalance = parseFloat((totalDue - paidTotal).toFixed(2)); 
+    let remainingBalance = parseFloat((totalDue - paidTotal).toFixed(2));
     if (remainingBalance > 0.01) {
         alert("O saldo devedor ainda é maior que zero. Registre mais pagamentos.");
         return;
@@ -743,9 +745,7 @@ async function finalizeOrder() {
 
 // --- Funções de Inicialização e Listeners de UI ---
 function initializeListeners() {
-    // ⚠️ CRÍTICO: Delegação de eventos no BODY para elementos dinâmicos
     document.body.addEventListener('click', (e) => {
-        // --- Lógica de Pedidos/Menu ---
         const addButton = e.target.closest('.add-to-order-btn');
         if (addButton) {
             const card = addButton.closest('.menu-item');
@@ -756,8 +756,6 @@ function initializeListeners() {
             );
             return;
         }
-
-        // --- Lógica de Modais/Ações de Item Selecionado (+ / - / Obs) ---
         const qtyButton = e.target.closest('.qty-btn');
         if (qtyButton) {
             const itemId = qtyButton.getAttribute('data-item-id');
@@ -767,7 +765,6 @@ function initializeListeners() {
             }
             return;
         }
-
         const obsButton = e.target.closest('.obs-btn');
         if (obsButton) {
             const card = obsButton.closest('div[data-item-id]');
@@ -777,27 +774,21 @@ function initializeListeners() {
             openObservationModal(itemId, itemName, currentObs);
             return;
         }
-
-        // --- Lógica de Navegação e Painel ---
-        
         const searchTableBtn = document.getElementById('searchTableBtn');
         if (searchTableBtn && e.target.closest('#searchTableBtn')) {
             searchTable();
             return;
         }
-
         const abrirMesaBtn = document.getElementById('abrirMesaBtn');
         if(abrirMesaBtn && e.target.closest('#abrirMesaBtn')) {
             openTable();
             return;
         }
-
         const backToPanelFromOrderBtn = document.getElementById('backToPanelFromOrderBtn');
         if(backToPanelFromOrderBtn && e.target.closest('#backToPanelFromOrderBtn')) {
             showPanelScreen();
             return;
         }
-
         const toggleReviewBtn = document.getElementById('toggleReviewBtn');
         if (toggleReviewBtn && e.target.closest('#toggleReviewBtn')) {
             currentMode = (currentMode === 0) ? 2 : 0;
@@ -816,36 +807,27 @@ function initializeListeners() {
             }
             return;
         }
-        
-        // --- Listeners de Modal ---
-
         const cancelObsBtn = document.getElementById('cancelObsBtn');
         if (cancelObsBtn && e.target.closest('#cancelObsBtn')) {
             document.getElementById('obsModal').classList.add('hidden');
             return;
         }
-        
         const saveObsBtn = document.getElementById('saveObsBtn');
         if (saveObsBtn && e.target.closest('#saveObsBtn')) {
             saveObservation();
             return;
         }
-
         const cancelChargeBtn = document.getElementById('cancelChargeBtn');
         if (cancelChargeBtn && e.target.closest('#cancelChargeBtn')) {
             document.getElementById('chargeModal').classList.add('hidden');
             return;
         }
-        
         const finalizeOrderBtn = document.getElementById('finalizeOrderBtn');
         if (finalizeOrderBtn && e.target.closest('#finalizeOrderBtn')) {
-            // Chamada do modal de confirmação de fechamento
             const totalDue = calculateTotal(finalCharge.subtotal, finalCharge.serviceTaxApplied, finalCharge.taxRate);
             const paidTotal = calculatePaidTotal();
-            let remainingBalance = parseFloat((totalDue - paidTotal).toFixed(2)); 
-
+            let remainingBalance = parseFloat((totalDue - paidTotal).toFixed(2));
             if (remainingBalance <= 0.01) {
-                // Abre o modal de NF-e
                 const confirmModal = document.getElementById('confirmCloseModal');
                 document.getElementById('chargePaidDisplay').textContent = `R$ ${paidTotal.toFixed(2).replace('.', ',')}`;
                 confirmModal.classList.remove('hidden');
@@ -854,15 +836,12 @@ function initializeListeners() {
             }
             return;
         }
-        
-        // --- Listeners de Modal Confirm Close (para o novo modal) ---
         const closeTableOnlyBtn = document.getElementById('closeTableOnlyBtn');
         if(closeTableOnlyBtn && e.target.closest('#closeTableOnlyBtn')) {
-             handleCloseTable(null, calculatePaidTotal(), finalCharge.total, calculatePaidTotal() - finalCharge.total);
-             document.getElementById('confirmCloseModal').classList.add('hidden');
-             return;
+            handleCloseTable(null, calculatePaidTotal(), finalCharge.total, calculatePaidTotal() - finalCharge.total);
+            document.getElementById('confirmCloseModal').classList.add('hidden');
+            return;
         }
-        
         const confirmCloseOrderBtn = document.getElementById('confirmCloseOrderBtn');
         if(confirmCloseOrderBtn && e.target.closest('#confirmCloseOrderBtn')) {
             const taxId = document.getElementById('taxIdInput').value.trim();
@@ -870,20 +849,16 @@ function initializeListeners() {
             document.getElementById('confirmCloseModal').classList.add('hidden');
             return;
         }
-
-
         const toggleServiceTaxBtn = document.getElementById('toggleServiceTaxBtn');
         if (toggleServiceTaxBtn && e.target.closest('#toggleServiceTaxBtn')) {
             toggleServiceTax();
             return;
         }
-
         const addPaymentBtn = document.getElementById('addPaymentBtn');
         if (addPaymentBtn && e.target.closest('#addPaymentBtn')) {
             addPayment();
             return;
         }
-        
         const paymentMethodButtons = document.getElementById('paymentMethodButtons');
         if (paymentMethodButtons && e.target.closest('.payment-method-btn')) {
             const btn = e.target.closest('.payment-method-btn');
@@ -891,7 +866,6 @@ function initializeListeners() {
             selectPaymentMethod(method);
             return;
         }
-
         const categoryBtn = e.target.closest('.category-btn');
         if (categoryBtn) {
             const category = categoryBtn.getAttribute('data-category');
@@ -902,6 +876,13 @@ function initializeListeners() {
             categoryBtn.classList.add('bg-indigo-600', 'text-white');
             categoryBtn.classList.remove('bg-white', 'text-gray-700');
             renderMenu(category);
+        }
+        
+        // NOVO CÓDIGO: Listener para o botão de enviar pedido
+        const sendOrderButton = e.target.closest('#sendOrderButton');
+        if (sendOrderButton) {
+            sendOrderToProduction();
+            return;
         }
     });
 }
