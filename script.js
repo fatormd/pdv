@@ -64,7 +64,7 @@ function calculateTotal(subtotal, applyServiceTax, taxRate = 0.10) {
     return subtotal + taxValue;
 }
 function calculatePaidTotal() {
-    return finalCharge.payments.reduce((sum, payment) => sum + payment.value, 0);
+    return finalCharge.payments.reduce((sum, payment) => payment.value, 0);
 }
 
 // --- Funções Auxiliares de UI (Movidas para o Escopo Global) ---
@@ -270,6 +270,12 @@ function renderOrderScreen() {
     if(orderSubtotalDisplay) orderSubtotalDisplay.textContent = `R$ ${subtotal.toFixed(2).replace('.', ',')}`;
     if(orderServiceTaxDisplay) orderServiceTaxDisplay.textContent = `R$ ${taxValue.toFixed(2).replace('.', ',')}`;
     if(orderTotalDisplay) orderTotalDisplay.textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
+    
+    // 4. MUDANÇA: Calcula e exibe o valor restante
+    const remainingBalanceDisplay = document.getElementById('remainingBalanceDisplay');
+    const paidTotal = finalCharge.payments.reduce((sum, p) => p.value, 0); 
+    let remaining = total - paidTotal;
+    if(remainingBalanceDisplay) remainingBalanceDisplay.textContent = `R$ ${Math.max(0, remaining).toFixed(2).replace('.', ',')}`;
     
     if (currentOrder.total !== total) {
          const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
@@ -666,7 +672,7 @@ function addPayment() {
     
     const totalDue = calculateTotal(finalCharge.subtotal, finalCharge.serviceTaxApplied, finalCharge.taxRate);
     const paidTotal = calculatePaidTotal();
-    let remainingBefore = parseFloat((totalDue - paidTotal).toFixed(2));
+    const remainingBefore = parseFloat((totalDue - paidTotal).toFixed(2));
     
     if (paymentValue > remainingBefore + 0.01 && remainingBefore > 0.01) {
         if (!confirm(`O valor de R$ ${paymentValue.toFixed(2).replace('.', ',')} é maior que o saldo de R$ ${remainingBefore.toFixed(2).replace('.', ',')}. Deseja registrar este valor e dar troco?`)) {
@@ -685,6 +691,16 @@ function addPayment() {
 }
 
 function removePayment(index) {
+    if (!confirm('Deseja realmente remover este pagamento?')) {
+        return;
+    }
+    
+    const senha = prompt("Insira a senha do gerente para confirmar a remoção:");
+    if (senha !== GERENTE_SENHA) {
+        alert("Senha incorreta. Ação cancelada.");
+        return;
+    }
+
     if (index >= 0 && index < finalCharge.payments.length) {
         finalCharge.payments.splice(index, 1);
         updateChargeModalUI();
@@ -727,41 +743,65 @@ async function finalizeOrder() {
 
 // --- Funções de Inicialização e Listeners de UI ---
 function initializeListeners() {
-    // CORRIGIDO: Listener para a caixa de itens do menu
-    document.getElementById('menuItemsGrid').addEventListener('click', (e) => {
-        const button = e.target.closest('.add-to-order-btn');
-        if (button) {
-            const card = button.closest('.menu-item');
-            addItemToOrder(
-                card.getAttribute('data-item-id'),
-                card.getAttribute('data-item-name'),
-                parseFloat(card.getAttribute('data-price'))
-            );
+    // ⚠️ CRÍTICO: Delegação de eventos no BODY para elementos dinâmicos
+    document.body.addEventListener('click', (e) => {
+        // --- Lógica de Pedidos/Menu ---
+        const addButton = e.target.closest('.add-to-order-btn');
+        if (addButton) {
+            const card = addButton.closest('.menu-item');
+            if (card) {
+                addItemToOrder(
+                    card.getAttribute('data-item-id'),
+                    card.getAttribute('data-item-name'),
+                    parseFloat(card.getAttribute('data-price'))
+                );
+            }
+            return;
         }
-    });
 
-    document.querySelectorAll('.category-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const category = e.currentTarget.getAttribute('data-category');
-            document.querySelectorAll('.category-btn').forEach(b => {
-                b.classList.remove('bg-indigo-600', 'text-white', 'border-0');
-                b.classList.add('bg-white', 'text-gray-700', 'border', 'border-gray-300');
-            });
-            e.currentTarget.classList.add('bg-indigo-600', 'text-white');
-            e.currentTarget.classList.remove('bg-white', 'text-gray-700');
-            renderMenu(category);
-        });
-    });
-    
-    const searchTableBtn = document.getElementById('searchTableBtn');
-    if (searchTableBtn) searchTableBtn.addEventListener('click', searchTable);
+        // --- Lógica de Modais/Ações de Item Selecionado (+ / - / Obs) ---
+        const qtyButton = e.target.closest('.qty-btn');
+        if (qtyButton) {
+            const itemId = qtyButton.getAttribute('data-item-id');
+            const action = qtyButton.getAttribute('data-action');
+            if (action === 'increase' || action === 'decrease') {
+                updateItemQuantity(itemId, action);
+            }
+            return;
+        }
 
-    document.getElementById('abrirMesaBtn').addEventListener('click', openTable);
-    document.getElementById('backToPanelFromOrderBtn').addEventListener('click', showPanelScreen);
+        const obsButton = e.target.closest('.obs-btn');
+        if (obsButton) {
+            const card = obsButton.closest('div[data-item-id]');
+            const itemId = card.getAttribute('data-item-id');
+            const itemName = obsButton.getAttribute('data-item-name');
+            const currentObs = obsButton.getAttribute('data-obs');
+            openObservationModal(itemId, itemName, currentObs);
+            return;
+        }
 
-    const toggleReviewBtn = document.getElementById('toggleReviewBtn');
-    if (toggleReviewBtn) {
-        toggleReviewBtn.addEventListener('click', () => {
+        // --- Lógica de Navegação e Painel ---
+        
+        const searchTableBtn = document.getElementById('searchTableBtn');
+        if (searchTableBtn && e.target.closest('#searchTableBtn')) {
+            searchTable();
+            return;
+        }
+
+        const abrirMesaBtn = document.getElementById('abrirMesaBtn');
+        if(abrirMesaBtn && e.target.closest('#abrirMesaBtn')) {
+            openTable();
+            return;
+        }
+
+        const backToPanelFromOrderBtn = document.getElementById('backToPanelFromOrderBtn');
+        if(backToPanelFromOrderBtn && e.target.closest('#backToPanelFromOrderBtn')) {
+            showPanelScreen();
+            return;
+        }
+
+        const toggleReviewBtn = document.getElementById('toggleReviewBtn');
+        if (toggleReviewBtn && e.target.closest('#toggleReviewBtn')) {
             currentMode = (currentMode === 0) ? 2 : 0;
             renderOrderScreen();
             const icon = document.querySelector('#toggleReviewBtn i');
@@ -776,60 +816,97 @@ function initializeListeners() {
                     document.getElementById('toggleReviewBtn').classList.replace('bg-green-600', 'bg-gray-500');
                 }
             }
-        });
-    }
-    
-    const openOrderList = document.getElementById('openOrderList');
-    if (openOrderList) {
-        openOrderList.addEventListener('click', (e) => {
-            const target = e.target.closest('button');
-            if (!target) return;
-            const itemId = target.getAttribute('data-item-id');
-            const action = target.getAttribute('data-action');
-            if (action === 'increase' || action === 'decrease') {
-                updateItemQuantity(itemId, action);
-            } else if (target.classList.contains('obs-btn')) {
-                const itemName = target.getAttribute('data-item-name');
-                const currentObs = target.getAttribute('data-obs');
-                openObservationModal(itemId, itemName, currentObs);
+            return;
+        }
+        
+        // --- Listeners de Modal ---
+
+        const cancelObsBtn = document.getElementById('cancelObsBtn');
+        if (cancelObsBtn && e.target.closest('#cancelObsBtn')) {
+            document.getElementById('obsModal').classList.add('hidden');
+            return;
+        }
+        
+        const saveObsBtn = document.getElementById('saveObsBtn');
+        if (saveObsBtn && e.target.closest('#saveObsBtn')) {
+            saveObservation();
+            return;
+        }
+
+        const cancelChargeBtn = document.getElementById('cancelChargeBtn');
+        if (cancelChargeBtn && e.target.closest('#cancelChargeBtn')) {
+            document.getElementById('chargeModal').classList.add('hidden');
+            return;
+        }
+        
+        const finalizeOrderBtn = document.getElementById('finalizeOrderBtn');
+        if (finalizeOrderBtn && e.target.closest('#finalizeOrderBtn')) {
+            // Chamada do modal de confirmação de fechamento
+            const totalDue = calculateTotal(finalCharge.subtotal, finalCharge.serviceTaxApplied, finalCharge.taxRate);
+            const paidTotal = calculatePaidTotal();
+            let remainingBalance = parseFloat((totalDue - paidTotal).toFixed(2)); 
+
+            if (remainingBalance <= 0.01) {
+                // Abre o modal de NF-e
+                const confirmModal = document.getElementById('confirmCloseModal');
+                document.getElementById('chargePaidDisplay').textContent = `R$ ${paidTotal.toFixed(2).replace('.', ',')}`;
+                confirmModal.classList.remove('hidden');
+            } else {
+                alert("O saldo devedor ainda é maior que zero. Registre mais pagamentos.");
             }
-        });
-    }
-    
-    const sendOrderButton = document.getElementById('sendOrderButton');
-    if (sendOrderButton) sendOrderButton.addEventListener('click', () => sendOrderToProduction());
+            return;
+        }
+        
+        // --- Listeners de Modal Confirm Close (para o novo modal) ---
+        const closeTableOnlyBtn = document.getElementById('closeTableOnlyBtn');
+        if(closeTableOnlyBtn && e.target.closest('#closeTableOnlyBtn')) {
+             handleCloseTable(null, calculatePaidTotal(), finalCharge.total, calculatePaidTotal() - finalCharge.total);
+             document.getElementById('confirmCloseModal').classList.add('hidden');
+             return;
+        }
+        
+        const confirmCloseOrderBtn = document.getElementById('confirmCloseOrderBtn');
+        if(confirmCloseOrderBtn && e.target.closest('#confirmCloseOrderBtn')) {
+            const taxId = document.getElementById('taxIdInput').value.trim();
+            handleCloseTable(taxId, calculatePaidTotal(), finalCharge.total, calculatePaidTotal() - finalCharge.total);
+            document.getElementById('confirmCloseModal').classList.add('hidden');
+            return;
+        }
 
-    const openChargeModalButton = document.getElementById('openChargeModalButton');
-    if (openChargeModalButton) openChargeModalButton.addEventListener('click', openChargeModal); 
 
-    const cancelObsBtn = document.getElementById('cancelObsBtn');
-    if (cancelObsBtn) cancelObsBtn.addEventListener('click', () => document.getElementById('obsModal').classList.add('hidden'));
+        const toggleServiceTaxBtn = document.getElementById('toggleServiceTaxBtn');
+        if (toggleServiceTaxBtn && e.target.closest('#toggleServiceTaxBtn')) {
+            toggleServiceTax();
+            return;
+        }
 
-    const saveObsBtn = document.getElementById('saveObsBtn');
-    if (saveObsBtn) saveObsBtn.addEventListener('click', saveObservation);
-
-    const cancelChargeBtn = document.getElementById('cancelChargeBtn');
-    if (cancelChargeBtn) cancelChargeBtn.addEventListener('click', () => document.getElementById('chargeModal').classList.add('hidden'));
-    
-    const finalizeOrderBtn = document.getElementById('finalizeOrderBtn');
-    if (finalizeOrderBtn) finalizeOrderBtn.addEventListener('click', finalizeOrder);
-    
-    const toggleServiceTaxBtn = document.getElementById('toggleServiceTaxBtn');
-    if (toggleServiceTaxBtn) toggleServiceTaxBtn.addEventListener('click', toggleServiceTax);
-    
-    const addPaymentBtn = document.getElementById('addPaymentBtn');
-    if (addPaymentBtn) addPaymentBtn.addEventListener('click', addPayment);
-    
-    const paymentMethodButtons = document.getElementById('paymentMethodButtons');
-    if (paymentMethodButtons) paymentMethodButtons.addEventListener('click', (e) => {
-        const btn = e.target.closest('.payment-method-btn');
-        if (btn) {
+        const addPaymentBtn = document.getElementById('addPaymentBtn');
+        if (addPaymentBtn && e.target.closest('#addPaymentBtn')) {
+            addPayment();
+            return;
+        }
+        
+        const paymentMethodButtons = document.getElementById('paymentMethodButtons');
+        if (paymentMethodButtons && e.target.closest('.payment-method-btn')) {
+            const btn = e.target.closest('.payment-method-btn');
             const method = btn.getAttribute('data-method');
             selectPaymentMethod(method);
+            return;
+        }
+
+        // --- Listeners de Categoria ---
+        const categoryBtn = e.target.closest('.category-btn');
+        if (categoryBtn) {
+            const category = categoryBtn.getAttribute('data-category');
+            document.querySelectorAll('.category-btn').forEach(b => {
+                b.classList.remove('bg-indigo-600', 'text-white', 'border-0');
+                b.classList.add('bg-white', 'text-gray-700', 'border', 'border-gray-300');
+            });
+            categoryBtn.classList.add('bg-indigo-600', 'text-white');
+            categoryBtn.classList.remove('bg-white', 'text-gray-700');
+            renderMenu(category);
         }
     });
-
-    renderMenu('main');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
