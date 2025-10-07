@@ -375,7 +375,6 @@ function renderMenu(category) {
         </div>
     `).join('');
 }
-// 1. MUDANÇA: Função de busca por mesa
 function searchTable() {
     const searchInput = document.getElementById('searchTableInput');
     const mesaNumber = searchInput.value.trim();
@@ -390,7 +389,6 @@ function searchTable() {
     }
 }
 
-// NOVO: Função para buscar produtos no cardápio
 function searchProducts() {
     const searchInput = document.getElementById('searchProductInput').value.toLowerCase();
     const currentCategory = document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'all';
