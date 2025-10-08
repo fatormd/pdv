@@ -430,8 +430,78 @@ function searchProducts() {
         </div>
     `).join('');
 }
-
-// --- Funções de Inicialização e Listeners de UI ---
+// --- Funções de Inicialização do Firebase e Listeners de UI ---
+async function initializeFirebase() {
+    const userIdDisplay = document.getElementById('user-id-display');
+    try {
+        if (!firebaseConfig || !firebaseConfig.apiKey || firebaseConfig.apiKey.includes("SUA_CHAVE_API_FIREBASE")) {
+            throw new Error("Configuração do Firebase ausente ou com valores placeholder. Atualize o script.js.");
+        }
+        app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+        await new Promise((resolve, reject) => {
+            const authPromise = initialAuthToken ? signInWithCustomToken(auth, initialAuthToken) : signInAnonymously(auth);
+            authPromise.then(() => {
+                const unsubscribe = onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        userIdDisplay.textContent = `Usuário ID: ${userId}`;
+                        isAuthReady = true;
+                        setupTableListener();
+                    } else {
+                        reject(new Error("Falha na autenticação do Firebase."));
+                    }
+                    unsubscribe();
+                    resolve();
+                });
+            }).catch(reject);
+        });
+    } catch (error) {
+        console.error("Erro na inicialização do Firebase:", error);
+        appErrorMessage = `Falha ao conectar: ${error.message}`;
+    } finally {
+        isAppLoading = false;
+        renderAppStatus();
+    }
+}
+function setupTableListener() {
+    if (!db || !userId) return;
+    const tablesColRef = collection(db, 'artifacts', appId, 'public', 'data', 'orders',);
+    onSnapshot(tablesColRef, (snapshot) => {
+        tablesData = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.status === 'Aberta') {
+                const subtotal = calculateSubtotal(data);
+                const total = calculateTotal(subtotal, data.serviceTaxApplied !== false);
+                tablesData.push({ id: doc.id, ...data, total });
+            }
+        });
+        renderOpenTables();
+    }, (error) => {
+        console.error("Erro no onSnapshot de Mesas:", error);
+    });
+}
+function setupOrderListener(tableId) {
+    if (unsubscribeOrder) unsubscribeOrder();
+    if (!db || !tableId) return;
+    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', tableId);
+    unsubscribeOrder = onSnapshot(docRef, (docSnap) => {
+        if (docSnap.exists()) {
+            currentOrder = { id: docSnap.id, ...docSnap.data() };
+            if (currentOrder.status !== 'Aberta') {
+                showPanelScreen();
+                return;
+            }
+            renderOrderScreen();
+        } else {
+            showPanelScreen();
+        }
+    }, (error) => {
+        console.error(`Erro no onSnapshot da comanda ${tableId}:`, error);
+    });
+}
 function initializeListeners() {
     document.body.addEventListener('click', (e) => {
         const addButton = e.target.closest('.add-to-order-btn');
