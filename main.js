@@ -432,51 +432,36 @@ function searchProducts() {
 }
 // --- Funções de Inicialização do Firebase e Listeners de UI ---
 async function initializeFirebase() {
-    // Adicione um elemento no seu HTML com o ID "appStatus" para ver o status.
     const userIdDisplay = document.getElementById('user-id-display');
-    const appStatusEl = document.getElementById('appStatus');
-    if (appStatusEl) {
-        appStatusEl.textContent = "Conectando ao Firebase...";
-    }
-
     try {
         if (!firebaseConfig || !firebaseConfig.apiKey || firebaseConfig.apiKey.includes("SUA_CHAVE_API_FIREBASE")) {
             throw new Error("Configuração do Firebase ausente ou com valores placeholder. Atualize o script.js.");
         }
-        
         app = initializeApp(firebaseConfig);
         db = getFirestore(app);
         auth = getAuth(app);
-        
         await new Promise((resolve, reject) => {
             const authPromise = initialAuthToken ? signInWithCustomToken(auth, initialAuthToken) : signInAnonymously(auth);
-            
             authPromise.then(() => {
                 const unsubscribe = onAuthStateChanged(auth, (user) => {
-                    unsubscribe();
                     if (user) {
                         userId = user.uid;
-                        if (userIdDisplay) userIdDisplay.textContent = `Usuário ID: ${userId}`;
-                        if (appStatusEl) appStatusEl.textContent = "Conexão estabelecida.";
+                        userIdDisplay.textContent = `Usuário ID: ${userId}`;
                         isAuthReady = true;
                         setupTableListener();
-                        resolve();
                     } else {
                         reject(new Error("Falha na autenticação do Firebase."));
                     }
+                    unsubscribe();
+                    resolve();
                 });
             }).catch(reject);
         });
     } catch (error) {
         console.error("Erro na inicialização do Firebase:", error);
-        if (appStatusEl) {
-            appStatusEl.textContent = `Falha ao conectar: ${error.message}`;
-            appStatusEl.classList.add('text-red-500');
-        }
         appErrorMessage = `Falha ao conectar: ${error.message}`;
     } finally {
         isAppLoading = false;
-        // Chame sua função para esconder o spinner de loading aqui, se tiver uma.
         renderAppStatus();
     }
 }
@@ -671,4 +656,3 @@ function initializeListeners() {
         });
     }
 }
-
