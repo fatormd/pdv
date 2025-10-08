@@ -141,7 +141,7 @@ function renderOrderScreen() {
     const total = subtotal + taxValue;
 
     if(orderSubtotalDisplay) orderSubtotalDisplay.textContent = `R$ ${subtotal.toFixed(2).replace('.', ',')}`;
-    if(orderServiceTaxDisplay) orderServiceTaxDisplay.textContent = `R$ ${taxValue.toFixed(2).replace('.', ',')}`;
+    if(orderServiceTaxDisplay) orderServiceTaxDisplay.textContent = `R$ ${(total - subtotal).toFixed(2).replace('.', ',')}`;
     if(orderTotalDisplay) orderTotalDisplay.textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
     
     const paidTotal = calculatePaidTotal();
@@ -191,12 +191,6 @@ function renderOrderScreen() {
                 </div>
             </div>
         `).join('');
-        document.querySelectorAll('.remove-sent-btn').forEach(btn => {
-            btn.addEventListener('click', () => removeSentItem(btn.getAttribute('data-item-id')));
-        });
-        document.querySelectorAll('.transfer-sent-btn').forEach(btn => {
-            btn.addEventListener('click', () => transferSentItem(btn.getAttribute('data-item-id')));
-        });
     } else {
         reviewItemsList.innerHTML = `<div class="text-base text-gray-500 italic p-2">Nenhum item enviado.</div>`;
     }
@@ -248,7 +242,7 @@ function renderMenu(category) {
             <div class="flex items-center justify-between w-full mt-1">
                 <p class="text-lg font-bold text-indigo-700">R$ ${item.price.toFixed(2).replace('.', ',')}</p>
                 <button class="add-to-order-btn bg-green-500 text-white font-bold p-2 rounded-md hover:bg-green-600 transition"
-                         data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
+                             data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
                     <i class="fas fa-plus text-sm"></i>
                 </button>
             </div>
@@ -423,236 +417,204 @@ function searchProducts() {
             <div class="flex items-center justify-between w-full mt-1">
                 <p class="text-lg font-bold text-indigo-700">R$ ${item.price.toFixed(2).replace('.', ',')}</p>
                 <button class="add-to-order-btn bg-green-500 text-white font-bold p-2 rounded-md hover:bg-green-600 transition"
-                         data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
+                             data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
                     <i class="fas fa-plus text-sm"></i>
                 </button>
             </div>
         </div>
     `).join('');
 }
-// --- Funções de Inicialização do Firebase e Listeners de UI ---
-async function initializeFirebase() {
-    const userIdDisplay = document.getElementById('user-id-display');
+
+// --- Funções de Manipulação de Dados (Criação, Atualização, Exclusão) ---
+
+/**
+ * Salva as alterações do pedido atual no Firebase Firestore.
+ */
+async function saveOrderToFirebase() {
+    if (!currentOrder || !db) return;
+    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
     try {
-        if (!firebaseConfig || !firebaseConfig.apiKey || firebaseConfig.apiKey.includes("SUA_CHAVE_API_FIREBASE")) {
-            throw new Error("Configuração do Firebase ausente ou com valores placeholder. Atualize o script.js.");
-        }
-        app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
-        auth = getAuth(app);
-        await new Promise((resolve, reject) => {
-            const authPromise = initialAuthToken ? signInWithCustomToken(auth, initialAuthToken) : signInAnonymously(auth);
-            authPromise.then(() => {
-                const unsubscribe = onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        userId = user.uid;
-                        userIdDisplay.textContent = `Usuário ID: ${userId}`;
-                        isAuthReady = true;
-                        setupTableListener();
-                    } else {
-                        reject(new Error("Falha na autenticação do Firebase."));
-                    }
-                    unsubscribe();
-                    resolve();
-                });
-            }).catch(reject);
-        });
-    } catch (error) {
-        console.error("Erro na inicialização do Firebase:", error);
-        appErrorMessage = `Falha ao conectar: ${error.message}`;
-    } finally {
-        isAppLoading = false;
-        renderAppStatus();
+        await setDoc(docRef, currentOrder);
+        displayMessage('Pedido atualizado com sucesso!', 'success');
+    } catch (e) {
+        console.error("Erro ao salvar o pedido:", e);
+        displayMessage('Erro ao salvar o pedido.', 'error');
     }
 }
-function setupTableListener() {
-    if (!db || !userId) return;
-    const tablesColRef = collection(db, 'artifacts', appId, 'public', 'data', 'orders',);
-    onSnapshot(tablesColRef, (snapshot) => {
-        tablesData = [];
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            if (data.status === 'Aberta') {
-                const subtotal = calculateSubtotal(data);
-                const total = calculateTotal(subtotal, data.serviceTaxApplied !== false);
-                tablesData.push({ id: doc.id, ...data, total });
-            }
-        });
-        renderOpenTables();
-    }, (error) => {
-        console.error("Erro no onSnapshot de Mesas:", error);
-    });
-}
-function setupOrderListener(tableId) {
-    if (unsubscribeOrder) unsubscribeOrder();
-    if (!db || !tableId) return;
-    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', tableId);
-    unsubscribeOrder = onSnapshot(docRef, (docSnap) => {
-        if (docSnap.exists()) {
-            currentOrder = { id: docSnap.id, ...docSnap.data() };
-            if (currentOrder.status !== 'Aberta') {
-                showPanelScreen();
-                return;
-            }
-            renderOrderScreen();
-        } else {
-            showPanelScreen();
-        }
-    }, (error) => {
-        console.error(`Erro no onSnapshot da comanda ${tableId}:`, error);
-    });
-}
-function initializeListeners() {
-    document.body.addEventListener('click', (e) => {
-        const addButton = e.target.closest('.add-to-order-btn');
-        if (addButton) {
-            const card = addButton.closest('.menu-item');
-            addItemToOrder(
-                card.getAttribute('data-item-id'),
-                card.getAttribute('data-item-name'),
-                parseFloat(card.getAttribute('data-price'))
-            );
-            return;
-        }
-        const qtyButton = e.target.closest('.qty-btn');
-        if (qtyButton) {
-            const itemId = qtyButton.getAttribute('data-item-id');
-            const action = qtyButton.getAttribute('data-action');
-            if (action === 'increase' || action === 'decrease') {
-                updateItemQuantity(itemId, action);
-            }
-            return;
-        }
-        const obsButton = e.target.closest('.obs-btn');
-        if (obsButton) {
-            const card = obsButton.closest('div[data-item-id]');
-            const itemId = card.getAttribute('data-item-id');
-            const itemName = obsButton.getAttribute('data-item-name');
-            const currentObs = obsButton.getAttribute('data-obs');
-            openObservationModal(itemId, itemName, currentObs);
-            return;
-        }
-        const searchTableBtn = document.getElementById('searchTableBtn');
-        if (searchTableBtn && e.target.closest('#searchTableBtn')) {
-            searchTable();
-            return;
-        }
-        const abrirMesaBtn = document.getElementById('abrirMesaBtn');
-        if(abrirMesaBtn && e.target.closest('#abrirMesaBtn')) {
-            openTable();
-            return;
-        }
-        const backToPanelFromOrderBtn = document.getElementById('backToPanelFromOrderBtn');
-        if(backToPanelFromOrderBtn && e.target.closest('#backToPanelFromOrderBtn')) {
-            showPanelScreen();
-            return;
-        }
-        
-        const goToPaymentBtn = document.getElementById('goToPaymentBtn');
-        if (goToPaymentBtn && e.target.closest('#goToPaymentBtn')) {
-            if (currentOrder && currentOrder.itemsSent.length > 0) {
-                 finalCharge.subtotal = calculateSubtotal(currentOrder);
-                finalCharge.serviceTaxApplied = currentOrder.serviceTaxApplied !== false;
-                finalCharge.payments = currentOrder.payments || [];
-                updateChargeModalUI();
-                showPaymentScreen();
-            } else {
-                alert("Nenhum item enviado para a produção. Envie o pedido antes de ir para o pagamento.");
-            }
-            return;
-        }
-        
-        const backToOrderFromPaymentBtn = document.getElementById('backToOrderFromPaymentBtn');
-        if(backToOrderFromPaymentBtn && e.target.closest('#backToOrderFromPaymentBtn')) {
-            showOrderScreen(currentOrder.id);
-            return;
-        }
 
-        const cancelObsBtn = document.getElementById('cancelObsBtn');
-        if (cancelObsBtn && e.target.closest('#cancelObsBtn')) {
-            document.getElementById('obsModal').classList.add('hidden');
-            return;
-        }
-        const saveObsBtn = document.getElementById('saveObsBtn');
-        if (saveObsBtn && e.target.closest('#saveObsBtn')) {
-            saveObservation();
-            return;
-        }
-        const finalizeOrderBtn = document.getElementById('finalizeOrderBtn');
-        if (finalizeOrderBtn && e.target.closest('#finalizeOrderBtn')) {
-            const totalDue = calculateTotal(finalCharge.subtotal, finalCharge.serviceTaxApplied, finalCharge.taxRate);
-            const paidTotal = calculatePaidTotal();
-            let remainingBalance = parseFloat((totalDue - paidTotal).toFixed(2));
-            if (remainingBalance <= 0.01) {
-                const confirmModal = document.getElementById('confirmCloseModal');
-                document.getElementById('chargePaidDisplay').textContent = `R$ ${paidTotal.toFixed(2).replace('.', ',')}`;
-                confirmModal.classList.remove('hidden');
-            } else {
-                alert("O saldo devedor ainda é maior que zero. Registre mais pagamentos.");
-            }
-            return;
-        }
-        const closeTableOnlyBtn = document.getElementById('closeTableOnlyBtn');
-        if(closeTableOnlyBtn && e.target.closest('#closeTableOnlyBtn')) {
-            handleCloseTable(null, calculatePaidTotal(), finalCharge.total, calculatePaidTotal() - finalCharge.total);
-            document.getElementById('confirmCloseModal').classList.add('hidden');
-            return;
-        }
-        const confirmCloseOrderBtn = document.getElementById('confirmCloseOrderBtn');
-        if(confirmCloseOrderBtn && e.target.closest('#confirmCloseOrderBtn')) {
-            const taxId = document.getElementById('taxIdInput').value.trim();
-            handleCloseTable(taxId, calculatePaidTotal(), finalCharge.total, calculatePaidTotal() - finalCharge.total);
-            document.getElementById('confirmCloseModal').classList.add('hidden');
-            return;
-        }
-        const toggleServiceTaxBtn = e.target.closest('#toggleServiceTaxBtn');
-        if (toggleServiceTaxBtn) {
-            toggleServiceTax();
-            return;
-        }
-        const addPaymentBtn = e.target.closest('#addPaymentBtn');
-        if (addPaymentBtn) {
-            addPayment();
-            return;
-        }
-        const paymentMethodButtons = e.target.closest('#paymentMethodButtons');
-        if (paymentMethodButtons && e.target.closest('.payment-method-btn')) {
-            const btn = e.target.closest('.payment-method-btn');
-            const method = btn.getAttribute('data-method');
-            selectPaymentMethod(method);
-            return;
-        }
-        const categoryBtn = e.target.closest('.category-btn');
-        if (categoryBtn) {
-            const category = categoryBtn.getAttribute('data-category');
-            document.querySelectorAll('.category-btn').forEach(b => {
-                b.classList.remove('bg-indigo-600', 'text-white', 'border-0');
-                b.classList.add('bg-white', 'text-gray-700', 'border', 'border-gray-300');
-            });
-            categoryBtn.classList.add('bg-indigo-600', 'text-white');
-            categoryBtn.classList.remove('bg-white', 'text-gray-700');
-            renderMenu(category);
-            return;
-        }
-        
-        const sendOrderButton = e.target.closest('#sendOrderButton');
-        if (sendOrderButton) {
-            sendOrderToProduction();
-            return;
-        }
-        
-        const openCalculatorBtn = e.target.closest('#openCalculatorBtn');
-        if (openCalculatorBtn) {
-            openCalculator();
-            return;
-        }
-    });
+/**
+ * Adiciona um item ao array de itens abertos do pedido.
+ */
+function addItemToOrder(itemId, itemName, price) {
+    if (!currentOrder) {
+        displayMessage("Nenhum pedido selecionado. Abra uma mesa primeiro.", "error");
+        return;
+    }
 
-    const searchProductInput = document.getElementById('searchProductInput');
-    if (searchProductInput) {
-        searchProductInput.addEventListener('input', () => {
-            const currentCategory = document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'all';
-            renderMenu(currentCategory);
+    const existingItem = currentOrder.itemsOpen.find(item => item.id === itemId);
+    if (existingItem) {
+        existingItem.quantity += 1;
+    } else {
+        currentOrder.itemsOpen.push({
+            id: itemId,
+            name: itemName,
+            price: price,
+            quantity: 1,
+            addedBy: userId,
+            timestamp: new Date().toISOString()
         });
     }
+
+    saveOrderToFirebase();
 }
+
+/**
+ * Atualiza a quantidade de um item no array de itens abertos.
+ */
+function updateItemQuantity(itemId, action) {
+    const itemIndex = currentOrder.itemsOpen.findIndex(item => item.id === itemId);
+    if (itemIndex > -1) {
+        if (action === 'increase') {
+            currentOrder.itemsOpen[itemIndex].quantity += 1;
+        } else if (action === 'decrease') {
+            currentOrder.itemsOpen[itemIndex].quantity -= 1;
+            if (currentOrder.itemsOpen[itemIndex].quantity <= 0) {
+                currentOrder.itemsOpen.splice(itemIndex, 1);
+            }
+        }
+        saveOrderToFirebase();
+    }
+}
+
+/**
+ * Adiciona uma observação a um item aberto.
+ */
+function saveObservation() {
+    if (!itemToObserve || !currentOrder) return;
+    const obsInput = document.getElementById('obsInput');
+    const item = currentOrder.itemsOpen.find(i => i.id === itemToObserve);
+    if (item) {
+        item.observation = obsInput.value.trim();
+        saveOrderToFirebase();
+        document.getElementById('obsModal').classList.add('hidden');
+    }
+}
+
+/**
+ * Move itens de 'itemsOpen' para 'itemsSent'.
+ */
+async function sendOrderToProduction() {
+    if (!currentOrder || (currentOrder.itemsOpen || []).length === 0) {
+        displayMessage("Não há itens para enviar.", "info");
+        return;
+    }
+    
+    // Concatena itens abertos com os já enviados.
+    const updatedItemsSent = [...(currentOrder.itemsSent || []), ...currentOrder.itemsOpen];
+    
+    // Limpa o array de itens abertos.
+    currentOrder.itemsOpen = [];
+    currentOrder.itemsSent = updatedItemsSent;
+    
+    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
+    try {
+        await updateDoc(docRef, {
+            itemsOpen: [],
+            itemsSent: updatedItemsSent,
+            updatedAt: new Date().toISOString()
+        });
+        displayMessage("Pedido enviado para a produção!", "success");
+    } catch (e) {
+        console.error("Erro ao enviar pedido:", e);
+        displayMessage("Erro ao enviar pedido.", "error");
+    }
+}
+
+// ** FUNÇÃO ADICIONADA: removeSentItem **
+/**
+ * Remove um item do array de itens enviados. Requer senha de gerente.
+ */
+function removeSentItem(itemId) {
+    if (!currentOrder) return;
+    
+    const senha = prompt("Insira a senha do gerente para confirmar a exclusão:");
+    if (senha !== GERENTE_SENHA) {
+        alert("Senha incorreta. Ação cancelada.");
+        return;
+    }
+    
+    const itemIndex = currentOrder.itemsSent.findIndex(item => item.id === itemId);
+    if (itemIndex > -1) {
+        const removedItem = currentOrder.itemsSent.splice(itemIndex, 1)[0];
+        displayMessage(`Item "${removedItem.name}" removido.`, "success");
+        saveOrderToFirebase();
+    }
+}
+
+// ** FUNÇÃO ADICIONADA: transferSentItem **
+/**
+ * Transfere um item enviado para outra mesa.
+ */
+async function transferSentItem(itemId) {
+    if (!currentOrder) return;
+    
+    const newTableNumber = prompt("Para qual número de mesa deseja transferir este item?");
+    if (!newTableNumber || isNaN(parseInt(newTableNumber))) {
+        alert("Número de mesa inválido. Ação cancelada.");
+        return;
+    }
+    
+    const newTableId = `MESA_${newTableNumber}`;
+    const itemIndex = currentOrder.itemsSent.findIndex(item => item.id === itemId);
+    if (itemIndex === -1) {
+        displayMessage("Item não encontrado no pedido enviado.", "error");
+        return;
+    }
+    
+    const itemToTransfer = currentOrder.itemsSent[itemIndex];
+    
+    const newDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', newTableId);
+    
+    try {
+        const newDocSnap = await getDoc(newDocRef);
+        let newItemsOpen = [];
+        let newItemsSent = [];
+
+        if (newDocSnap.exists()) {
+            const newTableData = newDocSnap.data();
+            newItemsOpen = newTableData.itemsOpen || [];
+            newItemsSent = newTableData.itemsSent || [];
+        }
+
+        // Remove o item da mesa atual
+        currentOrder.itemsSent.splice(itemIndex, 1);
+        
+        // Adiciona o item na nova mesa
+        newItemsOpen.push({
+            ...itemToTransfer,
+            timestamp: new Date().toISOString(),
+            transferredFrom: currentOrder.id
+        });
+
+        // Salva as alterações nas duas mesas
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id), {
+            itemsSent: currentOrder.itemsSent
+        });
+
+        await setDoc(newDocRef, {
+            id: newTableId,
+            tableNumber: `Mesa ${newTableNumber}`,
+            diners: 1, // Pode ajustar isso se necessário
+            itemsOpen: newItemsOpen,
+            itemsSent: newItemsSent,
+            status: 'Aberta'
+        }, { merge: true }); // O 'merge: true' é importante para não apagar dados existentes
+
+        displayMessage(`Item transferido para a Mesa ${newTableNumber}!`, "success");
+    } catch (e) {
+        console.error("Erro ao transferir item:", e);
+        displayMessage("Erro ao transferir item. Ação cancelada.", "error");
+    }
+}
+
+// ... (Resto do seu código, não foi alterado)
