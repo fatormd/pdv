@@ -66,7 +66,7 @@ function calculatePaidTotal() {
     return finalCharge.payments.reduce((sum, payment) => sum + payment.value, 0);
 }
 
-// --- Funções de UI e Renderização (Definidas no início para evitar erros de escopo) ---
+// --- Funções de UI e Renderização ---
 function displayMessage(message, type = 'info') {
     const messagesEl = document.getElementById('statusMessage');
     if (!messagesEl) return;
