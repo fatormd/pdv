@@ -11,12 +11,11 @@
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Arquivos de Estilo e Lógica (Simulados para serem carregados) -->
+    <!-- Arquivos de Estilo e Lógica -->
     <link rel="stylesheet" href="style.css">
     <script type="module" src="script.js"></script> 
 
     <script>
-        // Configuração do Tailwind (mantida aqui para fácil acesso à paleta de cores)
         tailwind.config = {
             theme: {
                 extend: {
@@ -33,137 +32,211 @@
 </head>
 <body class="bg-gray-100 min-h-screen"> 
     
-    <!-- Barra de Navegação (Placeholder) -->
+    <!-- BARRA DE NAVEGAÇÃO -->
     <header class="bg-primary p-4 shadow-lg fixed top-0 left-0 right-0 z-10">
         <div class="flex justify-between items-center text-white">
             <h1 class="text-2xl font-bold">Fator PDV</h1>
-            <button id="notificationBtn" class="relative p-2 bg-indigo-700 rounded-full hover:bg-indigo-800 transition">
-                <i class="fas fa-bell"></i>
-                <!-- Badge de Notificação (KDS Ready) -->
-                <span id="kdsNotificationBadge" class="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full hidden">0</span>
-            </button>
+            <div class="flex space-x-4">
+                <button class="text-white p-2 rounded-full hover:bg-indigo-700 transition" onclick="renderScreen('tables')">
+                    <i class="fas fa-utensils"></i> <span class="hidden sm:inline ml-1">Mesas</span>
+                </button>
+                <button id="notificationBtn" class="relative p-2 bg-indigo-700 rounded-full hover:bg-indigo-800 transition">
+                    <i class="fas fa-bell"></i>
+                    <!-- Badge de Notificação (KDS Ready) -->
+                    <span id="kdsNotificationBadge" class="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full hidden">0</span>
+                </button>
+            </div>
         </div>
     </header>
 
-    <!-- Estrutura Principal -->
-    <div class="flex h-screen overflow-hidden pt-16">
+    <!-- ESTRUTURA PRINCIPAL COM 3 PAINÉIS -->
+    <div class="pt-16 p-4 md:p-6 flex flex-col h-full min-h-screen">
         
-        <!-- Sidebar (Placeholder) -->
-        <aside class="w-20 bg-gray-800 p-3 flex flex-col items-center space-y-4 shadow-xl">
-            <button class="text-white p-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 transition" onclick="alert('Tela de Mesas/Mapa (Mock)')">
-                <i class="fas fa-utensils text-xl"></i>
-            </button>
-            <button class="text-white p-3 rounded-xl bg-gray-700 hover:bg-indigo-700 transition" onclick="alert('Tela de Produtos (Mock)')">
-                <i class="fas fa-box text-xl"></i>
-            </button>
-            <button class="text-white p-3 rounded-xl bg-gray-700 hover:bg-indigo-700 transition" onclick="alert('Relatórios (Mock)')">
-                <i class="fas fa-chart-bar text-xl"></i>
-            </button>
-        </aside>
-
-        <!-- Main Content -->
-        <main class="flex-1 overflow-y-auto p-4 md:p-6">
-            
-            <div id="payment-screen" class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
-                
-                <!-- Coluna 1: Resumo da Comanda e Pagamento -->
-                <div class="flex flex-col space-y-6">
-                    <!-- Resumo da Comanda -->
-                    <div class="content-card bg-white p-6 flex-grow">
-                        <div class="flex justify-between items-center border-b pb-3 mb-3">
-                            <h2 class="text-2xl font-bold text-gray-800">Comanda da Mesa 1</h2>
-                            <span id="orderBadge" class="bg-indigo-600 text-white text-lg font-bold px-3 py-1 rounded-full">R$ 0,00</span>
-                        </div>
-                        
-                        <!-- Lista de Itens Enviados -->
-                        <div id="sentItemsList" class="max-h-96 overflow-y-auto mb-4">
-                            <!-- Itens da comanda (sentItems) serão renderizados aqui pelo JS -->
-                        </div>
-
-                        <!-- Sub-total e Taxa de Serviço (Opcional) -->
-                        <div class="space-y-2 border-t pt-3">
-                            <div class="flex justify-between text-gray-600">
-                                <span>Total (Itens Abertos):</span>
-                                <span id="paymentSubTotalDisplay" class="font-semibold">R$ 0,00</span>
-                            </div>
-                            <div class="flex justify-between text-gray-600">
-                                <label class="flex items-center space-x-2 cursor-pointer">
-                                    <input type="checkbox" id="serviceTaxCheckbox" class="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500">
-                                    <span>Taxa de Serviço (10%):</span>
-                                </label>
-                                <span id="paymentServiceTaxDisplay" class="font-semibold">R$ 0,00</span>
-                            </div>
-                            <div class="flex justify-between text-2xl font-bold text-indigo-700">
-                                <span>TOTAL A PAGAR:</span>
-                                <span id="paymentTotalDisplay">R$ 0,00</span>
-                            </div>
-                        </div>
-
-                        <!-- Botões de Ação -->
-                        <div class="mt-6 space-y-3">
-                            <button id="openItemSplitModalBtn" class="w-full px-4 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition text-base shadow-md">
-                                <i class="fas fa-divide mr-2"></i> Dividir Conta por Itens
-                            </button>
-                            <button id="openTransferModalBtn" class="w-full px-4 py-3 bg-gray-500 text-white font-bold rounded-lg hover:bg-gray-600 transition text-base shadow-md" onclick="openManagerModal('transfer', 'MOCK')">
-                                <i class="fas fa-exchange-alt mr-2"></i> Transferir Itens Seletivamente
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Coluna 2: Métodos de Pagamento e Resumo -->
-                <div class="flex flex-col space-y-6">
-                    <!-- Resumo de Pagamentos -->
-                    <div class="content-card bg-white p-6">
-                        <h3 class="text-xl font-bold mb-4 text-green-700">Pagamentos Registrados</h3>
-                        <div id="paymentsList" class="space-y-2 mb-4 max-h-40 overflow-y-auto">
-                            <!-- Pagamentos serão listados aqui -->
-                        </div>
-
-                        <div class="space-y-2 border-t pt-3">
-                            <div class="flex justify-between text-lg font-bold text-gray-700">
-                                <span>Total Pago:</span>
-                                <span id="totalPaidDisplay" class="text-green-600">R$ 0,00</span>
-                            </div>
-                            <div class="flex justify-between text-lg font-bold">
-                                <span>VALOR RESTANTE:</span>
-                                <span id="remainingValueDisplay" class="text-red-600">R$ 0,00</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Input de Pagamento -->
-                    <div class="content-card bg-white p-6">
-                        <h3 class="text-xl font-bold mb-4 text-indigo-700">Registrar Pagamento</h3>
-                        <div class="flex space-x-3 mb-4">
-                            <input type="text" id="paymentInput" placeholder="Valor a Pagar" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-xl font-bold text-right" value="R$ 0,00">
-                            <select id="paymentMethodSelect" class="p-3 border border-gray-300 rounded-lg text-base">
-                                <option value="Cartão">Cartão</option>
-                                <option value="Dinheiro">Dinheiro</option>
-                                <option value="Pix">Pix</option>
-                            </select>
-                        </div>
-                        <button id="addPaymentBtn" class="w-full px-4 py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition text-base disabled:opacity-50" disabled>
-                            Adicionar Pagamento
-                        </button>
-                        
-                        <div class="mt-4 border-t pt-4 space-y-2">
-                            <button id="divideByPersonBtn" class="w-full px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-base" onclick="alert('Funcionalidade de Divisão por Pessoa (Próximo Recurso)')">
-                                <i class="fas fa-user-friends mr-2"></i> Divisão por Pessoa
-                            </button>
-                            <button id="finalizeOrderBtn" class="w-full px-4 py-3 bg-green-600 text-white font-bold rounded-lg transition text-base disabled:opacity-50" disabled>
-                                <i class="fas fa-check-circle mr-2"></i> FECHAR CONTA / NF-e
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
+        <!-- Tela de status (Usada para loading ou quando não há mesas) -->
+        <div id="statusScreen" class="flex-grow flex items-center justify-center p-6 bg-white rounded-xl shadow-lg hidden">
+            <div id="statusContent" class="flex flex-col items-center">
+                <i class="fas fa-spinner fa-spin text-4xl text-indigo-500 mb-4"></i>
+                <p class="text-xl text-gray-700">Carregando dados...</p>
             </div>
+        </div>
+
+        <!-- PAINEL 1: MESAS -->
+        <div id="tables-screen" class="screen-panel hidden">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">Mesas Abertas</h2>
+            <div id="tablesGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+                <!-- Cards de Mesas serão inseridos aqui pelo JS -->
+            </div>
+            <button class="fixed bottom-4 right-4 p-4 bg-green-600 text-white rounded-full text-xl shadow-lg hover:bg-green-700 transition" onclick="openTable('new')">
+                <i class="fas fa-plus"></i> <span class="hidden sm:inline ml-2">Abrir Nova Mesa</span>
+            </button>
+        </div>
+
+        <!-- PAINEL 2: PEDIDO E CARDÁPIO -->
+        <div id="order-screen" class="screen-panel grid grid-cols-1 lg:grid-cols-3 gap-6 h-full hidden">
             
-        </main>
+            <!-- Coluna 1: Cardápio (70% em telas grandes) -->
+            <div class="lg:col-span-2 flex flex-col space-y-4">
+                <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-md">
+                    <h3 class="text-2xl font-bold text-gray-800">Cardápio</h3>
+                    <input type="text" id="menuSearchInput" placeholder="Buscar item..." class="p-2 border border-gray-300 rounded-lg w-1/2">
+                </div>
+                <div id="menuGrid" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto flex-grow">
+                    <!-- Cards de Menu serão inseridos aqui pelo JS -->
+                </div>
+            </div>
+
+            <!-- Coluna 2: Comanda Local (30% em telas grandes) -->
+            <div class="lg:col-span-1 flex flex-col space-y-4 bg-white p-4 rounded-xl shadow-lg">
+                <h3 class="text-2xl font-bold text-indigo-700 border-b pb-3">Comanda Local (<span id="currentTableName">Mesa X</span>)</h3>
+                
+                <div id="selectedItemsListP2" class="flex-grow overflow-y-auto space-y-2">
+                    <!-- Itens selecionados localmente serão listados aqui -->
+                </div>
+
+                <div class="border-t pt-4">
+                    <div class="flex justify-between font-bold text-lg mb-4">
+                        <span>Total Local:</span>
+                        <span id="localOrderTotalDisplay">R$ 0,00</span>
+                    </div>
+                    
+                    <button id="sendToKitchenBtn" class="w-full px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition text-base disabled:opacity-50" disabled>
+                        <i class="fas fa-paper-plane mr-2"></i> Enviar Pedido para Cozinha
+                    </button>
+                    
+                    <button id="openPaymentScreenBtn" class="w-full mt-2 px-4 py-3 bg-primary text-white font-bold rounded-lg hover:bg-indigo-700 transition text-base" disabled>
+                        <i class="fas fa-dollar-sign mr-2"></i> Ir para Pagamento
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- PAINEL 3: PAGAMENTO (Com Divisão de Conta por Itens) -->
+        <div id="payment-screen" class="screen-panel grid grid-cols-1 lg:grid-cols-2 gap-6 h-full hidden">
+            
+            <!-- Coluna 1: Resumo da Comanda e Taxa -->
+            <div class="flex flex-col space-y-6">
+                <div class="content-card bg-white p-6 flex-grow">
+                    <div class="flex justify-between items-center border-b pb-3 mb-3">
+                        <h2 class="text-2xl font-bold text-gray-800">Comanda da Mesa 1</h2>
+                        <span id="orderBadge" class="bg-indigo-600 text-white text-lg font-bold px-3 py-1 rounded-full">R$ 0,00</span>
+                    </div>
+                    
+                    <!-- Lista de Itens Enviados -->
+                    <div id="sentItemsList" class="max-h-96 overflow-y-auto mb-4">
+                        <!-- Itens da comanda (sentItems) serão renderizados aqui pelo JS -->
+                    </div>
+
+                    <!-- Sub-total e Taxa de Serviço (Opcional) -->
+                    <div class="space-y-2 border-t pt-3">
+                        <div class="flex justify-between text-gray-600">
+                            <span>Total (Itens Abertos):</span>
+                            <span id="paymentSubTotalDisplay" class="font-semibold">R$ 0,00</span>
+                        </div>
+                        <div class="flex justify-between text-gray-600">
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="checkbox" id="serviceTaxCheckbox" class="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500">
+                                <span>Taxa de Serviço (10%):</span>
+                            </label>
+                            <span id="paymentServiceTaxDisplay" class="font-semibold">R$ 0,00</span>
+                        </div>
+                        <div class="flex justify-between text-2xl font-bold text-indigo-700">
+                            <span>TOTAL A PAGAR:</span>
+                            <span id="paymentTotalDisplay">R$ 0,00</span>
+                        </div>
+                    </div>
+
+                    <!-- Botões de Ação (DIVISÃO E TRANSFERÊNCIA) -->
+                    <div class="mt-6 space-y-3">
+                        <button id="openItemSplitModalBtn" class="w-full px-4 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition text-base shadow-md">
+                            <i class="fas fa-divide mr-2"></i> Dividir Conta por Itens
+                        </button>
+                        <button id="openTransferModalBtn" class="w-full px-4 py-3 bg-gray-500 text-white font-bold rounded-lg hover:bg-gray-600 transition text-base shadow-md" onclick="openManagerModal('transfer', 'MOCK')">
+                            <i class="fas fa-exchange-alt mr-2"></i> Transferir Itens Seletivamente
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Coluna 2: Métodos de Pagamento e Resumo -->
+            <div class="flex flex-col space-y-6">
+                <!-- Resumo de Pagamentos -->
+                <div class="content-card bg-white p-6">
+                    <h3 class="text-xl font-bold mb-4 text-green-700">Pagamentos Registrados</h3>
+                    <div id="paymentsList" class="space-y-2 mb-4 max-h-40 overflow-y-auto">
+                        <!-- Pagamentos serão listados aqui -->
+                    </div>
+
+                    <div class="space-y-2 border-t pt-3">
+                        <div class="flex justify-between text-lg font-bold text-gray-700">
+                            <span>Total Pago:</span>
+                            <span id="totalPaidDisplay" class="text-green-600">R$ 0,00</span>
+                        </div>
+                        <div class="flex justify-between text-lg font-bold">
+                            <span>VALOR RESTANTE:</span>
+                            <span id="remainingValueDisplay" class="text-red-600">R$ 0,00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input de Pagamento -->
+                <div class="content-card bg-white p-6">
+                    <h3 class="text-xl font-bold mb-4 text-indigo-700">Registrar Pagamento</h3>
+                    <div class="flex space-x-3 mb-4">
+                        <!-- Botões de Pagamento Rápido (Reincorporados) -->
+                        <button class="w-1/3 px-3 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-base" onclick="setPaymentValue(10.00)">R$ 10</button>
+                        <button class="w-1/3 px-3 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-base" onclick="setPaymentValue(50.00)">R$ 50</button>
+                        <button class="w-1/3 px-3 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-base" onclick="setPaymentValue(calculateTotals(currentOrderSnapshot).remaining)">Total</button>
+                    </div>
+                    
+                    <div class="flex space-x-3 mb-4">
+                        <input type="text" id="paymentInput" placeholder="Valor a Pagar" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-xl font-bold text-right" value="R$ 0,00">
+                        <select id="paymentMethodSelect" class="p-3 border border-gray-300 rounded-lg text-base">
+                            <option value="Cartão">Cartão</option>
+                            <option value="Dinheiro">Dinheiro</option>
+                            <option value="Pix">Pix</option>
+                        </select>
+                    </div>
+                    <button id="addPaymentBtn" class="w-full px-4 py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition text-base disabled:opacity-50" disabled>
+                        Adicionar Pagamento
+                    </button>
+                    
+                    <div class="mt-4 border-t pt-4 space-y-2">
+                        <button id="divideByPersonBtn" class="w-full px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-base" onclick="alert('Divisão por Pessoa (Próximo Recurso)')">
+                            <i class="fas fa-user-friends mr-2"></i> Divisão por Pessoa
+                        </button>
+                        <button id="finalizeOrderBtn" class="w-full px-4 py-3 bg-green-600 text-white font-bold rounded-lg transition text-base disabled:opacity-50" disabled>
+                            <i class="fas fa-check-circle mr-2"></i> FECHAR CONTA / NF-e
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
-    <!-- MODAIS GERAIS (INCLUINDO O NOVO) -->
+    <!-- MODAIS -->
+
+    <!-- MODAL DE OBSERVAÇÕES / MARCHA-ESPERA -->
+    <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md">
+            <h3 class="text-xl font-bold mb-4 text-indigo-700">Observações do Pedido</h3>
+            <textarea id="obsInput" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 text-base h-24" placeholder="Ex: Ponto da carne, sem gelo, etc."></textarea>
+            
+            <div class="flex justify-between items-center my-4">
+                <span class="font-semibold text-gray-700">Controle de Produção:</span>
+                <div class="flex space-x-2">
+                    <button id="productionMarchBtn" class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition text-sm">Marcha (Enviar Agora)</button>
+                    <button id="productionWaitBtn" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition text-sm">Espera (Aguardar)</button>
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-3 mt-4">
+                <button class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-base" onclick="document.getElementById('obsModal').style.display='none'">Cancelar</button>
+                <button id="confirmObsBtn" class="px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-base">Confirmar Item</button>
+            </div>
+        </div>
+    </div>
+
 
     <!-- MODAL DE DIVISÃO DE CONTA POR ITENS -->
     <div id="itemSplitModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
@@ -200,7 +273,7 @@
         </div>
     </div>
 
-    <!-- MODAL GERENCIAL (SIMULADO) -->
+    <!-- MODAL GERENCIAL -->
     <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 class="text-xl font-bold mb-4 text-red-700">Ação Gerencial Necessária</h3>
@@ -212,7 +285,6 @@
             </div>
         </div>
     </div>
-
 
 </body>
 </html>
