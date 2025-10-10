@@ -1,50 +1,43 @@
-/* Fator PDV - Comanda Touch
-    Estilos customizados para complementar Tailwind CSS
-*/
-
-/* Fonte Padrão (Inter é carregado pelo Tailwind, mas aqui garantimos o fallback) */
-body {
-    font-family: 'Inter', sans-serif;
+.header-bar {
+    background: linear-gradient(90deg, #6366f1 60%, #818cf8 100%);
 }
 
-/* Estilo para cartões de conteúdo principal (usado no index.html) */
 .content-card {
     border-radius: 1rem;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 4px 24px 0 rgba(50, 50, 93, 0.09), 0 1.5px 4px 0 rgba(0,0,0,0.03);
 }
 
-/* Estilo para botões de ação na lista de pedidos/comanda */
-.action-btn {
-    padding: 0.5rem 1rem;
-    border-radius: 0.5rem;
-    font-weight: 600;
-    transition: background-color 0.15s ease-in-out;
+.input-pdv {
+    font-size: 1rem;
+    padding: .5rem .75rem;
 }
 
-/* Estilo para o KDS (Kitchen Display System) - Simulação de produção */
-.kds-card {
-    background-color: #ffffff;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.75rem;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    margin-bottom: 1rem;
+.screen-panel,
+.screen-order {
+    min-height: 100vh;
 }
 
-.kds-header {
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid #e5e7eb;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+.transition-container {
+    transition: opacity 0.2s, transform 0.2s;
 }
 
-/* Status do KDS */
-.kds-status-pending {
-    background-color: #fef3c7; /* yellow-100 */
-    color: #b45309; /* amber-700 */
+.hidden-state {
+    display: none;
 }
 
-.kds-status-ready {
-    background-color: #d1fae5; /* green-100 */
-    color: #065f46; /* green-700 */
+.review-box {
+    border-top: 5px solid #059669;
+}
+
+#statusScreen {
+    background: rgba(249,250,251,0.96);
+}
+
+#obsModal, #chargeModal {
+    animation: fade-in 0.2s;
+}
+
+@keyframes fade-in {
+    from { opacity: 0;}
+    to { opacity: 1;}
 }
