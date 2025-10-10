@@ -1,88 +1,50 @@
-/* Estilização básica e tipografia */
-html { font-family: 'Inter', sans-serif; scroll-behavior: smooth; }
-body { overflow-x: hidden; }
+/* Fator PDV - Comanda Touch
+    Estilos customizados para complementar Tailwind CSS
+*/
 
-/* Cabeçalho */
-.header-bar { background-color: #4f46e5; padding: 0.75rem 1rem; }
+/* Fonte Padrão (Inter é carregado pelo Tailwind, mas aqui garantimos o fallback) */
+body {
+    font-family: 'Inter', sans-serif;
+}
 
-/* Cards de Conteúdo */
+/* Estilo para cartões de conteúdo principal (usado no index.html) */
 .content-card {
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+    border-radius: 1rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Estilo para botões de ação na lista de pedidos/comanda */
+.action-btn {
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    transition: background-color 0.15s ease-in-out;
+}
+
+/* Estilo para o KDS (Kitchen Display System) - Simulação de produção */
+.kds-card {
+    background-color: #ffffff;
+    border: 1px solid #e5e7eb;
     border-radius: 0.75rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    margin-bottom: 1rem;
 }
 
-/* Contêiner principal para transição de telas */
-#appContainer {
+.kds-header {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #e5e7eb;
     display: flex;
-    width: 300vw; /* 3 Telas: Painel, Pedido, Pagamento */
-    transition: transform 0.3s ease-out; 
-    min-height: calc(100vh - 56px); /* Altura total - altura do header */
-}
-
-/* Cada tela ocupa 100vw */
-#panelScreen, #orderScreen, #paymentScreen {
-    width: 100vw;
-    max-width: 100%;
-    flex-shrink: 0;
-    padding: 1rem;
-    box-sizing: border-box;
-    min-height: 100%;
-}
-
-/* Estilos de Otimização para Touch */
-.table-card-panel {
-    min-height: 120px; 
-    display: flex;
-    flex-direction: column;
     justify-content: space-between;
     align-items: center;
-    padding: 1rem;
-    text-align: center;
-    cursor: pointer;
-    border-radius: 0.75rem;
-}
-.qty-btn { width: 36px; height: 36px; }
-.add-to-order-btn { 
-    padding-top: 0.75rem; 
-    padding-bottom: 0.75rem; 
-    font-size: 1rem; 
-}
-.input-pdv { padding: 0.75rem; font-size: 1rem; }
-
-/* Estilo do botão de pagamento ativo */
-.payment-method-btn.active {
-    background-color: #4f46e5 !important;
-    color: white !important;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-/* Estilos para o cardápio */
-.menu-item {
-     min-height: 100px;
-}
-.add-icon-btn {
-    width: 40px;
-    height: 40px;
-    border-radius: 9999px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0; /* Evita que o botão encolha */
+/* Status do KDS */
+.kds-status-pending {
+    background-color: #fef3c7; /* yellow-100 */
+    color: #b45309; /* amber-700 */
 }
 
-/* Animação de Loading */
-@keyframes spin { to { transform: rotate(360deg); } }
-.loading-spinner {
-    border: 4px solid rgba(0, 0, 0, 0.1);
-    border-left-color: #4f46e5;
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    animation: spin 1s linear infinite;
-}
-
-/* Estilo para itens prontos no KDS (para reutilização em notificação) */
-.kds-ready-item {
-    text-decoration: line-through;
-    color: #6b7280; /* gray-500 */
+.kds-status-ready {
+    background-color: #d1fae5; /* green-100 */
+    color: #065f46; /* green-700 */
 }
