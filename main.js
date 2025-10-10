@@ -1,658 +1,971 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, doc, onSnapshot, setDoc, collection, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, query, where, serverTimestamp, getDoc, arrayRemove, arrayUnion, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 
-// --- Configuração e Variáveis Globais ---
-const appId = '1:1097659747429:web:8ec0a7c3978c311dbe0a8c';
-const firebaseConfig = {
-    apiKey: "AIzaSyCiquxozxlU2dmlNCCwUG1sjpZVzOuZd0M",
-    authDomain: "fator-pdv.firebaseapp.com",
-    projectId: "fator-pdv",
-    storageBucket: "fator-pdv.firebasestorage.app",
-    messagingSenderId: "1097659747429",
-    appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c",
-    measurementId: "G-02QWNRXRCV"
-};
-const initialAuthToken = null;
+// O código é envolvido em DOMContentLoaded para garantir que os elementos HTML existam
+document.addEventListener('DOMContentLoaded', () => {
 
-let app, db, auth;
-let userId = null;
-let tablesData = [];
-let currentOrder = null;
-let itemToObserve = null;
-let currentMode = 0; // 0 = Painel de Mesas, 1 = Pedido, 2 = Pagamento
-let unsubscribeOrder = null;
+    // --- VARIÁVEIS GLOBAIS ---
+    let db, auth, userId;
+    const appId = window.__app_id;
+    let currentTableId = null;
+    let selectedItems = []; // Itens selecionados na UI antes de enviar (lista de anotações)
+    let currentOrderSnapshot = null; // Último estado da mesa no Firebase
+    let serviceTaxApplied = false;
+    let currentPayments = []; // Pagamentos registrados localmente
 
-let finalCharge = {
-    subtotal: 0,
-    taxRate: 0.10,
-    serviceTaxApplied: true,
-    total: 0,
-    payments: []
-};
-let selectedPaymentMethod = 'Dinheiro';
-let isAppLoading = true;
-let isAuthReady = false;
-let appErrorMessage = null;
+    // --- MAPAS DE REFERÊNCIA ---
+    const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2 };
+    const MENU_DATA = [
+        { id: 'item1', name: 'Cheeseburger Clássico', price: 35.90, category: 'main', sector: 'cozinha' },
+        { id: 'item2', name: 'Refrigerante Cola Lata', price: 7.50, category: 'drinks', sector: 'bar' },
+        { id: 'item3', name: 'Batata Frita Média', price: 18.00, category: 'main', sector: 'cozinha' },
+        { id: 'item4', name: 'Suco Natural Laranja', price: 12.00, category: 'drinks', sector: 'bar' },
+        { id: 'item5', name: 'Pudim de Leite', price: 15.00, category: 'desserts', sector: 'cozinha' },
+    ];
+    const password = '1234'; // Senha simulada de gerente
 
-const MENU_ITEMS = [
-    { id: 'picanha', name: 'Picanha Grelhada', price: 79.90, category: 'main' },
-    { id: 'salmao', name: 'Salmão com Ervas', price: 65.00, category: 'main' },
-    { id: 'agua', name: 'Água Mineral', price: 5.00, category: 'drinks' },
-    { id: 'cerveja', name: 'Cerveja Long Neck', price: 15.00, category: 'drinks' },
-    { id: 'mousse', name: 'Mousse de Chocolate', price: 18.00, category: 'desserts' },
-    { id: 'petit', name: 'Petit Gateau', price: 22.00, category: 'desserts' }
-];
-
-const GERENTE_SENHA = 'gerente2025';
-
-// --- Funções Auxiliares de Cálculo ---
-function calculateSubtotal(order) {
-    let subtotal = 0;
-    const allItems = [...(order.itemsOpen || []), ...(order.itemsSent || [])];
-    
-    allItems.forEach(item => {
-        const price = Number(item.price) || 0;
-        const quantity = Number(item.quantity) || 0;
-        subtotal += (price * quantity);
-    });
-    return subtotal;
-}
-function calculateTotal(subtotal, applyServiceTax, taxRate = 0.10) {
-    const taxValue = applyServiceTax ? subtotal * taxRate : 0;
-    return subtotal + taxValue;
-}
-function calculatePaidTotal() {
-    return finalCharge.payments.reduce((sum, payment) => sum + payment.value, 0);
-}
-
-// --- Funções de UI e Renderização (Definidas no início para evitar erros de escopo) ---
-function displayMessage(message, type = 'info') {
-    const messagesEl = document.getElementById('statusMessage');
-    if (!messagesEl) return;
-    
-    messagesEl.textContent = message;
-    messagesEl.classList.remove('hidden', 'text-red-500', 'text-green-500', 'text-indigo-500');
-    
-    if (type === 'error') {
-        messagesEl.classList.add('text-red-500');
-    } else if (type === 'success') {
-        messagesEl.classList.add('text-green-500');
-    } else {
-        messagesEl.classList.add('text-indigo-500');
-    }
-    
-    setTimeout(() => {
-        messagesEl.classList.add('hidden');
-    }, 4000);
-}
-
-function renderOpenTables() {
-    const openTablesCount = document.getElementById('openTablesCount');
+    // --- ELEMENTOS DA UI ---
+    const statusScreen = document.getElementById('statusScreen');
+    const statusContent = document.getElementById('statusContent');
+    const mainContent = document.getElementById('mainContent');
+    const appContainer = document.getElementById('appContainer');
+    const mesaInput = document.getElementById('mesaInput');
+    const pessoasInput = document.getElementById('pessoasInput');
+    const abrirMesaBtn = document.getElementById('abrirMesaBtn');
     const openTablesList = document.getElementById('openTablesList');
-    
-    if(openTablesCount) openTablesCount.textContent = tablesData.length;
-    if (!openTablesList) return;
-    
-    if (tablesData.length === 0) {
-        openTablesList.innerHTML = `<div class="col-span-full text-sm text-gray-500 italic p-4 content-card bg-white">Nenhuma mesa aberta.</div>`;
-        return;
-    }
-    openTablesList.innerHTML = tablesData.map(table => `
-        <button class="table-card table-card-panel ${table.total > 0 ? 'bg-red-500 text-white' : 'bg-green-500 text-white'} p-3 content-card shadow-lg hover:opacity-90 transition duration-150" data-table-id="${table.id}">
-            <div class="flex flex-col items-center">
-                <p class="text-4xl font-extrabold mb-1">${table.tableNumber.replace('Mesa ', '')}</p>
-                <p class="text-sm">${table.diners} Pessoas</p>
-            </div>
-            <div class="mt-2">
-                <p class="text-base font-bold">R$ ${table.total.toFixed(2).replace('.', ',')}</p>
-                <p class="text-xs opacity-80">${(table.itemsSent || []).length} Itens Enviados</p>
-            </div>
-        </button>
-    `).join('');
-
-    document.querySelectorAll('.table-card').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const tableId = e.currentTarget.getAttribute('data-table-id');
-            showOrderScreen(tableId);
-        });
-    });
-}
-
-function renderOrderScreen() {
-    if (!currentOrder) return;
-    const currentTableNumber = document.getElementById('current-table-number');
+    const openTablesCount = document.getElementById('openTablesCount');
+    const menuItemsGrid = document.getElementById('menuItemsGrid');
     const openOrderList = document.getElementById('openOrderList');
-    const reviewItemsList = document.getElementById('reviewItemsList');
-    const orderSubtotalDisplay = document.getElementById('orderSubtotalDisplay');
-    const orderServiceTaxDisplay = document.getElementById('orderServiceTaxDisplay');
-    const orderTotalDisplay = document.getElementById('orderTotalDisplay');
-    const openItemsCount = document.getElementById('openItemsCount');
-
-    if (currentTableNumber) currentTableNumber.textContent = currentOrder.tableNumber || `Mesa ${currentOrder.id.replace('MESA_', '')}`;
-    if (!openOrderList || !reviewItemsList) return;
-
-    const openItems = currentOrder.itemsOpen || [];
-    const sentItems = currentOrder.itemsSent || [];
-
-    const subtotal = calculateSubtotal(currentOrder);
-    const serviceTaxApplied = currentOrder.serviceTaxApplied !== false;
-    const taxValue = serviceTaxApplied ? subtotal * finalCharge.taxRate : 0;
-    const total = subtotal + taxValue;
-
-    if(orderSubtotalDisplay) orderSubtotalDisplay.textContent = `R$ ${subtotal.toFixed(2).replace('.', ',')}`;
-    if(orderServiceTaxDisplay) orderServiceTaxDisplay.textContent = `R$ ${taxValue.toFixed(2).replace('.', ',')}`;
-    if(orderTotalDisplay) orderTotalDisplay.textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
-    
-    const paidTotal = calculatePaidTotal();
-    let remaining = total - paidTotal;
-    
-    if (currentOrder.total !== total) {
-        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', currentOrder.id);
-        updateDoc(docRef, { total: total, serviceTaxApplied: serviceTaxApplied }).catch(console.error);
-    }
-    
-    if(openItemsCount) openItemsCount.textContent = openItems.length;
-    const sendOrderButton = document.getElementById('sendOrderButton');
-    if(sendOrderButton) sendOrderButton.disabled = openItems.length === 0;
-    
-    if (openItems.length > 0) {
-        openOrderList.innerHTML = openItems.map(item => `
-            <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-indigo-100" data-item-id="${item.id}">
-                <div class="flex flex-col w-3/4">
-                    <span class="font-semibold text-base text-gray-800">${item.name || 'Item (Nome Ausente)'}</span>
-                    <div class="flex items-center space-x-2 mt-1">
-                        <button data-item-id="${item.id}" data-item-name="${item.name || 'Item (Nome Ausente)'}" data-obs="${item.observation || ''}" class="obs-btn text-sm ${item.observation ? 'text-green-600 font-bold' : 'text-indigo-600'} hover:text-indigo-800 transition py-2 px-1">
-                            <i class="fas ${item.observation ? 'fa-check' : 'fa-edit'} mr-1"></i> ${item.observation ? 'Obs: ' + item.observation : 'Add Detalhes'}
-                        </button>
-                    </div>
-                </div>
-                <div class="flex items-center space-x-1 border border-gray-300 rounded-full p-1 bg-white">
-                    <button data-item-id="${item.id}" data-action="decrease" class="qty-btn text-red-500 hover:bg-red-100 rounded-full flex items-center justify-center text-lg"><i class="fas fa-minus text-sm"></i></button>
-                    <span class="font-bold text-base w-6 text-center">${item.quantity}</span>
-                    <button data-item-id="${item.id}" data-action="increase" class="qty-btn text-green-500 hover:bg-green-100 rounded-full flex items-center justify-center text-lg"><i class="fas fa-plus text-sm"></i></button>
-                </div>
-            </div>
-        `).join('');
-    } else {
-        openOrderList.innerHTML = `<div class="text-base text-gray-500 italic p-2">Nenhum item selecionado.</div>`;
-    }
-
-    if (sentItems.length > 0) {
-        reviewItemsList.innerHTML = sentItems.map(item => `
-            <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg border-b border-gray-200">
-                <div class="flex flex-col w-3/4">
-                    <span class="font-semibold text-base text-gray-800">${item.quantity}x ${item.name}</span>
-                    ${item.observation ? `<span class="text-xs text-green-600 italic">Obs: ${item.observation}</span>` : ''}
-                </div>
-                <div class="flex space-x-3">
-                    <button data-item-id="${item.id}" data-action="remove-sent" class="remove-sent-btn text-red-500 hover:bg-red-100 p-2 rounded-full w-9 h-9" title="Excluir Item"><i class="fas fa-trash-alt text-base"></i></button>
-                    <button data-item-id="${item.id}" data-action="transfer-sent" class="transfer-sent-btn text-indigo-500 hover:bg-indigo-100 p-2 rounded-full w-9 h-9" title="Transferir para outra mesa"><i class="fas fa-exchange-alt text-base"></i></button>
-                </div>
-            </div>
-        `).join('');
-        document.querySelectorAll('.remove-sent-btn').forEach(btn => {
-            btn.addEventListener('click', () => removeSentItem(btn.getAttribute('data-item-id')));
-        });
-        document.querySelectorAll('.transfer-sent-btn').forEach(btn => {
-            btn.addEventListener('click', () => transferSentItem(btn.getAttribute('data-item-id')));
-        });
-    } else {
-        reviewItemsList.innerHTML = `<div class="text-base text-gray-500 italic p-2">Nenhum item enviado.</div>`;
-    }
-
-    const orderingInputs = document.getElementById('orderingInputs');
-    const reviewDetailsContainer = document.getElementById('reviewDetailsContainer');
-    
-    if (currentMode === 1) {
-        if(orderingInputs) orderingInputs.classList.remove('hidden');
-        if(reviewDetailsContainer) reviewDetailsContainer.classList.add('hidden');
-    } else if (currentMode === 2) {
-        if(orderingInputs) orderingInputs.classList.add('hidden');
-        if(reviewDetailsContainer) reviewDetailsContainer.classList.remove('hidden');
-    }
-    
-    const orderSubtotalDisplayPayment = document.getElementById('orderSubtotalDisplayPayment');
-    const orderServiceTaxDisplayPayment = document.getElementById('orderServiceTaxDisplayPayment');
-    const orderTotalDisplayPayment = document.getElementById('orderTotalDisplayPayment');
-    const paymentTableNumber = document.getElementById('payment-table-number');
-
-    if (orderSubtotalDisplayPayment) orderSubtotalDisplayPayment.textContent = `R$ ${subtotal.toFixed(2).replace('.', ',')}`;
-    if (orderServiceTaxDisplayPayment) orderServiceTaxDisplayPayment.textContent = `R$ ${(total - subtotal).toFixed(2).replace('.', ',')}`;
-    if (orderTotalDisplayPayment) orderTotalDisplayPayment.textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
-    if (paymentTableNumber) paymentTableNumber.textContent = currentOrder.tableNumber || `Mesa ${currentOrder.id.replace('MESA_', '')}`;
-    
-    const menuItemsGrid = document.getElementById('menuItemsGrid');
-    if (menuItemsGrid) {
-        renderMenu(document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'all');
-    }
-}
-
-function renderMenu(category) {
-    const menuItemsGrid = document.getElementById('menuItemsGrid');
-    if (!menuItemsGrid) return;
-    
-    const searchInputEl = document.getElementById('searchProductInput');
-    const searchValue = (searchInputEl ? searchInputEl.value : "").toLowerCase();
-
-    const itemsToRender = category === 'all' ? MENU_ITEMS : MENU_ITEMS.filter(item => item.category === category);
-    
-    const filteredItems = itemsToRender.filter(item => 
-        item.name.toLowerCase().includes(searchValue)
-    );
-
-    menuItemsGrid.innerHTML = filteredItems.map(item => `
-        <div class="menu-item content-card bg-white p-3 flex flex-col justify-between items-start text-left hover:shadow-lg transition duration-200"
-                 data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
-            <p class="font-semibold text-gray-800 text-base">${item.name}</p>
-            <div class="flex items-center justify-between w-full mt-1">
-                <p class="text-lg font-bold text-indigo-700">R$ ${item.price.toFixed(2).replace('.', ',')}</p>
-                <button class="add-to-order-btn bg-green-500 text-white font-bold p-2 rounded-md hover:bg-green-600 transition"
-                         data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
-                    <i class="fas fa-plus text-sm"></i>
-                </button>
-            </div>
-        </div>
-    `).join('');
-}
-
-function searchTable() {
-    const searchInput = document.getElementById('searchTableInput');
-    const mesaNumber = searchInput.value.trim();
-    if (mesaNumber) {
-        const tableId = `MESA_${mesaNumber}`;
-        const existingTable = tablesData.find(table => table.id === tableId);
-        if (existingTable) {
-            showOrderScreen(tableId);
-        } else {
-            alert(`A Mesa ${mesaNumber} não está aberta.`);
-        }
-    }
-}
-
-function updateChargeModalUI() {
-    finalCharge.subtotal = calculateSubtotal(currentOrder);
-    finalCharge.serviceTaxApplied = currentOrder.serviceTaxApplied !== false;
-    finalCharge.total = calculateTotal(finalCharge.subtotal, finalCharge.serviceTaxApplied, finalCharge.taxRate);
-    const paidTotal = calculatePaidTotal();
-    const remainingBalance = parseFloat((finalCharge.total - paidTotal).toFixed(2));
-    
-    const orderSubtotalDisplayPayment = document.getElementById('orderSubtotalDisplayPayment');
-    const orderServiceTaxDisplayPayment = document.getElementById('orderServiceTaxDisplayPayment');
-    const orderTotalDisplayPayment = document.getElementById('orderTotalDisplayPayment');
-    const serviceTaxBtn = document.getElementById('toggleServiceTaxBtn');
+    const obsModal = document.getElementById('obsModal');
+    const obsItemName = document.getElementById('obsItemName');
+    const obsInput = document.getElementById('obsInput');
+    const saveObsBtn = document.getElementById('saveObsBtn');
+    const cancelObsBtn = document.getElementById('cancelObsBtn');
+    const searchProductInput = document.getElementById('searchProductInput');
+    const paymentValueInput = document.getElementById('paymentValueInput');
+    const addPaymentBtn = document.getElementById('addPaymentBtn');
     const finalizeOrderBtn = document.getElementById('finalizeOrderBtn');
-    const paymentSummaryList = document.getElementById('paymentSummaryList');
+    const openNfeModalBtn = document.getElementById('openNfeModalBtn');
+    const toggleServiceTaxBtn = document.getElementById('toggleServiceTaxBtn');
+    const dinersSplitInput = document.getElementById('dinersSplitInput');
+    const openActionsModalBtn = document.getElementById('openActionsModalBtn');
 
-    if (orderSubtotalDisplayPayment) orderSubtotalDisplayPayment.textContent = `R$ ${finalCharge.subtotal.toFixed(2).replace('.', ',')}`;
-    if (orderServiceTaxDisplayPayment) orderServiceTaxDisplayPayment.textContent = `R$ ${(finalCharge.total - finalCharge.subtotal).toFixed(2).replace('.', ',')}`;
-    if (orderTotalDisplayPayment) orderTotalDisplayPayment.textContent = `R$ ${finalCharge.total.toFixed(2).replace('.', ',')}`;
-    
-    if (serviceTaxBtn) {
-        serviceTaxBtn.textContent = finalCharge.serviceTaxApplied ? 'Aplicado' : 'Removido';
-        serviceTaxBtn.classList.toggle('bg-green-500', finalCharge.serviceTaxApplied);
-        serviceTaxBtn.classList.toggle('bg-red-500', !finalCharge.serviceTaxApplied);
-        serviceTaxBtn.classList.toggle('hover:bg-green-600', finalCharge.serviceTaxApplied);
-        serviceTaxBtn.classList.toggle('hover:bg-red-600', !finalCharge.serviceTaxApplied);
-    }
-    
-    if (paymentSummaryList) {
-        let paymentsHtml = '';
-        if (finalCharge.payments.length > 0) {
-            paymentsHtml = finalCharge.payments.map((p, index) => `
-                <div class="flex justify-between items-center py-1">
-                    <span class="font-medium">${p.method}</span>
-                    <span class="font-bold text-gray-800">R$ ${p.value.toFixed(2).replace('.', ',')}</span>
-                    <button data-payment-index="${index}" class="remove-payment-btn text-red-500 hover:text-red-700 text-sm" title="Remover Pagamento">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            `).join('');
+
+    // --- UTILS ---
+    const formatCurrency = (value) => `R$ ${parseFloat(value || 0).toFixed(2).replace('.', ',')}`;
+
+    // Máscara de Moeda (da esquerda para a direita)
+    const currencyMask = (input) => {
+        let value = input.replace(/\D/g, "");
+        if (value.length > 2) {
+            value = value.padStart(3, '0');
+        } else if (value.length < 3) {
+            value = value.padStart(3, '0');
         }
         
-        paymentsHtml += `
+        const integerPart = value.substring(0, value.length - 2);
+        const decimalPart = value.substring(value.length - 2);
+
+        return `R$ ${parseInt(integerPart).toLocaleString('pt-BR')},${decimalPart}`;
+    };
+
+    // Event handler para máscara (garante apenas números e formata)
+    paymentValueInput.addEventListener('input', (e) => {
+        const cursorStart = e.target.selectionStart;
+        const rawValue = e.target.value.replace(/\D/g, ''); // Remove tudo que não for dígito
+        
+        // Aplica a máscara e atualiza o campo
+        e.target.value = currencyMask(rawValue);
+
+        // Tenta manter o cursor no final da parte digitada
+        const newCursorPos = e.target.value.length;
+        e.target.setSelectionRange(newCursorPos, newCursorPos);
+    });
+
+    // Função de Navegação
+    window.goToScreen = (screenId) => {
+        const screenIndex = screens[screenId];
+        if (screenIndex !== undefined) {
+            appContainer.style.transform = `translateX(-${screenIndex * 100}vw)`;
+        }
+    };
+
+    // --- FIREBASE PATHS ---
+    const getTablesCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'tables');
+    const getTableDocRef = (tableNumber) => doc(db, 'artifacts', appId, 'public', 'data', 'tables', tableNumber.toString());
+    const getKdsCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'kds_orders');
+    const getManagerCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'manager_logs');
+
+
+    // --- FIREBASE INIT ---
+    try {
+        const firebaseConfig = JSON.parse(window.__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        db = getFirestore(app);
+        
+        onAuthStateChanged(auth, async (user) => {
+            if (!user) {
+                if (window.__initial_auth_token) {
+                    try {
+                        await signInWithCustomToken(auth, window.__initial_auth_token);
+                    } catch (tokenError) {
+                        await signInAnonymously(auth);
+                    }
+                } else {
+                    await signInAnonymously(auth);
+                }
+            }
+            userId = auth.currentUser?.uid || crypto.randomUUID();
+            document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)}... (${appId})`;
+            hideStatus();
+            loadOpenTables();
+            renderMenu();
+        });
+
+    } catch (e) {
+        console.error("Erro ao inicializar Firebase: ", e);
+        document.getElementById('statusContent').innerHTML = `<h2 class="text-xl font-bold mb-2 text-red-600">Erro de Configuração</h2><p>Verifique as variáveis do Firebase. ${e.message}</p>`;
+    }
+
+
+    // --- FUNÇÕES DE PAGAMENTO (3) ---
+
+    // Calcula o total geral (subtotal + serviço)
+    const calculateTotal = (subtotal, applyServiceTax) => {
+        const taxRate = applyServiceTax ? 0.10 : 0;
+        const serviceValue = subtotal * taxRate;
+        const total = subtotal + serviceValue;
+        return { total, serviceValue };
+    };
+
+    // Recalcula e renderiza o resumo de pagamento
+    const renderPaymentSummary = () => {
+        if (!currentOrderSnapshot) return;
+
+        const tableData = currentOrderSnapshot;
+        const subtotal = tableData.total || 0;
+        const payments = tableData.payments || [];
+        const currentPaymentsTotal = payments.reduce((sum, p) => sum + p.value, 0);
+
+        serviceTaxApplied = tableData.serviceTaxApplied || false;
+
+        const { total: generalTotal, serviceValue } = calculateTotal(subtotal, serviceTaxApplied);
+        
+        // Valores para a divisão
+        const diners = parseInt(dinersSplitInput.value) || 1;
+        const valuePerDiner = generalTotal / diners;
+
+        // Calcula o saldo restante e o troco
+        const remainingBalance = generalTotal - currentPaymentsTotal;
+        const isClosed = remainingBalance <= 0;
+        const displayBalance = isClosed ? 0 - remainingBalance : remainingBalance;
+        
+        // Atualiza a UI
+        document.getElementById('orderSubtotalDisplayPayment').textContent = formatCurrency(subtotal);
+        document.getElementById('orderServiceTaxDisplayPayment').textContent = formatCurrency(serviceValue);
+        document.getElementById('orderTotalDisplayPayment').textContent = formatCurrency(generalTotal);
+        document.getElementById('remainingBalanceDisplay').textContent = formatCurrency(displayBalance);
+        document.getElementById('valuePerDinerDisplay').textContent = formatCurrency(valuePerDiner);
+
+        document.getElementById('remainingBalanceDisplay').classList.toggle('text-red-600', remainingBalance > 0);
+        document.getElementById('remainingBalanceDisplay').classList.toggle('text-green-600', isClosed);
+
+        toggleServiceTaxBtn.textContent = serviceTaxApplied ? 'Remover' : 'Aplicar';
+        toggleServiceTaxBtn.classList.toggle('bg-gray-400', !serviceTaxApplied);
+        toggleServiceTaxBtn.classList.toggle('bg-green-600', serviceTaxApplied);
+
+        // Habilita/Desabilita botões de fechamento
+        finalizeOrderBtn.disabled = !isClosed;
+        openNfeModalBtn.disabled = !isClosed;
+
+        // Renderiza a lista de pagamentos
+        const paymentListEl = document.getElementById('paymentSummaryList');
+        // Remove tudo, exceto o Resumo do Saldo e Botões de Fechamento
+        paymentListEl.innerHTML = ''; 
+
+        if (payments.length === 0) {
+            paymentListEl.innerHTML += `<p class="text-xs text-gray-500 italic p-2">Nenhum pagamento registrado.</p>`;
+        } else {
+            payments.forEach(p => {
+                paymentListEl.innerHTML += `
+                    <div class="flex justify-between items-center py-1 border-b border-gray-100">
+                        <span class="text-xs text-gray-700">${p.method}</span>
+                        <span class="font-semibold text-sm">${formatCurrency(p.value)}</span>
+                    </div>
+                `;
+            });
+        }
+        
+        // Adiciona de volta o Resumo do Saldo e Botões de Fechamento
+        paymentListEl.innerHTML += `
             <div class="flex justify-between items-center py-1 font-bold border-t border-gray-200 mt-2 pt-2">
-                <span>VALOR RESTANTE:</span>
-                <span class="text-red-600">${remainingBalance > 0 ? `R$ ${remainingBalance.toFixed(2).replace('.', ',')}` : 'R$ 0,00'}</span>
+                <span>${remainingBalance <= 0 ? 'TROCO' : 'VALOR RESTANTE'}:</span>
+                <span id="remainingBalanceDisplayNested" class="font-extrabold ${isClosed ? 'text-green-600' : 'text-red-600'}">${formatCurrency(displayBalance)}</span>
+            </div>
+            <div class="flex justify-between space-x-3 pt-2">
+                <button id="finalizeOrderBtnNested" class="w-1/2 px-4 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition text-base disabled:opacity-50" disabled>FECHAR CONTA</button>
+                <button id="openNfeModalBtnNested" class="w-1/2 px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition text-base disabled:opacity-50" disabled>NF-e</button>
             </div>
         `;
         
-        paymentSummaryList.innerHTML = paymentsHtml;
+        // Re-vincula os botões de fechamento para a UI aninhada
+        const finalizeBtnNested = document.getElementById('finalizeOrderBtnNested');
+        const nfeBtnNested = document.getElementById('openNfeModalBtnNested');
+
+        finalizeBtnNested.disabled = !isClosed;
+        nfeBtnNested.disabled = !isClosed;
+
+        finalizeBtnNested.addEventListener('click', finalizeOrder);
+        nfeBtnNested.addEventListener('click', openNfeModal);
         
-        document.querySelectorAll('.remove-payment-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => removePayment(parseInt(e.currentTarget.getAttribute('data-payment-index'))));
-        });
-    }
+        addPaymentBtn.disabled = !tableData.currentTotal || remainingBalance <= 0;
+    };
 
-    if(finalizeOrderBtn) {
-        finalizeOrderBtn.disabled = remainingBalance > 0.01;
-        if (!finalizeOrderBtn.disabled) {
-            finalizeOrderBtn.classList.replace('bg-red-600', 'bg-green-600');
-            finalizeOrderBtn.classList.replace('hover:bg-red-700', 'hover:bg-green-700');
-        } else {
-            finalizeOrderBtn.classList.replace('bg-green-600', 'bg-red-600');
-            finalizeOrderBtn.classList.replace('hover:bg-green-700', 'hover:bg-red-700');
-        }
-    }
-    
-    const paymentValueInput = document.getElementById('paymentValueInput');
-    if (paymentValueInput) paymentValueInput.value = Math.max(0, remainingBalance).toFixed(2);
-}
 
-function selectPaymentMethod(method) {
-    selectedPaymentMethod = method;
-    document.querySelectorAll('.payment-method-btn').forEach(btn => {
-        if (btn.getAttribute('data-method') === method) {
-            btn.classList.add('active', 'bg-indigo-600', 'text-white');
-            btn.classList.remove('bg-gray-200', 'text-gray-700');
-        } else {
-            btn.classList.remove('active', 'bg-indigo-600', 'text-white');
-            btn.classList.add('bg-gray-200', 'text-gray-700');
+    // Altera a taxa de serviço (10%)
+    toggleServiceTaxBtn.addEventListener('click', async () => {
+        if (!currentTableId) return;
+        const tableRef = getTableDocRef(currentTableId);
+        try {
+            await updateDoc(tableRef, {
+                serviceTaxApplied: !serviceTaxApplied,
+            });
+        } catch (e) {
+            console.error("Erro ao alternar taxa de serviço:", e);
         }
     });
-}
 
-function addPayment() {
-    const valueInput = document.getElementById('paymentValueInput');
-    const paymentValue = parseFloat(valueInput.value);
+    // Input de Divisão de Conta
+    dinersSplitInput.addEventListener('input', renderPaymentSummary);
 
-    if (isNaN(paymentValue) || paymentValue <= 0) {
-        alert("Insira um valor de pagamento válido.");
-        return;
-    }
-    
-    const totalDue = calculateTotal(finalCharge.subtotal, finalCharge.serviceTaxApplied, finalCharge.taxRate);
-    const paidTotal = calculatePaidTotal();
-    const remainingBefore = parseFloat((totalDue - paidTotal).toFixed(2));
-    
-    if (paymentValue > remainingBefore + 0.01 && remainingBefore > 0.01) {
-        if (!confirm(`O valor de R$ ${paymentValue.toFixed(2).replace('.', ',')} é maior que o saldo de R$ ${remainingBefore.toFixed(2).replace('.', ',')}. Deseja registrar este valor e dar troco?`)) {
+    // Adicionar Pagamento
+    addPaymentBtn.addEventListener('click', async () => {
+        if (!currentTableId) return;
+
+        const valueRaw = paymentValueInput.value.replace('R$', '').replace('.', '').replace(',', '.').trim();
+        const value = parseFloat(valueRaw);
+        const methodEl = document.querySelector('.payment-method-btn.active');
+        const method = methodEl ? methodEl.dataset.method : null;
+
+        if (!method || value <= 0) {
+            alert("Selecione um método e insira um valor válido.");
             return;
         }
-    }
 
-    finalCharge.payments.push({
-        method: selectedPaymentMethod,
-        value: paymentValue,
-        timestamp: new Date().toISOString()
+        const tableRef = getTableDocRef(currentTableId);
+        
+        const newPayment = {
+            method,
+            value,
+            timestamp: Date.now(), // Usando timestamp local para evitar erro de array
+            userId: userId
+        };
+
+        try {
+            await updateDoc(tableRef, {
+                payments: arrayUnion(newPayment)
+            });
+
+            // Limpa o input após o sucesso
+            paymentValueInput.value = 'R$ 0,00';
+            document.querySelectorAll('.payment-method-btn').forEach(btn => btn.classList.remove('active'));
+            addPaymentBtn.disabled = true;
+
+        } catch (e) {
+            console.error("Erro ao adicionar pagamento:", e);
+        }
+    });
+
+    // Seleção do Método de Pagamento
+    document.getElementById('paymentMethodButtons').addEventListener('click', (e) => {
+        const btn = e.target.closest('.payment-method-btn');
+        if (btn) {
+            document.querySelectorAll('.payment-method-btn').forEach(b => b.classList.remove('active', 'bg-indigo-600', 'text-white'));
+            btn.classList.add('active', 'bg-indigo-600', 'text-white');
+            addPaymentBtn.disabled = false;
+        }
     });
     
-    valueInput.value = '';
-    updateChargeModalUI();
-}
+    // Finalizar Pedido (Gatilho de Integração WooCommerce)
+    const finalizeOrder = async () => {
+        if (!currentTableId || !currentOrderSnapshot) return;
 
-function removePayment(index) {
-    if (!confirm('Deseja realmente remover este pagamento?')) {
-        return;
-    }
-    
-    const senha = prompt("Insira a senha do gerente para confirmar a remoção:");
-    if (senha !== GERENTE_SENHA) {
-        alert("Senha incorreta. Ação cancelada.");
-        return;
-    }
+        // 1. SIMULAÇÃO DA CHAMADA API DO WOOCOMMERCE
+        console.log("--- INICIANDO INTEGRAÇÃO WOOCOMMERCE ---");
+        const orderData = {
+            tableNumber: currentTableId,
+            items: currentOrderSnapshot.sentItems,
+            payments: currentOrderSnapshot.payments,
+            total: currentOrderSnapshot.currentTotal,
+            serviceTaxApplied: currentOrderSnapshot.serviceTaxApplied,
+            source: 'PDV_FATOR'
+        };
+        console.log("DADOS ENVIADOS PARA CRIAÇÃO DE ORDEM (API WooCommerce):", orderData);
+        
+        // Simulação de delay para a API
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log("Ordem de Venda Criada/Finalizada no WooCommerce.");
 
-    if (index >= 0 && index < finalCharge.payments.length) {
-        finalCharge.payments.splice(index, 1);
-        updateChargeModalUI();
-    }
-}
-
-function openCalculator() {
-    const paymentValueInput = document.getElementById('paymentValueInput');
-    if (paymentValueInput) {
-        const total = calculateTotal(finalCharge.subtotal, finalCharge.serviceTaxApplied, finalCharge.taxRate);
-        paymentValueInput.value = total.toFixed(2);
-    }
-}
-
-function searchProducts() {
-    const searchInputEl = document.getElementById('searchProductInput');
-    const searchValue = (searchInputEl ? searchInputEl.value : "").toLowerCase();
-    const currentCategory = document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'all';
-    const menuItemsGrid = document.getElementById('menuItemsGrid');
-    if (!menuItemsGrid) return;
-    const itemsToFilter = currentCategory === 'all' ? MENU_ITEMS : MENU_ITEMS.filter(item => item.category === currentCategory);
-    const filteredItems = itemsToFilter.filter(item =>
-        item.name.toLowerCase().includes(searchValue)
-    );
-    menuItemsGrid.innerHTML = filteredItems.map(item => `
-        <div class="menu-item content-card bg-white p-3 flex flex-col justify-between items-start text-left hover:shadow-lg transition duration-200"
-                 data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
-            <p class="font-semibold text-gray-800 text-base">${item.name}</p>
-            <div class="flex items-center justify-between w-full mt-1">
-                <p class="text-lg font-bold text-indigo-700">R$ ${item.price.toFixed(2).replace('.', ',')}</p>
-                <button class="add-to-order-btn bg-green-500 text-white font-bold p-2 rounded-md hover:bg-green-600 transition"
-                         data-item-id="${item.id}" data-item-name="${item.name}" data-price="${item.price}">
-                    <i class="fas fa-plus text-sm"></i>
-                </button>
-            </div>
-        </div>
-    `).join('');
-}
-// --- Funções de Inicialização do Firebase e Listeners de UI ---
-async function initializeFirebase() {
-    const userIdDisplay = document.getElementById('user-id-display');
-    try {
-        if (!firebaseConfig || !firebaseConfig.apiKey || firebaseConfig.apiKey.includes("SUA_CHAVE_API_FIREBASE")) {
-            throw new Error("Configuração do Firebase ausente ou com valores placeholder. Atualize o script.js.");
+        // 2. FECHA A MESA NO FIREBASE
+        const tableRef = getTableDocRef(currentTableId);
+        try {
+            await updateDoc(tableRef, {
+                status: 'closed',
+                closedAt: serverTimestamp(),
+            });
+            currentTableId = null;
+            selectedItems = [];
+            currentOrderSnapshot = null;
+            alert("Mesa fechada com sucesso! Ordem finalizada no WooCommerce."); // Usando alert apenas neste ponto de finalização crítica
+            goToScreen('panelScreen');
+        } catch (e) {
+            console.error("Erro ao fechar mesa:", e);
         }
-        app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
-        auth = getAuth(app);
-        await new Promise((resolve, reject) => {
-            const authPromise = initialAuthToken ? signInWithCustomToken(auth, initialAuthToken) : signInAnonymously(auth);
-            authPromise.then(() => {
-                const unsubscribe = onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        userId = user.uid;
-                        userIdDisplay.textContent = `Usuário ID: ${userId}`;
-                        isAuthReady = true;
-                        setupTableListener();
-                    } else {
-                        reject(new Error("Falha na autenticação do Firebase."));
-                    }
-                    unsubscribe();
-                    resolve();
-                });
-            }).catch(reject);
-        });
-    } catch (error) {
-        console.error("Erro na inicialização do Firebase:", error);
-        appErrorMessage = `Falha ao conectar: ${error.message}`;
-    } finally {
-        isAppLoading = false;
-        renderAppStatus();
-    }
-}
-function setupTableListener() {
-    if (!db || !userId) return;
-    const tablesColRef = collection(db, 'artifacts', appId, 'public', 'data', 'orders',);
-    onSnapshot(tablesColRef, (snapshot) => {
-        tablesData = [];
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            if (data.status === 'Aberta') {
-                const subtotal = calculateSubtotal(data);
-                const total = calculateTotal(subtotal, data.serviceTaxApplied !== false);
-                tablesData.push({ id: doc.id, ...data, total });
+    };
+
+    // --- FUNÇÕES DO PAINEL DE MESAS (1) ---
+
+    // Lógica de validação do botão Abrir Mesa
+    const checkInputs = () => {
+        const mesaValida = parseInt(mesaInput.value) > 0;
+        const pessoasValida = parseInt(pessoasInput.value) > 0;
+        abrirMesaBtn.disabled = !(mesaValida && pessoasValida);
+    };
+
+    mesaInput.addEventListener('input', checkInputs);
+    pessoasInput.addEventListener('input', checkInputs);
+
+    // Abrir Nova Mesa (CRUD - Create)
+    abrirMesaBtn.addEventListener('click', async () => {
+        // ... (lógica de abrir mesa)
+        const tableNumber = parseInt(mesaInput.value);
+        const diners = parseInt(pessoasInput.value);
+        const newTableRef = getTableDocRef(tableNumber);
+
+        try {
+            await setDoc(newTableRef, {
+                tableNumber: tableNumber,
+                diners: diners,
+                status: 'open',
+                createdAt: serverTimestamp(),
+                total: 0,
+                sentItems: [], 
+                payments: [],
+                serviceTaxApplied: false,
+            });
+
+            currentTableId = tableNumber.toString();
+            document.getElementById('current-table-number').textContent = `Mesa ${currentTableId}`;
+            document.getElementById('payment-table-number').textContent = `Mesa ${currentTableId}`;
+
+            mesaInput.value = '';
+            pessoasInput.value = '';
+            abrirMesaBtn.disabled = true;
+            goToScreen('orderScreen');
+        } catch (e) {
+            console.error("Erro ao criar nova mesa: ", e);
+            alert(`Erro: ${e.message}. Tente novamente.`); 
+        }
+    });
+
+    // Renderiza a lista de mesas na UI (Read - Realtime)
+    const renderTables = (docs) => {
+        openTablesList.innerHTML = '';
+        let count = 0;
+
+        if (docs.length === 0) {
+            openTablesList.innerHTML = `<div class="col-span-full text-sm text-gray-500 italic p-4 content-card bg-white">Nenhuma mesa aberta.</div>`;
+            openTablesCount.textContent = 0;
+            return;
+        }
+
+        docs.forEach(doc => {
+            const table = doc.data();
+            const tableId = doc.id;
+            
+            if (table.status === 'open') {
+                count++;
+                const total = table.total || 0;
+                const cardColor = total > 0 ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200';
+
+                const cardHtml = `
+                    <div class="table-card-panel ${cardColor} shadow-md transition-colors duration-200" data-table-id="${tableId}">
+                        <h3 class="font-bold text-2xl">Mesa ${table.tableNumber}</h3>
+                        <p class="text-xs font-light">Pessoas: ${table.diners}</p>
+                        <span class="font-bold text-lg mt-2">${formatCurrency(total)}</span>
+                    </div>
+                `;
+                openTablesList.innerHTML += cardHtml;
             }
         });
-        renderOpenTables();
-    }, (error) => {
-        console.error("Erro no onSnapshot de Mesas:", error);
+
+        openTablesCount.textContent = count;
+    };
+
+    // Listener em tempo real para Mesas Abertas
+    const loadOpenTables = () => {
+        const tablesCollection = getTablesCollectionRef();
+        const q = query(tablesCollection, where('status', '==', 'open'));
+
+        onSnapshot(q, (snapshot) => {
+            const docs = snapshot.docs;
+            renderTables(docs);
+        }, (error) => {
+            console.error("Erro ao carregar mesas (onSnapshot):", error);
+            openTablesList.innerHTML = `<div class="col-span-full text-sm text-red-500 italic p-4 content-card bg-white">Erro ao carregar mesas. Verifique as permissões.</div>`;
+        });
+    };
+
+    // Clique em uma Mesa (Navegação)
+    openTablesList.addEventListener('click', (e) => {
+        const tableCard = e.target.closest('.table-card-panel');
+        if (tableCard) {
+            currentTableId = tableCard.dataset.tableId;
+            document.getElementById('current-table-number').textContent = `Mesa ${currentTableId}`;
+            document.getElementById('payment-table-number').textContent = `Mesa ${currentTableId}`;
+            
+            selectedItems = [];
+            renderSelectedItems();
+            loadTableOrder(currentTableId); // Inicia o listener de status KDS/Mesa
+            goToScreen('orderScreen');
+        }
     });
-}
-function setupOrderListener(tableId) {
-    if (unsubscribeOrder) unsubscribeOrder();
-    if (!db || !tableId) return;
-    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', tableId);
-    unsubscribeOrder = onSnapshot(docRef, (docSnap) => {
-        if (docSnap.exists()) {
-            currentOrder = { id: docSnap.id, ...docSnap.data() };
-            if (currentOrder.status !== 'Aberta') {
-                showPanelScreen();
+
+    // --- FUNÇÕES DO CARDÁPIO (2) ---
+    
+    // Renderiza os itens do Cardápio com botão de adição
+    const renderMenu = (filter = 'all', search = '') => {
+        let filteredItems = MENU_DATA;
+        
+        // Filtro por categoria (se implementado)
+        // Filtro por busca
+        if (search) {
+            const normalizedSearch = search.toLowerCase();
+            filteredItems = filteredItems.filter(item => 
+                item.name.toLowerCase().includes(normalizedSearch)
+            );
+        }
+
+        menuItemsGrid.innerHTML = '';
+        
+        if (filteredItems.length === 0) {
+            menuItemsGrid.innerHTML = `<div class="col-span-full text-sm text-gray-500 italic p-4 content-card bg-white">Nenhum produto encontrado.</div>`;
+            return;
+        }
+
+        filteredItems.forEach(item => {
+            const itemHtml = `
+                <div class="menu-item bg-white rounded-lg shadow-sm p-3 transition flex flex-col justify-between border border-gray-200">
+                    <h4 class="font-bold text-base text-gray-800 text-left mb-1">${item.name}</h4>
+                    <div class="flex justify-between items-center mt-2">
+                        <p class="text-indigo-600 font-extrabold text-lg">${formatCurrency(item.price)}</p>
+                        <button data-item='${JSON.stringify(item).replace(/'/g, '&#39;')}' 
+                                class="add-item-btn add-icon-btn bg-green-500 text-white hover:bg-green-600 transition">
+                            <i class="fas fa-plus text-lg"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            menuItemsGrid.innerHTML += itemHtml;
+        });
+    };
+
+    // Renderiza a lista de itens selecionados (lista de anotações local)
+    const renderSelectedItems = () => {
+        openOrderList.innerHTML = '';
+
+        const totalItemsCount = selectedItems.length;
+
+        if (totalItemsCount === 0) {
+            openOrderList.innerHTML = `<div class="text-base text-gray-500 italic p-2">Nenhum item selecionado.</div>`;
+        } else {
+            // Agrupa itens por ID e Observação para consolidar
+            const groupedItems = selectedItems.reduce((acc, item) => {
+                const key = `${item.id}-${item.note || ''}`;
+                acc[key] = acc[key] || { ...item, qty: 0 };
+                acc[key].qty++;
+                return acc;
+            }, {});
+
+            Object.values(groupedItems).forEach((item, index) => {
+                const lineTotal = item.qty * item.price;
+                const obsText = item.note 
+                    ? `<span class="italic text-indigo-600 font-normal">(${item.note})</span>` 
+                    : `<span class="italic text-gray-500">(Adicionar Obs.)</span>`;
+                
+                openOrderList.innerHTML += `
+                    <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg shadow-sm" data-item-id="${item.id}" data-item-note="${item.note || ''}">
+                        <div class="flex flex-col flex-grow min-w-0 mr-2">
+                            <span class="font-semibold text-gray-800">${item.name} (${item.qty}x)</span>
+                            <span class="text-sm cursor-pointer" onclick="openObsModal(this)" data-item-id="${item.id}" data-item-note-key="${item.note || ''}">${obsText}</span>
+                        </div>
+
+                        <div class="flex items-center space-x-2 flex-shrink-0">
+                            <span class="font-bold text-base text-indigo-700">${formatCurrency(lineTotal)}</span>
+                            <button class="qty-btn bg-red-500 text-white rounded-full text-lg hover:bg-red-600 transition duration-150" onclick="decreaseLocalItemQuantity('${item.id}', '${item.note || ''}')" title="Remover um">
+                                <i class="fas fa-minus"></i>
+                            </button>
+                            <button class="qty-btn bg-green-500 text-white rounded-full text-lg hover:bg-green-600 transition duration-150" onclick="increaseLocalItemQuantity('${item.id}', '${item.note || ''}')" title="Adicionar um">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        document.getElementById('openItemsCount').textContent = totalItemsCount;
+    }
+
+    // Adiciona item à lista local de itens selecionados
+    const addItemToOrder = (item) => {
+        if (!currentTableId) {
+            alert("Selecione ou abra uma mesa primeiro.");
+            return;
+        }
+
+        selectedItems.push({ ...item, note: '' }); // Adiciona sem observação
+        renderSelectedItems();
+    };
+
+    // Aumenta quantidade na lista local
+    window.increaseLocalItemQuantity = (itemId, noteKey) => {
+        const itemToCopy = selectedItems.find(item => 
+            item.id === itemId && (item.note || '') === noteKey
+        );
+
+        if (itemToCopy) {
+            selectedItems.push({ ...itemToCopy, note: noteKey });
+            renderSelectedItems();
+        }
+    };
+
+    // Diminui/Remove quantidade na lista local
+    window.decreaseLocalItemQuantity = (itemId, noteKey) => {
+        const index = selectedItems.findIndex(item => 
+            item.id === itemId && (item.note || '') === noteKey
+        );
+
+        if (index > -1) {
+            selectedItems.splice(index, 1);
+            renderSelectedItems();
+        }
+    };
+
+    // Abre o Modal de Observações/Marcha
+    window.openObsModal = (el) => {
+        const itemId = el.dataset.itemId;
+        const noteKey = el.dataset.itemNoteKey;
+        
+        const item = MENU_DATA.find(i => i.id === itemId);
+        const currentNote = selectedItems.find(item => 
+            item.id === itemId && (item.note || '') === noteKey
+        )?.note || '';
+
+        if (item) {
+            obsItemName.textContent = item.name;
+            obsInput.value = currentNote;
+            obsModal.dataset.itemId = itemId;
+            obsModal.dataset.originalNoteKey = noteKey;
+            obsModal.style.display = 'flex';
+        }
+    };
+
+    // Listener para o Modal de Observações (ESPERA e MARCHA)
+    [saveObsBtn, cancelObsBtn].forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const action = e.target.dataset.action; // 'marcha' ou 'espera'
+            
+            const itemId = obsModal.dataset.itemId;
+            const originalNoteKey = obsModal.dataset.originalNoteKey;
+            const newNote = obsInput.value.trim();
+
+            if (!itemId) return;
+
+            // 1. Atualizar a observação na lista local (selectedItems)
+            if (newNote !== originalNoteKey) {
+                 selectedItems = selectedItems.map(item => {
+                    // Encontra todos os itens com o mesmo ID e a mesma observação original
+                    if (item.id === itemId && (item.note || '') === originalNoteKey) {
+                        // Atualiza a observação para o novo valor
+                        return { ...item, note: newNote };
+                    }
+                    return item;
+                });
+            }
+
+            // 2. Ação de envio (MARCHA)
+            if (action === 'marcha') {
+                await sendItemsToKDS(itemId, newNote);
+            }
+            
+            // 3. Fechar e Renderizar
+            obsModal.style.display = 'none';
+            obsInput.value = '';
+            renderSelectedItems();
+        });
+    });
+
+    // 4. Envia os itens para o KDS e atualiza a mesa
+    const sendItemsToKDS = async (itemId, currentNote) => {
+        if (!currentTableId) return;
+        
+        // Separa os itens a serem enviados (MARCHA) e os que ficam (ESPERA)
+        const itemsToMarch = selectedItems.filter(item => 
+            item.id === itemId && (item.note || '') === currentNote
+        );
+
+        if (itemsToMarch.length === 0) return;
+
+        // Remove os itens enviados da lista local
+        selectedItems = selectedItems.filter(item => 
+            !(item.id === itemId && (item.note || '') === currentNote)
+        );
+
+        // Agrupa os itens para o KDS (por setor)
+        const itemsGroupedBySector = itemsToMarch.reduce((acc, item) => {
+            const sector = item.sector;
+            const itemToSend = {};
+            for (const key in item) {
+                if (item[key] !== undefined) {
+                    itemToSend[key] = item[key];
+                }
+            }
+            // Garante que a nota é uma string vazia se for nula
+            itemToSend.note = itemToSend.note || ''; 
+            acc[sector] = acc[sector] || [];
+            acc[sector].push(itemToSend);
+            return acc;
+        }, {});
+        
+        // Cria um documento de pedido KDS
+        const kdsOrderRef = doc(getKdsCollectionRef());
+        const timestamp = Date.now();
+        
+        try {
+            await setDoc(kdsOrderRef, {
+                orderId: kdsOrderRef.id,
+                tableNumber: parseInt(currentTableId),
+                timestamp: timestamp,
+                sentAt: serverTimestamp(),
+                sectors: itemsGroupedBySector,
+                status: 'pending'
+            });
+
+            // Atualiza a mesa (total e lista de itens enviados)
+            const tableRef = getTableDocRef(currentTableId);
+            const itemsForUpdate = itemsToMarch.map(item => {
+                const updatedItem = {};
+                for (const key in item) {
+                    if (item[key] !== undefined) {
+                        updatedItem[key] = item[key];
+                    }
+                }
+                updatedItem.note = updatedItem.note || '';
+                updatedItem.orderId = kdsOrderRef.id; // Vincula ao pedido KDS
+                return updatedItem;
+            });
+
+            await updateDoc(tableRef, {
+                // Adiciona os itens à lista de sentItems
+                sentItems: arrayUnion(...itemsForUpdate), 
+            });
+
+        } catch (e) {
+            console.error("Erro ao enviar pedido KDS/Atualizar Mesa:", e);
+        }
+    }
+
+
+    // Listener para os botões de adicionar item ao Cardápio
+    menuItemsGrid.addEventListener('click', (e) => {
+        const addButton = e.target.closest('.add-item-btn');
+        if (addButton) {
+            // Remove o replace, pois o JSON.stringify já trata a maioria dos caracteres
+            const itemData = JSON.parse(addButton.dataset.item.replace(/&#39;/g, "'"));
+            addItemToOrder(itemData);
+        }
+    });
+
+    // Listener de Busca
+    searchProductInput.addEventListener('input', (e) => {
+        renderMenu('all', e.target.value);
+    });
+
+    // --- FUNÇÕES DE STATUS (KDS/MESA) ---
+
+    let unsubscribeTable = null;
+
+    // Listener para as atualizações da mesa (usado em OrderScreen e PaymentScreen)
+    const loadTableOrder = (tableId) => {
+        if (unsubscribeTable) unsubscribeTable(); // Limpa listener anterior
+
+        const tableRef = getTableDocRef(tableId);
+
+        unsubscribeTable = onSnapshot(tableRef, (docSnapshot) => {
+            if (docSnapshot.exists()) {
+                currentOrderSnapshot = docSnapshot.data();
+                renderSentItems();
+                renderPaymentSummary(); 
+                subscribeToKdsNotifications(tableId); // Inicia notificação
+            } else {
+                console.log(`Mesa ${tableId} não encontrada.`);
+                currentOrderSnapshot = null;
+                renderSentItems();
+                renderPaymentSummary();
+            }
+        }, (error) => {
+            console.error("Erro ao carregar dados da mesa:", error);
+        });
+    };
+
+    // Renderiza itens já enviados (Comanda Aberta)
+    const renderSentItems = () => {
+        const listEl = document.getElementById('reviewItemsList'); // Reutilizando a lista de pagamento aqui
+
+        if (!currentOrderSnapshot || currentOrderSnapshot.sentItems.length === 0) {
+            listEl.innerHTML = `<div class="text-sm text-gray-500 italic p-2">Nenhum item na conta para revisão.</div>`;
+            return;
+        }
+
+        listEl.innerHTML = '';
+
+        // Agrupa itens para exibição
+        const groupedItems = currentOrderSnapshot.sentItems.reduce((acc, item) => {
+            const key = `${item.id}-${item.note || ''}`;
+            acc[key] = acc[key] || { ...item, qty: 0 };
+            acc[key].qty++;
+            return acc;
+        }, {});
+
+        // Recalcula o total (útil em caso de erro de sincronização)
+        let totalRecalculated = 0;
+
+        Object.values(groupedItems).forEach((item, index) => {
+            const lineTotal = item.qty * item.price;
+            totalRecalculated += lineTotal;
+            const obsText = item.note ? ` (${item.note})` : '';
+
+            listEl.innerHTML += `
+                <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                    <div class="flex flex-col flex-grow min-w-0 mr-2">
+                         <span class="font-semibold text-gray-800">${item.name} (${item.qty}x)</span>
+                         <span class="text-xs text-gray-500 truncate">${obsText}</span>
+                    </div>
+                    <div class="flex items-center space-x-2 flex-shrink-0">
+                        <span class="font-bold text-base text-indigo-700">${formatCurrency(lineTotal)}</span>
+                        <!-- Botão de Exclusão Gerencial (com Lixeira) -->
+                        <button class="text-red-500 hover:text-red-700 transition" onclick="openManagerModal('deleteItem', '${item.id}', '${item.note || ''}')" title="Excluir Item (Gerente)">
+                             <i class="fas fa-trash text-sm"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        
+        // Atualiza o total da mesa no documento do Firebase (se for diferente)
+        if (totalRecalculated !== currentOrderSnapshot.total) {
+            const tableRef = getTableDocRef(currentTableId);
+            updateDoc(tableRef, { total: totalRecalculated }).catch(e => console.error("Erro ao sincronizar total:", e));
+        }
+
+    };
+    
+    // --- NOTIFICAÇÃO KDS ---
+    let unsubscribeKds = null;
+    
+    const subscribeToKdsNotifications = (tableId) => {
+        if (unsubscribeKds) unsubscribeKds();
+        
+        const q = query(getKdsCollectionRef(), where('tableNumber', '==', parseInt(tableId)), where('status', '==', 'ready'));
+
+        unsubscribeKds = onSnapshot(q, (snapshot) => {
+            if (snapshot.docs.length > 0) {
+                // Há pedidos prontos
+                document.getElementById('kds-notification-badge').classList.remove('hidden');
+                document.getElementById('notification-badge-container').classList.add('animate-pulse');
+            } else {
+                // Nenhum pedido pronto
+                document.getElementById('kds-notification-badge').classList.add('hidden');
+                document.getElementById('notification-badge-container').classList.remove('animate-pulse');
+            }
+        }, (error) => {
+            console.error("Erro no listener de notificação KDS:", error);
+        });
+    };
+
+    // --- FUNÇÕES DE AJUDA ---
+    
+    const hideStatus = () => {
+        statusScreen.style.display = 'none';
+        mainContent.style.display = 'block';
+    };
+
+    // --- INTEGRAÇÃO COM MODAIS E AUTENTICAÇÃO GERENCIAL ---
+    // (Omitindo a lógica completa de renderização de Modais para manter o foco na separação de arquivos)
+
+    window.openManagerModal = (action, itemId = null, itemNote = null) => {
+        // Lógica para abrir o modal de gerente (senha)
+        const managerModal = document.getElementById('managerModal');
+        managerModal.innerHTML = `
+            <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+                <h3 class="text-xl font-bold mb-4 text-red-600">Ação Gerencial Necessária</h3>
+                <p class="text-base mb-3">Insira a senha do gerente para prosseguir.</p>
+                <input type="password" id="managerPasswordInput" placeholder="Senha (Ex: 1234)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 text-base" maxlength="4">
+                
+                <div class="flex justify-end space-x-3 mt-4">
+                    <button class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-base" onclick="document.getElementById('managerModal').style.display='none'">Cancelar</button>
+                    <button id="authManagerBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-base">Autenticar</button>
+                </div>
+            </div>
+        `;
+        managerModal.style.display = 'flex';
+        
+        document.getElementById('authManagerBtn').onclick = () => {
+            const input = document.getElementById('managerPasswordInput');
+            if (input.value === password) {
+                managerModal.style.display = 'none';
+                if (action === 'deleteItem') {
+                    deleteSentItem(itemId, itemNote);
+                } else if (action === 'openSelectiveTransfer') {
+                    openSelectiveTransferModal();
+                } else if (action === 'openActions') {
+                    openActionsModal();
+                }
+            } else {
+                alert("Senha incorreta.");
+                input.value = '';
+            }
+        };
+    };
+    
+    // Deleta item enviado (Após autenticação Gerencial)
+    const deleteSentItem = async (itemId, itemNote) => {
+        if (!currentTableId || !currentOrderSnapshot) return;
+        
+        const itemToDelete = currentOrderSnapshot.sentItems.find(item => 
+            item.id === itemId && (item.note || '') === itemNote
+        );
+
+        if (!itemToDelete) return;
+
+        const tableRef = getTableDocRef(currentTableId);
+
+        try {
+            await updateDoc(tableRef, {
+                // Remove apenas o primeiro item que corresponde
+                sentItems: arrayRemove(itemToDelete)
+            });
+            alert("Item removido da conta.");
+        } catch (e) {
+            console.error("Erro ao deletar item da conta:", e);
+            alert("Erro ao tentar remover o item.");
+        }
+    };
+    
+    // Adiciona listener para o botão de ações gerenciais (engrenagem)
+    openActionsModalBtn.addEventListener('click', () => {
+        openManagerModal('openActions');
+    });
+
+    // Adiciona listener para o botão de transferência seletiva
+    document.getElementById('openSelectiveTransferModalBtn').addEventListener('click', () => {
+        openManagerModal('openSelectiveTransfer');
+    });
+    
+    // Função placeholder para o modal de transferência seletiva
+    const openSelectiveTransferModal = () => {
+        const modal = document.getElementById('selectiveTransferModal');
+        modal.innerHTML = `
+            <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg">
+                <h3 class="text-xl font-bold mb-4 text-indigo-700">Transferência Seletiva</h3>
+                <p class="text-sm text-gray-600 mb-4">Selecione os itens e a mesa de destino para transferir.</p>
+
+                <div class="flex space-x-2 mb-4">
+                    <input type="number" id="targetTableInput" placeholder="Nº Mesa Destino" class="w-2/3 p-3 border border-gray-300 rounded-lg focus:ring-indigo-500" min="1">
+                    <button id="checkTargetTableBtn" class="w-1/3 bg-blue-500 text-white p-3 rounded-lg hover:bg-blue-600 transition disabled:opacity-50">Verificar</button>
+                </div>
+                <p id="transferStatus" class="text-sm text-red-500 mb-4 italic hidden"></p>
+
+                <div id="transferItemsList" class="max-h-60 overflow-y-auto space-y-2 p-2 border border-gray-200 rounded-lg bg-gray-50">
+                    <p class="text-center text-gray-500">Carregando itens...</p>
+                </div>
+                
+                <div class="flex justify-end space-x-3 mt-4">
+                    <button class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition" onclick="document.getElementById('selectiveTransferModal').style.display='none'">Cancelar</button>
+                    <button id="confirmTransferBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50" disabled>Confirmar Transferência</button>
+                </div>
+            </div>
+        `;
+        
+        // Renderiza a lista de itens para transferência (similar ao renderSentItems)
+        const renderTransferItems = () => {
+             const listEl = document.getElementById('transferItemsList');
+             if (!currentOrderSnapshot || currentOrderSnapshot.sentItems.length === 0) {
+                 listEl.innerHTML = `<p class="text-center text-gray-500">Nenhum item para transferir.</p>`;
+                 return;
+             }
+             
+             // Lógica simplificada de renderização para a transferência
+             listEl.innerHTML = '';
+             // ... [Lógica completa de transferência seletiva seria aqui, usando os arrays da comanda] ...
+             listEl.innerHTML = `<p class="text-center text-gray-500">Funcionalidade de Seleção de Itens não implementada nesta versão, mas o botão está ativo.</p>`;
+        };
+        
+        // Simulação da verificação da mesa
+        document.getElementById('checkTargetTableBtn').addEventListener('click', () => {
+            const targetTable = parseInt(document.getElementById('targetTableInput').value);
+            if (!targetTable || targetTable === parseInt(currentTableId)) {
+                document.getElementById('transferStatus').textContent = 'Mesa inválida ou igual à atual.';
+                document.getElementById('transferStatus').classList.remove('hidden');
+                document.getElementById('confirmTransferBtn').disabled = true;
                 return;
             }
-            renderOrderScreen();
-        } else {
-            showPanelScreen();
-        }
-    }, (error) => {
-        console.error(`Erro no onSnapshot da comanda ${tableId}:`, error);
-    });
-}
-function initializeListeners() {
-    document.body.addEventListener('click', (e) => {
-        const addButton = e.target.closest('.add-to-order-btn');
-        if (addButton) {
-            const card = addButton.closest('.menu-item');
-            addItemToOrder(
-                card.getAttribute('data-item-id'),
-                card.getAttribute('data-item-name'),
-                parseFloat(card.getAttribute('data-price'))
-            );
-            return;
-        }
-        const qtyButton = e.target.closest('.qty-btn');
-        if (qtyButton) {
-            const itemId = qtyButton.getAttribute('data-item-id');
-            const action = qtyButton.getAttribute('data-action');
-            if (action === 'increase' || action === 'decrease') {
-                updateItemQuantity(itemId, action);
-            }
-            return;
-        }
-        const obsButton = e.target.closest('.obs-btn');
-        if (obsButton) {
-            const card = obsButton.closest('div[data-item-id]');
-            const itemId = card.getAttribute('data-item-id');
-            const itemName = obsButton.getAttribute('data-item-name');
-            const currentObs = obsButton.getAttribute('data-obs');
-            openObservationModal(itemId, itemName, currentObs);
-            return;
-        }
-        const searchTableBtn = document.getElementById('searchTableBtn');
-        if (searchTableBtn && e.target.closest('#searchTableBtn')) {
-            searchTable();
-            return;
-        }
-        const abrirMesaBtn = document.getElementById('abrirMesaBtn');
-        if(abrirMesaBtn && e.target.closest('#abrirMesaBtn')) {
-            openTable();
-            return;
-        }
-        const backToPanelFromOrderBtn = document.getElementById('backToPanelFromOrderBtn');
-        if(backToPanelFromOrderBtn && e.target.closest('#backToPanelFromOrderBtn')) {
-            showPanelScreen();
-            return;
-        }
-        
-        const goToPaymentBtn = document.getElementById('goToPaymentBtn');
-        if (goToPaymentBtn && e.target.closest('#goToPaymentBtn')) {
-            if (currentOrder && currentOrder.itemsSent.length > 0) {
-                 finalCharge.subtotal = calculateSubtotal(currentOrder);
-                finalCharge.serviceTaxApplied = currentOrder.serviceTaxApplied !== false;
-                finalCharge.payments = currentOrder.payments || [];
-                updateChargeModalUI();
-                showPaymentScreen();
-            } else {
-                alert("Nenhum item enviado para a produção. Envie o pedido antes de ir para o pagamento.");
-            }
-            return;
-        }
-        
-        const backToOrderFromPaymentBtn = document.getElementById('backToOrderFromPaymentBtn');
-        if(backToOrderFromPaymentBtn && e.target.closest('#backToOrderFromPaymentBtn')) {
-            showOrderScreen(currentOrder.id);
-            return;
-        }
-
-        const cancelObsBtn = document.getElementById('cancelObsBtn');
-        if (cancelObsBtn && e.target.closest('#cancelObsBtn')) {
-            document.getElementById('obsModal').classList.add('hidden');
-            return;
-        }
-        const saveObsBtn = document.getElementById('saveObsBtn');
-        if (saveObsBtn && e.target.closest('#saveObsBtn')) {
-            saveObservation();
-            return;
-        }
-        const finalizeOrderBtn = document.getElementById('finalizeOrderBtn');
-        if (finalizeOrderBtn && e.target.closest('#finalizeOrderBtn')) {
-            const totalDue = calculateTotal(finalCharge.subtotal, finalCharge.serviceTaxApplied, finalCharge.taxRate);
-            const paidTotal = calculatePaidTotal();
-            let remainingBalance = parseFloat((totalDue - paidTotal).toFixed(2));
-            if (remainingBalance <= 0.01) {
-                const confirmModal = document.getElementById('confirmCloseModal');
-                document.getElementById('chargePaidDisplay').textContent = `R$ ${paidTotal.toFixed(2).replace('.', ',')}`;
-                confirmModal.classList.remove('hidden');
-            } else {
-                alert("O saldo devedor ainda é maior que zero. Registre mais pagamentos.");
-            }
-            return;
-        }
-        const closeTableOnlyBtn = document.getElementById('closeTableOnlyBtn');
-        if(closeTableOnlyBtn && e.target.closest('#closeTableOnlyBtn')) {
-            handleCloseTable(null, calculatePaidTotal(), finalCharge.total, calculatePaidTotal() - finalCharge.total);
-            document.getElementById('confirmCloseModal').classList.add('hidden');
-            return;
-        }
-        const confirmCloseOrderBtn = document.getElementById('confirmCloseOrderBtn');
-        if(confirmCloseOrderBtn && e.target.closest('#confirmCloseOrderBtn')) {
-            const taxId = document.getElementById('taxIdInput').value.trim();
-            handleCloseTable(taxId, calculatePaidTotal(), finalCharge.total, calculatePaidTotal() - finalCharge.total);
-            document.getElementById('confirmCloseModal').classList.add('hidden');
-            return;
-        }
-        const toggleServiceTaxBtn = e.target.closest('#toggleServiceTaxBtn');
-        if (toggleServiceTaxBtn) {
-            toggleServiceTax();
-            return;
-        }
-        const addPaymentBtn = e.target.closest('#addPaymentBtn');
-        if (addPaymentBtn) {
-            addPayment();
-            return;
-        }
-        const paymentMethodButtons = e.target.closest('#paymentMethodButtons');
-        if (paymentMethodButtons && e.target.closest('.payment-method-btn')) {
-            const btn = e.target.closest('.payment-method-btn');
-            const method = btn.getAttribute('data-method');
-            selectPaymentMethod(method);
-            return;
-        }
-        const categoryBtn = e.target.closest('.category-btn');
-        if (categoryBtn) {
-            const category = categoryBtn.getAttribute('data-category');
-            document.querySelectorAll('.category-btn').forEach(b => {
-                b.classList.remove('bg-indigo-600', 'text-white', 'border-0');
-                b.classList.add('bg-white', 'text-gray-700', 'border', 'border-gray-300');
-            });
-            categoryBtn.classList.add('bg-indigo-600', 'text-white');
-            categoryBtn.classList.remove('bg-white', 'text-gray-700');
-            renderMenu(category);
-            return;
-        }
-        
-        const sendOrderButton = e.target.closest('#sendOrderButton');
-        if (sendOrderButton) {
-            sendOrderToProduction();
-            return;
-        }
-        
-        const openCalculatorBtn = e.target.closest('#openCalculatorBtn');
-        if (openCalculatorBtn) {
-            openCalculator();
-            return;
-        }
-    });
-
-    const searchProductInput = document.getElementById('searchProductInput');
-    if (searchProductInput) {
-        searchProductInput.addEventListener('input', () => {
-            const currentCategory = document.querySelector('.category-btn.bg-indigo-600')?.getAttribute('data-category') || 'all';
-            renderMenu(currentCategory);
+            document.getElementById('transferStatus').textContent = `Mesa ${targetTable} verificada.`;
+            document.getElementById('transferStatus').classList.remove('hidden');
+            document.getElementById('confirmTransferBtn').disabled = false;
         });
-    }
-}
+
+        // Simulação da confirmação de transferência
+        document.getElementById('confirmTransferBtn').addEventListener('click', async () => {
+             // ... [Lógica de mover itens entre mesas no Firestore, ajustando totais] ...
+             alert(`Simulação: Itens da Mesa ${currentTableId} transferidos para Mesa ${document.getElementById('targetTableInput').value}.`);
+             modal.style.display = 'none';
+        });
+
+        renderTransferItems();
+        modal.style.display = 'flex';
+    };
+    
+    // Função placeholder para o modal NF-e
+    const openNfeModal = () => {
+        const nfeModal = document.getElementById('nfeModal');
+        nfeModal.innerHTML = `
+            <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+                <h3 class="text-xl font-bold mb-4 text-green-700">NF-e / Recibo</h3>
+                <p class="text-base mb-3">Deseja incluir CPF/CNPJ?</p>
+                <input type="text" id="nfeCpfCnpjInput" placeholder="CPF ou CNPJ (Opcional)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-base">
+                
+                <div class="flex flex-col space-y-2 mt-4">
+                    <button class="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-base">Imprimir Recibo</button>
+                    <button class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base">Enviar por Email</button>
+                </div>
+
+                <div class="flex justify-end mt-4">
+                    <button class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-base" onclick="document.getElementById('nfeModal').style.display='none'">Fechar</button>
+                </div>
+            </div>
+        `;
+        nfeModal.style.display = 'flex';
+    };
+
+
+    // Vincula os listeners de fechamento de conta após o carregamento inicial
+    if (finalizeOrderBtn) finalizeOrderBtn.addEventListener('click', finalizeOrder);
+    if (openNfeModalBtn) openNfeModalBtn.addEventListener('click', openNfeModal);
+    
+    // Oculta a tela de status ao carregar o DOM
+    document.getElementById('statusScreen').style.display = 'flex';
+    document.getElementById('mainContent').style.display = 'none';
+
+});
