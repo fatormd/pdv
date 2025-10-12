@@ -1,43 +1,75 @@
-.header-bar {
-    background: linear-gradient(90deg, #6366f1 60%, #818cf8 100%);
+/* Estilização específica */
+html { 
+    font-family: 'Inter', sans-serif; 
+    scroll-behavior: smooth; 
+}
+.header-bar { 
+    background-color: #4f46e5; 
+    padding: 0.75rem 1rem; 
+    color: white; 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between; 
+}
+.header-bar button { 
+    color: white; 
+    padding: 0.5rem; 
+    border-radius: 0.5rem; 
+    transition: background-color 0.15s; 
+}
+.header-bar button:hover { 
+    background-color: rgba(255, 255, 255, 0.1); 
 }
 
-.content-card {
-    border-radius: 1rem;
-    box-shadow: 0 4px 24px 0 rgba(50, 50, 93, 0.09), 0 1.5px 4px 0 rgba(0,0,0,0.03);
+/* Estilo para simular o efeito de navegação entre telas */
+.screen {
+    width: 100%;
+    transition: transform 0.3s ease-in-out;
+    position: absolute;
+    top: 0;
+    left: 0;
+    min-height: 100vh; /* Garante que a tela cubra toda a altura */
+    background-color: #f3f4f6; /* Cor de fundo para telas */
+}
+.screen:not(.active-screen) {
+    transform: translateX(100%);
+    z-index: 0;
+}
+.active-screen {
+    transform: translateX(0);
+    z-index: 10;
 }
 
-.input-pdv {
-    font-size: 1rem;
-    padding: .5rem .75rem;
+/* Oculta scrollbars nos modais */
+.modal-content-scrollable {
+    max-height: 70vh;
+    overflow-y: auto;
+    scrollbar-width: none; /* Firefox */
+}
+.modal-content-scrollable::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
 }
 
-.screen-panel,
-.screen-order {
-    min-height: 100vh;
+/* Classes para simular botão de "mensagem" (substituindo o alert) */
+#messageBox {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 500;
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+    max-width: 90%;
+    min-width: 300px;
+    text-align: center;
 }
 
-.transition-container {
-    transition: opacity 0.2s, transform 0.2s;
-}
-
-.hidden-state {
-    display: none;
-}
-
-.review-box {
-    border-top: 5px solid #059669;
-}
-
-#statusScreen {
-    background: rgba(249,250,251,0.96);
-}
-
-#obsModal, #chargeModal {
-    animation: fade-in 0.2s;
-}
-
-@keyframes fade-in {
-    from { opacity: 0;}
-    to { opacity: 1;}
+/* Estilo para o separador de item no pedido */
+.order-item-separator {
+    content: "";
+    display: block;
+    height: 1px;
+    background-color: #e5e7eb;
+    margin: 0.5rem 0;
 }
