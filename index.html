@@ -3,278 +3,324 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestão de Comandas (PDV Touch) - Smart Card</title>
-    <!-- Carrega Tailwind CSS e Font Awesome -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Fator PDV - Comanda Touch</title>
+    
+    <!-- Biblioteca de Ícones -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     
-    <!-- Carrega estilos customizados -->
+    <!-- Link para o arquivo de estilos customizados -->
     <link rel="stylesheet" href="style.css">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
     
     <script>
-        // Configuração do Tailwind para usar a fonte Inter e cores primárias
+        // Configuração do Tailwind (mantida aqui para fácil acesso à paleta de cores)
         tailwind.config = {
             theme: {
                 extend: {
-                    fontSize: {
-                        'base': '1rem', 
-                        'lg': '1.125rem',
-                        'xl': '1.25rem',
-                        '2xl': '1.5rem',
-                        '3xl': '1.875rem',
-                    },
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
                     },
                     colors: {
-                        'primary': '#4f46e5',
+                        'primary': '#4f46e5', // Índigo
                     },
                 }
             }
         }
     </script>
 </head>
-<body class="bg-gray-100 antialiased overflow-x-hidden">
-
-    <!-- Caixa de Mensagem (Substitui alert()) -->
-    <div id="messageBox" class="hidden bg-white">
-        <p id="messageText" class="text-gray-800 font-medium mb-4"></p>
-        <button id="messageCloseBtn" class="bg-primary hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition duration-150">
-            Entendi
-        </button>
+<body class="bg-gray-100 min-h-screen"> 
+    
+    <!-- Tela de status (Usada para loading ou erros) -->
+    <div id="statusScreen" class="absolute inset-0 bg-gray-100 z-50 flex items-center justify-center p-6" style="display: none;">
+        <div id="statusContent" class="flex flex-col items-center content-card bg-white p-8 max-w-sm w-full text-center">
+            <i class="fas fa-spinner fa-spin text-4xl text-indigo-500 mb-4"></i>
+            <h2 class="text-xl font-bold mb-2">Iniciando PDV...</h2>
+            <p class="text-gray-600">Conectando ao Firebase.</p>
+        </div>
     </div>
 
-    <!-- Container Principal das Telas -->
-    <div class="relative w-full h-screen">
-
-        <!-- TELA 1: Painel de Mesas/Comandas -->
-        <div id="panelScreen" class="screen active-screen">
-            <header class="header-bar shadow-md">
-                <h1 class="text-xl font-bold">Gestão de Comandas (PDV)</h1>
-                <div class="flex items-center space-x-2">
-                    <span id="authStatus" class="text-sm font-light mr-2"></span>
-                    <button id="refreshTablesBtn" title="Recarregar Mesas">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                    <button id="createTableBtn" title="Criar Nova Mesa" class="bg-green-600 hover:bg-green-700 rounded-full w-8 h-8 flex items-center justify-center">
-                        <i class="fas fa-plus"></i>
-                    </button>
-                </div>
-            </header>
-            
-            <main class="p-4">
-                <h2 class="text-2xl font-semibold mb-4 text-gray-800">Mesas / Comandas Ativas</h2>
-                <div id="tablesContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
-                    <!-- Mesas serão renderizadas aqui -->
-                    <div class="text-center text-gray-500 py-10" id="loadingMessage">Carregando mesas...</div>
-                </div>
-            </main>
+    <!-- Cabeçalho Fixo -->
+    <div class="header-bar text-white p-4 flex justify-between items-center sticky top-0 z-20">
+        <h1 class="text-xl font-bold">Fator PDV</h1>
+        <div id="notification-badge-container" class="relative">
+            <!-- Badge de Notificação KDS -->
+            <span id="kds-notification-badge" class="hidden absolute top-0 right-0 h-3 w-3 bg-red-500 rounded-full ring-2 ring-white"></span>
+            <div class="rounded-full bg-white p-2 text-indigo-700">
+                <i class="fas fa-tablet-alt text-lg"></i>
+            </div>
         </div>
-
-        <!-- TELA 2: Detalhe da Mesa / Lançamento de Itens -->
-        <div id="tableScreen" class="screen hidden flex flex-col">
-            <header class="header-bar shadow-md sticky top-0 z-20">
-                <button id="backToPanelBtn" title="Voltar ao Painel">
-                    <i class="fas fa-arrow-left"></i>
-                </button>
-                <div class="flex-grow text-center">
-                    <h1 class="text-xl font-bold" id="tableNameHeader">Mesa X</h1>
-                    <span id="tableIdHeader" class="text-xs font-light opacity-80">ID:</span>
-                </div>
-                <button id="openCloseModalBtn" title="Fechar/Pagar Mesa" class="bg-red-600 hover:bg-red-700">
-                    <i class="fas fa-dollar-sign mr-1"></i> Fechar
-                </button>
-            </header>
-
-            <main class="flex-1 overflow-auto">
-                <div class="flex flex-col md:flex-row h-full">
+    </div>
+    
+    <!-- Conteúdo Principal - Contêiner deslizante de 400vw (Painel, Pedido, Pagamento, Histórico) -->
+    <main id="mainContent" class="relative overflow-hidden">
+        <div id="appContainer" class="flex transition-transform duration-300 ease-out">
+            
+            <!-- PAINEL 1: Mesas Abertas -->
+            <div id="panelScreen" class="flex-shrink-0">
+                <div class="content-card bg-white p-4 mb-6">
+                    <h3 class="text-lg font-semibold text-indigo-700 mb-3">Abrir Nova Mesa</h3>
                     
-                    <!-- Coluna do Pedido Atual (Esquerda/Topo) -->
-                    <div class="md:w-1/3 lg:w-1/4 bg-white shadow-xl p-4 flex flex-col">
-                        <h2 class="text-xl font-bold mb-3 text-primary border-b pb-2">Pedido Atual</h2>
-                        <div id="orderItems" class="flex-1 overflow-y-auto mb-4 space-y-3">
-                            <!-- Itens do pedido serão listados aqui -->
-                            <p id="emptyOrderMessage" class="text-gray-500 italic text-center py-4">Nenhum item adicionado.</p>
-                        </div>
-
-                        <div id="orderSummary" class="border-t pt-3 space-y-1">
-                            <div class="flex justify-between font-medium text-gray-700">
-                                <span>Subtotal:</span>
-                                <span id="subtotalValue">R$ 0,00</span>
-                            </div>
-                            <div class="flex justify-between font-medium text-gray-700">
-                                <span>Serviço (10%):</span>
-                                <span id="serviceFeeValue">R$ 0,00</span>
-                            </div>
-                            <div class="flex justify-between text-2xl font-extrabold text-primary pt-1">
-                                <span>TOTAL:</span>
-                                <span id="totalValue">R$ 0,00</span>
-                            </div>
-                        </div>
-
-                        <button id="saveOrderBtn" class="mt-4 bg-primary hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition duration-150 shadow-lg">
-                            <i class="fas fa-save mr-2"></i> Salvar Pedido
+                    <div class="flex space-x-3 mb-3">
+                        <input type="number" id="mesaInput" placeholder="Nº Mesa" class="w-1/3 input-pdv border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" min="1" required>
+                        <input type="number" id="pessoasInput" placeholder="Pessoas" class="w-1/3 input-pdv border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" min="1" required>
+                        <button id="abrirMesaBtn" class="w-1/3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition duration-150 shadow-md text-lg disabled:opacity-50" disabled>
+                            +
                         </button>
                     </div>
+                </div>
 
-                    <!-- Coluna do Cardápio (Direita/Rodapé) -->
-                    <div class="md:w-2/3 lg:w-3/4 p-4 bg-gray-50 flex flex-col">
-                        <div class="mb-4 flex items-center justify-between">
-                            <h2 class="text-xl font-bold text-gray-800">Cardápio</h2>
-                            <input type="text" id="menuSearch" placeholder="Buscar no cardápio..." class="p-2 border border-gray-300 rounded-lg w-1/2 md:w-1/3 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 transition duration-150">
-                        </div>
-                        
-                        <div id="menuCategories" class="flex flex-wrap gap-2 mb-4 border-b pb-2">
-                            <!-- Categorias serão renderizadas aqui -->
-                        </div>
-
-                        <div id="menuItems" class="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 p-1">
-                            <!-- Itens do cardápio serão renderizados aqui -->
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-xl font-semibold text-gray-700">Mesas Abertas (<span id="openTablesCount">0</span>)</h3>
+                        <div class="relative flex items-center">
+                            <input type="number" id="searchTableInput" placeholder="Nº Mesa" class="pr-8 input-pdv border border-gray-300 rounded-lg text-sm" style="width: 120px;">
+                            <button id="searchTableBtn" class="absolute right-0 p-2 text-gray-400 hover:text-indigo-600 transition" title="Buscar Mesa">
+                                <i class="fas fa-search"></i>
+                            </button>
                         </div>
                     </div>
-
-                </div>
-            </main>
-        </div>
-
-    </div> <!-- Fim Container Principal das Telas -->
-
-    <!-- Modal de Confirmação de Fechamento de Mesa -->
-    <div id="confirmCloseModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
-        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg transform transition-all">
-            <h3 class="text-2xl font-bold mb-4 text-red-600 border-b pb-2">Fechar Mesa e Pagamento</h3>
-            
-            <p class="mb-4 text-gray-700">Confirma o fechamento e pagamento da mesa <span id="closeModalTableName" class="font-bold"></span>?</p>
-            
-            <div id="closeModalOrderSummary" class="bg-gray-100 p-4 rounded-lg mb-4 space-y-1">
-                <div class="flex justify-between"><span>Subtotal:</span> <span id="closeModalSubtotal">R$ 0,00</span></div>
-                <div class="flex justify-between"><span>Serviço (10%):</span> <span id="closeModalServiceFee">R$ 0,00</span></div>
-                <div class="flex justify-between font-bold text-lg text-primary border-t pt-2 mt-2">
-                    <span>TOTAL GERAL:</span> <span id="closeModalTotal">R$ 0,00</span>
+                    
+                    <div id="openTablesList" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-3 gap-3">
+                        <!-- Carregado dinamicamente pelo JS -->
+                        <div class="col-span-full text-sm text-gray-500 italic p-4 content-card bg-white">Carregando mesas...</div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Opções de Pagamento -->
-            <div class="space-y-3 mb-6">
-                <h4 class="font-semibold text-lg text-gray-800 border-b pb-1">Pagamentos</h4>
-                <div id="paymentMethodsContainer" class="space-y-2">
-                    <!-- Métodos de pagamento dinâmicos (Dinheiro, Cartão, PIX) -->
+            <!-- PAINEL 2: Pedido e Cardápio -->
+            <div id="orderScreen" class="flex-shrink-0">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center text-indigo-700">
+                        <button id="backToPanelFromOrderBtn" class="mr-2 text-3xl p-2 hover:text-indigo-900 transition duration-150" title="Voltar para o Painel" onclick="goToScreen('panelScreen')">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <span class="text-2xl font-semibold mr-3" id="current-table-number">Mesa Selecionada</span>
+                    </div>
+                    
+                    <!-- Botão de Ações Gerenciais -->
+                    <button id="openActionsModalBtn" class="rounded-full bg-gray-500 p-3 text-white shadow-lg hover:bg-gray-600 transition duration-150 w-12 h-12 flex items-center justify-center" title="Ações Gerenciais">
+                        <i class="fas fa-cog text-xl"></i>
+                    </button>
+                    
+                    <button id="goToPaymentBtn" class="rounded-full bg-indigo-600 p-3 text-white shadow-lg hover:bg-green-600 transition duration-150 w-12 h-12 flex items-center justify-center" title="Ir para Pagamento" onclick="goToScreen('paymentScreen')">
+                        <i class="fas fa-money-bill-wave text-xl"></i>
+                    </button>
                 </div>
-                <div id="paymentInputContainer" class="flex space-x-2">
-                    <select id="paymentMethodSelect" class="p-2 border rounded-lg flex-grow shadow-sm">
-                        <option value="Dinheiro">Dinheiro</option>
-                        <option value="Cartão">Cartão</option>
-                        <option value="PIX">PIX</option>
-                        <option value="Outro">Outro</option>
-                    </select>
-                    <input type="number" id="paymentValueInput" placeholder="Valor pago" class="p-2 border rounded-lg w-1/3 shadow-sm" step="0.01">
-                    <button id="addPaymentBtn" class="bg-primary hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition duration-150">
-                        <i class="fas fa-plus"></i>
+
+                <div id="orderingInputs" class="space-y-4">
+                    <div class="p-4 content-card bg-white">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-semibold text-gray-700">Itens A Enviar (<span id="openItemsCount">0</span>)</h2>
+                        </div>
+                        
+                        <div id="openOrderList" class="space-y-3 mb-4">
+                            <div class="text-base text-gray-500 italic p-2">Nenhum item selecionado.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="menuContainer" class="mt-6">
+                    <div class="flex justify-between items-center mb-4 px-4">
+                        <h2 class="text-xl font-bold text-gray-800">Cardápio</h2>
+                        <div class="relative">
+                            <input type="text" id="searchProductInput" placeholder="Buscar produtos..." class="pr-8 input-pdv border border-gray-300 rounded-lg text-sm" style="width: 150px;">
+                            <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                        </div>
+                    </div>
+                    
+                    <div id="categoryFilters" class="flex space-x-2 overflow-x-auto pb-2 mb-4 px-4">
+                        <button class="category-btn px-4 py-3 bg-indigo-600 text-white rounded-full text-base font-semibold whitespace-nowrap" data-category="all">Todos</button>
+                        <button class="category-btn px-4 py-3 bg-white text-gray-700 rounded-full text-base font-semibold border border-gray-300 whitespace-nowrap" data-category="main">Principais</button>
+                        <button class="category-btn px-4 py-3 bg-white text-gray-700 rounded-full text-base font-semibold border border-gray-300 whitespace-nowrap" data-category="drinks">Bebidas</button>
+                        <button class="category-btn px-4 py-3 bg-white text-gray-700 rounded-full text-base font-semibold border border-gray-300 whitespace-nowrap" data-category="desserts">Sobremesas</button>
+                    </div>
+                    
+                    <div id="menuItemsGrid" class="px-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                         <!-- Itens do Cardápio serão carregados aqui -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- PAINEL 3: Pagamento -->
+            <div id="paymentScreen" class="flex-shrink-0">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center text-indigo-700">
+                        <button id="backToOrderFromPaymentBtn" class="mr-2 text-3xl p-2 hover:text-indigo-900 transition duration-150" title="Voltar para o Pedido" onclick="goToScreen('orderScreen')">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <span class="text-2xl font-semibold mr-3" id="payment-table-number">Mesa Selecionada</span>
+                    </div>
+                </div>
+
+                <div class="content-card bg-white p-4 mb-6">
+                    <h2 class="text-xl font-semibold text-green-700 mb-4">Resumo da Conta</h2>
+                    <div id="reviewItemsList" class="space-y-3 pt-2">
+                         <div class="text-sm text-gray-500 italic p-2">Nenhum item na conta para revisão.</div>
+                    </div>
+                    
+                    <div class="flex justify-between items-center border-t border-gray-200 pt-4 mt-4">
+                        <div>
+                            <span class="text-xl font-bold text-gray-800">SUBTOTAL:</span>
+                            <p class="text-xs text-gray-500">Valor dos produtos consumidos.</p>
+                        </div>
+                        <span class="text-2xl font-bold text-indigo-700" id="orderSubtotalDisplayPayment">R$ 0,00</span>
+                    </div>
+
+                    <div class="flex justify-between items-center border-b border-gray-200 pb-2">
+                        <div>
+                            <span class="text-lg font-bold text-green-700">SERVIÇO (10%):</span>
+                            <p class="text-xs text-gray-500">Taxa opcional de serviço.</p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-lg font-bold text-green-700" id="orderServiceTaxDisplayPayment">R$ 0,00</span>
+                            <button id="toggleServiceTaxBtn" class="px-2 py-1 text-xs rounded-full transition duration-150 bg-gray-400 text-white hover:bg-gray-500" title="Aplicar/Remover Taxa">
+                                Aplicar
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Divisão de Conta -->
+                    <div class="flex justify-between items-center border-b border-gray-200 pb-2 pt-2">
+                        <div>
+                            <span class="text-lg font-bold text-indigo-700">VALOR POR PESSOA:</span>
+                            <p class="text-xs text-gray-500">Divisão do Total Geral por pagantes.</p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span id="valuePerDinerDisplay" class="text-lg font-bold text-indigo-700">R$ 0,00</span>
+                            <input type="number" id="dinersSplitInput" class="w-16 p-1 text-sm border border-gray-300 rounded-lg text-center" min="1" value="1">
+                        </div>
+                    </div>
+                    <!-- Fim Divisão de Conta -->
+
+                    <div class="flex justify-between items-center pt-2">
+                        <span class="text-xl font-bold text-gray-800">TOTAL GERAL:</span>
+                        <span class="text-3xl font-extrabold text-indigo-700" id="orderTotalDisplayPayment">R$ 0,00</span>
+                    </div>
+                    
+                    <!-- Botão de Transferência Seletiva (Ao lado de Excluir Itens) -->
+                    <button id="openSelectiveTransferModalBtn" class="mt-4 w-full px-4 py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition text-base shadow-md">
+                        <i class="fas fa-exchange-alt mr-2"></i> Transferir Itens Seletivamente
                     </button>
                 </div>
                 
-                <div class="flex justify-between font-bold text-red-600 text-xl pt-2 border-t mt-3">
-                    <span>A Pagar (Restante):</span> <span id="remainingToPay">R$ 0,00</span>
-                </div>
-                <div class="flex justify-between font-bold text-green-600 text-xl">
-                    <span>Troco:</span> <span id="changeValue">R$ 0,00</span>
-                </div>
-            </div>
-
-            <div class="flex justify-end space-x-3">
-                <button id="openTransferModalBtn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg transition duration-150">
-                    <i class="fas fa-exchange-alt mr-1"></i> Transferir Itens
-                </button>
-                <button id="openNFeModalBtn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition duration-150">
-                    <i class="fas fa-file-invoice mr-1"></i> NFe
-                </button>
-                <button id="cancelCloseBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg transition duration-150">
-                    Cancelar
-                </button>
-                <button id="confirmCloseBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-150 disabled:opacity-50" disabled>
-                    <i class="fas fa-check mr-1"></i> Finalizar (R$ 0,00)
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal de Transferência de Itens -->
-    <div id="transferModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
-        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-2xl transform transition-all">
-            <h3 class="text-2xl font-bold mb-4 text-yellow-600 border-b pb-2">Transferir Itens para Outra Mesa</h3>
-            
-            <p class="mb-4 text-gray-700">Selecione os itens para transferir e o destino.</p>
-
-            <div class="flex space-x-4">
-                <!-- Coluna de Itens da Mesa de Origem -->
-                <div class="w-1/2">
-                    <h4 class="font-semibold text-lg mb-2">Itens da Mesa <span id="transferOriginTableName" class="font-bold text-primary"></span></h4>
-                    <div id="transferOriginItems" class="modal-content-scrollable bg-gray-50 p-3 rounded-lg space-y-2 border">
-                        <!-- Itens da mesa de origem com checkboxes -->
+                <div id="chargeInputsAndSummary" class="p-4 pt-0 content-card bg-white">
+                    <h4 class="text-lg font-semibold text-gray-700 mb-3">Registrar Pagamento</h4>
+                    <div class="space-y-3">
+                        <div id="paymentMethodButtons" class="grid grid-cols-3 gap-2">
+                            <!-- Botões de Método de Pagamento -->
+                        </div>
+                        <div class="flex space-x-2">
+                            <!-- Input de Valor com Máscara de Moeda -->
+                            <input type="text" id="paymentValueInput" placeholder="Valor Pago (R$ 0,00)" class="w-full p-3 input-pdv border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base text-right" value="R$ 0,00">
+                            <button class="bg-gray-200 text-gray-700 font-bold py-3 px-4 rounded-lg hover:bg-gray-300 transition text-base disabled:opacity-50" id="openCalculatorBtn" title="Abrir Calculadora">
+                                <i class="fas fa-calculator"></i>
+                            </button>
+                        </div>
+                        <button id="addPaymentBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition duration-150 text-base disabled:opacity-50">
+                            Adicionar Pagamento
+                        </button>
                     </div>
-                </div>
-
-                <!-- Coluna de Seleção de Destino -->
-                <div class="w-1/2">
-                    <h4 class="font-semibold text-lg mb-2">Mesa de Destino</h4>
-                    <select id="transferDestinationSelect" class="w-full p-2 border rounded-lg mb-4 shadow-sm">
-                        <option value="">Selecione uma mesa...</option>
-                        <!-- Opções de mesas ativas (exceto a atual) -->
-                    </select>
                     
-                    <button id="createDestinationTableBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 rounded-lg transition duration-150 shadow-md">
-                        <i class="fas fa-plus mr-1"></i> Criar Nova Mesa de Destino
-                    </button>
-
-                    <div id="transferSummary" class="mt-4 p-3 bg-yellow-100 rounded-lg">
-                        <div class="flex justify-between font-semibold">
-                            <span>Itens Selecionados:</span> <span id="transferItemCount">0</span>
+                    <h4 class="text-sm font-semibold text-gray-500 mt-4 mb-2">Pagamentos Registrados:</h4>
+                    <div id="paymentSummaryList" class="space-y-1 p-2 bg-gray-50 rounded-lg border border-gray-200 text-sm">
+                        <!-- Lista de Pagamentos e Resumo de Saldo -->
+                        <div class="flex justify-between items-center py-1 font-bold border-t border-gray-200 mt-2 pt-2">
+                            <span>VALOR RESTANTE:</span>
+                            <span id="remainingBalanceDisplay" class="text-red-600">R$ 0,00</span>
                         </div>
-                        <div class="flex justify-between font-semibold">
-                            <span>Total dos Itens:</span> <span id="transferItemTotal">R$ 0,00</span>
+
+                        <!-- Botões de Fechamento (Habilitados após Saldo Zero) -->
+                        <div class="flex justify-between space-x-3 pt-2">
+                            <button id="finalizeOrderBtn" class="w-1/2 px-4 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition text-base disabled:opacity-50" disabled>
+                                FECHAR CONTA
+                            </button>
+                            <button id="openNfeModalBtn" class="w-1/2 px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition text-base disabled:opacity-50" disabled>
+                                NF-e
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
+            
+        </div>
+    </main>
 
-            <div class="flex justify-end space-x-3 mt-6">
-                <button id="cancelTransferBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg transition duration-150">
-                    Cancelar
+    <!-- Modal de Gerenciamento de Item (Obs, Marcha/Espera) -->
+    <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+            <h3 class="text-xl font-bold mb-4 text-indigo-700">Detalhes do Item</h3>
+            <p class="text-base mb-3">Item: <span id="obsItemName" class="font-semibold text-gray-800"></span></p>
+            <textarea id="obsInput" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 resize-none text-base" rows="3" placeholder="Ex: Sem gelo, carne ao ponto, trocar batata por arroz..."></textarea>
+            
+            <div class="flex justify-end space-x-3 mt-4">
+                <!-- Botão ESPERA (Cancela o envio, mantém na lista local) -->
+                <button id="cancelObsBtn" data-action="espera" class="px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition text-base font-bold">
+                    ESPERA
                 </button>
-                <button id="confirmTransferBtn" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg transition duration-150 disabled:opacity-50" disabled>
-                    <i class="fas fa-share-square mr-1"></i> Confirmar Transferência
+                <!-- Botão MARCHA (Envia para o KDS/Produção) -->
+                <button id="saveObsBtn" data-action="marcha" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base font-bold">
+                    MARCHA
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- Modal de NFe -->
-    <div id="nfeModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
-        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md transform transition-all">
-            <h3 class="text-2xl font-bold mb-4 text-gray-800 border-b pb-2">Nota Fiscal Eletrônica (NFe)</h3>
-            
-            <p class="mb-4 text-gray-700">Informe o CPF ou CNPJ para a emissão da Nota Fiscal de Consumo Eletrônica (NFC-e).</p>
-            
-            <div class="mb-6">
-                <label for="nfeDocInput" class="block text-sm font-medium text-gray-700 mb-1">CPF/CNPJ (Opcional)</label>
-                <input type="text" id="nfeDocInput" placeholder="Ex: 123.456.789-00 ou 12.345.678/0001-90" class="w-full p-2 border border-gray-300 rounded-lg shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 transition duration-150">
-            </div>
-
-            <div class="flex justify-end space-x-3">
-                <button id="closeNFeModalBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg transition duration-150">
-                    Cancelar
-                </button>
-                <button class="nfe-action-btn bg-primary hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition duration-150">
-                    Emitir NFe
-                </button>
-                <button class="nfe-action-btn bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-150">
-                    NFe Sem Documento
-                </button>
-            </div>
-        </div>
+    <!-- MODAL GERENCIAL (Ações/Transferência/Exclusão) -->
+    <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        <!-- Conteúdo do Modal Gerencial e Autenticação -->
     </div>
 
-    <!-- Carrega o script principal como módulo -->
+    <!-- MODAL NF-E -->
+    <div id="nfeModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        <!-- Conteúdo do Modal NF-e -->
+    </div>
+
+    <!-- MODAL TRANSFERÊNCIA SELETIVA -->
+    <div id="selectiveTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        <!-- Conteúdo do Modal Transferência Seletiva -->
+    </div>
+
+    <!-- Exibição de ID do Usuário e Mensagens de Status (necessário para Firebase) -->
+    <p class="mt-8 text-center text-xs text-gray-400" id="user-id-display">Usuário ID: Carregando...</p>
+    <div id="statusMessage" class="mt-4 text-center text-sm hidden"></div>
+
+
+    <!-- IMPORTAÇÕES FIREBASE -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, query, where, serverTimestamp, getDoc, arrayRemove, arrayUnion, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Expondo as referências do Firebase para o script.js (module-level global)
+        window.initializeApp = initializeApp;
+        window.getAuth = getAuth;
+        window.signInAnonymously = signInAnonymously;
+        window.onAuthStateChanged = onAuthStateChanged;
+        window.signInWithCustomToken = signInWithCustomToken;
+        window.getFirestore = getFirestore;
+        window.collection = collection;
+        window.onSnapshot = onSnapshot;
+        window.doc = doc;
+        window.setDoc = setDoc;
+        window.updateDoc = updateDoc;
+        window.query = query;
+        window.where = where;
+        window.serverTimestamp = serverTimestamp;
+        window.getDoc = getDoc;
+        window.arrayRemove = arrayRemove;
+        window.arrayUnion = arrayUnion;
+        window.writeBatch = writeBatch;
+
+        // Variáveis de Configuração (passadas para script.js via window)
+        window.__app_id = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        window.__firebase_config = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
+        window.__initial_auth_token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : undefined;
+
+    </script>
+    
+    <!-- LINK PARA O JAVASCRIPT PRINCIPAL (DEVE VIR DEPOIS DAS IMPORTAÇÕES FIREBASE) -->
     <script type="module" src="script.js"></script>
 </body>
 </html>
