@@ -5,13 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fator PDV - Comanda Touch</title>
     
-    <!-- Biblioteca de Ícones -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     
-    <!-- Link para o arquivo de estilos customizados -->
     <link rel="stylesheet" href="style.css">
 
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     
     <script>
@@ -32,7 +29,6 @@
 </head>
 <body class="bg-gray-100 min-h-screen"> 
     
-    <!-- Tela de status (Usada para loading ou erros) -->
     <div id="statusScreen" class="absolute inset-0 bg-gray-100 z-50 flex items-center justify-center p-6" style="display: none;">
         <div id="statusContent" class="flex flex-col items-center content-card bg-white p-8 max-w-sm w-full text-center">
             <i class="fas fa-spinner fa-spin text-4xl text-indigo-500 mb-4"></i>
@@ -41,11 +37,9 @@
         </div>
     </div>
 
-    <!-- Cabeçalho Fixo -->
     <div class="header-bar text-white p-4 flex justify-between items-center sticky top-0 z-20">
         <h1 class="text-xl font-bold">Fator PDV</h1>
         <div id="notification-badge-container" class="relative">
-            <!-- Badge de Notificação KDS -->
             <span id="kds-notification-badge" class="hidden absolute top-0 right-0 h-3 w-3 bg-red-500 rounded-full ring-2 ring-white"></span>
             <div class="rounded-full bg-white p-2 text-indigo-700">
                 <i class="fas fa-tablet-alt text-lg"></i>
@@ -53,11 +47,9 @@
         </div>
     </div>
     
-    <!-- Conteúdo Principal - Contêiner deslizante de 400vw (Painel, Pedido, Pagamento, Histórico) -->
     <main id="mainContent" class="relative overflow-hidden">
         <div id="appContainer" class="flex transition-transform duration-300 ease-out">
             
-            <!-- PAINEL 1: Mesas Abertas -->
             <div id="panelScreen" class="flex-shrink-0">
                 <div class="content-card bg-white p-4 mb-6">
                     <h3 class="text-lg font-semibold text-indigo-700 mb-3">Abrir Nova Mesa</h3>
@@ -83,13 +75,11 @@
                     </div>
                     
                     <div id="openTablesList" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-3 gap-3">
-                        <!-- Carregado dinamicamente pelo JS -->
                         <div class="col-span-full text-sm text-gray-500 italic p-4 content-card bg-white">Carregando mesas...</div>
                     </div>
                 </div>
             </div>
 
-            <!-- PAINEL 2: Pedido e Cardápio -->
             <div id="orderScreen" class="flex-shrink-0">
                 <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center text-indigo-700">
@@ -99,7 +89,6 @@
                         <span class="text-2xl font-semibold mr-3" id="current-table-number">Mesa Selecionada</span>
                     </div>
                     
-                    <!-- Botão de Ações Gerenciais -->
                     <button id="openActionsModalBtn" class="rounded-full bg-gray-500 p-3 text-white shadow-lg hover:bg-gray-600 transition duration-150 w-12 h-12 flex items-center justify-center" title="Ações Gerenciais">
                         <i class="fas fa-cog text-xl"></i>
                     </button>
@@ -138,12 +127,10 @@
                     </div>
                     
                     <div id="menuItemsGrid" class="px-4 grid grid-cols-2 md:grid-cols-3 gap-4">
-                         <!-- Itens do Cardápio serão carregados aqui -->
-                    </div>
+                         </div>
                 </div>
             </div>
             
-            <!-- PAINEL 3: Pagamento -->
             <div id="paymentScreen" class="flex-shrink-0">
                 <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center text-indigo-700">
@@ -181,7 +168,6 @@
                         </div>
                     </div>
                     
-                    <!-- Divisão de Conta -->
                     <div class="flex justify-between items-center border-b border-gray-200 pb-2 pt-2">
                         <div>
                             <span class="text-lg font-bold text-indigo-700">VALOR POR PESSOA:</span>
@@ -192,14 +178,11 @@
                             <input type="number" id="dinersSplitInput" class="w-16 p-1 text-sm border border-gray-300 rounded-lg text-center" min="1" value="1">
                         </div>
                     </div>
-                    <!-- Fim Divisão de Conta -->
-
                     <div class="flex justify-between items-center pt-2">
                         <span class="text-xl font-bold text-gray-800">TOTAL GERAL:</span>
                         <span class="text-3xl font-extrabold text-indigo-700" id="orderTotalDisplayPayment">R$ 0,00</span>
                     </div>
                     
-                    <!-- Botão de Transferência Seletiva (Ao lado de Excluir Itens) -->
                     <button id="openSelectiveTransferModalBtn" class="mt-4 w-full px-4 py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition text-base shadow-md">
                         <i class="fas fa-exchange-alt mr-2"></i> Transferir Itens Seletivamente
                     </button>
@@ -209,10 +192,8 @@
                     <h4 class="text-lg font-semibold text-gray-700 mb-3">Registrar Pagamento</h4>
                     <div class="space-y-3">
                         <div id="paymentMethodButtons" class="grid grid-cols-3 gap-2">
-                            <!-- Botões de Método de Pagamento -->
-                        </div>
+                            </div>
                         <div class="flex space-x-2">
-                            <!-- Input de Valor com Máscara de Moeda -->
                             <input type="text" id="paymentValueInput" placeholder="Valor Pago (R$ 0,00)" class="w-full p-3 input-pdv border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base text-right" value="R$ 0,00">
                             <button class="bg-gray-200 text-gray-700 font-bold py-3 px-4 rounded-lg hover:bg-gray-300 transition text-base disabled:opacity-50" id="openCalculatorBtn" title="Abrir Calculadora">
                                 <i class="fas fa-calculator"></i>
@@ -225,13 +206,11 @@
                     
                     <h4 class="text-sm font-semibold text-gray-500 mt-4 mb-2">Pagamentos Registrados:</h4>
                     <div id="paymentSummaryList" class="space-y-1 p-2 bg-gray-50 rounded-lg border border-gray-200 text-sm">
-                        <!-- Lista de Pagamentos e Resumo de Saldo -->
                         <div class="flex justify-between items-center py-1 font-bold border-t border-gray-200 mt-2 pt-2">
                             <span>VALOR RESTANTE:</span>
                             <span id="remainingBalanceDisplay" class="text-red-600">R$ 0,00</span>
                         </div>
 
-                        <!-- Botões de Fechamento (Habilitados após Saldo Zero) -->
                         <div class="flex justify-between space-x-3 pt-2">
                             <button id="finalizeOrderBtn" class="w-1/2 px-4 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition text-base disabled:opacity-50" disabled>
                                 FECHAR CONTA
@@ -247,7 +226,6 @@
         </div>
     </main>
 
-    <!-- Modal de Gerenciamento de Item (Obs, Marcha/Espera) -->
     <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 class="text-xl font-bold mb-4 text-indigo-700">Detalhes do Item</h3>
@@ -255,11 +233,9 @@
             <textarea id="obsInput" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 resize-none text-base" rows="3" placeholder="Ex: Sem gelo, carne ao ponto, trocar batata por arroz..."></textarea>
             
             <div class="flex justify-end space-x-3 mt-4">
-                <!-- Botão ESPERA (Cancela o envio, mantém na lista local) -->
                 <button id="cancelObsBtn" data-action="espera" class="px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition text-base font-bold">
                     ESPERA
                 </button>
-                <!-- Botão MARCHA (Envia para o KDS/Produção) -->
                 <button id="saveObsBtn" data-action="marcha" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base font-bold">
                     MARCHA
                 </button>
@@ -267,33 +243,26 @@
         </div>
     </div>
 
-    <!-- MODAL GERENCIAL (Ações/Transferência/Exclusão) -->
     <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-        <!-- Conteúdo do Modal Gerencial e Autenticação -->
-    </div>
+        </div>
 
-    <!-- MODAL NF-E -->
     <div id="nfeModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-        <!-- Conteúdo do Modal NF-e -->
-    </div>
+        </div>
 
-    <!-- MODAL TRANSFERÊNCIA SELETIVA -->
     <div id="selectiveTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-        <!-- Conteúdo do Modal Transferência Seletiva -->
-    </div>
+        </div>
 
-    <!-- Exibição de ID do Usuário e Mensagens de Status (necessário para Firebase) -->
     <p class="mt-8 text-center text-xs text-gray-400" id="user-id-display">Usuário ID: Carregando...</p>
     <div id="statusMessage" class="mt-4 text-center text-sm hidden"></div>
 
 
-    <!-- IMPORTAÇÕES FIREBASE -->
     <script type="module">
+        // Este bloco importa os módulos do Firebase separadamente (necessário para o main.js)
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, query, where, serverTimestamp, getDoc, arrayRemove, arrayUnion, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
-        // Expondo as referências do Firebase para o script.js (module-level global)
+        // Expondo as referências do Firebase para o script principal (main.js)
         window.initializeApp = initializeApp;
         window.getAuth = getAuth;
         window.signInAnonymously = signInAnonymously;
@@ -313,15 +282,16 @@
         window.arrayUnion = arrayUnion;
         window.writeBatch = writeBatch;
 
-        // Variáveis de Configuração (passadas para script.js via window)
+        // Variáveis de Configuração (passadas para main.js via window)
         window.__app_id = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        window.__firebase_config = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
+        
+        // Configuração real do Firebase injetada (RESOLVE O ERRO "auth/invalid-api-key")
+        window.__firebase_config = typeof __firebase_config !== 'undefined' ? __firebase_config : '{"apiKey": "AIzaSyCiquxozxI1u2DM1NCCwUG1sjpZVZ0uZdDM", "authDomain": "fator-pdv.firebaseapp.com", "projectId": "fator-pdv", "storageBucket": "fator-pdv.firebaseapp.com", "messagingSenderId": "1097659747429", "appId": "1:1097659747429:web:8ec0a7c3978c311dbe0a8c", "measurementId": "G-02QWNRXRCV"}';
+        
         window.__initial_auth_token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : undefined;
 
     </script>
     
-    <!-- LINK PARA O JAVASCRIPT PRINCIPAL (DEVE VIR DEPOIS DAS IMPORTAÇÕES FIREBASE) -->
     <script type="module" src="main.js"></script>
 </body>
 </html>
-
