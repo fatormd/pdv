@@ -1,75 +1,88 @@
-/* Estilização específica */
-html { 
-    font-family: 'Inter', sans-serif; 
-    scroll-behavior: smooth; 
-}
-.header-bar { 
-    background-color: #4f46e5; 
-    padding: 0.75rem 1rem; 
-    color: white; 
-    display: flex; 
-    align-items: center; 
-    justify-content: space-between; 
-}
-.header-bar button { 
-    color: white; 
-    padding: 0.5rem; 
-    border-radius: 0.5rem; 
-    transition: background-color 0.15s; 
-}
-.header-bar button:hover { 
-    background-color: rgba(255, 255, 255, 0.1); 
-}
+/* Estilização básica e tipografia */
+html { font-family: 'Inter', sans-serif; scroll-behavior: smooth; }
+body { overflow-x: hidden; }
 
-/* Estilo para simular o efeito de navegação entre telas */
-.screen {
-    width: 100%;
-    transition: transform 0.3s ease-in-out;
-    position: absolute;
-    top: 0;
-    left: 0;
-    min-height: 100vh; /* Garante que a tela cubra toda a altura */
-    background-color: #f3f4f6; /* Cor de fundo para telas */
-}
-.screen:not(.active-screen) {
-    transform: translateX(100%);
-    z-index: 0;
-}
-.active-screen {
-    transform: translateX(0);
-    z-index: 10;
-}
+/* Cabeçalho */
+.header-bar { background-color: #4f46e5; padding: 0.75rem 1rem; }
 
-/* Oculta scrollbars nos modais */
-.modal-content-scrollable {
-    max-height: 70vh;
-    overflow-y: auto;
-    scrollbar-width: none; /* Firefox */
-}
-.modal-content-scrollable::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, Opera */
-}
-
-/* Classes para simular botão de "mensagem" (substituindo o alert) */
-#messageBox {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 500;
-    padding: 1.5rem;
+/* Cards de Conteúdo */
+.content-card {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
     border-radius: 0.75rem;
-    box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
-    max-width: 90%;
-    min-width: 300px;
-    text-align: center;
 }
 
-/* Estilo para o separador de item no pedido */
-.order-item-separator {
-    content: "";
-    display: block;
-    height: 1px;
-    background-color: #e5e7eb;
-    margin: 0.5rem 0;
+/* Contêiner principal para transição de telas */
+#appContainer {
+    display: flex;
+    width: 300vw; /* 3 Telas: Painel, Pedido, Pagamento */
+    transition: transform 0.3s ease-out; 
+    min-height: calc(100vh - 56px); /* Altura total - altura do header */
+}
+
+/* Cada tela ocupa 100vw */
+#panelScreen, #orderScreen, #paymentScreen {
+    width: 100vw;
+    max-width: 100%;
+    flex-shrink: 0;
+    padding: 1rem;
+    box-sizing: border-box;
+    min-height: 100%;
+}
+
+/* Estilos de Otimização para Touch */
+.table-card-panel {
+    min-height: 120px; 
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    text-align: center;
+    cursor: pointer;
+    border-radius: 0.75rem;
+}
+.qty-btn { width: 36px; height: 36px; }
+.add-to-order-btn { 
+    padding-top: 0.75rem; 
+    padding-bottom: 0.75rem; 
+    font-size: 1rem; 
+}
+.input-pdv { padding: 0.75rem; font-size: 1rem; }
+
+/* Estilo do botão de pagamento ativo */
+.payment-method-btn.active {
+    background-color: #4f46e5 !important;
+    color: white !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* Estilos para o cardápio */
+.menu-item {
+     min-height: 100px;
+}
+.add-icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 9999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0; /* Evita que o botão encolha */
+}
+
+/* Animação de Loading */
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-spinner {
+    border: 4px solid rgba(0, 0, 0, 0.1);
+    border-left-color: #4f46e5;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+}
+
+/* Estilo para itens prontos no KDS (para reutilização em notificação) */
+.kds-ready-item {
+    text-decoration: line-through;
+    color: #6b7280; /* gray-500 */
 }
