@@ -1,4 +1,6 @@
-import { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, query, where, serverTimestamp, getDoc, arrayRemove, arrayUnion, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, query, where, serverTimestamp, getDoc, arrayRemove, arrayUnion, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // O código é envolvido em DOMContentLoaded para garantir que os elementos HTML existam
 document.addEventListener('DOMContentLoaded', () => {
@@ -969,4 +971,5 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('mainContent').style.display = 'none';
 
 });
+
 
