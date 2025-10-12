@@ -1,6 +1,23 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, query, where, serverTimestamp, getDoc, arrayRemove, arrayUnion, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+// O script principal agora usa as funções do Firebase expostas globalmente pelo index.html
+const initializeApp = window.initializeApp;
+const getAuth = window.getAuth;
+const signInAnonymously = window.signInAnonymously;
+const onAuthStateChanged = window.onAuthStateChanged;
+const signInWithCustomToken = window.signInWithCustomToken;
+const getFirestore = window.getFirestore;
+const collection = window.collection;
+const onSnapshot = window.onSnapshot;
+const doc = window.doc;
+const setDoc = window.setDoc;
+const updateDoc = window.updateDoc;
+const query = window.query;
+const where = window.where;
+const serverTimestamp = window.serverTimestamp;
+const getDoc = window.getDoc;
+const arrayRemove = window.arrayRemove;
+const arrayUnion = window.arrayUnion;
+const writeBatch = window.writeBatch;
+
 
 // O código é envolvido em DOMContentLoaded para garantir que os elementos HTML existam
 document.addEventListener('DOMContentLoaded', () => {
@@ -126,6 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     } catch (e) {
         console.error("Erro ao inicializar Firebase: ", e);
+        // Atualiza a tela de status com a mensagem de erro detalhada
         document.getElementById('statusContent').innerHTML = `<h2 class="text-xl font-bold mb-2 text-red-600">Erro de Configuração</h2><p>Verifique as variáveis do Firebase. ${e.message}</p>`;
     }
 
@@ -756,7 +774,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                     <div class="flex items-center space-x-2 flex-shrink-0">
                         <span class="font-bold text-base text-indigo-700">${formatCurrency(lineTotal)}</span>
-                        <!-- Botão de Exclusão Gerencial (com Lixeira) -->
                         <button class="text-red-500 hover:text-red-700 transition" onclick="openManagerModal('deleteItem', '${item.id}', '${item.note || ''}')" title="Excluir Item (Gerente)">
                              <i class="fas fa-trash text-sm"></i>
                         </button>
@@ -971,5 +988,3 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('mainContent').style.display = 'none';
 
 });
-
-
