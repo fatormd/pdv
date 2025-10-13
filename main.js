@@ -108,6 +108,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Função de Navegação
     window.goToScreen = (screenId) => {
+        // CORREÇÃO: Salva os itens selecionados antes de sair da tela do pedido
+        if (screenId === 'panelScreen' && currentTableId) {
+            saveSelectedItemsToFirebase(currentTableId);
+        }
+
         const screenIndex = screens[screenId];
         if (screenIndex !== undefined) {
             appContainer.style.transform = `translateX(-${screenIndex * 100}vw)`;
@@ -119,6 +124,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const getTableDocRef = (tableNumber) => doc(db, 'artifacts', appId, 'public', 'data', 'tables', tableNumber.toString());
     const getKdsCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'kds_orders');
     const getManagerCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'manager_logs');
+
+    // --- FUNÇÃO PARA SALVAR A LISTA selectedItems NO FIREBASE (NOVA FUNÇÃO) ---
+    const saveSelectedItemsToFirebase = async (tableId) => {
+        if (!tableId || selectedItems.length === 0) return;
+
+        const tableRef = getTableDocRef(tableId);
+        try {
+            // Salva a lista inteira, incluindo os itens com "Espera"
+            await updateDoc(tableRef, {
+                selectedItems: selectedItems
+            });
+            console.log(`Itens da mesa ${tableId} salvos com sucesso.`);
+        } catch (e) {
+            console.error(`Erro ao salvar itens da mesa ${tableId}:`, e);
+        }
+    }
 
 
     // --- FIREBASE INIT ---
@@ -164,7 +185,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return { total, serviceValue };
     };
 
-    // Função auxiliar para atualizar texto de elemento com verificação de nulo (CORREÇÃO DE TypeError)
+    // Função auxiliar para atualizar texto de elemento com verificação de nulo
     const updateText = (id, value) => {
         const el = document.getElementById(id);
         if (el) el.textContent = value;
@@ -192,7 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const isClosed = remainingBalance <= 0;
         const displayBalance = isClosed ? 0 - remainingBalance : remainingBalance;
         
-        // Atualiza a UI com checagem de nulo (CORREÇÃO DE TypeError)
+        // Atualiza a UI com checagem de nulo
         updateText('orderSubtotalDisplayPayment', formatCurrency(subtotal));
         updateText('orderServiceTaxDisplayPayment', formatCurrency(serviceValue));
         updateText('orderTotalDisplayPayment', formatCurrency(generalTotal));
@@ -217,10 +238,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Renderiza a lista de pagamentos
         const paymentListEl = document.getElementById('paymentSummaryList');
-        // Se o elemento não existir (estamos em outra tela), não prossegue.
         if (!paymentListEl) return; 
 
-        // Remove tudo, exceto o Resumo do Saldo e Botões de Fechamento
         paymentListEl.innerHTML = ''; 
 
         if (payments.length === 0) {
@@ -236,7 +255,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         
-        // Adiciona de volta o Resumo do Saldo e Botões de Fechamento
         const isClosedClass = isClosed ? 'text-green-600' : 'text-red-600';
 
         paymentListEl.innerHTML += `
@@ -250,7 +268,6 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
         
-        // Re-vincula os botões de fechamento para a UI aninhada
         const finalizeBtnNested = document.getElementById('finalizeOrderBtnNested');
         const nfeBtnNested = document.getElementById('openNfeModalBtnNested');
 
@@ -264,7 +281,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
 
-    // Altera a taxa de serviço (10%)
     if (toggleServiceTaxBtn) {
         toggleServiceTaxBtn.addEventListener('click', async () => {
             if (!currentTableId) return;
@@ -279,13 +295,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Input de Divisão de Conta
     if (dinersSplitInput) {
         dinersSplitInput.addEventListener('input', renderPaymentSummary);
     }
 
 
-    // Adicionar Pagamento
     if (addPaymentBtn) {
         addPaymentBtn.addEventListener('click', async () => {
             if (!currentTableId) return;
@@ -305,7 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const newPayment = {
                 method,
                 value,
-                timestamp: Date.now(), // Usando timestamp local para evitar erro de array
+                timestamp: Date.now(), 
                 userId: userId
             };
 
@@ -314,7 +328,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     payments: arrayUnion(newPayment)
                 });
 
-                // Limpa o input após o sucesso
                 paymentValueInput.value = 'R$ 0,00';
                 document.querySelectorAll('.payment-method-btn').forEach(btn => btn.classList.remove('active'));
                 addPaymentBtn.disabled = true;
@@ -325,7 +338,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Seleção do Método de Pagamento
     document.getElementById('paymentMethodButtons').addEventListener('click', (e) => {
         const btn = e.target.closest('.payment-method-btn');
         if (btn) {
@@ -335,11 +347,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
-    // Finalizar Pedido (Gatilho de Integração WooCommerce)
     const finalizeOrder = async () => {
         if (!currentTableId || !currentOrderSnapshot) return;
 
-        // 1. SIMULAÇÃO DA CHAMADA API DO WOOCOMMERCE
         console.log("--- INICIANDO INTEGRAÇÃO WOOCOMMERCE ---");
         const orderData = {
             tableNumber: currentTableId,
@@ -351,11 +361,9 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         console.log("DADOS ENVIADOS PARA CRIAÇÃO DE ORDEM (API WooCommerce):", orderData);
         
-        // Simulação de delay para a API
         await new Promise(resolve => setTimeout(resolve, 1000));
         console.log("Ordem de Venda Criada/Finalizada no WooCommerce.");
 
-        // 2. FECHA A MESA NO FIREBASE
         const tableRef = getTableDocRef(currentTableId);
         try {
             await updateDoc(tableRef, {
@@ -365,7 +373,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentTableId = null;
             selectedItems = [];
             currentOrderSnapshot = null;
-            alert("Mesa fechada com sucesso! Ordem finalizada no WooCommerce."); // Usando alert apenas neste ponto de finalização crítica
+            alert("Mesa fechada com sucesso! Ordem finalizada no WooCommerce."); 
             goToScreen('panelScreen');
         } catch (e) {
             console.error("Erro ao fechar mesa:", e);
@@ -374,7 +382,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- FUNÇÕES DO PAINEL DE MESAS (1) ---
 
-    // Lógica de validação do botão Abrir Mesa
     const checkInputs = () => {
         const mesaValida = parseInt(mesaInput.value) > 0;
         const pessoasValida = parseInt(pessoasInput.value) > 0;
@@ -384,9 +391,7 @@ document.addEventListener('DOMContentLoaded', () => {
     mesaInput.addEventListener('input', checkInputs);
     pessoasInput.addEventListener('input', checkInputs);
 
-    // Abrir Nova Mesa (CRUD - Create)
     abrirMesaBtn.addEventListener('click', async () => {
-        // ... (lógica de abrir mesa)
         const tableNumber = parseInt(mesaInput.value);
         const diners = parseInt(pessoasInput.value);
         const newTableRef = getTableDocRef(tableNumber);
@@ -401,6 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 sentItems: [], 
                 payments: [],
                 serviceTaxApplied: false,
+                selectedItems: [] // NOVO: Campo para salvar os itens em espera
             });
 
             currentTableId = tableNumber.toString();
@@ -417,7 +423,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Renderiza a lista de mesas na UI (Read - Realtime)
     const renderTables = (docs) => {
         openTablesList.innerHTML = '';
         let count = 0;
@@ -451,7 +456,6 @@ document.addEventListener('DOMContentLoaded', () => {
         openTablesCount.textContent = count;
     };
 
-    // Listener em tempo real para Mesas Abertas
     const loadOpenTables = () => {
         const tablesCollection = getTablesCollectionRef();
         const q = query(tablesCollection, where('status', '==', 'open'));
@@ -466,28 +470,33 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Clique em uma Mesa (Navegação)
-    openTablesList.addEventListener('click', (e) => {
+    openTablesList.addEventListener('click', async (e) => {
         const tableCard = e.target.closest('.table-card-panel');
         if (tableCard) {
             currentTableId = tableCard.dataset.tableId;
             document.getElementById('current-table-number').textContent = `Mesa ${currentTableId}`;
             document.getElementById('payment-table-number').textContent = `Mesa ${currentTableId}`;
             
-            selectedItems = [];
+            // CARREGA ITENS SALVOS NO FIREBASE (NOVA LÓGICA)
+            const tableRef = getTableDocRef(currentTableId);
+            const docSnap = await getDoc(tableRef);
+            if (docSnap.exists() && docSnap.data().selectedItems) {
+                selectedItems = docSnap.data().selectedItems;
+            } else {
+                selectedItems = [];
+            }
+            
             renderSelectedItems();
-            loadTableOrder(currentTableId); // Inicia o listener de status KDS/Mesa
+            loadTableOrder(currentTableId); 
             goToScreen('orderScreen');
         }
     });
 
     // --- FUNÇÕES DO CARDÁPIO (2) ---
     
-    // Renderiza os itens do Cardápio com botão de adição
-    // CORREÇÃO: Adicionada lógica de filtro por categoria.
     const renderMenu = (filter = 'all', search = '') => {
         let filteredItems = MENU_DATA;
         
-        // 1. Filtro por busca
         if (search) {
             const normalizedSearch = search.toLowerCase();
             filteredItems = filteredItems.filter(item => 
@@ -495,7 +504,6 @@ document.addEventListener('DOMContentLoaded', () => {
             );
         }
 
-        // 2. Filtro por categoria (NEW LOGIC)
         if (filter !== 'all') {
             filteredItems = filteredItems.filter(item => 
                 item.category === filter
@@ -526,12 +534,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // Adiciona listener para os botões de filtro de categoria
     document.getElementById('categoryFilters').addEventListener('click', (e) => {
         const btn = e.target.closest('.category-btn');
         if (btn) {
             const category = btn.dataset.category;
-            // 1. Atualiza estado ativo
             document.querySelectorAll('.category-btn').forEach(b => {
                 b.classList.remove('bg-indigo-600', 'text-white');
                 b.classList.add('bg-white', 'text-gray-700', 'border', 'border-gray-300');
@@ -539,12 +545,10 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.classList.remove('bg-white', 'text-gray-700', 'border', 'border-gray-300');
             btn.classList.add('bg-indigo-600', 'text-white');
             
-            // 2. Renderiza menu filtrado
             renderMenu(category, searchProductInput.value);
         }
     });
 
-    // Renderiza a lista de itens selecionados (lista de anotações local)
     const renderSelectedItems = () => {
         openOrderList.innerHTML = '';
 
@@ -555,13 +559,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (sendSelectedItemsBtn) sendSelectedItemsBtn.disabled = true;
         } else {
             if (sendSelectedItemsBtn) sendSelectedItemsBtn.disabled = false;
-            // Agrupa itens por ID e Observação para consolidar
             const groupedItems = selectedItems.reduce((acc, item) => {
                 const key = `${item.id}-${item.note || ''}`;
                 acc[key] = acc[key] || { ...item, qty: 0, firstIndex: -1 };
                 acc[key].qty++;
                 if (acc[key].firstIndex === -1) {
-                    // Armazena o ID e a nota para ser passado ao modal
                     acc[key].firstIndex = selectedItems.findIndex(i => i.id === item.id && (i.note || '') === (item.note || ''));
                 }
                 return acc;
@@ -569,6 +571,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             Object.values(groupedItems).forEach((item, index) => {
                 const lineTotal = item.qty * item.price;
+                const isEspera = item.note && item.note.toLowerCase().includes('espera');
                 const obsText = item.note 
                     ? `<span class="italic text-indigo-600 font-normal">(${item.note})</span>` 
                     : `<span class="italic text-gray-500">(Adicionar Obs.)</span>`;
@@ -577,7 +580,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg shadow-sm" data-item-id="${item.id}" data-item-note="${item.note || ''}">
                         <div class="flex flex-col flex-grow min-w-0 mr-2">
                             <span class="font-semibold text-gray-800">${item.name} (${item.qty}x)</span>
-                            <span class="text-sm cursor-pointer" onclick="openObsModal(this)" data-item-id="${item.id}" data-item-note-key="${item.note || ''}">${obsText}</span>
+                            <span class="text-sm cursor-pointer ${isEspera ? 'text-yellow-600' : ''}" onclick="openObsModal(this)" data-item-id="${item.id}" data-item-note-key="${item.note || ''}">${obsText}</span>
                         </div>
 
                         <div class="flex items-center space-x-2 flex-shrink-0">
@@ -597,7 +600,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('openItemsCount').textContent = totalItemsCount;
     }
 
-    // Adiciona item à lista local de itens selecionados
     const addItemToOrder = (item) => {
         if (!currentTableId) {
             alert("Selecione ou abra uma mesa primeiro.");
@@ -616,11 +618,9 @@ document.addEventListener('DOMContentLoaded', () => {
         obsModal.dataset.originalNoteKey = '';
         
         obsModal.style.display = 'flex';
-        // Define o switch de espera como desativado por padrão
         esperaSwitch.checked = false; 
     };
 
-    // Listener para os botões de adicionar item ao Cardápio
     menuItemsGrid.addEventListener('click', (e) => {
         const addButton = e.target.closest('.add-item-btn');
         if (addButton) {
@@ -629,7 +629,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
-    // Listener para os Botões de Observação Rápida
     if (quickObsButtons) {
         quickObsButtons.addEventListener('click', (e) => {
             const btn = e.target.closest('.quick-obs-btn');
@@ -638,9 +637,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const currentObs = obsInput.value.trim();
                 
                 if (obsText === 'Espera') {
-                    // Clica no switch para marcar/desmarcar a espera
                     esperaSwitch.checked = !esperaSwitch.checked;
-                    obsInput.value = currentObs; // Mantém a observação atual
+                    obsInput.value = currentObs; 
                 } else if (currentObs === '') {
                     obsInput.value = obsText;
                 } else {
@@ -653,7 +651,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    // Aumenta quantidade na lista local
     window.increaseLocalItemQuantity = (itemId, noteKey) => {
         const itemToCopy = selectedItems.find(item => 
             item.id === itemId && (item.note || '') === noteKey
@@ -665,7 +662,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Diminui/Remove quantidade na lista local
     window.decreaseLocalItemQuantity = (itemId, noteKey) => {
         const index = selectedItems.findIndex(item => 
             item.id === itemId && (item.note || '') === noteKey
@@ -677,7 +673,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Abre o Modal de Observações/Edição
     window.openObsModal = (el) => {
         const itemId = el.dataset.itemId;
         const noteKey = el.dataset.itemNoteKey;
@@ -693,7 +688,6 @@ document.addEventListener('DOMContentLoaded', () => {
             obsModal.dataset.itemId = itemId;
             obsModal.dataset.originalNoteKey = noteKey;
             
-            // Define o estado do switch com base na observação "Espera"
             esperaSwitch.checked = currentNote.toLowerCase().includes('espera');
 
             obsModal.style.display = 'flex';
@@ -701,11 +695,19 @@ document.addEventListener('DOMContentLoaded', () => {
             currentObsGroup = { id: itemId, note: noteKey };
         }
     };
+    
+    // Adiciona listener para a nova chave de 'Espera'
+    if (esperaSwitch) {
+        esperaSwitch.addEventListener('change', () => {
+            // Mantém a observação de texto, a lógica de espera é separada agora.
+            // A lógica de anexar/remover "Espera" do texto é feita no botão de salvar.
+        });
+    }
 
-    // Listener para o Modal de Observações (SALVAR OBS e CANCELAR)
+
     [saveObsBtn, cancelObsBtn].forEach(btn => {
         btn.addEventListener('click', async (e) => {
-            const action = e.target.textContent.trim();
+            const action = e.target.textContent.trim(); 
             
             if (!currentObsGroup) {
                 obsModal.style.display = 'none';
@@ -724,10 +726,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             } else { // SALVAR OBS
-                 // Adiciona ou remove "Espera" da observação com base no switch
-                if (esperaSwitch.checked && !newNote.toLowerCase().includes('espera')) {
+                 // Adiciona ou remove "Espera" da observação com base no switch (NOVA LÓGICA)
+                const isEsperaActive = esperaSwitch.checked;
+                const hasEsperaText = newNote.toLowerCase().includes('espera');
+
+                if (isEsperaActive && !hasEsperaText) {
                     newNote += (newNote === '' ? '' : ', ') + 'Espera';
-                } else if (!esperaSwitch.checked && newNote.toLowerCase().includes('espera')) {
+                } else if (!isEsperaActive && hasEsperaText) {
+                    // Remove "Espera" se a chave estiver desativada
                     newNote = newNote.replace(/(,?\s*Espera)/gi, '').trim();
                 }
 
@@ -748,7 +754,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // FUNÇÃO PRINCIPAL PARA ENVIAR TODOS OS ITENS SELECIONADOS
     if (sendSelectedItemsBtn) {
         sendSelectedItemsBtn.addEventListener('click', async () => {
             if (!currentTableId) {
@@ -759,7 +764,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert("Nenhum item para enviar.");
                 return;
             }
-
+            
+            // FILTRA ITENS A SEREM ENVIADOS E ITENS EM ESPERA (CORREÇÃO DE LÓGICA)
             const itemsToSend = selectedItems.filter(item => !item.note || !item.note.toLowerCase().includes('espera'));
             const itemsToHold = selectedItems.filter(item => item.note && item.note.toLowerCase().includes('espera'));
 
@@ -768,6 +774,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            // ATUALIZA A LISTA LOCAL APENAS COM OS ITENS EM ESPERA
             selectedItems = [...itemsToHold];
 
             const itemsGroupedBySector = itemsToSend.reduce((acc, item) => {
@@ -808,9 +815,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     note: item.note || '',
                     orderId: kdsOrderRef.id,
                 }));
-
+                
+                // ATUALIZA O FIREBASE COM OS ITENS ENVIADOS E OS ITENS SELECIONADOS RESTANTES
                 await updateDoc(tableRef, {
                     sentItems: arrayUnion(...itemsForUpdate), 
+                    selectedItems: selectedItems // Salva a lista com os itens em espera
                 });
                 
                 renderSelectedItems(); 
@@ -825,14 +834,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Listener de Busca
     searchProductInput.addEventListener('input', (e) => {
         const activeCategoryBtn = document.querySelector('#categoryFilters .bg-indigo-600');
         const activeCategory = activeCategoryBtn ? activeCategoryBtn.dataset.category : 'all';
         renderMenu(activeCategory, e.target.value);
     });
-
-    // --- FUNÇÕES DE STATUS (KDS/MESA) ---
 
     let unsubscribeTable = null;
 
@@ -844,12 +850,18 @@ document.addEventListener('DOMContentLoaded', () => {
         unsubscribeTable = onSnapshot(tableRef, (docSnapshot) => {
             if (docSnapshot.exists()) {
                 currentOrderSnapshot = docSnapshot.data();
+                // CORREÇÃO: Carrega os itens selecionados do firebase (se existirem)
+                selectedItems = currentOrderSnapshot.selectedItems || [];
+                renderSelectedItems(); 
+
                 renderSentItems();
                 renderPaymentSummary(); 
                 subscribeToKdsNotifications(tableId); 
             } else {
                 console.log(`Mesa ${tableId} não encontrada.`);
                 currentOrderSnapshot = null;
+                selectedItems = []; // Limpa a lista local se a mesa não for encontrada
+                renderSelectedItems();
                 renderSentItems();
                 renderPaymentSummary();
             }
@@ -909,7 +921,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     };
     
-    // --- NOTIFICAÇÃO KDS ---
     let unsubscribeKds = null;
     
     const subscribeToKdsNotifications = (tableId) => {
@@ -934,14 +945,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // --- FUNÇÕES DE AJUDA ---
-    
     const hideStatus = () => {
         statusScreen.style.display = 'none';
         mainContent.style.display = 'block';
     };
-
-    // --- INTEGRAÇÃO COM MODAIS E AUTENTICAÇÃO GERENCIAL ---
 
     window.openManagerModal = (action, itemId = null, itemNote = null) => {
         const managerModal = document.getElementById('managerModal');
