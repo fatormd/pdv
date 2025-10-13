@@ -551,9 +551,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (totalItemsCount === 0) {
             openOrderList.innerHTML = `<div class="text-base text-gray-500 italic p-2">Nenhum item selecionado.</div>`;
-            sendSelectedItemsBtn.disabled = true;
+            if (sendSelectedItemsBtn) sendSelectedItemsBtn.disabled = true;
         } else {
-            sendSelectedItemsBtn.disabled = false;
+            if (sendSelectedItemsBtn) sendSelectedItemsBtn.disabled = false;
             // Agrupa itens por ID e Observação para consolidar
             const groupedItems = selectedItems.reduce((acc, item) => {
                 const key = `${item.id}-${item.note || ''}`;
@@ -754,8 +754,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // 1. Agrupa todos os itens selecionados por setor para o KDS
-            const itemsGroupedBySector = selectedItems.reduce((acc, item) => {
+            // NOVO: Filtra itens para envio e itens para segurar
+            const itemsToSend = selectedItems.filter(item => !item.note || !item.note.toLowerCase().includes('espera'));
+            const itemsToHold = selectedItems.filter(item => item.note && item.note.toLowerCase().includes('espera'));
+
+            if (itemsToSend.length === 0) {
+                alert("Nenhum item pronto para envio (todos estão marcados como 'Espera').");
+                return;
+            }
+
+            // 1. Limpa selectedItems, mas mantém os itens em espera (CORREÇÃO DE LÓGICA)
+            selectedItems = [...itemsToHold]; // Mantém apenas os itens com 'Espera'
+
+            // 2. Agrupa os itens PARA ENVIO por setor para o KDS
+            const itemsGroupedBySector = itemsToSend.reduce((acc, item) => {
                 const sector = item.sector;
                 const itemToSend = { 
                     id: item.id, 
@@ -770,10 +782,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return acc;
             }, {});
             
-            // 2. Remove todos os itens da lista local para preparo de envio
-            const itemsToUpdateTable = [...selectedItems];
-            selectedItems = [];
-
             // 3. Cria um documento de pedido KDS (Bulk KDS Order)
             const kdsOrderRef = doc(getKdsCollectionRef());
             
@@ -790,7 +798,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 4. Atualiza a mesa (total e lista de itens enviados)
                 const tableRef = getTableDocRef(currentTableId);
                 
-                const itemsForUpdate = itemsToUpdateTable.map(item => ({
+                const itemsForUpdate = itemsToSend.map(item => ({
                     id: item.id,
                     name: item.name,
                     price: item.price,
@@ -801,19 +809,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 }));
 
                 await updateDoc(tableRef, {
-                    // Adiciona todos os itens à lista de sentItems
+                    // Adiciona apenas os itens SEM 'ESPERA' à lista de sentItems
                     sentItems: arrayUnion(...itemsForUpdate), 
                 });
                 
                 // 5. Atualiza a UI
                 renderSelectedItems(); 
-                alert("Itens enviados para a produção (KDS).");
+                alert(`Itens enviados para a produção (KDS). ${itemsToHold.length > 0 ? `(${itemsToHold.length} itens permaneceram em Espera)` : ''}`);
 
             } catch (e) {
                 console.error("Erro ao enviar pedido KDS/Atualizar Mesa:", e);
                 alert("Erro ao enviar itens. Tente novamente.");
-                // Se falhar, restaura a lista local para evitar perda de dados
-                selectedItems = [...itemsToUpdateTable];
+                // Se falhar, restaura todos os itens de volta à lista local (incluindo os que seriam enviados)
+                selectedItems = [...itemsToSend, ...itemsToHold];
                 renderSelectedItems(); 
             }
         });
