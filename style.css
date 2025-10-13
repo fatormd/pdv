@@ -73,6 +73,12 @@ body { overflow-x: hidden; }
     font-size: 0.875rem; /* Redução do ícone (+) */
 }
 
+/* NOVO: Aumento da fonte para botões de observação rápida */
+.quick-obs-btn {
+    font-size: 1rem !important; /* Aumentado para 16px */
+    padding: 0.5rem 0.75rem !important; /* Ajuste de padding */
+}
+
 
 /* Animação de Loading */
 @keyframes spin { to { transform: rotate(360deg); } }
