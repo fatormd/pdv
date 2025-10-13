@@ -68,10 +68,75 @@ document.addEventListener('DOMContentLoaded', () => {
     const dinersSplitInput = document.getElementById('dinersSplitInput');
     const openActionsModalBtn = document.getElementById('openActionsModalBtn');
     const sendSelectedItemsBtn = document.getElementById('sendSelectedItemsBtn');
+    const quickObsButtons = document.getElementById('quickObsButtons'); // NOVO ELEMENTO
 
 
     // Variável para rastrear o item/grupo que está no modal de OBS
     let currentObsGroup = null;
+
+    // --- NOVO: Observações Rápidas ---
+    const QUICK_OBS_LIST = [
+        // Bebidas
+        { text: 'Gelo', type: 'drink' },
+        { text: 'Limão', type: 'drink' },
+        { text: 'Limão Espremido', type: 'drink' },
+        { text: 'Gelo à Parte', type: 'drink' },
+        { text: 'Limão Espremido à Parte', type: 'drink' },
+        { text: 'Laranja', type: 'drink' },
+        // Carnes / Ponto
+        { text: 'Mal Passado', type: 'meat' },
+        { text: 'Ponto Menos', type: 'meat' },
+        { text: 'Ao Ponto', type: 'meat' },
+        { text: 'Ponto Mais', type: 'meat' },
+        { text: 'Bem Passado', type: 'meat' },
+        // Ação
+        { text: 'Espera', type: 'action' },
+    ];
+    
+    // Renders the quick observation buttons and adds listeners
+    const renderQuickObsButtons = () => {
+        quickObsButtons.innerHTML = '';
+        QUICK_OBS_LIST.forEach(obs => {
+            quickObsButtons.innerHTML += `
+                <button data-obs-text="${obs.text}" class="quick-obs-btn text-xs px-3 py-2 rounded-full border border-gray-300 bg-gray-100 text-gray-700 hover:bg-indigo-100 transition duration-150 whitespace-nowrap">
+                    ${obs.text}
+                </button>
+            `;
+        });
+
+        // Add listener for button clicks
+        quickObsButtons.addEventListener('click', (e) => {
+            const btn = e.target.closest('.quick-obs-btn');
+            if (btn) {
+                const obsText = btn.dataset.obsText;
+                
+                // Lógica Especial para o botão 'Espera'
+                if (obsText === 'Espera') {
+                    // O item fica na lista local (Ação da 'ESPERA')
+                    // O modal é fechado sem salvar a nota 'ESPERA'
+                    obsModal.style.display = 'none';
+                    obsInput.value = '';
+                    currentObsGroup = null;
+                    return;
+                }
+                
+                let currentText = obsInput.value.trim();
+                
+                // Add the new text, separated by comma/space if the field is not empty
+                if (currentText && !currentText.endsWith(',')) {
+                    obsInput.value = currentText + ', ' + obsText;
+                } else if (currentText) {
+                    obsInput.value = currentText + ' ' + obsText;
+                } else {
+                    obsInput.value = obsText;
+                }
+                
+                // Re-focus on the input for ease of use
+                obsInput.focus();
+            }
+        });
+    }
+
 
     // --- UTILS ---
     const formatCurrency = (value) => `R$ ${parseFloat(value || 0).toFixed(2).replace('.', ',')}`;
@@ -143,6 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
             hideStatus();
             loadOpenTables();
             renderMenu();
+            renderQuickObsButtons(); // NOVO: Call to render buttons
         });
 
     } catch (e) {
@@ -542,6 +608,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Adiciona listener para os botões de adicionar item ao Cardápio
+    menuItemsGrid.addEventListener('click', (e) => {
+        const addButton = e.target.closest('.add-item-btn');
+        if (addButton) {
+            // Remove o replace, pois o JSON.stringify já trata a maioria dos caracteres
+            const itemData = JSON.parse(addButton.dataset.item.replace(/&#39;/g, "'"));
+            addItemToOrder(itemData);
+        }
+    });
+
     // Renderiza a lista de itens selecionados (lista de anotações local)
     const renderSelectedItems = () => {
         openOrderList.innerHTML = '';
@@ -617,22 +693,12 @@ document.addEventListener('DOMContentLoaded', () => {
         obsModal.dataset.itemId = item.id;
         obsModal.dataset.originalNoteKey = '';
         
-        // Mudar o botão MARCHA para SALVAR OBS
+        // Mudar o botão SALVAR OBS para o texto de Ação.
         saveObsBtn.textContent = 'SALVAR OBS';
-        cancelObsBtn.textContent = 'CANCELAR';
+        cancelObsBtn.textContent = 'ESPERA'; // Set to ESPERA
 
         obsModal.style.display = 'flex';
     };
-
-    // Listener para os botões de adicionar item ao Cardápio
-    menuItemsGrid.addEventListener('click', (e) => {
-        const addButton = e.target.closest('.add-item-btn');
-        if (addButton) {
-            // Remove o replace, pois o JSON.stringify já trata a maioria dos caracteres
-            const itemData = JSON.parse(addButton.dataset.item.replace(/&#39;/g, "'"));
-            addItemToOrder(itemData);
-        }
-    });
 
     // Aumenta quantidade na lista local
     window.increaseLocalItemQuantity = (itemId, noteKey) => {
@@ -678,45 +744,57 @@ document.addEventListener('DOMContentLoaded', () => {
             // Armazena o grupo atual sendo editado
             currentObsGroup = { id: itemId, note: noteKey };
             
-            // Mudar o botão MARCHA para SALVAR OBS
+            // Mudar o botão SALVAR OBS para o texto de Ação.
             saveObsBtn.textContent = 'SALVAR OBS';
-            cancelObsBtn.textContent = 'CANCELAR';
+            cancelObsBtn.textContent = 'ESPERA'; // Set to ESPERA
         }
     };
 
-    // Listener para o Modal de Observações (SALVAR OBS)
+    // Listener para o Modal de Observações (SALVAR OBS e ESPERA)
     [saveObsBtn, cancelObsBtn].forEach(btn => {
         btn.addEventListener('click', async (e) => {
-            const action = e.target.dataset.action; // 'marcha' ou 'espera'
-            
+            const action = e.target.id; // Use ID: 'saveObsBtn' or 'cancelObsBtn'
+
             if (!currentObsGroup) {
                 obsModal.style.display = 'none';
                 return;
             }
-
-            const itemId = currentObsGroup.id;
-            const originalNoteKey = currentObsGroup.note;
-            const newNote = obsInput.value.trim();
-
-            // 1. Atualizar a observação na lista local (selectedItems)
-            if (newNote !== originalNoteKey) {
-                 selectedItems = selectedItems.map(item => {
-                    // Encontra todos os itens com o mesmo ID e a mesma observação original
-                    if (item.id === itemId && (item.note || '') === originalNoteKey) {
-                        // Atualiza a observação para o novo valor
-                        return { ...item, note: newNote };
-                    }
-                    return item;
-                });
-            }
-
-            // 2. Ação de envio (MARCHA) - REMOVIDA A LÓGICA DE ENVIO INDIVIDUAL
             
-            // 3. Fechar e Renderizar
-            obsModal.style.display = 'none';
-            obsInput.value = '';
-            currentObsGroup = null; // Limpa o estado do modal
-            renderSelectedItems();
+            // Lógica para o botão ESPERA (cancelObsBtn)
+            if (action === 'cancelObsBtn') {
+                // Ação ESPERA: O item permanece na lista selectedItems
+                // e o modal é fechado. Nenhuma alteração é feita no item.
+                obsModal.style.display = 'none';
+                obsInput.value = '';
+                currentObsGroup = null;
+                renderSelectedItems();
+                return; 
+            }
+            
+            // Lógica para o botão SALVAR OBS (saveObsBtn)
+            if (action === 'saveObsBtn') {
+                const itemId = currentObsGroup.id;
+                const originalNoteKey = currentObsGroup.note;
+                const newNote = obsInput.value.trim();
+
+                // 1. Atualizar a observação na lista local (selectedItems)
+                if (newNote !== originalNoteKey) {
+                    selectedItems = selectedItems.map(item => {
+                        // Encontra todos os itens com o mesmo ID e a mesma observação original
+                        if (item.id === itemId && (item.note || '') === originalNoteKey) {
+                            // Atualiza a observação para o novo valor
+                            return { ...item, note: newNote };
+                        }
+                        return item;
+                    });
+                }
+                
+                // 2. Fechar e Renderizar
+                obsModal.style.display = 'none';
+                obsInput.value = '';
+                currentObsGroup = null; // Limpa o estado do modal
+                renderSelectedItems();
+            }
         });
     });
 
