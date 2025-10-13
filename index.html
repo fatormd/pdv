@@ -235,19 +235,26 @@
             <p class="text-base mb-3">Item: <span id="obsItemName" class="font-semibold text-gray-800"></span></p>
 
             <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-4">
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">2CP</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">G</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">L</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">L.e</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">Sg</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">G/</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">L.e/</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">Mp</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">P-</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">Ao ponto</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">P+</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">Bp</button>
-                <button class="quick-obs-btn bg-yellow-400 text-gray-800 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-yellow-500 transition">Espera</button>
+                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">2CP</button>
+                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">G</button>
+                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">L</button>
+                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">L.e</button>
+                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">Sg</button>
+                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">G/</button>
+                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">L.e/</button>
+                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">Mp</button>
+                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">P-</button>
+                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">Ao ponto</button>
+                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">P+</button>
+                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">Bp</button>
+            </div>
+            
+            <div class="flex items-center justify-between mb-4 mt-2">
+                <span class="text-sm font-semibold text-gray-600">Manter item em Espera:</span>
+                <label class="switch-obs">
+                    <input type="checkbox" id="esperaSwitch">
+                    <span class="slider-obs"></span>
+                </label>
             </div>
 
             <textarea id="obsInput" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 resize-none text-base" rows="3" placeholder="Ex: Sem gelo, carne ao ponto, trocar batata por arroz..."></textarea>
