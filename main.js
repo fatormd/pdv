@@ -69,6 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const openActionsModalBtn = document.getElementById('openActionsModalBtn');
     const sendSelectedItemsBtn = document.getElementById('sendSelectedItemsBtn');
     const quickObsButtons = document.getElementById('quickObsButtons');
+    const esperaSwitch = document.getElementById('esperaSwitch');
 
 
     // Variável para rastrear o item/grupo que está no modal de OBS
@@ -597,41 +598,38 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Adiciona item à lista local de itens selecionados
-    // CORREÇÃO: Abre o modal de OBS imediatamente após adicionar.
     const addItemToOrder = (item) => {
         if (!currentTableId) {
             alert("Selecione ou abra uma mesa primeiro.");
             return;
         }
         
-        // O novo item é adicionado com uma nota vazia
         selectedItems.push({ ...item, note: '' }); 
 
         renderSelectedItems();
         
-        // Abre o modal de observação para o item recém-adicionado
-        // Ele edita o grupo que tem o mesmo ID e nota VAZIA
         currentObsGroup = { id: item.id, note: '' };
 
         obsItemName.textContent = item.name;
-        obsInput.value = ''; // Começa com a nota vazia
+        obsInput.value = ''; 
         obsModal.dataset.itemId = item.id;
         obsModal.dataset.originalNoteKey = '';
         
         obsModal.style.display = 'flex';
+        // Define o switch de espera como desativado por padrão
+        esperaSwitch.checked = false; 
     };
 
     // Listener para os botões de adicionar item ao Cardápio
     menuItemsGrid.addEventListener('click', (e) => {
         const addButton = e.target.closest('.add-item-btn');
         if (addButton) {
-            // Remove o replace, pois o JSON.stringify já trata a maioria dos caracteres
             const itemData = JSON.parse(addButton.dataset.item.replace(/&#39;/g, "'"));
             addItemToOrder(itemData);
         }
     });
     
-    // Listener para os Botões de Observação Rápida (NEW LOGIC)
+    // Listener para os Botões de Observação Rápida
     if (quickObsButtons) {
         quickObsButtons.addEventListener('click', (e) => {
             const btn = e.target.closest('.quick-obs-btn');
@@ -639,10 +637,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const obsText = btn.textContent.trim();
                 const currentObs = obsInput.value.trim();
                 
-                if (currentObs === '') {
+                if (obsText === 'Espera') {
+                    // Clica no switch para marcar/desmarcar a espera
+                    esperaSwitch.checked = !esperaSwitch.checked;
+                    obsInput.value = currentObs; // Mantém a observação atual
+                } else if (currentObs === '') {
                     obsInput.value = obsText;
                 } else {
-                    // Adiciona vírgula e espaço se o último caractere não for um espaço ou pontuação
                     const lastChar = currentObs.slice(-1);
                     const separator = (lastChar === ',' || lastChar === ';' || lastChar === ' ' || lastChar === '/') ? '' : ', ';
                     obsInput.value += separator + obsText;
@@ -691,9 +692,12 @@ document.addEventListener('DOMContentLoaded', () => {
             obsInput.value = currentNote;
             obsModal.dataset.itemId = itemId;
             obsModal.dataset.originalNoteKey = noteKey;
+            
+            // Define o estado do switch com base na observação "Espera"
+            esperaSwitch.checked = currentNote.toLowerCase().includes('espera');
+
             obsModal.style.display = 'flex';
 
-            // Armazena o grupo atual sendo editado
             currentObsGroup = { id: itemId, note: noteKey };
         }
     };
@@ -701,7 +705,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Listener para o Modal de Observações (SALVAR OBS e CANCELAR)
     [saveObsBtn, cancelObsBtn].forEach(btn => {
         btn.addEventListener('click', async (e) => {
-            const action = e.target.textContent.trim(); // "SALVAR OBS" ou "CANCELAR"
+            const action = e.target.textContent.trim();
             
             if (!currentObsGroup) {
                 obsModal.style.display = 'none';
@@ -710,10 +714,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const itemId = currentObsGroup.id;
             const originalNoteKey = currentObsGroup.note;
-            const newNote = obsInput.value.trim();
+            let newNote = obsInput.value.trim();
 
             if (action === 'CANCELAR') {
-                // Se CANCELAR e o item foi recém-adicionado (noteKey vazio), remove o item.
                 if (originalNoteKey === '' && newNote === '') {
                     const indexToRemove = selectedItems.findIndex(item => item.id === itemId && item.note === '');
                     if (indexToRemove !== -1) {
@@ -721,12 +724,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             } else { // SALVAR OBS
-                 // 1. Atualizar a observação na lista local (selectedItems)
+                 // Adiciona ou remove "Espera" da observação com base no switch
+                if (esperaSwitch.checked && !newNote.toLowerCase().includes('espera')) {
+                    newNote += (newNote === '' ? '' : ', ') + 'Espera';
+                } else if (!esperaSwitch.checked && newNote.toLowerCase().includes('espera')) {
+                    newNote = newNote.replace(/(,?\s*Espera)/gi, '').trim();
+                }
+
                 if (newNote !== originalNoteKey) {
                     selectedItems = selectedItems.map(item => {
-                        // Encontra todos os itens com o mesmo ID e a mesma observação original
                         if (item.id === itemId && (item.note || '') === originalNoteKey) {
-                            // Atualiza a observação para o novo valor
                             return { ...item, note: newNote };
                         }
                         return item;
@@ -734,15 +741,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // 2. Fechar e Renderizar
             obsModal.style.display = 'none';
             obsInput.value = '';
-            currentObsGroup = null; // Limpa o estado do modal
+            currentObsGroup = null;
             renderSelectedItems();
         });
     });
 
-    // FUNÇÃO PRINCIPAL PARA ENVIAR TODOS OS ITENS SELECIONADOS (NOVO BOTÃO)
+    // FUNÇÃO PRINCIPAL PARA ENVIAR TODOS OS ITENS SELECIONADOS
     if (sendSelectedItemsBtn) {
         sendSelectedItemsBtn.addEventListener('click', async () => {
             if (!currentTableId) {
@@ -754,7 +760,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // NOVO: Filtra itens para envio e itens para segurar
             const itemsToSend = selectedItems.filter(item => !item.note || !item.note.toLowerCase().includes('espera'));
             const itemsToHold = selectedItems.filter(item => item.note && item.note.toLowerCase().includes('espera'));
 
@@ -763,10 +768,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // 1. Limpa selectedItems, mas mantém os itens em espera (CORREÇÃO DE LÓGICA)
-            selectedItems = [...itemsToHold]; // Mantém apenas os itens com 'Espera'
+            selectedItems = [...itemsToHold];
 
-            // 2. Agrupa os itens PARA ENVIO por setor para o KDS
             const itemsGroupedBySector = itemsToSend.reduce((acc, item) => {
                 const sector = item.sector;
                 const itemToSend = { 
@@ -782,7 +785,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return acc;
             }, {});
             
-            // 3. Cria um documento de pedido KDS (Bulk KDS Order)
             const kdsOrderRef = doc(getKdsCollectionRef());
             
             try {
@@ -795,7 +797,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     status: 'pending'
                 });
 
-                // 4. Atualiza a mesa (total e lista de itens enviados)
                 const tableRef = getTableDocRef(currentTableId);
                 
                 const itemsForUpdate = itemsToSend.map(item => ({
@@ -809,18 +810,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 }));
 
                 await updateDoc(tableRef, {
-                    // Adiciona apenas os itens SEM 'ESPERA' à lista de sentItems
                     sentItems: arrayUnion(...itemsForUpdate), 
                 });
                 
-                // 5. Atualiza a UI
                 renderSelectedItems(); 
                 alert(`Itens enviados para a produção (KDS). ${itemsToHold.length > 0 ? `(${itemsToHold.length} itens permaneceram em Espera)` : ''}`);
 
             } catch (e) {
                 console.error("Erro ao enviar pedido KDS/Atualizar Mesa:", e);
                 alert("Erro ao enviar itens. Tente novamente.");
-                // Se falhar, restaura todos os itens de volta à lista local (incluindo os que seriam enviados)
                 selectedItems = [...itemsToSend, ...itemsToHold];
                 renderSelectedItems(); 
             }
@@ -829,7 +827,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Listener de Busca
     searchProductInput.addEventListener('input', (e) => {
-        // Assume que o filtro de categoria atual está 'all' se não for passado
         const activeCategoryBtn = document.querySelector('#categoryFilters .bg-indigo-600');
         const activeCategory = activeCategoryBtn ? activeCategoryBtn.dataset.category : 'all';
         renderMenu(activeCategory, e.target.value);
@@ -839,9 +836,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let unsubscribeTable = null;
 
-    // Listener para as atualizações da mesa (usado em OrderScreen e PaymentScreen)
     const loadTableOrder = (tableId) => {
-        if (unsubscribeTable) unsubscribeTable(); // Limpa listener anterior
+        if (unsubscribeTable) unsubscribeTable(); 
 
         const tableRef = getTableDocRef(tableId);
 
@@ -850,7 +846,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentOrderSnapshot = docSnapshot.data();
                 renderSentItems();
                 renderPaymentSummary(); 
-                subscribeToKdsNotifications(tableId); // Inicia notificação
+                subscribeToKdsNotifications(tableId); 
             } else {
                 console.log(`Mesa ${tableId} não encontrada.`);
                 currentOrderSnapshot = null;
@@ -862,20 +858,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // Renderiza itens já enviados (Comanda Aberta)
     const renderSentItems = () => {
-        const listEl = document.getElementById('reviewItemsList'); // Reutilizando a lista de pagamento aqui
+        const listEl = document.getElementById('reviewItemsList'); 
 
         if (!currentOrderSnapshot || currentOrderSnapshot.sentItems.length === 0) {
-            if (listEl) { // Verificação de nulo (CORREÇÃO DE TypeError)
+            if (listEl) { 
                 listEl.innerHTML = `<div class="text-sm text-gray-500 italic p-2">Nenhum item na conta para revisão.</div>`;
             }
             return;
         }
 
-        if (listEl) listEl.innerHTML = ''; // Verificação de nulo (CORREÇÃO DE TypeError)
+        if (listEl) listEl.innerHTML = ''; 
 
-        // Agrupa itens para exibição
         const groupedItems = currentOrderSnapshot.sentItems.reduce((acc, item) => {
             const key = `${item.id}-${item.note || ''}`;
             acc[key] = acc[key] || { ...item, qty: 0 };
@@ -883,7 +877,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return acc;
         }, {});
 
-        // Recalcula o total (útil em caso de erro de sincronização)
         let totalRecalculated = 0;
 
         Object.values(groupedItems).forEach((item, index) => {
@@ -891,7 +884,7 @@ document.addEventListener('DOMContentLoaded', () => {
             totalRecalculated += lineTotal;
             const obsText = item.note ? ` (${item.note})` : '';
 
-            if (listEl) { // Verificação de nulo (CORREÇÃO DE TypeError)
+            if (listEl) { 
                 listEl.innerHTML += `
                     <div class="flex justify-between items-center py-2 border-b border-gray-100">
                         <div class="flex flex-col flex-grow min-w-0 mr-2">
@@ -909,7 +902,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
-        // Atualiza o total da mesa no documento do Firebase (se for diferente)
         if (totalRecalculated !== currentOrderSnapshot.total) {
             const tableRef = getTableDocRef(currentTableId);
             updateDoc(tableRef, { total: totalRecalculated }).catch(e => console.error("Erro ao sincronizar total:", e));
@@ -927,13 +919,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         unsubscribeKds = onSnapshot(q, (snapshot) => {
             if (snapshot.docs.length > 0) {
-                // Há pedidos prontos
                 const badge = document.getElementById('kds-notification-badge');
                 const container = document.getElementById('notification-badge-container');
                 if (badge) badge.classList.remove('hidden');
                 if (container) container.classList.add('animate-pulse');
             } else {
-                // Nenhum pedido pronto
                 const badge = document.getElementById('kds-notification-badge');
                 const container = document.getElementById('notification-badge-container');
                 if (badge) badge.classList.add('hidden');
@@ -952,12 +942,10 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- INTEGRAÇÃO COM MODAIS E AUTENTICAÇÃO GERENCIAL ---
-    // (Omitindo a lógica completa de renderização de Modais para manter o foco na separação de arquivos)
 
     window.openManagerModal = (action, itemId = null, itemNote = null) => {
-        // Lógica para abrir o modal de gerente (senha)
         const managerModal = document.getElementById('managerModal');
-        if (!managerModal) return; // Verificação de nulo
+        if (!managerModal) return; 
 
         managerModal.innerHTML = `
             <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
@@ -991,7 +979,6 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     };
     
-    // Deleta item enviado (Após autenticação Gerencial)
     const deleteSentItem = async (itemId, itemNote) => {
         if (!currentTableId || !currentOrderSnapshot) return;
         
@@ -1005,7 +992,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             await updateDoc(tableRef, {
-                // Remove apenas o primeiro item que corresponde
                 sentItems: arrayRemove(itemToDelete)
             });
             alert("Item removido da conta.");
@@ -1015,23 +1001,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     
-    // Adiciona listener para o botão de ações gerenciais (engrenagem)
     if (openActionsModalBtn) {
         openActionsModalBtn.addEventListener('click', () => {
             openManagerModal('openActions');
         });
     }
 
-
-    // Adiciona listener para o botão de transferência seletiva
     document.getElementById('openSelectiveTransferModalBtn').addEventListener('click', () => {
         openManagerModal('openSelectiveTransfer');
     });
     
-    // Função placeholder para o modal de transferência seletiva
     const openSelectiveTransferModal = () => {
         const modal = document.getElementById('selectiveTransferModal');
-        if (!modal) return; // Verificação de nulo
+        if (!modal) return; 
 
         modal.innerHTML = `
             <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg">
@@ -1055,7 +1037,6 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
         
-        // Renderiza a lista de itens para transferência (similar ao renderSentItems)
         const renderTransferItems = () => {
              const listEl = document.getElementById('transferItemsList');
              if (!currentOrderSnapshot || currentOrderSnapshot.sentItems.length === 0) {
@@ -1063,13 +1044,11 @@ document.addEventListener('DOMContentLoaded', () => {
                  return;
              }
              
-             // Lógica simplificada de renderização para a transferência
              if (listEl) {
                  listEl.innerHTML = `<p class="text-center text-gray-500">Funcionalidade de Seleção de Itens não implementada nesta versão, mas o botão está ativo.</p>`;
              }
         };
         
-        // Simulação da verificação da mesa
         const checkTargetTableBtn = document.getElementById('checkTargetTableBtn');
         if (checkTargetTableBtn) {
             checkTargetTableBtn.addEventListener('click', () => {
@@ -1093,11 +1072,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // Simulação da confirmação de transferência
         const confirmTransferBtn = document.getElementById('confirmTransferBtn');
         if (confirmTransferBtn) {
             confirmTransferBtn.addEventListener('click', async () => {
-                // ... [Lógica de mover itens entre mesas no Firestore, ajustando totais] ...
                 alert(`Simulação: Itens da Mesa ${currentTableId} transferidos para Mesa ${document.getElementById('targetTableInput')?.value}.`);
                 modal.style.display = 'none';
             });
@@ -1107,10 +1084,9 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.style.display = 'flex';
     };
     
-    // Função placeholder para o modal NF-e
     const openNfeModal = () => {
         const nfeModal = document.getElementById('nfeModal');
-        if (!nfeModal) return; // Verificação de nulo
+        if (!nfeModal) return; 
         
         nfeModal.innerHTML = `
             <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
@@ -1132,11 +1108,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
 
-    // Vincula os listeners de fechamento de conta após o carregamento inicial
     if (finalizeOrderBtn) finalizeOrderBtn.addEventListener('click', finalizeOrder);
     if (openNfeModalBtn) openNfeModalBtn.addEventListener('click', openNfeModal);
     
-    // Oculta a tela de status ao carregar o DOM
     document.getElementById('statusScreen').style.display = 'flex';
     document.getElementById('mainContent').style.display = 'none';
 
