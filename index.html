@@ -233,17 +233,30 @@
         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 class="text-xl font-bold mb-4 text-indigo-700">Detalhes do Item</h3>
             <p class="text-base mb-3">Item: <span id="obsItemName" class="font-semibold text-gray-800"></span></p>
-            
-            <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-3 max-h-40 overflow-y-auto pr-1">
-                </div>
+
+            <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-4">
+                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">2CP</button>
+                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">G</button>
+                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">L</button>
+                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">L.e</button>
+                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">Sg</button>
+                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">G/</button>
+                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">L.e/</button>
+                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">Mp</button>
+                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">P-</button>
+                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">Ao ponto</button>
+                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">P+</button>
+                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">Bp</button>
+                <button class="quick-obs-btn bg-yellow-400 text-gray-800 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-yellow-500 transition">Espera</button>
+            </div>
 
             <textarea id="obsInput" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 resize-none text-base" rows="3" placeholder="Ex: Sem gelo, carne ao ponto, trocar batata por arroz..."></textarea>
             
             <div class="flex justify-end space-x-3 mt-4">
-                <button id="cancelObsBtn" data-action="espera" class="px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition text-base font-bold">
-                    ESPERA
+                <button id="cancelObsBtn" class="px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition text-base font-bold">
+                    CANCELAR
                 </button>
-                <button id="saveObsBtn" data-action="salvar" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base font-bold">
+                <button id="saveObsBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base font-bold">
                     SALVAR OBS
                 </button>
             </div>
