@@ -56,19 +56,23 @@ body { overflow-x: hidden; }
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-/* Estilos para o cardápio */
+/* Estilos para o cardápio (Tamanhos reduzidos) */
 .menu-item {
-     min-height: 100px;
+     min-height: 90px; /* Redução de altura */
 }
 .add-icon-btn {
-    width: 40px;
-    height: 40px;
+    width: 36px; /* Redução de tamanho */
+    height: 36px; /* Redução de tamanho */
     border-radius: 9999px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0; /* Evita que o botão encolha */
 }
+.add-icon-btn i {
+    font-size: 0.875rem; /* Redução do ícone (+) */
+}
+
 
 /* Animação de Loading */
 @keyframes spin { to { transform: rotate(360deg); } }
