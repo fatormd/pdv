@@ -233,14 +233,19 @@
         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 class="text-xl font-bold mb-4 text-indigo-700">Detalhes do Item</h3>
             <p class="text-base mb-3">Item: <span id="obsItemName" class="font-semibold text-gray-800"></span></p>
+            
+            <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-3 max-h-40 overflow-y-auto pr-1">
+                </div>
+
             <textarea id="obsInput" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 resize-none text-base" rows="3" placeholder="Ex: Sem gelo, carne ao ponto, trocar batata por arroz..."></textarea>
             
             <div class="flex justify-end space-x-3 mt-4">
-                <button id="cancelObsBtn" data-action="espera" class="px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition text-base font-bold">
+                <button id="cancelObsBtn" data-action="espera" class="px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition text-base font-bold">
                     ESPERA
                 </button>
-                <button id="saveObsBtn" data-action="marcha" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base font-bold">
-                    SALVAR OBS</button>
+                <button id="saveObsBtn" data-action="salvar" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base font-bold">
+                    SALVAR OBS
+                </button>
             </div>
         </div>
     </div>
