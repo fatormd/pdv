@@ -67,7 +67,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const toggleServiceTaxBtn = document.getElementById('toggleServiceTaxBtn');
     const dinersSplitInput = document.getElementById('dinersSplitInput');
     const openActionsModalBtn = document.getElementById('openActionsModalBtn');
+    const sendSelectedItemsBtn = document.getElementById('sendSelectedItemsBtn');
 
+
+    // Variável para rastrear o item/grupo que está no modal de OBS
+    let currentObsGroup = null;
 
     // --- UTILS ---
     const formatCurrency = (value) => `R$ ${parseFloat(value || 0).toFixed(2).replace('.', ',')}`;
@@ -158,14 +162,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return { total, serviceValue };
     };
 
-    // Função auxiliar para atualizar texto de elemento com verificação de nulo
+    // Função auxiliar para atualizar texto de elemento com verificação de nulo (CORREÇÃO DE TypeError)
     const updateText = (id, value) => {
         const el = document.getElementById(id);
         if (el) el.textContent = value;
     };
 
     // Recalcula e renderiza o resumo de pagamento
-    // CORREÇÃO: Adicionada verificação de nulo para evitar o TypeError (main.js:187)
     const renderPaymentSummary = () => {
         if (!currentOrderSnapshot) return;
 
@@ -260,58 +263,65 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // Altera a taxa de serviço (10%)
-    toggleServiceTaxBtn.addEventListener('click', async () => {
-        if (!currentTableId) return;
-        const tableRef = getTableDocRef(currentTableId);
-        try {
-            await updateDoc(tableRef, {
-                serviceTaxApplied: !serviceTaxApplied,
-            });
-        } catch (e) {
-            console.error("Erro ao alternar taxa de serviço:", e);
-        }
-    });
+    if (toggleServiceTaxBtn) {
+        toggleServiceTaxBtn.addEventListener('click', async () => {
+            if (!currentTableId) return;
+            const tableRef = getTableDocRef(currentTableId);
+            try {
+                await updateDoc(tableRef, {
+                    serviceTaxApplied: !serviceTaxApplied,
+                });
+            } catch (e) {
+                console.error("Erro ao alternar taxa de serviço:", e);
+            }
+        });
+    }
 
     // Input de Divisão de Conta
-    dinersSplitInput.addEventListener('input', renderPaymentSummary);
+    if (dinersSplitInput) {
+        dinersSplitInput.addEventListener('input', renderPaymentSummary);
+    }
+
 
     // Adicionar Pagamento
-    addPaymentBtn.addEventListener('click', async () => {
-        if (!currentTableId) return;
+    if (addPaymentBtn) {
+        addPaymentBtn.addEventListener('click', async () => {
+            if (!currentTableId) return;
 
-        const valueRaw = paymentValueInput.value.replace('R$', '').replace('.', '').replace(',', '.').trim();
-        const value = parseFloat(valueRaw);
-        const methodEl = document.querySelector('.payment-method-btn.active');
-        const method = methodEl ? methodEl.dataset.method : null;
+            const valueRaw = paymentValueInput.value.replace('R$', '').replace('.', '').replace(',', '.').trim();
+            const value = parseFloat(valueRaw);
+            const methodEl = document.querySelector('.payment-method-btn.active');
+            const method = methodEl ? methodEl.dataset.method : null;
 
-        if (!method || value <= 0) {
-            alert("Selecione um método e insira um valor válido.");
-            return;
-        }
+            if (!method || value <= 0) {
+                alert("Selecione um método e insira um valor válido.");
+                return;
+            }
 
-        const tableRef = getTableDocRef(currentTableId);
-        
-        const newPayment = {
-            method,
-            value,
-            timestamp: Date.now(), // Usando timestamp local para evitar erro de array
-            userId: userId
-        };
+            const tableRef = getTableDocRef(currentTableId);
+            
+            const newPayment = {
+                method,
+                value,
+                timestamp: Date.now(), // Usando timestamp local para evitar erro de array
+                userId: userId
+            };
 
-        try {
-            await updateDoc(tableRef, {
-                payments: arrayUnion(newPayment)
-            });
+            try {
+                await updateDoc(tableRef, {
+                    payments: arrayUnion(newPayment)
+                });
 
-            // Limpa o input após o sucesso
-            paymentValueInput.value = 'R$ 0,00';
-            document.querySelectorAll('.payment-method-btn').forEach(btn => btn.classList.remove('active'));
-            addPaymentBtn.disabled = true;
+                // Limpa o input após o sucesso
+                paymentValueInput.value = 'R$ 0,00';
+                document.querySelectorAll('.payment-method-btn').forEach(btn => btn.classList.remove('active'));
+                addPaymentBtn.disabled = true;
 
-        } catch (e) {
-            console.error("Erro ao adicionar pagamento:", e);
-        }
-    });
+            } catch (e) {
+                console.error("Erro ao adicionar pagamento:", e);
+            }
+        });
+    }
 
     // Seleção do Método de Pagamento
     document.getElementById('paymentMethodButtons').addEventListener('click', (e) => {
@@ -471,15 +481,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- FUNÇÕES DO CARDÁPIO (2) ---
     
     // Renderiza os itens do Cardápio com botão de adição
+    // CORREÇÃO: Adicionada lógica de filtro por categoria.
     const renderMenu = (filter = 'all', search = '') => {
         let filteredItems = MENU_DATA;
         
-        // Filtro por categoria (se implementado)
-        // Filtro por busca
+        // 1. Filtro por busca
         if (search) {
             const normalizedSearch = search.toLowerCase();
             filteredItems = filteredItems.filter(item => 
                 item.name.toLowerCase().includes(normalizedSearch)
+            );
+        }
+
+        // 2. Filtro por categoria (NEW LOGIC)
+        if (filter !== 'all') {
+            filteredItems = filteredItems.filter(item => 
+                item.category === filter
             );
         }
 
@@ -495,7 +512,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="menu-item bg-white rounded-lg shadow-sm p-3 transition flex flex-col justify-between border border-gray-200">
                     <h4 class="font-bold text-base text-gray-800 text-left mb-1">${item.name}</h4>
                     <div class="flex justify-between items-center mt-2">
-                        <p class="text-indigo-600 font-extrabold text-lg">${formatCurrency(item.price)}</p>
+                        <p class="text-indigo-600 font-extrabold text-sm">${formatCurrency(item.price)}</p>
                         <button data-item='${JSON.stringify(item).replace(/'/g, '&#39;')}' 
                                 class="add-item-btn add-icon-btn bg-green-500 text-white hover:bg-green-600 transition">
                             <i class="fas fa-plus text-lg"></i>
@@ -507,6 +524,24 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
+    // Adiciona listener para os botões de filtro de categoria
+    document.getElementById('categoryFilters').addEventListener('click', (e) => {
+        const btn = e.target.closest('.category-btn');
+        if (btn) {
+            const category = btn.dataset.category;
+            // 1. Atualiza estado ativo
+            document.querySelectorAll('.category-btn').forEach(b => {
+                b.classList.remove('bg-indigo-600', 'text-white');
+                b.classList.add('bg-white', 'text-gray-700', 'border', 'border-gray-300');
+            });
+            btn.classList.remove('bg-white', 'text-gray-700', 'border', 'border-gray-300');
+            btn.classList.add('bg-indigo-600', 'text-white');
+            
+            // 2. Renderiza menu filtrado
+            renderMenu(category, searchProductInput.value);
+        }
+    });
+
     // Renderiza a lista de itens selecionados (lista de anotações local)
     const renderSelectedItems = () => {
         openOrderList.innerHTML = '';
@@ -515,12 +550,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (totalItemsCount === 0) {
             openOrderList.innerHTML = `<div class="text-base text-gray-500 italic p-2">Nenhum item selecionado.</div>`;
+            sendSelectedItemsBtn.disabled = true;
         } else {
+            sendSelectedItemsBtn.disabled = false;
             // Agrupa itens por ID e Observação para consolidar
             const groupedItems = selectedItems.reduce((acc, item) => {
                 const key = `${item.id}-${item.note || ''}`;
-                acc[key] = acc[key] || { ...item, qty: 0 };
+                acc[key] = acc[key] || { ...item, qty: 0, firstIndex: -1 };
                 acc[key].qty++;
+                if (acc[key].firstIndex === -1) {
+                    // Armazena o ID e a nota para ser passado ao modal
+                    acc[key].firstIndex = selectedItems.findIndex(i => i.id === item.id && (i.note || '') === (item.note || ''));
+                }
                 return acc;
             }, {});
 
@@ -555,15 +596,43 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Adiciona item à lista local de itens selecionados
+    // CORREÇÃO: Abre o modal de OBS imediatamente após adicionar.
     const addItemToOrder = (item) => {
         if (!currentTableId) {
             alert("Selecione ou abra uma mesa primeiro.");
             return;
         }
+        
+        // O novo item é adicionado com uma nota vazia
+        selectedItems.push({ ...item, note: '' }); 
 
-        selectedItems.push({ ...item, note: '' }); // Adiciona sem observação
         renderSelectedItems();
+        
+        // Abre o modal de observação para o item recém-adicionado
+        // Ele edita o grupo que tem o mesmo ID e nota VAZIA
+        currentObsGroup = { id: item.id, note: '' };
+
+        obsItemName.textContent = item.name;
+        obsInput.value = ''; // Começa com a nota vazia
+        obsModal.dataset.itemId = item.id;
+        obsModal.dataset.originalNoteKey = '';
+        
+        // Mudar o botão MARCHA para SALVAR OBS
+        saveObsBtn.textContent = 'SALVAR OBS';
+        cancelObsBtn.textContent = 'CANCELAR';
+
+        obsModal.style.display = 'flex';
     };
+
+    // Listener para os botões de adicionar item ao Cardápio
+    menuItemsGrid.addEventListener('click', (e) => {
+        const addButton = e.target.closest('.add-item-btn');
+        if (addButton) {
+            // Remove o replace, pois o JSON.stringify já trata a maioria dos caracteres
+            const itemData = JSON.parse(addButton.dataset.item.replace(/&#39;/g, "'"));
+            addItemToOrder(itemData);
+        }
+    });
 
     // Aumenta quantidade na lista local
     window.increaseLocalItemQuantity = (itemId, noteKey) => {
@@ -589,7 +658,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Abre o Modal de Observações/Marcha
+    // Abre o Modal de Observações/Edição
     window.openObsModal = (el) => {
         const itemId = el.dataset.itemId;
         const noteKey = el.dataset.itemNoteKey;
@@ -605,19 +674,29 @@ document.addEventListener('DOMContentLoaded', () => {
             obsModal.dataset.itemId = itemId;
             obsModal.dataset.originalNoteKey = noteKey;
             obsModal.style.display = 'flex';
+
+            // Armazena o grupo atual sendo editado
+            currentObsGroup = { id: itemId, note: noteKey };
+            
+            // Mudar o botão MARCHA para SALVAR OBS
+            saveObsBtn.textContent = 'SALVAR OBS';
+            cancelObsBtn.textContent = 'CANCELAR';
         }
     };
 
-    // Listener para o Modal de Observações (ESPERA e MARCHA)
+    // Listener para o Modal de Observações (SALVAR OBS)
     [saveObsBtn, cancelObsBtn].forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const action = e.target.dataset.action; // 'marcha' ou 'espera'
             
-            const itemId = obsModal.dataset.itemId;
-            const originalNoteKey = obsModal.dataset.originalNoteKey;
-            const newNote = obsInput.value.trim();
+            if (!currentObsGroup) {
+                obsModal.style.display = 'none';
+                return;
+            }
 
-            if (!itemId) return;
+            const itemId = currentObsGroup.id;
+            const originalNoteKey = currentObsGroup.note;
+            const newNote = obsInput.value.trim();
 
             // 1. Atualizar a observação na lista local (selectedItems)
             if (newNote !== originalNoteKey) {
@@ -631,102 +710,99 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
 
-            // 2. Ação de envio (MARCHA)
-            if (action === 'marcha') {
-                await sendItemsToKDS(itemId, newNote);
-            }
+            // 2. Ação de envio (MARCHA) - REMOVIDA A LÓGICA DE ENVIO INDIVIDUAL
             
             // 3. Fechar e Renderizar
             obsModal.style.display = 'none';
             obsInput.value = '';
+            currentObsGroup = null; // Limpa o estado do modal
             renderSelectedItems();
         });
     });
 
-    // 4. Envia os itens para o KDS e atualiza a mesa
-    const sendItemsToKDS = async (itemId, currentNote) => {
-        if (!currentTableId) return;
-        
-        // Separa os itens a serem enviados (MARCHA) e os que ficam (ESPERA)
-        const itemsToMarch = selectedItems.filter(item => 
-            item.id === itemId && (item.note || '') === currentNote
-        );
-
-        if (itemsToMarch.length === 0) return;
-
-        // Remove os itens enviados da lista local
-        selectedItems = selectedItems.filter(item => 
-            !(item.id === itemId && (item.note || '') === currentNote)
-        );
-
-        // Agrupa os itens para o KDS (por setor)
-        const itemsGroupedBySector = itemsToMarch.reduce((acc, item) => {
-            const sector = item.sector;
-            const itemToSend = {};
-            for (const key in item) {
-                if (item[key] !== undefined) {
-                    itemToSend[key] = item[key];
-                }
+    // FUNÇÃO PRINCIPAL PARA ENVIAR TODOS OS ITENS SELECIONADOS (NOVO BOTÃO)
+    if (sendSelectedItemsBtn) {
+        sendSelectedItemsBtn.addEventListener('click', async () => {
+            if (!currentTableId) {
+                alert("Selecione ou abra uma mesa primeiro.");
+                return;
             }
-            // Garante que a nota é uma string vazia se for nula
-            itemToSend.note = itemToSend.note || ''; 
-            acc[sector] = acc[sector] || [];
-            acc[sector].push(itemToSend);
-            return acc;
-        }, {});
-        
-        // Cria um documento de pedido KDS
-        const kdsOrderRef = doc(getKdsCollectionRef());
-        const timestamp = Date.now();
-        
-        try {
-            await setDoc(kdsOrderRef, {
-                orderId: kdsOrderRef.id,
-                tableNumber: parseInt(currentTableId),
-                timestamp: timestamp,
-                sentAt: serverTimestamp(),
-                sectors: itemsGroupedBySector,
-                status: 'pending'
-            });
+            if (selectedItems.length === 0) {
+                alert("Nenhum item para enviar.");
+                return;
+            }
 
-            // Atualiza a mesa (total e lista de itens enviados)
-            const tableRef = getTableDocRef(currentTableId);
-            const itemsForUpdate = itemsToMarch.map(item => {
-                const updatedItem = {};
-                for (const key in item) {
-                    if (item[key] !== undefined) {
-                        updatedItem[key] = item[key];
-                    }
-                }
-                updatedItem.note = updatedItem.note || '';
-                updatedItem.orderId = kdsOrderRef.id; // Vincula ao pedido KDS
-                return updatedItem;
-            });
+            // 1. Agrupa todos os itens selecionados por setor para o KDS
+            const itemsGroupedBySector = selectedItems.reduce((acc, item) => {
+                const sector = item.sector;
+                const itemToSend = { 
+                    id: item.id, 
+                    name: item.name, 
+                    price: item.price,
+                    category: item.category,
+                    sector: item.sector,
+                    note: item.note || ''
+                };
+                acc[sector] = acc[sector] || [];
+                acc[sector].push(itemToSend);
+                return acc;
+            }, {});
+            
+            // 2. Remove todos os itens da lista local para preparo de envio
+            const itemsToUpdateTable = [...selectedItems];
+            selectedItems = [];
 
-            await updateDoc(tableRef, {
-                // Adiciona os itens à lista de sentItems
-                sentItems: arrayUnion(...itemsForUpdate), 
-            });
+            // 3. Cria um documento de pedido KDS (Bulk KDS Order)
+            const kdsOrderRef = doc(getKdsCollectionRef());
+            
+            try {
+                await setDoc(kdsOrderRef, {
+                    orderId: kdsOrderRef.id,
+                    tableNumber: parseInt(currentTableId),
+                    timestamp: Date.now(),
+                    sentAt: serverTimestamp(),
+                    sectors: itemsGroupedBySector,
+                    status: 'pending'
+                });
 
-        } catch (e) {
-            console.error("Erro ao enviar pedido KDS/Atualizar Mesa:", e);
-        }
+                // 4. Atualiza a mesa (total e lista de itens enviados)
+                const tableRef = getTableDocRef(currentTableId);
+                
+                const itemsForUpdate = itemsToUpdateTable.map(item => ({
+                    id: item.id,
+                    name: item.name,
+                    price: item.price,
+                    category: item.category,
+                    sector: item.sector,
+                    note: item.note || '',
+                    orderId: kdsOrderRef.id,
+                }));
+
+                await updateDoc(tableRef, {
+                    // Adiciona todos os itens à lista de sentItems
+                    sentItems: arrayUnion(...itemsForUpdate), 
+                });
+                
+                // 5. Atualiza a UI
+                renderSelectedItems(); 
+                alert("Itens enviados para a produção (KDS).");
+
+            } catch (e) {
+                console.error("Erro ao enviar pedido KDS/Atualizar Mesa:", e);
+                alert("Erro ao enviar itens. Tente novamente.");
+                // Se falhar, restaura a lista local para evitar perda de dados
+                selectedItems = [...itemsToUpdateTable];
+                renderSelectedItems(); 
+            }
+        });
     }
-
-
-    // Listener para os botões de adicionar item ao Cardápio
-    menuItemsGrid.addEventListener('click', (e) => {
-        const addButton = e.target.closest('.add-item-btn');
-        if (addButton) {
-            // Remove o replace, pois o JSON.stringify já trata a maioria dos caracteres
-            const itemData = JSON.parse(addButton.dataset.item.replace(/&#39;/g, "'"));
-            addItemToOrder(itemData);
-        }
-    });
 
     // Listener de Busca
     searchProductInput.addEventListener('input', (e) => {
-        renderMenu('all', e.target.value);
+        // Assume que o filtro de categoria atual está 'all' se não for passado
+        const activeCategoryBtn = document.querySelector('#categoryFilters .bg-indigo-600');
+        const activeCategory = activeCategoryBtn ? activeCategoryBtn.dataset.category : 'all';
+        renderMenu(activeCategory, e.target.value);
     });
 
     // --- FUNÇÕES DE STATUS (KDS/MESA) ---
@@ -761,13 +837,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const listEl = document.getElementById('reviewItemsList'); // Reutilizando a lista de pagamento aqui
 
         if (!currentOrderSnapshot || currentOrderSnapshot.sentItems.length === 0) {
-            if (listEl) { // Verificação de nulo
+            if (listEl) { // Verificação de nulo (CORREÇÃO DE TypeError)
                 listEl.innerHTML = `<div class="text-sm text-gray-500 italic p-2">Nenhum item na conta para revisão.</div>`;
             }
             return;
         }
 
-        if (listEl) listEl.innerHTML = ''; // Verificação de nulo
+        if (listEl) listEl.innerHTML = ''; // Verificação de nulo (CORREÇÃO DE TypeError)
 
         // Agrupa itens para exibição
         const groupedItems = currentOrderSnapshot.sentItems.reduce((acc, item) => {
@@ -785,7 +861,7 @@ document.addEventListener('DOMContentLoaded', () => {
             totalRecalculated += lineTotal;
             const obsText = item.note ? ` (${item.note})` : '';
 
-            if (listEl) { // Verificação de nulo
+            if (listEl) { // Verificação de nulo (CORREÇÃO DE TypeError)
                 listEl.innerHTML += `
                     <div class="flex justify-between items-center py-2 border-b border-gray-100">
                         <div class="flex flex-col flex-grow min-w-0 mr-2">
@@ -910,9 +986,12 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     // Adiciona listener para o botão de ações gerenciais (engrenagem)
-    openActionsModalBtn.addEventListener('click', () => {
-        openManagerModal('openActions');
-    });
+    if (openActionsModalBtn) {
+        openActionsModalBtn.addEventListener('click', () => {
+            openManagerModal('openActions');
+        });
+    }
+
 
     // Adiciona listener para o botão de transferência seletiva
     document.getElementById('openSelectiveTransferModalBtn').addEventListener('click', () => {
