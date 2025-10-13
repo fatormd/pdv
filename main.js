@@ -158,7 +158,14 @@ document.addEventListener('DOMContentLoaded', () => {
         return { total, serviceValue };
     };
 
+    // Função auxiliar para atualizar texto de elemento com verificação de nulo
+    const updateText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value;
+    };
+
     // Recalcula e renderiza o resumo de pagamento
+    // CORREÇÃO: Adicionada verificação de nulo para evitar o TypeError (main.js:187)
     const renderPaymentSummary = () => {
         if (!currentOrderSnapshot) return;
 
@@ -180,26 +187,34 @@ document.addEventListener('DOMContentLoaded', () => {
         const isClosed = remainingBalance <= 0;
         const displayBalance = isClosed ? 0 - remainingBalance : remainingBalance;
         
-        // Atualiza a UI
-        document.getElementById('orderSubtotalDisplayPayment').textContent = formatCurrency(subtotal);
-        document.getElementById('orderServiceTaxDisplayPayment').textContent = formatCurrency(serviceValue);
-        document.getElementById('orderTotalDisplayPayment').textContent = formatCurrency(generalTotal);
-        document.getElementById('remainingBalanceDisplay').textContent = formatCurrency(displayBalance);
-        document.getElementById('valuePerDinerDisplay').textContent = formatCurrency(valuePerDiner);
-
-        document.getElementById('remainingBalanceDisplay').classList.toggle('text-red-600', remainingBalance > 0);
-        document.getElementById('remainingBalanceDisplay').classList.toggle('text-green-600', isClosed);
-
-        toggleServiceTaxBtn.textContent = serviceTaxApplied ? 'Remover' : 'Aplicar';
-        toggleServiceTaxBtn.classList.toggle('bg-gray-400', !serviceTaxApplied);
-        toggleServiceTaxBtn.classList.toggle('bg-green-600', serviceTaxApplied);
+        // Atualiza a UI com checagem de nulo (CORREÇÃO DE TypeError)
+        updateText('orderSubtotalDisplayPayment', formatCurrency(subtotal));
+        updateText('orderServiceTaxDisplayPayment', formatCurrency(serviceValue));
+        updateText('orderTotalDisplayPayment', formatCurrency(generalTotal));
+        updateText('remainingBalanceDisplay', formatCurrency(displayBalance));
+        updateText('valuePerDinerDisplay', formatCurrency(valuePerDiner));
+        
+        const remainingBalanceDisplayEl = document.getElementById('remainingBalanceDisplay');
+        if (remainingBalanceDisplayEl) {
+            remainingBalanceDisplayEl.classList.toggle('text-red-600', remainingBalance > 0);
+            remainingBalanceDisplayEl.classList.toggle('text-green-600', isClosed);
+        }
+        
+        if (toggleServiceTaxBtn) {
+            toggleServiceTaxBtn.textContent = serviceTaxApplied ? 'Remover' : 'Aplicar';
+            toggleServiceTaxBtn.classList.toggle('bg-gray-400', !serviceTaxApplied);
+            toggleServiceTaxBtn.classList.toggle('bg-green-600', serviceTaxApplied);
+        }
 
         // Habilita/Desabilita botões de fechamento
-        finalizeOrderBtn.disabled = !isClosed;
-        openNfeModalBtn.disabled = !isClosed;
+        if (finalizeOrderBtn) finalizeOrderBtn.disabled = !isClosed;
+        if (openNfeModalBtn) openNfeModalBtn.disabled = !isClosed;
 
         // Renderiza a lista de pagamentos
         const paymentListEl = document.getElementById('paymentSummaryList');
+        // Se o elemento não existir (estamos em outra tela), não prossegue.
+        if (!paymentListEl) return; 
+
         // Remove tudo, exceto o Resumo do Saldo e Botões de Fechamento
         paymentListEl.innerHTML = ''; 
 
@@ -217,10 +232,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Adiciona de volta o Resumo do Saldo e Botões de Fechamento
+        const isClosedClass = isClosed ? 'text-green-600' : 'text-red-600';
+
         paymentListEl.innerHTML += `
             <div class="flex justify-between items-center py-1 font-bold border-t border-gray-200 mt-2 pt-2">
                 <span>${remainingBalance <= 0 ? 'TROCO' : 'VALOR RESTANTE'}:</span>
-                <span id="remainingBalanceDisplayNested" class="font-extrabold ${isClosed ? 'text-green-600' : 'text-red-600'}">${formatCurrency(displayBalance)}</span>
+                <span id="remainingBalanceDisplayNested" class="font-extrabold ${isClosedClass}">${formatCurrency(displayBalance)}</span>
             </div>
             <div class="flex justify-between space-x-3 pt-2">
                 <button id="finalizeOrderBtnNested" class="w-1/2 px-4 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition text-base disabled:opacity-50" disabled>FECHAR CONTA</button>
@@ -232,13 +249,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const finalizeBtnNested = document.getElementById('finalizeOrderBtnNested');
         const nfeBtnNested = document.getElementById('openNfeModalBtnNested');
 
-        finalizeBtnNested.disabled = !isClosed;
-        nfeBtnNested.disabled = !isClosed;
+        if (finalizeBtnNested) finalizeBtnNested.disabled = !isClosed;
+        if (nfeBtnNested) nfeBtnNested.disabled = !isClosed;
 
-        finalizeBtnNested.addEventListener('click', finalizeOrder);
-        nfeBtnNested.addEventListener('click', openNfeModal);
+        if (finalizeBtnNested) finalizeBtnNested.addEventListener('click', finalizeOrder);
+        if (nfeBtnNested) nfeBtnNested.addEventListener('click', openNfeModal);
         
-        addPaymentBtn.disabled = !tableData.currentTotal || remainingBalance <= 0;
+        if (addPaymentBtn && tableData.currentTotal) addPaymentBtn.disabled = remainingBalance <= 0;
     };
 
 
@@ -744,11 +761,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const listEl = document.getElementById('reviewItemsList'); // Reutilizando a lista de pagamento aqui
 
         if (!currentOrderSnapshot || currentOrderSnapshot.sentItems.length === 0) {
-            listEl.innerHTML = `<div class="text-sm text-gray-500 italic p-2">Nenhum item na conta para revisão.</div>`;
+            if (listEl) { // Verificação de nulo
+                listEl.innerHTML = `<div class="text-sm text-gray-500 italic p-2">Nenhum item na conta para revisão.</div>`;
+            }
             return;
         }
 
-        listEl.innerHTML = '';
+        if (listEl) listEl.innerHTML = ''; // Verificação de nulo
 
         // Agrupa itens para exibição
         const groupedItems = currentOrderSnapshot.sentItems.reduce((acc, item) => {
@@ -766,20 +785,22 @@ document.addEventListener('DOMContentLoaded', () => {
             totalRecalculated += lineTotal;
             const obsText = item.note ? ` (${item.note})` : '';
 
-            listEl.innerHTML += `
-                <div class="flex justify-between items-center py-2 border-b border-gray-100">
-                    <div class="flex flex-col flex-grow min-w-0 mr-2">
-                         <span class="font-semibold text-gray-800">${item.name} (${item.qty}x)</span>
-                         <span class="text-xs text-gray-500 truncate">${obsText}</span>
+            if (listEl) { // Verificação de nulo
+                listEl.innerHTML += `
+                    <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                        <div class="flex flex-col flex-grow min-w-0 mr-2">
+                            <span class="font-semibold text-gray-800">${item.name} (${item.qty}x)</span>
+                            <span class="text-xs text-gray-500 truncate">${obsText}</span>
+                        </div>
+                        <div class="flex items-center space-x-2 flex-shrink-0">
+                            <span class="font-bold text-base text-indigo-700">${formatCurrency(lineTotal)}</span>
+                            <button class="text-red-500 hover:text-red-700 transition" onclick="openManagerModal('deleteItem', '${item.id}', '${item.note || ''}')" title="Excluir Item (Gerente)">
+                                <i class="fas fa-trash text-sm"></i>
+                            </button>
+                        </div>
                     </div>
-                    <div class="flex items-center space-x-2 flex-shrink-0">
-                        <span class="font-bold text-base text-indigo-700">${formatCurrency(lineTotal)}</span>
-                        <button class="text-red-500 hover:text-red-700 transition" onclick="openManagerModal('deleteItem', '${item.id}', '${item.note || ''}')" title="Excluir Item (Gerente)">
-                             <i class="fas fa-trash text-sm"></i>
-                        </button>
-                    </div>
-                </div>
-            `;
+                `;
+            }
         });
         
         // Atualiza o total da mesa no documento do Firebase (se for diferente)
@@ -801,12 +822,16 @@ document.addEventListener('DOMContentLoaded', () => {
         unsubscribeKds = onSnapshot(q, (snapshot) => {
             if (snapshot.docs.length > 0) {
                 // Há pedidos prontos
-                document.getElementById('kds-notification-badge').classList.remove('hidden');
-                document.getElementById('notification-badge-container').classList.add('animate-pulse');
+                const badge = document.getElementById('kds-notification-badge');
+                const container = document.getElementById('notification-badge-container');
+                if (badge) badge.classList.remove('hidden');
+                if (container) container.classList.add('animate-pulse');
             } else {
                 // Nenhum pedido pronto
-                document.getElementById('kds-notification-badge').classList.add('hidden');
-                document.getElementById('notification-badge-container').classList.remove('animate-pulse');
+                const badge = document.getElementById('kds-notification-badge');
+                const container = document.getElementById('notification-badge-container');
+                if (badge) badge.classList.add('hidden');
+                if (container) container.classList.remove('animate-pulse');
             }
         }, (error) => {
             console.error("Erro no listener de notificação KDS:", error);
@@ -826,6 +851,8 @@ document.addEventListener('DOMContentLoaded', () => {
     window.openManagerModal = (action, itemId = null, itemNote = null) => {
         // Lógica para abrir o modal de gerente (senha)
         const managerModal = document.getElementById('managerModal');
+        if (!managerModal) return; // Verificação de nulo
+
         managerModal.innerHTML = `
             <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
                 <h3 class="text-xl font-bold mb-4 text-red-600">Ação Gerencial Necessária</h3>
@@ -895,6 +922,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Função placeholder para o modal de transferência seletiva
     const openSelectiveTransferModal = () => {
         const modal = document.getElementById('selectiveTransferModal');
+        if (!modal) return; // Verificação de nulo
+
         modal.innerHTML = `
             <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg">
                 <h3 class="text-xl font-bold mb-4 text-indigo-700">Transferência Seletiva</h3>
@@ -921,36 +950,49 @@ document.addEventListener('DOMContentLoaded', () => {
         const renderTransferItems = () => {
              const listEl = document.getElementById('transferItemsList');
              if (!currentOrderSnapshot || currentOrderSnapshot.sentItems.length === 0) {
-                 listEl.innerHTML = `<p class="text-center text-gray-500">Nenhum item para transferir.</p>`;
+                 if (listEl) listEl.innerHTML = `<p class="text-center text-gray-500">Nenhum item para transferir.</p>`;
                  return;
              }
              
              // Lógica simplificada de renderização para a transferência
-             listEl.innerHTML = '';
-             // ... [Lógica completa de transferência seletiva seria aqui, usando os arrays da comanda] ...
-             listEl.innerHTML = `<p class="text-center text-gray-500">Funcionalidade de Seleção de Itens não implementada nesta versão, mas o botão está ativo.</p>`;
+             if (listEl) {
+                 listEl.innerHTML = `<p class="text-center text-gray-500">Funcionalidade de Seleção de Itens não implementada nesta versão, mas o botão está ativo.</p>`;
+             }
         };
         
         // Simulação da verificação da mesa
-        document.getElementById('checkTargetTableBtn').addEventListener('click', () => {
-            const targetTable = parseInt(document.getElementById('targetTableInput').value);
-            if (!targetTable || targetTable === parseInt(currentTableId)) {
-                document.getElementById('transferStatus').textContent = 'Mesa inválida ou igual à atual.';
-                document.getElementById('transferStatus').classList.remove('hidden');
-                document.getElementById('confirmTransferBtn').disabled = true;
-                return;
-            }
-            document.getElementById('transferStatus').textContent = `Mesa ${targetTable} verificada.`;
-            document.getElementById('transferStatus').classList.remove('hidden');
-            document.getElementById('confirmTransferBtn').disabled = false;
-        });
+        const checkTargetTableBtn = document.getElementById('checkTargetTableBtn');
+        if (checkTargetTableBtn) {
+            checkTargetTableBtn.addEventListener('click', () => {
+                const targetTable = parseInt(document.getElementById('targetTableInput')?.value);
+                const transferStatus = document.getElementById('transferStatus');
+                const confirmTransferBtn = document.getElementById('confirmTransferBtn');
+                
+                if (!targetTable || targetTable === parseInt(currentTableId)) {
+                    if (transferStatus) {
+                        transferStatus.textContent = 'Mesa inválida ou igual à atual.';
+                        transferStatus.classList.remove('hidden');
+                    }
+                    if (confirmTransferBtn) confirmTransferBtn.disabled = true;
+                    return;
+                }
+                if (transferStatus) {
+                    transferStatus.textContent = `Mesa ${targetTable} verificada.`;
+                    transferStatus.classList.remove('hidden');
+                }
+                if (confirmTransferBtn) confirmTransferBtn.disabled = false;
+            });
+        }
 
         // Simulação da confirmação de transferência
-        document.getElementById('confirmTransferBtn').addEventListener('click', async () => {
-             // ... [Lógica de mover itens entre mesas no Firestore, ajustando totais] ...
-             alert(`Simulação: Itens da Mesa ${currentTableId} transferidos para Mesa ${document.getElementById('targetTableInput').value}.`);
-             modal.style.display = 'none';
-        });
+        const confirmTransferBtn = document.getElementById('confirmTransferBtn');
+        if (confirmTransferBtn) {
+            confirmTransferBtn.addEventListener('click', async () => {
+                // ... [Lógica de mover itens entre mesas no Firestore, ajustando totais] ...
+                alert(`Simulação: Itens da Mesa ${currentTableId} transferidos para Mesa ${document.getElementById('targetTableInput')?.value}.`);
+                modal.style.display = 'none';
+            });
+        }
 
         renderTransferItems();
         modal.style.display = 'flex';
@@ -959,6 +1001,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Função placeholder para o modal NF-e
     const openNfeModal = () => {
         const nfeModal = document.getElementById('nfeModal');
+        if (!nfeModal) return; // Verificação de nulo
+        
         nfeModal.innerHTML = `
             <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
                 <h3 class="text-xl font-bold mb-4 text-green-700">NF-e / Recibo</h3>
