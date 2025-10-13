@@ -101,7 +101,10 @@
                 <div id="orderingInputs" class="space-y-4">
                     <div class="p-4 content-card bg-white">
                         <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-xl font-semibold text-gray-700">Itens A Enviar (<span id="openItemsCount">0</span>)</h2>
+                            <h2 class="text-xl font-semibold text-gray-700 mr-2">Itens Selecionados (<span id="openItemsCount">0</span>)</h2>
+                            <button id="sendSelectedItemsBtn" class="bg-indigo-600 text-white p-3 rounded-full shadow-lg hover:bg-indigo-700 transition duration-150 w-12 h-12 flex items-center justify-center text-xl disabled:opacity-50" title="Enviar Itens Selecionados (MARCHA)">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
                         </div>
                         
                         <div id="openOrderList" class="space-y-3 mb-4">
@@ -237,8 +240,7 @@
                     ESPERA
                 </button>
                 <button id="saveObsBtn" data-action="marcha" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base font-bold">
-                    MARCHA
-                </button>
+                    SALVAR OBS</button>
             </div>
         </div>
     </div>
@@ -284,7 +286,7 @@
         // Variáveis de Configuração (passadas para main.js via window)
         window.__app_id = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         
-        // CONFIGURAÇÃO FINAL COM A NOVA CHAVE: AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY
+        // CONFIGURAÇÃO COM A NOVA CHAVE: AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY
         window.__firebase_config = '{"apiKey": "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY", "authDomain": "fator-pdv.firebaseapp.com", "projectId": "fator-pdv", "storageBucket": "fator-pdv.appspot.com", "messagingSenderId": "1097659747429", "appId": "1:1097659747429:web:8ec0a7c3978c311dbe0a8c", "measurementId": "G-02QWNRXRCV"}';
         
         window.__initial_auth_token = typeof __initial_auth_token !== 'undefined' ? window.__initial_auth_token : undefined;
