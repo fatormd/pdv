@@ -477,7 +477,6 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('current-table-number').textContent = `Mesa ${currentTableId}`;
             document.getElementById('payment-table-number').textContent = `Mesa ${currentTableId}`;
             
-            // CARREGA ITENS SALVOS NO FIREBASE (NOVA LÓGICA)
             const tableRef = getTableDocRef(currentTableId);
             const docSnap = await getDoc(tableRef);
             if (docSnap.exists() && docSnap.data().selectedItems) {
@@ -580,7 +579,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg shadow-sm" data-item-id="${item.id}" data-item-note="${item.note || ''}">
                         <div class="flex flex-col flex-grow min-w-0 mr-2">
                             <span class="font-semibold text-gray-800">${item.name} (${item.qty}x)</span>
-                            <span class="text-sm cursor-pointer ${isEspera ? 'text-yellow-600' : ''}" onclick="openObsModal(this)" data-item-id="${item.id}" data-item-note-key="${item.note || ''}">${obsText}</span>
+                            <span class="text-sm cursor-pointer ${isEspera ? 'text-yellow-600 font-bold' : ''}" onclick="openObsModal(this)" data-item-id="${item.id}" data-item-note-key="${item.note || ''}">${obsText}</span>
                         </div>
 
                         <div class="flex items-center space-x-2 flex-shrink-0">
@@ -696,11 +695,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     
-    // Adiciona listener para a nova chave de 'Espera'
     if (esperaSwitch) {
         esperaSwitch.addEventListener('change', () => {
-            // Mantém a observação de texto, a lógica de espera é separada agora.
-            // A lógica de anexar/remover "Espera" do texto é feita no botão de salvar.
         });
     }
 
@@ -726,14 +722,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             } else { // SALVAR OBS
-                 // Adiciona ou remove "Espera" da observação com base no switch (NOVA LÓGICA)
-                const isEsperaActive = esperaSwitch.checked;
+                 const isEsperaActive = esperaSwitch.checked;
                 const hasEsperaText = newNote.toLowerCase().includes('espera');
 
                 if (isEsperaActive && !hasEsperaText) {
                     newNote += (newNote === '' ? '' : ', ') + 'Espera';
                 } else if (!isEsperaActive && hasEsperaText) {
-                    // Remove "Espera" se a chave estiver desativada
                     newNote = newNote.replace(/(,?\s*Espera)/gi, '').trim();
                 }
 
@@ -765,7 +759,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             
-            // FILTRA ITENS A SEREM ENVIADOS E ITENS EM ESPERA (CORREÇÃO DE LÓGICA)
             const itemsToSend = selectedItems.filter(item => !item.note || !item.note.toLowerCase().includes('espera'));
             const itemsToHold = selectedItems.filter(item => item.note && item.note.toLowerCase().includes('espera'));
 
@@ -774,7 +767,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // ATUALIZA A LISTA LOCAL APENAS COM OS ITENS EM ESPERA
             selectedItems = [...itemsToHold];
 
             const itemsGroupedBySector = itemsToSend.reduce((acc, item) => {
@@ -816,10 +808,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     orderId: kdsOrderRef.id,
                 }));
                 
-                // ATUALIZA O FIREBASE COM OS ITENS ENVIADOS E OS ITENS SELECIONADOS RESTANTES
                 await updateDoc(tableRef, {
                     sentItems: arrayUnion(...itemsForUpdate), 
-                    selectedItems: selectedItems // Salva a lista com os itens em espera
+                    selectedItems: selectedItems 
                 });
                 
                 renderSelectedItems(); 
@@ -850,7 +841,6 @@ document.addEventListener('DOMContentLoaded', () => {
         unsubscribeTable = onSnapshot(tableRef, (docSnapshot) => {
             if (docSnapshot.exists()) {
                 currentOrderSnapshot = docSnapshot.data();
-                // CORREÇÃO: Carrega os itens selecionados do firebase (se existirem)
                 selectedItems = currentOrderSnapshot.selectedItems || [];
                 renderSelectedItems(); 
 
@@ -860,7 +850,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 console.log(`Mesa ${tableId} não encontrada.`);
                 currentOrderSnapshot = null;
-                selectedItems = []; // Limpa a lista local se a mesa não for encontrada
+                selectedItems = []; 
                 renderSelectedItems();
                 renderSentItems();
                 renderPaymentSummary();
