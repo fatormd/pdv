@@ -38,8 +38,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const password = '1234'; // Senha simulada de gerente
     const PAYMENT_METHODS = ['Dinheiro', 'Pix', 'Crédito', 'Débito'];
     
-    // --- WooCommerce Configuração (NOVO) ---
-    const WOOCOMMERCE_URL = 'https://pdv.fatormd.com';
+    // --- WooCommerce Configuração ---
+    const WOOCOMMERCE_URL = 'https://nossotempero.fatormd.com';
     const CONSUMER_KEY = 'ck_e06515127d067eff5c39d6d93b3908b1baf9158a';
     const CONSUMER_SECRET = 'cs_0a4cdf88eb7f16387cff8a6a6ee6697eb395299';
 
@@ -266,7 +266,6 @@ document.addEventListener('DOMContentLoaded', () => {
             hideStatus();
             loadOpenTables();
             
-            // NOVO: Carrega dados do WooCommerce
             await fetchWooCommerceProducts();
             await fetchWooCommerceCategories();
             renderMenu();
