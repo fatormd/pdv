@@ -30,16 +30,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentOrderSnapshot = null; // Último estado da mesa no Firebase
     let serviceTaxApplied = false;
     let currentPayments = []; // Pagamentos registrados localmente
+    let WOOCOMMERCE_PRODUCTS = []; // NOVO: Armazena produtos do WooCommerce
+    let WOOCOMMERCE_CATEGORIES = []; // NOVO: Armazena categorias do WooCommerce
 
     // --- MAPAS DE REFERÊNCIA ---
     const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2 };
-    const MENU_DATA = [
-        { id: 'item1', name: 'Cheeseburger Clássico', price: 35.90, category: 'main', sector: 'cozinha' },
-        { id: 'item2', name: 'Refrigerante Cola Lata', price: 7.50, category: 'drinks', sector: 'bar' },
-        { id: 'item3', name: 'Batata Frita Média', price: 18.00, category: 'main', sector: 'cozinha' },
-        { id: 'item4', name: 'Suco Natural Laranja', price: 12.00, category: 'drinks', sector: 'bar' },
-        { id: 'item5', name: 'Pudim de Leite', price: 15.00, category: 'desserts', sector: 'cozinha' },
-    ];
     const password = '1234'; // Senha simulada de gerente
     const PAYMENT_METHODS = ['Dinheiro', 'Pix', 'Crédito', 'Débito'];
     
@@ -271,6 +266,10 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)}... (${appId})`;
             hideStatus();
             loadOpenTables();
+            
+            // NOVO: Carrega dados do WooCommerce
+            await fetchWooCommerceProducts();
+            await fetchWooCommerceCategories();
             renderMenu();
             renderPaymentMethodButtons();
         });
@@ -280,6 +279,71 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('statusContent').innerHTML = `<h2 class="text-xl font-bold mb-2 text-red-600">Erro de Configuração</h2><p>Verifique as variáveis do Firebase. ${e.message}</p>`;
     }
 
+    // --- FUNÇÕES DE INTEGRAÇÃO WOOCOMMERCE (NOVO) ---
+    const fetchWooCommerceData = async (endpoint) => {
+        const url = `${WOOCOMMERCE_URL}/wp-json/wc/v3/${endpoint}?consumer_key=${CONSUMER_KEY}&consumer_secret=${CONSUMER_SECRET}`;
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                const errorBody = await response.json();
+                console.error(`Erro ao buscar dados do WooCommerce (${endpoint}):`, errorBody);
+                return [];
+            }
+            return await response.json();
+        } catch (error) {
+            console.error(`Falha ao conectar à API do WooCommerce (${endpoint}):`, error);
+            return [];
+        }
+    };
+
+    const fetchWooCommerceCategories = async () => {
+        const categories = await fetchWooCommerceData('products/categories');
+        WOOCOMMERCE_CATEGORIES = [{ id: 'all', name: 'Todos' }, ...categories];
+        renderCategoryFilters();
+    };
+
+    const fetchWooCommerceProducts = async () => {
+        const products = await fetchWooCommerceData('products?per_page=100'); // Puxa até 100 produtos
+        WOOCOMMERCE_PRODUCTS = products.map(p => ({
+            id: p.id,
+            name: p.name,
+            price: parseFloat(p.price),
+            category: p.categories.length > 0 ? p.categories[0].slug : 'uncategorized',
+            sector: 'cozinha' // Pode ser mapeado de tags ou atributos do WooCommerce
+        }));
+        renderMenu();
+    };
+
+    const renderCategoryFilters = () => {
+        const categoryFiltersContainer = document.getElementById('categoryFilters');
+        if (!categoryFiltersContainer) return;
+        
+        categoryFiltersContainer.innerHTML = '';
+        WOOCOMMERCE_CATEGORIES.forEach(cat => {
+            const isActive = cat.id === 'all' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border border-gray-300';
+            categoryFiltersContainer.innerHTML += `
+                <button class="category-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap ${isActive}" data-category="${cat.id === 'all' ? 'all' : cat.slug}">
+                    ${cat.name}
+                </button>
+            `;
+        });
+
+        // Adiciona listener para os botões de filtro de categoria (NOVO)
+        categoryFiltersContainer.addEventListener('click', (e) => {
+            const btn = e.target.closest('.category-btn');
+            if (btn) {
+                const category = btn.dataset.category;
+                document.querySelectorAll('.category-btn').forEach(b => {
+                    b.classList.remove('bg-indigo-600', 'text-white');
+                    b.classList.add('bg-white', 'text-gray-700', 'border', 'border-gray-300');
+                });
+                btn.classList.remove('bg-white', 'text-gray-700', 'border', 'border-gray-300');
+                btn.classList.add('bg-indigo-600', 'text-white');
+                
+                renderMenu(category, searchProductInput.value);
+            }
+        });
+    };
 
     // --- FUNÇÕES DE PAGAMENTO (3) ---
 
@@ -675,8 +739,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- FUNÇÕES DO CARDÁPIO (2) ---
     
+    // renderiza os itens do cardápio com botão de adição (AGORA USANDO DADOS DO WOOCOMMERCE)
     const renderMenu = (filter = 'all', search = '') => {
-        let filteredItems = MENU_DATA;
+        let filteredItems = WOOCOMMERCE_PRODUCTS;
         
         if (search) {
             const normalizedSearch = search.toLowerCase();
@@ -869,9 +934,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const itemId = el.dataset.itemId;
         const noteKey = el.dataset.itemNoteKey;
         
-        const item = MENU_DATA.find(i => i.id === itemId);
+        const item = WOOCOMMERCE_PRODUCTS.find(i => i.id == itemId); // Busca nos produtos do WooCommerce
         const currentNote = selectedItems.find(item => 
-            item.id === itemId && (item.note || '') === noteKey
+            item.id == itemId && (item.note || '') === noteKey
         )?.note || '';
 
         if (item && obsItemName && obsInput && obsModal && esperaSwitch) {
@@ -909,7 +974,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (action === 'CANCELAR') {
                 if (originalNoteKey === '' && newNote === '') {
-                    const indexToRemove = selectedItems.findIndex(item => item.id === itemId && item.note === '');
+                    const indexToRemove = selectedItems.findIndex(item => item.id == itemId && item.note === '');
                     if (indexToRemove !== -1) {
                         selectedItems.splice(indexToRemove, 1);
                     }
@@ -926,7 +991,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (newNote !== originalNoteKey) {
                     selectedItems = selectedItems.map(item => {
-                        if (item.id === itemId && (item.note || '') === originalNoteKey) {
+                        if (item.id == itemId && (item.note || '') === originalNoteKey) {
                             return { ...item, note: newNote };
                         }
                         return item;
