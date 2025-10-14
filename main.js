@@ -228,7 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- FUNÇÃO PARA SALVAR A LISTA selectedItems NO FIREBASE ---
     const saveSelectedItemsToFirebase = async (tableId) => {
-        if (!tableId || selectedItems.length === 0) return;
+        if (!tableId) return;
 
         const tableRef = getTableDocRef(tableId);
         try {
@@ -281,11 +281,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- FUNÇÕES DE INTEGRAÇÃO WOOCOMMERCE (NOVO) ---
     const fetchWooCommerceData = async (endpoint) => {
         // CORREÇÃO: Concatena os parâmetros de forma segura com &
-        const url = `${WOOCOMMERCE_URL}/wp-json/wc/v3/${endpoint}?consumer_key=${CONSUMER_KEY}&consumer_secret=${CONSUMER_SECRET}`;
+        const querySeparator = endpoint.includes('?') ? '&' : '?';
+        const url = `${WOOCOMMERCE_URL}/wp-json/wc/v3/${endpoint}${querySeparator}consumer_key=${CONSUMER_KEY}&consumer_secret=${CONSUMER_SECRET}`;
         try {
             const response = await fetch(url);
             if (!response.ok) {
-                // Tenta ler o corpo da resposta para um erro mais detalhado
                 const errorBody = await response.text(); 
                 console.error(`Erro ao buscar dados do WooCommerce (${endpoint}):`, errorBody);
                 throw new Error(`Erro do WooCommerce: ${response.status}`);
@@ -299,7 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const fetchWooCommerceCategories = async () => {
         const categories = await fetchWooCommerceData('products/categories');
-        WOOCOMMERCE_CATEGORIES = [{ id: 'all', name: 'Todos' }, ...categories];
+        WOOCOMMERCE_CATEGORIES = [{ id: 'all', name: 'Todos', slug: 'all' }, ...categories];
         renderCategoryFilters();
     };
 
@@ -329,7 +329,6 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         });
 
-        // Adiciona listener para os botões de filtro de categoria (NOVO)
         if (categoryFiltersContainer) {
             categoryFiltersContainer.addEventListener('click', (e) => {
                 const btn = e.target.closest('.category-btn');
@@ -1276,7 +1275,14 @@ document.addEventListener('DOMContentLoaded', () => {
             openManagerModal('openActions');
         });
     }
-    
+
+    if (document.getElementById('openSelectiveTransferModalBtn')) {
+        document.getElementById('openSelectiveTransferModalBtn').addEventListener('click', () => {
+            openManagerModal('openSelectiveTransfer');
+        });
+    }
+
+
     if (finalizeOrderBtn) finalizeOrderBtn.addEventListener('click', finalizeOrder);
     if (openNfeModalBtn) openNfeModalBtn.addEventListener('click', openNfeModal);
     
