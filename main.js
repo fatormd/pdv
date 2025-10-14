@@ -207,7 +207,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Função de Navegação
     window.goToScreen = (screenId) => {
-        // CORREÇÃO: Salva os itens selecionados antes de sair da tela do pedido
         if (screenId === 'panelScreen' && currentTableId) {
             saveSelectedItemsToFirebase(currentTableId);
         }
@@ -281,13 +280,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- FUNÇÕES DE INTEGRAÇÃO WOOCOMMERCE (NOVO) ---
     const fetchWooCommerceData = async (endpoint) => {
+        // CORREÇÃO: Concatena os parâmetros de forma segura com &
         const url = `${WOOCOMMERCE_URL}/wp-json/wc/v3/${endpoint}?consumer_key=${CONSUMER_KEY}&consumer_secret=${CONSUMER_SECRET}`;
         try {
             const response = await fetch(url);
             if (!response.ok) {
-                const errorBody = await response.json();
+                // Tenta ler o corpo da resposta para um erro mais detalhado
+                const errorBody = await response.text(); 
                 console.error(`Erro ao buscar dados do WooCommerce (${endpoint}):`, errorBody);
-                return [];
+                throw new Error(`Erro do WooCommerce: ${response.status}`);
             }
             return await response.json();
         } catch (error) {
@@ -320,7 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         categoryFiltersContainer.innerHTML = '';
         WOOCOMMERCE_CATEGORIES.forEach(cat => {
-            const isActive = cat.id === 'all' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border border-gray-300';
+            const isActive = cat.slug === 'all' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border border-gray-300';
             categoryFiltersContainer.innerHTML += `
                 <button class="category-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap ${isActive}" data-category="${cat.id === 'all' ? 'all' : cat.slug}">
                     ${cat.name}
@@ -329,20 +330,22 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Adiciona listener para os botões de filtro de categoria (NOVO)
-        categoryFiltersContainer.addEventListener('click', (e) => {
-            const btn = e.target.closest('.category-btn');
-            if (btn) {
-                const category = btn.dataset.category;
-                document.querySelectorAll('.category-btn').forEach(b => {
-                    b.classList.remove('bg-indigo-600', 'text-white');
-                    b.classList.add('bg-white', 'text-gray-700', 'border', 'border-gray-300');
-                });
-                btn.classList.remove('bg-white', 'text-gray-700', 'border', 'border-gray-300');
-                btn.classList.add('bg-indigo-600', 'text-white');
-                
-                renderMenu(category, searchProductInput.value);
-            }
-        });
+        if (categoryFiltersContainer) {
+            categoryFiltersContainer.addEventListener('click', (e) => {
+                const btn = e.target.closest('.category-btn');
+                if (btn) {
+                    const category = btn.dataset.category;
+                    document.querySelectorAll('.category-btn').forEach(b => {
+                        b.classList.remove('bg-indigo-600', 'text-white');
+                        b.classList.add('bg-white', 'text-gray-700', 'border', 'border-gray-300');
+                    });
+                    btn.classList.remove('bg-white', 'text-gray-700', 'border', 'border-gray-300');
+                    btn.classList.add('bg-indigo-600', 'text-white');
+                    
+                    renderMenu(category, searchProductInput.value);
+                }
+            });
+        }
     };
 
     // --- FUNÇÕES DE PAGAMENTO (3) ---
@@ -536,11 +539,11 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const wooCommercePayload = {
-            payment_method: orderData.payments[0].method.toLowerCase(),
-            payment_method_title: orderData.payments[0].method,
+            payment_method: orderData.payments.length > 0 ? orderData.payments[0].method.toLowerCase() : 'N/A',
+            payment_method_title: orderData.payments.length > 0 ? orderData.payments[0].method : 'N/A',
             set_paid: true,
             billing: {
-                first_name: "Garçom", // Pode ser dinâmico
+                first_name: "Garçom",
                 last_name: "PDV",
                 address_1: "Rua do PDV, 123",
                 city: "São Paulo",
@@ -551,8 +554,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 phone: "11999999999"
             },
             line_items: orderData.items.map(item => ({
-                product_id: item.id, // O ID do produto no WooCommerce
-                quantity: 1, // Assumimos 1 por item
+                product_id: item.id, 
+                quantity: 1, 
                 meta_data: [{
                     key: 'Observacao',
                     value: item.note || 'Nenhuma'
@@ -598,7 +601,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
-            await sendOrderToWooCommerce(orderData); // Chama a nova função de integração
+            await sendOrderToWooCommerce(orderData); 
 
             const tableRef = getTableDocRef(currentTableId);
             await updateDoc(tableRef, {
@@ -910,7 +913,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.increaseLocalItemQuantity = (itemId, noteKey) => {
         const itemToCopy = selectedItems.find(item => 
-            item.id === itemId && (item.note || '') === noteKey
+            item.id == itemId && (item.note || '') === noteKey
         );
 
         if (itemToCopy) {
@@ -921,7 +924,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.decreaseLocalItemQuantity = (itemId, noteKey) => {
         const index = selectedItems.findIndex(item => 
-            item.id === itemId && (item.note || '') === noteKey
+            item.id == itemId && (item.note || '') === noteKey
         );
 
         if (index > -1) {
@@ -934,7 +937,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const itemId = el.dataset.itemId;
         const noteKey = el.dataset.itemNoteKey;
         
-        const item = WOOCOMMERCE_PRODUCTS.find(i => i.id == itemId); // Busca nos produtos do WooCommerce
+        const item = WOOCOMMERCE_PRODUCTS.find(i => i.id == itemId); 
         const currentNote = selectedItems.find(item => 
             item.id == itemId && (item.note || '') === noteKey
         )?.note || '';
@@ -1235,7 +1238,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (action === 'deleteItem') {
                     deleteSentItem(itemId, itemNote);
                 } else if (action === 'openSelectiveTransfer') {
-                    openSelectiveTransferModal();
+                    openSelectiveTransferModal(itemId, itemNote);
                 } else if (action === 'openActions') {
                     openActionsModal();
                 }
@@ -1273,14 +1276,7 @@ document.addEventListener('DOMContentLoaded', () => {
             openManagerModal('openActions');
         });
     }
-
-    if (document.getElementById('openSelectiveTransferModalBtn')) {
-        document.getElementById('openSelectiveTransferModalBtn').addEventListener('click', () => {
-            openManagerModal('openSelectiveTransfer');
-        });
-    }
-
-
+    
     if (finalizeOrderBtn) finalizeOrderBtn.addEventListener('click', finalizeOrder);
     if (openNfeModalBtn) openNfeModalBtn.addEventListener('click', openNfeModal);
     
