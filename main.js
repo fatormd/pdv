@@ -99,7 +99,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Event handler para máscara (garante apenas números e formata)
     if (paymentValueInput) {
       paymentValueInput.addEventListener('input', (e) => {
-        // CORREÇÃO: Corrigido o nome da variável de 'rawValue' para 'valueRaw'
         const valueRaw = e.target.value.replace(/\D/g, ''); 
         e.target.value = currencyMask(valueRaw);
         const newCursorPos = e.target.value.length;
@@ -646,7 +645,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     selectedItems: [] 
                 });
 
-                // CORREÇÃO: Zera a lista de selectedItems para evitar que itens de sessões anteriores apareçam em mesas novas.
+                // CORREÇÃO: Limpa a lista de selectedItems para evitar que itens de sessões anteriores apareçam em mesas novas.
                 selectedItems = [];
 
                 currentTableId = tableNumber.toString();
@@ -1031,6 +1030,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            // CORREÇÃO: A lista local de selectedItems agora é atualizada com a lista de itens a serem retidos (itensToHold)
             selectedItems = [...itemsToHold];
 
             const itemsGroupedBySector = itemsToSend.reduce((acc, item) => {
@@ -1207,8 +1207,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const hideStatus = () => {
         if (statusScreen && mainContent) {
-            statusScreen.style.display = 'none';
-            mainContent.style.display = 'block';
+            statusScreen.style.display = 'flex';
+            mainContent.style.display = 'none';
         }
     };
 
