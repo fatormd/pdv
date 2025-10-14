@@ -165,8 +165,8 @@
                         </div>
                         <div class="flex items-center space-x-2">
                             <span class="text-lg font-bold text-green-700" id="orderServiceTaxDisplayPayment">R$ 0,00</span>
-                            <button id="toggleServiceTaxBtn" class="px-2 py-1 text-xs rounded-full transition duration-150 bg-gray-400 text-white hover:bg-gray-500" title="Aplicar/Remover Taxa">
-                                Aplicar
+                            <button id="toggleServiceTaxBtn" class="px-2 py-1 text-xs rounded-full transition duration-150 bg-green-600 text-white hover:bg-green-700" title="Aplicar/Remover Taxa">
+                                Remover
                             </button>
                         </div>
                     </div>
@@ -186,8 +186,15 @@
                         <span class="text-3xl font-extrabold text-indigo-700" id="orderTotalDisplayPayment">R$ 0,00</span>
                     </div>
                 </div>
-                
-                <div id="chargeInputsAndSummary" class="p-4 pt-0 content-card bg-white">
+
+                <div class="p-4 pt-0 content-card bg-white mt-6">
+                    <h4 class="text-sm font-semibold text-gray-500 mb-2">Pagamentos Registrados:</h4>
+                    <div id="paymentSummaryList" class="space-y-1 p-2 bg-gray-50 rounded-lg border border-gray-200 text-sm">
+                        <p class="text-xs text-gray-500 italic p-2">Nenhum pagamento registrado.</p>
+                    </div>
+                </div>
+
+                <div id="chargeInputs" class="p-4 pt-0 content-card bg-white mt-6">
                     <h4 class="text-lg font-semibold text-gray-700 mb-3">Registrar Pagamento</h4>
                     <div class="space-y-3">
                         <div id="paymentMethodButtons" class="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -206,22 +213,21 @@
                             Adicionar Pagamento
                         </button>
                     </div>
-                    
-                    <h4 class="text-sm font-semibold text-gray-500 mt-4 mb-2">Pagamentos Registrados:</h4>
-                    <div id="paymentSummaryList" class="space-y-1 p-2 bg-gray-50 rounded-lg border border-gray-200 text-sm">
-                        <div class="flex justify-between items-center py-1 font-bold border-t border-gray-200 mt-2 pt-2">
-                            <span>VALOR RESTANTE:</span>
-                            <span id="remainingBalanceDisplay" class="text-red-600">R$ 0,00</span>
-                        </div>
+                </div>
+                
+                <div class="p-4 pt-0 content-card bg-white mt-6">
+                    <div class="flex justify-between items-center py-1 font-bold border-t border-gray-200 mt-2 pt-2">
+                        <span>VALOR RESTANTE:</span>
+                        <span id="remainingBalanceDisplay" class="text-red-600">R$ 0,00</span>
+                    </div>
 
-                        <div class="flex justify-between space-x-3 pt-2">
-                            <button id="finalizeOrderBtn" class="w-1/2 px-4 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition text-base disabled:opacity-50" disabled>
-                                FECHAR CONTA
-                            </button>
-                            <button id="openNfeModalBtn" class="w-1/2 px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition text-base disabled:opacity-50" disabled>
-                                NF-e
-                            </button>
-                        </div>
+                    <div class="flex justify-between space-x-3 pt-2">
+                        <button id="finalizeOrderBtn" class="w-1/2 px-4 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition text-base disabled:opacity-50" disabled>
+                            FECHAR CONTA
+                        </button>
+                        <button id="openNfeModalBtn" class="w-1/2 px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition text-base disabled:opacity-50" disabled>
+                            NF-e
+                        </button>
                     </div>
                 </div>
             </div>
@@ -312,10 +318,10 @@
         // Variáveis de Configuração (passadas para main.js via window)
         window.__app_id = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         window.__firebase_config = typeof __firebase_config !== 'undefined' ? __firebase_config : '{"apiKey": "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY", "authDomain": "fator-pdv.firebaseapp.com", "projectId": "fator-pdv", "storageBucket": "fator-pdv.appspot.com", "messagingSenderId": "1097659747429", "appId": "1:1097659747429:web:8ec0a7c3978c311dbe0a8c", "measurementId": "G-02QWNRXRCV"}';
-        window.__initial_auth_token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : undefined;
+        window.__initial_auth_token = typeof __initial_auth_token !== 'undefined' ? window.__initial_auth_token : undefined;
 
     </script>
     
     <script type="module" src="main.js"></script>
 </body>
-</html>+
+</html>
