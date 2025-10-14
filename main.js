@@ -42,6 +42,12 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
     const password = '1234'; // Senha simulada de gerente
     const PAYMENT_METHODS = ['Dinheiro', 'Pix', 'Crédito', 'Débito'];
+    
+    // --- WooCommerce Configuração (NOVO) ---
+    const WOOCOMMERCE_URL = 'https://pdv.fatormd.com';
+    const CONSUMER_KEY = 'ck_e06515127d067eff5c39d6d93b3908b1baf9158a';
+    const CONSUMER_SECRET = 'cs_0a4cdf88eb7f16387cff8a6a6ee6697eb395299';
+
 
     // --- ELEMENTOS DA UI ---
     const statusScreen = document.getElementById('statusScreen');
@@ -226,13 +232,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const getKdsCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'kds_orders');
     const getManagerCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'manager_logs');
 
-    // --- FUNÇÃO PARA SALVAR A LISTA selectedItems NO FIREBASE (NOVA FUNÇÃO) ---
+    // --- FUNÇÃO PARA SALVAR A LISTA selectedItems NO FIREBASE ---
     const saveSelectedItemsToFirebase = async (tableId) => {
         if (!tableId || selectedItems.length === 0) return;
 
         const tableRef = getTableDocRef(tableId);
         try {
-            // Salva a lista inteira, incluindo os itens com "Espera"
             await updateDoc(tableRef, {
                 selectedItems: selectedItems
             });
@@ -272,7 +277,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     } catch (e) {
         console.error("Erro ao inicializar Firebase: ", e);
-        // Atualiza a tela de status com a mensagem de erro detalhada
         document.getElementById('statusContent').innerHTML = `<h2 class="text-xl font-bold mb-2 text-red-600">Erro de Configuração</h2><p>Verifique as variáveis do Firebase. ${e.message}</p>`;
     }
 
@@ -319,16 +323,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const { total: generalTotal, serviceValue } = calculateTotal(subtotal, serviceTaxApplied);
         
-        // Valores para a divisão
         const diners = parseInt(dinersSplitInput.value) || 1;
         const valuePerDiner = generalTotal / diners;
 
-        // Calcula o saldo restante e o troco
         const remainingBalance = generalTotal - currentPaymentsTotal;
         const isClosed = remainingBalance <= 0;
         const displayBalance = isClosed ? 0 - remainingBalance : remainingBalance;
         
-        // Atualiza a UI com checagem de nulo
         updateText('orderSubtotalDisplayPayment', formatCurrency(subtotal));
         updateText('orderServiceTaxDisplayPayment', formatCurrency(serviceValue));
         updateText('orderTotalDisplayPayment', formatCurrency(generalTotal));
@@ -347,11 +348,9 @@ document.addEventListener('DOMContentLoaded', () => {
             toggleServiceTaxBtn.classList.toggle('bg-green-600', serviceTaxApplied);
         }
 
-        // Habilita/Desabilita botões de fechamento
         if (finalizeOrderBtn) finalizeOrderBtn.disabled = !isClosed;
         if (openNfeModalBtn) openNfeModalBtn.disabled = !isClosed;
 
-        // Renderiza a lista de pagamentos
         const paymentListEl = document.getElementById('paymentSummaryList');
         if (!paymentListEl) return; 
 
@@ -464,10 +463,67 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Função de envio para o WooCommerce (NOVA)
+    const sendOrderToWooCommerce = async (orderData) => {
+        const orderEndpoint = `${WOOCOMMERCE_URL}/wp-json/wc/v3/orders`;
+        const headers = {
+            'Authorization': `Basic ${btoa(`${CONSUMER_KEY}:${CONSUMER_SECRET}`)}`,
+            'Content-Type': 'application/json',
+        };
+
+        const wooCommercePayload = {
+            payment_method: orderData.payments[0].method.toLowerCase(),
+            payment_method_title: orderData.payments[0].method,
+            set_paid: true,
+            billing: {
+                first_name: "Garçom", // Pode ser dinâmico
+                last_name: "PDV",
+                address_1: "Rua do PDV, 123",
+                city: "São Paulo",
+                state: "SP",
+                postcode: "01000-000",
+                country: "BR",
+                email: "garcom@pdv.com",
+                phone: "11999999999"
+            },
+            line_items: orderData.items.map(item => ({
+                product_id: item.id, // O ID do produto no WooCommerce
+                quantity: 1, // Assumimos 1 por item
+                meta_data: [{
+                    key: 'Observacao',
+                    value: item.note || 'Nenhuma'
+                }]
+            })),
+            shipping_lines: [],
+        };
+        
+        try {
+            const response = await fetch(orderEndpoint, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(wooCommercePayload),
+            });
+
+            if (!response.ok) {
+                const errorBody = await response.json();
+                console.error('Erro na API do WooCommerce:', errorBody);
+                throw new Error(`Erro do WooCommerce: ${response.status} - ${errorBody.message}`);
+            }
+
+            const data = await response.json();
+            console.log('WooCommerce API - Resposta de Sucesso:', data);
+            alert(`Venda finalizada no WooCommerce! Pedido #${data.id}`);
+
+        } catch (error) {
+            console.error('Falha ao enviar pedido para WooCommerce:', error);
+            alert(`Falha ao finalizar a venda: ${error.message}`);
+        }
+    };
+    
+    // Finalizar Pedido (Gatilho de Integração WooCommerce)
     const finalizeOrder = async () => {
         if (!currentTableId || !currentOrderSnapshot) return;
-
-        console.log("--- INICIANDO INTEGRAÇÃO WOOCOMMERCE ---");
+        
         const orderData = {
             tableNumber: currentTableId,
             items: currentOrderSnapshot.sentItems,
@@ -476,21 +532,19 @@ document.addEventListener('DOMContentLoaded', () => {
             serviceTaxApplied: currentOrderSnapshot.serviceTaxApplied,
             source: 'PDV_FATOR'
         };
-        console.log("DADOS ENVIADOS PARA CRIAÇÃO DE ORDEM (API WooCommerce):", orderData);
-        
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        console.log("Ordem de Venda Criada/Finalizada no WooCommerce.");
 
-        const tableRef = getTableDocRef(currentTableId);
         try {
+            await sendOrderToWooCommerce(orderData); // Chama a nova função de integração
+
+            const tableRef = getTableDocRef(currentTableId);
             await updateDoc(tableRef, {
                 status: 'closed',
                 closedAt: serverTimestamp(),
             });
+
             currentTableId = null;
             selectedItems = [];
             currentOrderSnapshot = null;
-            alert("Mesa fechada com sucesso! Ordem finalizada no WooCommerce."); 
             goToScreen('panelScreen');
         } catch (e) {
             console.error("Erro ao fechar mesa:", e);
