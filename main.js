@@ -96,17 +96,113 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Event handler para máscara (garante apenas números e formata)
-    paymentValueInput.addEventListener('input', (e) => {
-        const cursorStart = e.target.selectionStart;
-        const rawValue = e.target.value.replace(/\D/g, ''); // Remove tudo que não for dígito
-        
-        // Aplica a máscara e atualiza o campo
+    if (paymentValueInput) {
+      paymentValueInput.addEventListener('input', (e) => {
+        const rawValue = e.target.value.replace(/\D/g, ''); 
         e.target.value = currencyMask(rawValue);
-
-        // Tenta manter o cursor no final da parte digitada
         const newCursorPos = e.target.value.length;
         e.target.setSelectionRange(newCursorPos, newCursorPos);
     });
+    }
+
+
+    // Funções modais (MOVIDAS PARA O TOPO para resolver ReferenceError)
+    window.openNfeModal = () => {
+        const nfeModal = document.getElementById('nfeModal');
+        if (!nfeModal) return; 
+        
+        nfeModal.innerHTML = `
+            <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+                <h3 class="text-xl font-bold mb-4 text-green-700">NF-e / Recibo</h3>
+                <p class="text-base mb-3">Deseja incluir CPF/CNPJ?</p>
+                <input type="text" id="nfeCpfCnpjInput" placeholder="CPF ou CNPJ (Opcional)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-base">
+                
+                <div class="flex flex-col space-y-2 mt-4">
+                    <button class="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-base">Imprimir Recibo</button>
+                    <button class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base">Enviar por Email</button>
+                </div>
+
+                <div class="flex justify-end mt-4">
+                    <button class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-base" onclick="document.getElementById('nfeModal').style.display='none'">Fechar</button>
+                </div>
+            </div>
+        `;
+        nfeModal.style.display = 'flex';
+    };
+
+    window.openSelectiveTransferModal = (itemId = null, itemNote = null) => {
+        const modal = document.getElementById('selectiveTransferModal');
+        if (!modal) return; 
+
+        modal.innerHTML = `
+            <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg">
+                <h3 class="text-xl font-bold mb-4 text-indigo-700">Transferência Seletiva</h3>
+                <p class="text-sm text-gray-600 mb-4">Selecione os itens e a mesa de destino para transferir.</p>
+
+                <div class="flex space-x-2 mb-4">
+                    <input type="number" id="targetTableInput" placeholder="Nº Mesa Destino" class="w-2/3 p-3 border border-gray-300 rounded-lg focus:ring-indigo-500" min="1">
+                    <button id="checkTargetTableBtn" class="w-1/3 bg-blue-500 text-white p-3 rounded-lg hover:bg-blue-600 transition disabled:opacity-50">Verificar</button>
+                </div>
+                <p id="transferStatus" class="text-sm text-red-500 mb-4 italic hidden"></p>
+
+                <div id="transferItemsList" class="max-h-60 overflow-y-auto space-y-2 p-2 border border-gray-200 rounded-lg bg-gray-50">
+                    <p class="text-center text-gray-500">Carregando itens...</p>
+                </div>
+                
+                <div class="flex justify-end space-x-3 mt-4">
+                    <button class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition" onclick="document.getElementById('selectiveTransferModal').style.display='none'">Cancelar</button>
+                    <button id="confirmTransferBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50" disabled>Confirmar Transferência</button>
+                </div>
+            </div>
+        `;
+        
+        const renderTransferItems = () => {
+             const listEl = document.getElementById('transferItemsList');
+             if (!currentOrderSnapshot || currentOrderSnapshot.sentItems.length === 0) {
+                 if (listEl) listEl.innerHTML = `<p class="text-center text-gray-500">Nenhum item para transferir.</p>`;
+                 return;
+             }
+             
+             if (listEl) {
+                 listEl.innerHTML = `<p class="text-center text-gray-500">Funcionalidade de Seleção de Itens não implementada nesta versão, mas o botão está ativo.</p>`;
+             }
+        };
+        
+        const checkTargetTableBtn = document.getElementById('checkTargetTableBtn');
+        if (checkTargetTableBtn) {
+            checkTargetTableBtn.addEventListener('click', () => {
+                const targetTable = parseInt(document.getElementById('targetTableInput')?.value);
+                const transferStatus = document.getElementById('transferStatus');
+                const confirmTransferBtn = document.getElementById('confirmTransferBtn');
+                
+                if (!targetTable || targetTable === parseInt(currentTableId)) {
+                    if (transferStatus) {
+                        transferStatus.textContent = 'Mesa inválida ou igual à atual.';
+                        transferStatus.classList.remove('hidden');
+                    }
+                    if (confirmTransferBtn) confirmTransferBtn.disabled = true;
+                    return;
+                }
+                if (transferStatus) {
+                    transferStatus.textContent = `Mesa ${targetTable} verificada.`;
+                    transferStatus.classList.remove('hidden');
+                }
+                if (confirmTransferBtn) confirmTransferBtn.disabled = false;
+            });
+        }
+
+        const confirmTransferBtn = document.getElementById('confirmTransferBtn');
+        if (confirmTransferBtn) {
+            confirmTransferBtn.addEventListener('click', async () => {
+                alert(`Simulação: Itens da Mesa ${currentTableId} transferidos para Mesa ${document.getElementById('targetTableInput')?.value}.`);
+                modal.style.display = 'none';
+            });
+        }
+
+        renderTransferItems();
+        modal.style.display = 'flex';
+    };
+
 
     // Função de Navegação
     window.goToScreen = (screenId) => {
@@ -117,9 +213,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const screenIndex = screens[screenId];
         if (screenIndex !== undefined) {
-            appContainer.style.transform = `translateX(-${screenIndex * 100}vw)`;
+            if (appContainer) {
+              appContainer.style.transform = `translateX(-${screenIndex * 100}vw)`;
+            }
         }
     };
+
 
     // --- FIREBASE PATHS ---
     const getTablesCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'tables');
@@ -354,14 +453,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Ação dos novos botões de pagamento
     if (paymentMethodButtonsContainer) {
         paymentMethodButtonsContainer.addEventListener('click', (e) => {
             const btn = e.target.closest('.payment-method-btn');
             if (btn) {
-                // Remove o estado ativo de todos os botões
                 document.querySelectorAll('.payment-method-btn').forEach(b => b.classList.remove('active', 'bg-indigo-600', 'text-white'));
-                // Adiciona o estado ativo ao botão clicado
                 btn.classList.add('active', 'bg-indigo-600', 'text-white');
                 addPaymentBtn.disabled = false;
             }
@@ -406,45 +502,52 @@ document.addEventListener('DOMContentLoaded', () => {
     const checkInputs = () => {
         const mesaValida = parseInt(mesaInput.value) > 0;
         const pessoasValida = parseInt(pessoasInput.value) > 0;
-        abrirMesaBtn.disabled = !(mesaValida && pessoasValida);
+        if (abrirMesaBtn) {
+            abrirMesaBtn.disabled = !(mesaValida && pessoasValida);
+        }
     };
 
-    mesaInput.addEventListener('input', checkInputs);
-    pessoasInput.addEventListener('input', checkInputs);
+    if (mesaInput) mesaInput.addEventListener('input', checkInputs);
+    if (pessoasInput) pessoasInput.addEventListener('input', checkInputs);
 
-    abrirMesaBtn.addEventListener('click', async () => {
-        const tableNumber = parseInt(mesaInput.value);
-        const diners = parseInt(pessoasInput.value);
-        const newTableRef = getTableDocRef(tableNumber);
+    if (abrirMesaBtn) {
+        abrirMesaBtn.addEventListener('click', async () => {
+            const tableNumber = parseInt(mesaInput.value);
+            const diners = parseInt(pessoasInput.value);
+            const newTableRef = getTableDocRef(tableNumber);
 
-        try {
-            await setDoc(newTableRef, {
-                tableNumber: tableNumber,
-                diners: diners,
-                status: 'open',
-                createdAt: serverTimestamp(),
-                total: 0,
-                sentItems: [], 
-                payments: [],
-                serviceTaxApplied: false,
-                selectedItems: []
-            });
+            try {
+                await setDoc(newTableRef, {
+                    tableNumber: tableNumber,
+                    diners: diners,
+                    status: 'open',
+                    createdAt: serverTimestamp(),
+                    total: 0,
+                    sentItems: [], 
+                    payments: [],
+                    serviceTaxApplied: false,
+                    selectedItems: [] 
+                });
 
-            currentTableId = tableNumber.toString();
-            document.getElementById('current-table-number').textContent = `Mesa ${currentTableId}`;
-            document.getElementById('payment-table-number').textContent = `Mesa ${currentTableId}`;
+                currentTableId = tableNumber.toString();
+                document.getElementById('current-table-number').textContent = `Mesa ${currentTableId}`;
+                document.getElementById('payment-table-number').textContent = `Mesa ${currentTableId}`;
 
-            mesaInput.value = '';
-            pessoasInput.value = '';
-            abrirMesaBtn.disabled = true;
-            goToScreen('orderScreen');
-        } catch (e) {
-            console.error("Erro ao criar nova mesa: ", e);
-            alert(`Erro: ${e.message}. Tente novamente.`); 
-        }
-    });
+                mesaInput.value = '';
+                pessoasInput.value = '';
+                abrirMesaBtn.disabled = true;
+                goToScreen('orderScreen');
+            } catch (e) {
+                console.error("Erro ao criar nova mesa: ", e);
+                alert(`Erro: ${e.message}. Tente novamente.`); 
+            }
+        });
+    }
+
 
     const renderTables = (docs) => {
+        if (!openTablesList || !openTablesCount) return;
+
         openTablesList.innerHTML = '';
         let count = 0;
 
@@ -486,12 +589,14 @@ document.addEventListener('DOMContentLoaded', () => {
             renderTables(docs);
         }, (error) => {
             console.error("Erro ao carregar mesas (onSnapshot):", error);
-            openTablesList.innerHTML = `<div class="col-span-full text-sm text-red-500 italic p-4 content-card bg-white">Erro ao carregar mesas. Verifique as permissões.</div>`;
+            if (openTablesList) {
+                openTablesList.innerHTML = `<div class="col-span-full text-sm text-red-500 italic p-4 content-card bg-white">Erro ao carregar mesas. Verifique as permissões.</div>`;
+            }
         });
     };
 
-    // Clique em uma Mesa (Navegação)
-    openTablesList.addEventListener('click', async (e) => {
+    if (openTablesList) {
+      openTablesList.addEventListener('click', async (e) => {
         const tableCard = e.target.closest('.table-card-panel');
         if (tableCard) {
             currentTableId = tableCard.dataset.tableId;
@@ -511,6 +616,8 @@ document.addEventListener('DOMContentLoaded', () => {
             goToScreen('orderScreen');
         }
     });
+    }
+
 
     // --- FUNÇÕES DO CARDÁPIO (2) ---
     
@@ -530,10 +637,14 @@ document.addEventListener('DOMContentLoaded', () => {
             );
         }
 
-        menuItemsGrid.innerHTML = '';
+        if (menuItemsGrid) {
+            menuItemsGrid.innerHTML = '';
+        }
         
         if (filteredItems.length === 0) {
-            menuItemsGrid.innerHTML = `<div class="col-span-full text-sm text-gray-500 italic p-4 content-card bg-white">Nenhum produto encontrado.</div>`;
+            if (menuItemsGrid) {
+                menuItemsGrid.innerHTML = `<div class="col-span-full text-sm text-gray-500 italic p-4 content-card bg-white">Nenhum produto encontrado.</div>`;
+            }
             return;
         }
 
@@ -550,11 +661,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
             `;
-            menuItemsGrid.innerHTML += itemHtml;
+            if (menuItemsGrid) {
+                menuItemsGrid.innerHTML += itemHtml;
+            }
         });
     };
 
-    document.getElementById('categoryFilters').addEventListener('click', (e) => {
+    if (document.getElementById('categoryFilters')) {
+      document.getElementById('categoryFilters').addEventListener('click', (e) => {
         const btn = e.target.closest('.category-btn');
         if (btn) {
             const category = btn.dataset.category;
@@ -568,8 +682,12 @@ document.addEventListener('DOMContentLoaded', () => {
             renderMenu(category, searchProductInput.value);
         }
     });
+    }
+
 
     const renderSelectedItems = () => {
+        if (!openOrderList || !openItemsCount) return;
+
         openOrderList.innerHTML = '';
 
         const totalItemsCount = selectedItems.length;
@@ -617,7 +735,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        document.getElementById('openItemsCount').textContent = totalItemsCount;
+        openItemsCount.textContent = totalItemsCount;
     }
 
     const addItemToOrder = (item) => {
@@ -632,44 +750,44 @@ document.addEventListener('DOMContentLoaded', () => {
         
         currentObsGroup = { id: item.id, note: '' };
 
-        obsItemName.textContent = item.name;
-        obsInput.value = ''; 
-        obsModal.dataset.itemId = item.id;
-        obsModal.dataset.originalNoteKey = '';
-        
-        obsModal.style.display = 'flex';
-        esperaSwitch.checked = false; 
+        if (obsItemName) obsItemName.textContent = item.name;
+        if (obsInput) obsInput.value = ''; 
+        if (obsModal) {
+            obsModal.dataset.itemId = item.id;
+            obsModal.dataset.originalNoteKey = '';
+            obsModal.style.display = 'flex';
+        }
+        if (esperaSwitch) esperaSwitch.checked = false; 
     };
 
-    menuItemsGrid.addEventListener('click', (e) => {
+    if (menuItemsGrid) {
+      menuItemsGrid.addEventListener('click', (e) => {
         const addButton = e.target.closest('.add-item-btn');
         if (addButton) {
             const itemData = JSON.parse(addButton.dataset.item.replace(/&#39;/g, "'"));
             addItemToOrder(itemData);
         }
     });
-    
+    }
+
     if (quickObsButtons) {
         quickObsButtons.addEventListener('click', (e) => {
             const btn = e.target.closest('.quick-obs-btn');
             if (btn) {
                 const obsText = btn.textContent.trim();
-                const currentObs = obsInput.value.trim();
-                
-                if (obsText === 'Espera') {
-                    esperaSwitch.checked = !esperaSwitch.checked;
-                    obsInput.value = currentObs; 
-                } else if (currentObs === '') {
-                    obsInput.value = obsText;
-                } else {
-                    const lastChar = currentObs.slice(-1);
-                    const separator = (lastChar === ',' || lastChar === ';' || lastChar === ' ' || lastChar === '/') ? '' : ', ';
-                    obsInput.value += separator + obsText;
+                if (obsInput) {
+                    const currentObs = obsInput.value.trim();
+                    if (currentObs === '') {
+                        obsInput.value = obsText;
+                    } else {
+                        const lastChar = currentObs.slice(-1);
+                        const separator = (lastChar === ',' || lastChar === ';' || lastChar === ' ' || lastChar === '/') ? '' : ', ';
+                        obsInput.value += separator + obsText;
+                    }
                 }
             }
         });
     }
-
 
     window.increaseLocalItemQuantity = (itemId, noteKey) => {
         const itemToCopy = selectedItems.find(item => 
@@ -702,7 +820,7 @@ document.addEventListener('DOMContentLoaded', () => {
             item.id === itemId && (item.note || '') === noteKey
         )?.note || '';
 
-        if (item) {
+        if (item && obsItemName && obsInput && obsModal && esperaSwitch) {
             obsItemName.textContent = item.name;
             obsInput.value = currentNote;
             obsModal.dataset.itemId = itemId;
@@ -721,13 +839,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-
-    [saveObsBtn, cancelObsBtn].forEach(btn => {
+    if (saveObsBtn && cancelObsBtn) {
+      [saveObsBtn, cancelObsBtn].forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const action = e.target.textContent.trim(); 
             
             if (!currentObsGroup) {
-                obsModal.style.display = 'none';
+                if (obsModal) obsModal.style.display = 'none';
                 return;
             }
 
@@ -762,12 +880,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            obsModal.style.display = 'none';
-            obsInput.value = '';
+            if (obsModal && obsInput) {
+                obsModal.style.display = 'none';
+                obsInput.value = '';
+            }
             currentObsGroup = null;
             renderSelectedItems();
         });
     });
+    }
+
 
     if (sendSelectedItemsBtn) {
         sendSelectedItemsBtn.addEventListener('click', async () => {
@@ -846,11 +968,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    searchProductInput.addEventListener('input', (e) => {
+    if (searchProductInput) {
+      searchProductInput.addEventListener('input', (e) => {
         const activeCategoryBtn = document.querySelector('#categoryFilters .bg-indigo-600');
         const activeCategory = activeCategoryBtn ? activeCategoryBtn.dataset.category : 'all';
         renderMenu(activeCategory, e.target.value);
     });
+    }
+
 
     let unsubscribeTable = null;
 
@@ -960,8 +1085,10 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const hideStatus = () => {
-        statusScreen.style.display = 'none';
-        mainContent.style.display = 'block';
+        if (statusScreen && mainContent) {
+            statusScreen.style.display = 'none';
+            mainContent.style.display = 'block';
+        }
     };
 
     window.openManagerModal = (action, itemId = null, itemNote = null) => {
@@ -984,7 +1111,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         document.getElementById('authManagerBtn').onclick = () => {
             const input = document.getElementById('managerPasswordInput');
-            if (input.value === password) {
+            if (input && input.value === password) {
                 managerModal.style.display = 'none';
                 if (action === 'deleteItem') {
                     deleteSentItem(itemId, itemNote);
@@ -995,7 +1122,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } else {
                 alert("Senha incorreta.");
-                input.value = '';
+                if (input) input.value = '';
             }
         };
     };
@@ -1028,111 +1155,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    document.getElementById('openSelectiveTransferModalBtn').addEventListener('click', () => {
-        openManagerModal('openSelectiveTransfer');
-    });
-    
-    const openSelectiveTransferModal = () => {
-        const modal = document.getElementById('selectiveTransferModal');
-        if (!modal) return; 
-
-        modal.innerHTML = `
-            <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg">
-                <h3 class="text-xl font-bold mb-4 text-indigo-700">Transferência Seletiva</h3>
-                <p class="text-sm text-gray-600 mb-4">Selecione os itens e a mesa de destino para transferir.</p>
-
-                <div class="flex space-x-2 mb-4">
-                    <input type="number" id="targetTableInput" placeholder="Nº Mesa Destino" class="w-2/3 p-3 border border-gray-300 rounded-lg focus:ring-indigo-500" min="1">
-                    <button id="checkTargetTableBtn" class="w-1/3 bg-blue-500 text-white p-3 rounded-lg hover:bg-blue-600 transition disabled:opacity-50">Verificar</button>
-                </div>
-                <p id="transferStatus" class="text-sm text-red-500 mb-4 italic hidden"></p>
-
-                <div id="transferItemsList" class="max-h-60 overflow-y-auto space-y-2 p-2 border border-gray-200 rounded-lg bg-gray-50">
-                    <p class="text-center text-gray-500">Carregando itens...</p>
-                </div>
-                
-                <div class="flex justify-end space-x-3 mt-4">
-                    <button class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition" onclick="document.getElementById('selectiveTransferModal').style.display='none'">Cancelar</button>
-                    <button id="confirmTransferBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50" disabled>Confirmar Transferência</button>
-                </div>
-            </div>
-        `;
-        
-        const renderTransferItems = () => {
-             const listEl = document.getElementById('transferItemsList');
-             if (!currentOrderSnapshot || currentOrderSnapshot.sentItems.length === 0) {
-                 if (listEl) listEl.innerHTML = `<p class="text-center text-gray-500">Nenhum item para transferir.</p>`;
-                 return;
-             }
-             
-             if (listEl) {
-                 listEl.innerHTML = `<p class="text-center text-gray-500">Funcionalidade de Seleção de Itens não implementada nesta versão, mas o botão está ativo.</p>`;
-             }
-        };
-        
-        const checkTargetTableBtn = document.getElementById('checkTargetTableBtn');
-        if (checkTargetTableBtn) {
-            checkTargetTableBtn.addEventListener('click', () => {
-                const targetTable = parseInt(document.getElementById('targetTableInput')?.value);
-                const transferStatus = document.getElementById('transferStatus');
-                const confirmTransferBtn = document.getElementById('confirmTransferBtn');
-                
-                if (!targetTable || targetTable === parseInt(currentTableId)) {
-                    if (transferStatus) {
-                        transferStatus.textContent = 'Mesa inválida ou igual à atual.';
-                        transferStatus.classList.remove('hidden');
-                    }
-                    if (confirmTransferBtn) confirmTransferBtn.disabled = true;
-                    return;
-                }
-                if (transferStatus) {
-                    transferStatus.textContent = `Mesa ${targetTable} verificada.`;
-                    transferStatus.classList.remove('hidden');
-                }
-                if (confirmTransferBtn) confirmTransferBtn.disabled = false;
-            });
-        }
-
-        const confirmTransferBtn = document.getElementById('confirmTransferBtn');
-        if (confirmTransferBtn) {
-            confirmTransferBtn.addEventListener('click', async () => {
-                alert(`Simulação: Itens da Mesa ${currentTableId} transferidos para Mesa ${document.getElementById('targetTableInput')?.value}.`);
-                modal.style.display = 'none';
-            });
-        }
-
-        renderTransferItems();
-        modal.style.display = 'flex';
-    };
-    
-    const openNfeModal = () => {
-        const nfeModal = document.getElementById('nfeModal');
-        if (!nfeModal) return; 
-        
-        nfeModal.innerHTML = `
-            <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
-                <h3 class="text-xl font-bold mb-4 text-green-700">NF-e / Recibo</h3>
-                <p class="text-base mb-3">Deseja incluir CPF/CNPJ?</p>
-                <input type="text" id="nfeCpfCnpjInput" placeholder="CPF ou CNPJ (Opcional)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-base">
-                
-                <div class="flex flex-col space-y-2 mt-4">
-                    <button class="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-base">Imprimir Recibo</button>
-                    <button class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base">Enviar por Email</button>
-                </div>
-
-                <div class="flex justify-end mt-4">
-                    <button class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-base" onclick="document.getElementById('nfeModal').style.display='none'">Fechar</button>
-                </div>
-            </div>
-        `;
-        nfeModal.style.display = 'flex';
-    };
+    if (document.getElementById('openSelectiveTransferModalBtn')) {
+        document.getElementById('openSelectiveTransferModalBtn').addEventListener('click', () => {
+            openManagerModal('openSelectiveTransfer');
+        });
+    }
 
 
     if (finalizeOrderBtn) finalizeOrderBtn.addEventListener('click', finalizeOrder);
     if (openNfeModalBtn) openNfeModalBtn.addEventListener('click', openNfeModal);
     
-    document.getElementById('statusScreen').style.display = 'flex';
-    document.getElementById('mainContent').style.display = 'none';
+    if (statusScreen && mainContent) {
+        statusScreen.style.display = 'flex';
+        mainContent.style.display = 'none';
+    }
 
 });
