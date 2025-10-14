@@ -17,7 +17,7 @@ const getDoc = window.getDoc;
 const arrayRemove = window.arrayRemove;
 const arrayUnion = window.arrayUnion;
 const writeBatch = window.writeBatch;
-const orderBy = window.orderBy;
+const orderBy = window.orderBy; // NOVO: Adicionada a função orderBy
 
 
 // O código é envolvido em DOMContentLoaded para garantir que os elementos HTML existam
@@ -738,6 +738,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // renderiza os itens do cardápio com botão de adição (AGORA USANDO DADOS DO WOOCOMMERCE)
     const renderMenu = (filter = 'all', search = '') => {
+        // CORREÇÃO: Adicionada verificação de existência da variável
         let filteredItems = WOOCOMMERCE_PRODUCTS || [];
         
         if (search) {
