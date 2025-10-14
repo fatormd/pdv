@@ -17,7 +17,7 @@ const getDoc = window.getDoc;
 const arrayRemove = window.arrayRemove;
 const arrayUnion = window.arrayUnion;
 const writeBatch = window.writeBatch;
-const orderBy = window.orderBy;
+const orderBy = window.orderBy; // NOVO: Adicionada a função orderBy
 
 
 // O código é envolvido em DOMContentLoaded para garantir que os elementos HTML existam
@@ -1017,7 +1017,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            selectedItems = [...itemsToHold];
+            selectedItems = []; // CORREÇÃO: Limpa a lista para evitar que itens em espera apareçam em outras mesas.
 
             const itemsGroupedBySector = itemsToSend.reduce((acc, item) => {
                 const sector = item.sector;
