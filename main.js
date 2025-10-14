@@ -17,7 +17,6 @@ const getDoc = window.getDoc;
 const arrayRemove = window.arrayRemove;
 const arrayUnion = window.arrayUnion;
 const writeBatch = window.writeBatch;
-const orderBy = window.orderBy; // NOVO: Adicionada a função orderBy
 
 
 // O código é envolvido em DOMContentLoaded para garantir que os elementos HTML existam
@@ -702,8 +701,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const loadOpenTables = () => {
         const tablesCollection = getTablesCollectionRef();
-        // CORREÇÃO: Adiciona a cláusula orderBy para ordenar por 'tableNumber'
-        const q = query(tablesCollection, where('status', '==', 'open'), orderBy('tableNumber', 'asc'));
+        const q = query(tablesCollection, where('status', '==', 'open'));
 
         onSnapshot(q, (snapshot) => {
             const docs = snapshot.docs;
