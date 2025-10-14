@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { id: 'item5', name: 'Pudim de Leite', price: 15.00, category: 'desserts', sector: 'cozinha' },
     ];
     const password = '1234'; // Senha simulada de gerente
+    const PAYMENT_METHODS = ['Dinheiro', 'Pix', 'Crédito', 'Débito'];
 
     // --- ELEMENTOS DA UI ---
     const statusScreen = document.getElementById('statusScreen');
@@ -70,6 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sendSelectedItemsBtn = document.getElementById('sendSelectedItemsBtn');
     const quickObsButtons = document.getElementById('quickObsButtons');
     const esperaSwitch = document.getElementById('esperaSwitch');
+    const paymentMethodButtonsContainer = document.getElementById('paymentMethodButtons');
 
 
     // Variável para rastrear o item/grupo que está no modal de OBS
@@ -166,6 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
             hideStatus();
             loadOpenTables();
             renderMenu();
+            renderPaymentMethodButtons();
         });
 
     } catch (e) {
@@ -176,6 +179,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // --- FUNÇÕES DE PAGAMENTO (3) ---
+
+    // Renderiza os botões de método de pagamento
+    const renderPaymentMethodButtons = () => {
+        if (!paymentMethodButtonsContainer) return;
+        paymentMethodButtonsContainer.innerHTML = '';
+        PAYMENT_METHODS.forEach(method => {
+            paymentMethodButtonsContainer.innerHTML += `
+                <button class="payment-method-btn bg-gray-200 text-gray-700 font-bold py-3 rounded-lg hover:bg-gray-300 transition text-base" data-method="${method}">
+                    ${method}
+                </button>
+            `;
+        });
+    };
 
     // Calcula o total geral (subtotal + serviço)
     const calculateTotal = (subtotal, applyServiceTax) => {
@@ -338,15 +354,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    document.getElementById('paymentMethodButtons').addEventListener('click', (e) => {
-        const btn = e.target.closest('.payment-method-btn');
-        if (btn) {
-            document.querySelectorAll('.payment-method-btn').forEach(b => b.classList.remove('active', 'bg-indigo-600', 'text-white'));
-            btn.classList.add('active', 'bg-indigo-600', 'text-white');
-            addPaymentBtn.disabled = false;
-        }
-    });
-    
+    // Ação dos novos botões de pagamento
+    if (paymentMethodButtonsContainer) {
+        paymentMethodButtonsContainer.addEventListener('click', (e) => {
+            const btn = e.target.closest('.payment-method-btn');
+            if (btn) {
+                // Remove o estado ativo de todos os botões
+                document.querySelectorAll('.payment-method-btn').forEach(b => b.classList.remove('active', 'bg-indigo-600', 'text-white'));
+                // Adiciona o estado ativo ao botão clicado
+                btn.classList.add('active', 'bg-indigo-600', 'text-white');
+                addPaymentBtn.disabled = false;
+            }
+        });
+    }
+
     const finalizeOrder = async () => {
         if (!currentTableId || !currentOrderSnapshot) return;
 
@@ -406,7 +427,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 sentItems: [], 
                 payments: [],
                 serviceTaxApplied: false,
-                selectedItems: [] // NOVO: Campo para salvar os itens em espera
+                selectedItems: []
             });
 
             currentTableId = tableNumber.toString();
@@ -895,6 +916,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         <div class="flex items-center space-x-2 flex-shrink-0">
                             <span class="font-bold text-base text-indigo-700">${formatCurrency(lineTotal)}</span>
+                            <button class="text-indigo-500 hover:text-indigo-700 transition" onclick="openManagerModal('openSelectiveTransfer', '${item.id}', '${item.note || ''}')" title="Transferir Item (Gerente)">
+                                 <i class="fas fa-exchange-alt text-sm"></i>
+                            </button>
                             <button class="text-red-500 hover:text-red-700 transition" onclick="openManagerModal('deleteItem', '${item.id}', '${item.note || ''}')" title="Excluir Item (Gerente)">
                                 <i class="fas fa-trash text-sm"></i>
                             </button>
