@@ -31,6 +31,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentOrderSnapshot = null;
     let serviceTaxApplied = false;
     let currentPayments = [];
+    let WOOCOMMERCE_PRODUCTS = [];
+    let WOOCOMMERCE_CATEGORIES = [];
 
     // --- MAPAS DE REFERÊNCIA ---
     const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2 };
@@ -738,7 +740,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // renderiza os itens do cardápio com botão de adição (AGORA USANDO DADOS DO WOOCOMMERCE)
     const renderMenu = (filter = 'all', search = '') => {
-        let filteredItems = WOOCOMMERCE_PRODUCTS;
+        // CORREÇÃO: Adicionada verificação de existência da variável
+        let filteredItems = WOOCOMMERCE_PRODUCTS || [];
         
         if (search) {
             const normalizedSearch = search.toLowerCase();
