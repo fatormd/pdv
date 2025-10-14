@@ -31,8 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentOrderSnapshot = null;
     let serviceTaxApplied = false;
     let currentPayments = [];
-    let WOOCOMMERCE_PRODUCTS = [];
-    let WOOCOMMERCE_CATEGORIES = [];
 
     // --- MAPAS DE REFERÊNCIA ---
     const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2 };
@@ -484,7 +482,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!currentTableId) return;
 
             const valueRaw = paymentValueInput.value.replace('R$', '').replace('.', '').replace(',', '.').trim();
-            const value = parseFloat(valueRaw);
+            const value = parseFloat(rawValue);
             const methodEl = document.querySelector('.payment-method-btn.active');
             const method = methodEl ? methodEl.dataset.method : null;
 
@@ -740,7 +738,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // renderiza os itens do cardápio com botão de adição (AGORA USANDO DADOS DO WOOCOMMERCE)
     const renderMenu = (filter = 'all', search = '') => {
-        // CORREÇÃO: Adicionada verificação de existência da variável
         let filteredItems = WOOCOMMERCE_PRODUCTS || [];
         
         if (search) {
