@@ -701,7 +701,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const loadOpenTables = () => {
         const tablesCollection = getTablesCollectionRef();
-        const q = query(tablesCollection, where('status', '==', 'open'));
+        // NOVO: Adiciona a cláusula orderBy para ordenar por 'tableNumber'
+        const q = query(tablesCollection, where('status', '==', 'open'), orderBy('tableNumber', 'asc'));
 
         onSnapshot(q, (snapshot) => {
             const docs = snapshot.docs;
