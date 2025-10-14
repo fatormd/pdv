@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- WooCommerce Configuração ---
     const WOOCOMMERCE_URL = 'https://nossotempero.fatormd.com';
     const CONSUMER_KEY = 'ck_e06515127d067eff5c39d6d93b3908b1baf9158a';
-    const CONSUMER_SECRET = 'cs_0a4cdf88eb7f16387cff8a6a6ee6697eb395299';
+    const CONSUMER_SECRET = 'cs_0a4cdf88eb7f16387cff8a6a6ee6697eb3952999';
 
 
     // --- ELEMENTOS DA UI ---
