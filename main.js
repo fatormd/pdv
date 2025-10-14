@@ -17,7 +17,6 @@ const getDoc = window.getDoc;
 const arrayRemove = window.arrayRemove;
 const arrayUnion = window.arrayUnion;
 const writeBatch = window.writeBatch;
-const orderBy = window.orderBy;
 
 
 // O código é envolvido em DOMContentLoaded para garantir que os elementos HTML existam
@@ -27,14 +26,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let db, auth, userId;
     const appId = window.__app_id;
     let currentTableId = null;
-    let selectedItems = [];
-    let currentOrderSnapshot = null;
+    let selectedItems = []; // Itens selecionados na UI antes de enviar (lista de anotações)
+    let currentOrderSnapshot = null; // Último estado da mesa no Firebase
     let serviceTaxApplied = false;
-    let currentPayments = [];
+    let currentPayments = []; // Pagamentos registrados localmente
+    let WOOCOMMERCE_PRODUCTS = []; // NOVO: Armazena produtos do WooCommerce
+    let WOOCOMMERCE_CATEGORIES = []; // NOVO: Armazena categorias do WooCommerce
 
     // --- MAPAS DE REFERÊNCIA ---
     const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2 };
-    const password = '1234';
+    const password = '1234'; // Senha simulada de gerente
     const PAYMENT_METHODS = ['Dinheiro', 'Pix', 'Crédito', 'Débito'];
     
     // --- WooCommerce Configuração ---
@@ -278,6 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- FUNÇÕES DE INTEGRAÇÃO WOOCOMMERCE (NOVO) ---
     const fetchWooCommerceData = async (endpoint) => {
+        // CORREÇÃO: Concatena os parâmetros de forma segura com &
         const querySeparator = endpoint.includes('?') ? '&' : '?';
         const url = `${WOOCOMMERCE_URL}/wp-json/wc/v3/${endpoint}${querySeparator}consumer_key=${CONSUMER_KEY}&consumer_secret=${CONSUMER_SECRET}`;
         try {
@@ -301,13 +303,13 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const fetchWooCommerceProducts = async () => {
-        const products = await fetchWooCommerceData('products?per_page=100');
+        const products = await fetchWooCommerceData('products?per_page=100'); // Puxa até 100 produtos
         WOOCOMMERCE_PRODUCTS = products.map(p => ({
             id: p.id,
             name: p.name,
             price: parseFloat(p.price),
             category: p.categories.length > 0 ? p.categories[0].slug : 'uncategorized',
-            sector: 'cozinha'
+            sector: 'cozinha' // Pode ser mapeado de tags ou atributos do WooCommerce
         }));
         renderMenu();
     };
@@ -699,7 +701,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const loadOpenTables = () => {
         const tablesCollection = getTablesCollectionRef();
-        const q = query(tablesCollection, where('status', '==', 'open'), orderBy('tableNumber', 'asc'));
+        const q = query(tablesCollection, where('status', '==', 'open'));
 
         onSnapshot(q, (snapshot) => {
             const docs = snapshot.docs;
