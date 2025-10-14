@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentTableId = null;
     let selectedItems = [];
     let currentOrderSnapshot = null;
-    let serviceTaxApplied = false;
+    let serviceTaxApplied = true; // CORREÇÃO: Taxa de serviço ativa por padrão
     let currentPayments = [];
     let WOOCOMMERCE_PRODUCTS = [];
     let WOOCOMMERCE_CATEGORIES = [];
@@ -436,25 +436,13 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const isClosedClass = isClosed ? 'text-green-600' : 'text-red-600';
 
+        // CORREÇÃO: Estrutura alterada para corresponder ao novo HTML
         paymentListEl.innerHTML += `
             <div class="flex justify-between items-center py-1 font-bold border-t border-gray-200 mt-2 pt-2">
                 <span>${remainingBalance <= 0 ? 'TROCO' : 'VALOR RESTANTE'}:</span>
                 <span id="remainingBalanceDisplayNested" class="font-extrabold ${isClosedClass}">${formatCurrency(displayBalance)}</span>
             </div>
-            <div class="flex justify-between space-x-3 pt-2">
-                <button id="finalizeOrderBtnNested" class="w-1/2 px-4 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition text-base disabled:opacity-50" disabled>FECHAR CONTA</button>
-                <button id="openNfeModalBtnNested" class="w-1/2 px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition text-base disabled:opacity-50" disabled>NF-e</button>
-            </div>
         `;
-        
-        const finalizeBtnNested = document.getElementById('finalizeOrderBtnNested');
-        const nfeBtnNested = document.getElementById('openNfeModalBtnNested');
-
-        if (finalizeBtnNested) finalizeBtnNested.disabled = !isClosed;
-        if (nfeBtnNested) nfeBtnNested.disabled = !isClosed;
-
-        if (finalizeBtnNested) finalizeBtnNested.addEventListener('click', finalizeOrder);
-        if (nfeBtnNested) nfeBtnNested.addEventListener('click', openNfeModal);
         
         if (addPaymentBtn && tableData.currentTotal) addPaymentBtn.disabled = remainingBalance <= 0;
     };
@@ -642,7 +630,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     total: 0,
                     sentItems: [], 
                     payments: [],
-                    serviceTaxApplied: false,
+                    serviceTaxApplied: true, // CORREÇÃO: Taxa de serviço ativa por padrão
                     selectedItems: [] 
                 });
 
@@ -976,7 +964,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (originalNoteKey === '' && newNote === '') {
                     const indexToRemove = selectedItems.findIndex(item => item.id == itemId && item.note === '');
                     if (indexToRemove !== -1) {
-                        selectedItems.splice(indexToRemove, 1);
+                        selectedItems.splice(index, 1);
                     }
                 }
             } else { // SALVAR OBS
