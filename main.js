@@ -17,7 +17,6 @@ const getDoc = window.getDoc;
 const arrayRemove = window.arrayRemove;
 const arrayUnion = window.arrayUnion;
 const writeBatch = window.writeBatch;
-const orderBy = window.orderBy; // NOVO: Adicionada a função orderBy
 
 
 // O código é envolvido em DOMContentLoaded para garantir que os elementos HTML existam
@@ -27,16 +26,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let db, auth, userId;
     const appId = window.__app_id;
     let currentTableId = null;
-    let selectedItems = [];
-    let currentOrderSnapshot = null;
+    let selectedItems = []; // Itens selecionados na UI antes de enviar (lista de anotações)
+    let currentOrderSnapshot = null; // Último estado da mesa no Firebase
     let serviceTaxApplied = true; // CORREÇÃO: Taxa de serviço ativa por padrão
-    let currentPayments = [];
-    let WOOCOMMERCE_PRODUCTS = [];
-    let WOOCOMMERCE_CATEGORIES = [];
+    let currentPayments = []; // Pagamentos registrados localmente
+    let WOOCOMMERCE_PRODUCTS = []; // NOVO: Armazena produtos do WooCommerce
+    let WOOCOMMERCE_CATEGORIES = []; // NOVO: Armazena categorias do WooCommerce
 
     // --- MAPAS DE REFERÊNCIA ---
     const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2 };
-    const password = '1234';
+    const password = '1234'; // Senha simulada de gerente
     const PAYMENT_METHODS = ['Dinheiro', 'Pix', 'Crédito', 'Débito'];
     
     // --- WooCommerce Configuração ---
@@ -100,8 +99,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Event handler para máscara (garante apenas números e formata)
     if (paymentValueInput) {
       paymentValueInput.addEventListener('input', (e) => {
-        const rawValue = e.target.value.replace(/\D/g, ''); 
-        e.target.value = currencyMask(rawValue);
+        // CORREÇÃO: Corrigido o nome da variável de 'rawValue' para 'valueRaw'
+        const valueRaw = e.target.value.replace(/\D/g, ''); 
+        e.target.value = currencyMask(valueRaw);
         const newCursorPos = e.target.value.length;
         e.target.setSelectionRange(newCursorPos, newCursorPos);
     });
@@ -436,13 +436,25 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const isClosedClass = isClosed ? 'text-green-600' : 'text-red-600';
 
-        // CORREÇÃO: Estrutura alterada para corresponder ao novo HTML
         paymentListEl.innerHTML += `
             <div class="flex justify-between items-center py-1 font-bold border-t border-gray-200 mt-2 pt-2">
                 <span>${remainingBalance <= 0 ? 'TROCO' : 'VALOR RESTANTE'}:</span>
                 <span id="remainingBalanceDisplayNested" class="font-extrabold ${isClosedClass}">${formatCurrency(displayBalance)}</span>
             </div>
+            <div class="flex justify-between space-x-3 pt-2">
+                <button id="finalizeOrderBtnNested" class="w-1/2 px-4 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition text-base disabled:opacity-50" disabled>FECHAR CONTA</button>
+                <button id="openNfeModalBtnNested" class="w-1/2 px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition text-base disabled:opacity-50" disabled>NF-e</button>
+            </div>
         `;
+        
+        const finalizeBtnNested = document.getElementById('finalizeOrderBtnNested');
+        const nfeBtnNested = document.getElementById('openNfeModalBtnNested');
+
+        if (finalizeBtnNested) finalizeBtnNested.disabled = !isClosed;
+        if (nfeBtnNested) nfeBtnNested.disabled = !isClosed;
+
+        if (finalizeBtnNested) finalizeBtnNested.addEventListener('click', finalizeOrder);
+        if (nfeBtnNested) nfeBtnNested.addEventListener('click', openNfeModal);
         
         if (addPaymentBtn && tableData.currentTotal) addPaymentBtn.disabled = remainingBalance <= 0;
     };
@@ -690,7 +702,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const loadOpenTables = () => {
         const tablesCollection = getTablesCollectionRef();
-        const q = query(tablesCollection, where('status', '==', 'open'), orderBy('tableNumber', 'asc'));
+        const q = query(tablesCollection, where('status', '==', 'open'));
 
         onSnapshot(q, (snapshot) => {
             const docs = snapshot.docs;
@@ -731,8 +743,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // renderiza os itens do cardápio com botão de adição (AGORA USANDO DADOS DO WOOCOMMERCE)
     const renderMenu = (filter = 'all', search = '') => {
-        // CORREÇÃO: Adicionada verificação de existência da variável
-        let filteredItems = WOOCOMMERCE_PRODUCTS || [];
+        let filteredItems = WOOCOMMERCE_PRODUCTS;
         
         if (search) {
             const normalizedSearch = search.toLowerCase();
