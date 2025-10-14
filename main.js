@@ -633,8 +633,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     serviceTaxApplied: true, // CORREÇÃO: Taxa de serviço ativa por padrão
                     selectedItems: [] 
                 });
-                
-                // CORREÇÃO: Limpa a lista local de itens ao abrir uma nova mesa
+
+                // CORREÇÃO: Zera a lista de selectedItems para evitar que itens de sessões anteriores apareçam em mesas novas.
                 selectedItems = [];
 
                 currentTableId = tableNumber.toString();
@@ -1020,7 +1020,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // CORREÇÃO: A lista local de selectedItems agora é atualizada com a lista de itens a serem retidos (itensToHold)
             selectedItems = [...itemsToHold];
 
             const itemsGroupedBySector = itemsToSend.reduce((acc, item) => {
@@ -1064,7 +1063,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 await updateDoc(tableRef, {
                     sentItems: arrayUnion(...itemsForUpdate), 
-                    selectedItems: selectedItems // CORREÇÃO: Agora este array contém os itens em espera
+                    selectedItems: selectedItems 
                 });
                 
                 renderSelectedItems(); 
