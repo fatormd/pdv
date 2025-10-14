@@ -182,17 +182,17 @@
                         <span class="text-xl font-bold text-gray-800">TOTAL GERAL:</span>
                         <span class="text-3xl font-extrabold text-indigo-700" id="orderTotalDisplayPayment">R$ 0,00</span>
                     </div>
+                    
+                    <button id="openSelectiveTransferModalBtn" class="mt-4 w-full px-4 py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition text-base shadow-md">
+                        <i class="fas fa-exchange-alt mr-2"></i> Transferir Itens Seletivamente
+                    </button>
                 </div>
                 
                 <div id="chargeInputsAndSummary" class="p-4 pt-0 content-card bg-white">
                     <h4 class="text-lg font-semibold text-gray-700 mb-3">Registrar Pagamento</h4>
                     <div class="space-y-3">
-                        <div id="paymentMethodButtons" class="grid grid-cols-2 md:grid-cols-4 gap-2">
-                            <button class="payment-method-btn" data-method="Dinheiro">Dinheiro</button>
-                            <button class="payment-method-btn" data-method="Pix">Pix</button>
-                            <button class="payment-method-btn" data-method="Credito">Crédito</button>
-                            <button class="payment-method-btn" data-method="Debito">Débito</button>
-                        </div>
+                        <div id="paymentMethodButtons" class="grid grid-cols-3 gap-2">
+                            </div>
                         <div class="flex space-x-2">
                             <input type="text" id="paymentValueInput" placeholder="Valor Pago (R$ 0,00)" class="w-full p-3 input-pdv border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base text-right" value="R$ 0,00">
                             <button class="bg-gray-200 text-gray-700 font-bold py-3 px-4 rounded-lg hover:bg-gray-300 transition text-base disabled:opacity-50" id="openCalculatorBtn" title="Abrir Calculadora">
@@ -230,38 +230,14 @@
         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 class="text-xl font-bold mb-4 text-indigo-700">Detalhes do Item</h3>
             <p class="text-base mb-3">Item: <span id="obsItemName" class="font-semibold text-gray-800"></span></p>
-
-            <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-4">
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">2CP</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">G</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">L</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">L.e</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">Sg</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">G/</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">L.e/</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">Mp</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">P-</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">Ao ponto</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">P+</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">Bp</button>
-            </div>
-            
-            <div class="flex items-center justify-between mb-4 mt-2">
-                <span class="text-sm font-semibold text-gray-600">Manter item em Espera:</span>
-                <label class="switch-obs">
-                    <input type="checkbox" id="esperaSwitch">
-                    <span class="slider-obs"></span>
-                </label>
-            </div>
-
             <textarea id="obsInput" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 resize-none text-base" rows="3" placeholder="Ex: Sem gelo, carne ao ponto, trocar batata por arroz..."></textarea>
             
             <div class="flex justify-end space-x-3 mt-4">
-                <button id="cancelObsBtn" class="px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition text-base font-bold">
-                    CANCELAR
+                <button id="cancelObsBtn" data-action="espera" class="px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition text-base font-bold">
+                    ESPERA
                 </button>
-                <button id="saveObsBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base font-bold">
-                    SALVAR OBS
+                <button id="saveObsBtn" data-action="marcha" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base font-bold">
+                    MARCHA
                 </button>
             </div>
         </div>
@@ -304,12 +280,12 @@
         window.arrayRemove = arrayRemove;
         window.arrayUnion = arrayUnion;
         window.writeBatch = writeBatch;
-        window.orderBy = orderBy;
+        window.orderBy = orderBy; // NOVO: Adicionada a função orderBy para o script principal
 
-        // Variáveis de Configuração (passadas para main.js via window)
+        // Variáveis de Configuração (passadas para script.js via window)
         window.__app_id = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         window.__firebase_config = typeof __firebase_config !== 'undefined' ? __firebase_config : '{"apiKey": "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY", "authDomain": "fator-pdv.firebaseapp.com", "projectId": "fator-pdv", "storageBucket": "fator-pdv.appspot.com", "messagingSenderId": "1097659747429", "appId": "1:1097659747429:web:8ec0a7c3978c311dbe0a8c", "measurementId": "G-02QWNRXRCV"}';
-        window.__initial_auth_token = typeof __initial_auth_token !== 'undefined' ? window.__initial_auth_token : undefined;
+        window.__initial_auth_token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : undefined;
 
     </script>
     
