@@ -17,6 +17,7 @@ const getDoc = window.getDoc;
 const arrayRemove = window.arrayRemove;
 const arrayUnion = window.arrayUnion;
 const writeBatch = window.writeBatch;
+const orderBy = window.orderBy;
 
 
 // O código é envolvido em DOMContentLoaded para garantir que os elementos HTML existam
@@ -279,7 +280,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- FUNÇÕES DE INTEGRAÇÃO WOOCOMMERCE (NOVO) ---
     const fetchWooCommerceData = async (endpoint) => {
-        // CORREÇÃO: Concatena os parâmetros de forma segura com &
         const querySeparator = endpoint.includes('?') ? '&' : '?';
         const url = `${WOOCOMMERCE_URL}/wp-json/wc/v3/${endpoint}${querySeparator}consumer_key=${CONSUMER_KEY}&consumer_secret=${CONSUMER_SECRET}`;
         try {
@@ -303,13 +303,13 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const fetchWooCommerceProducts = async () => {
-        const products = await fetchWooCommerceData('products?per_page=100'); // Puxa até 100 produtos
+        const products = await fetchWooCommerceData('products?per_page=100');
         WOOCOMMERCE_PRODUCTS = products.map(p => ({
             id: p.id,
             name: p.name,
             price: parseFloat(p.price),
             category: p.categories.length > 0 ? p.categories[0].slug : 'uncategorized',
-            sector: 'cozinha' // Pode ser mapeado de tags ou atributos do WooCommerce
+            sector: 'cozinha'
         }));
         renderMenu();
     };
@@ -528,7 +528,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Função de envio para o WooCommerce (NOVA)
     const sendOrderToWooCommerce = async (orderData) => {
         const orderEndpoint = `${WOOCOMMERCE_URL}/wp-json/wc/v3/orders`;
         const headers = {
@@ -552,8 +551,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 phone: "11999999999"
             },
             line_items: orderData.items.map(item => ({
-                product_id: item.id, 
-                quantity: 1, 
+                product_id: item.id,
+                quantity: 1,
                 meta_data: [{
                     key: 'Observacao',
                     value: item.note || 'Nenhuma'
@@ -585,7 +584,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     
-    // Finalizar Pedido (Gatilho de Integração WooCommerce)
     const finalizeOrder = async () => {
         if (!currentTableId || !currentOrderSnapshot) return;
         
@@ -701,7 +699,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const loadOpenTables = () => {
         const tablesCollection = getTablesCollectionRef();
-        const q = query(tablesCollection, where('status', '==', 'open'));
+        const q = query(tablesCollection, where('status', '==', 'open'), orderBy('tableNumber', 'asc'));
 
         onSnapshot(q, (snapshot) => {
             const docs = snapshot.docs;
