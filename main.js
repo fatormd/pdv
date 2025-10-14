@@ -17,7 +17,7 @@ const getDoc = window.getDoc;
 const arrayRemove = window.arrayRemove;
 const arrayUnion = window.arrayUnion;
 const writeBatch = window.writeBatch;
-const orderBy = window.orderBy; // NOVO: Adicionada a função orderBy
+const orderBy = window.orderBy;
 
 
 // O código é envolvido em DOMContentLoaded para garantir que os elementos HTML existam
@@ -484,7 +484,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!currentTableId) return;
 
             const valueRaw = paymentValueInput.value.replace('R$', '').replace('.', '').replace(',', '.').trim();
-            const value = parseFloat(rawValue);
+            const value = parseFloat(valueRaw);
             const methodEl = document.querySelector('.payment-method-btn.active');
             const method = methodEl ? methodEl.dataset.method : null;
 
