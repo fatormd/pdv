@@ -27,16 +27,14 @@ document.addEventListener('DOMContentLoaded', () => {
     let db, auth, userId;
     const appId = window.__app_id;
     let currentTableId = null;
-    let selectedItems = []; // Itens selecionados na UI antes de enviar (lista de anotações)
-    let currentOrderSnapshot = null; // Último estado da mesa no Firebase
+    let selectedItems = [];
+    let currentOrderSnapshot = null;
     let serviceTaxApplied = false;
-    let currentPayments = []; // Pagamentos registrados localmente
-    let WOOCOMMERCE_PRODUCTS = []; // NOVO: Armazena produtos do WooCommerce
-    let WOOCOMMERCE_CATEGORIES = []; // NOVO: Armazena categorias do WooCommerce
+    let currentPayments = [];
 
     // --- MAPAS DE REFERÊNCIA ---
     const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2 };
-    const password = '1234'; // Senha simulada de gerente
+    const password = '1234';
     const PAYMENT_METHODS = ['Dinheiro', 'Pix', 'Crédito', 'Débito'];
     
     // --- WooCommerce Configuração ---
