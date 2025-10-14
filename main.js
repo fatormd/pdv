@@ -17,7 +17,7 @@ const getDoc = window.getDoc;
 const arrayRemove = window.arrayRemove;
 const arrayUnion = window.arrayUnion;
 const writeBatch = window.writeBatch;
-const orderBy = window.orderBy; // NOVO: Adicionada a função orderBy
+const orderBy = window.orderBy;
 
 
 // O código é envolvido em DOMContentLoaded para garantir que os elementos HTML existam
@@ -31,6 +31,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentOrderSnapshot = null;
     let serviceTaxApplied = false;
     let currentPayments = [];
+    let WOOCOMMERCE_PRODUCTS = [];
+    let WOOCOMMERCE_CATEGORIES = [];
 
     // --- MAPAS DE REFERÊNCIA ---
     const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2 };
