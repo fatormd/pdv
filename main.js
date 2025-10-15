@@ -17,6 +17,7 @@ const getDoc = window.getDoc;
 const arrayRemove = window.arrayRemove;
 const arrayUnion = window.arrayUnion;
 const writeBatch = window.writeBatch;
+const orderBy = window.orderBy;
 
 
 // O código é envolvido em DOMContentLoaded para garantir que os elementos HTML existam
@@ -645,7 +646,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     selectedItems: [] 
                 });
 
-                // CORREÇÃO: Limpa a lista de selectedItems para evitar que itens de sessões anteriores apareçam em mesas novas.
                 selectedItems = [];
 
                 currentTableId = tableNumber.toString();
@@ -658,7 +658,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 goToScreen('orderScreen');
             } catch (e) {
                 console.error("Erro ao criar nova mesa: ", e);
-                alert(`Erro: ${e.message}. Tente novamente.`); 
+                document.getElementById('statusContent').innerHTML = `<h2 class="text-xl font-bold mb-2 text-red-600">Erro ao Abrir Mesa</h2><p>Verifique as permissões do Firebase. ${e.message}</p>`;
+                if (statusScreen && mainContent) {
+                    statusScreen.style.display = 'flex';
+                    mainContent.style.display = 'none';
+                }
             }
         });
     }
@@ -701,7 +705,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const loadOpenTables = () => {
         const tablesCollection = getTablesCollectionRef();
-        const q = query(tablesCollection, where('status', '==', 'open'));
+        const q = query(tablesCollection, where('status', '==', 'open'), orderBy('tableNumber', 'asc'));
 
         onSnapshot(q, (snapshot) => {
             const docs = snapshot.docs;
@@ -1030,7 +1034,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // CORREÇÃO: A lista local de selectedItems agora é atualizada com a lista de itens a serem retidos (itensToHold)
             selectedItems = [...itemsToHold];
 
             const itemsGroupedBySector = itemsToSend.reduce((acc, item) => {
@@ -1207,8 +1210,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const hideStatus = () => {
         if (statusScreen && mainContent) {
-            statusScreen.style.display = 'flex';
-            mainContent.style.display = 'none';
+            statusScreen.style.display = 'none';
+            mainContent.style.display = 'block';
         }
     };
 
