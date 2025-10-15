@@ -277,24 +277,32 @@
     
     <div id="calculatorModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
-            <h3 class="text-xl font-bold mb-4 text-indigo-700">Calculadora</h3>
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-indigo-700">Calculadora</h3>
+                <button id="closeCalcBtn" class="text-gray-500 hover:text-gray-700 transition text-xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
             <input type="text" id="calcDisplay" class="w-full text-right text-3xl font-bold mb-4 p-2 bg-gray-100 rounded-lg border border-gray-300" value="0" disabled>
             <div class="grid grid-cols-4 gap-2">
+                <button class="calc-btn op-btn bg-gray-300 p-4 rounded-lg text-xl" data-key="%">%</button>
+                <button class="calc-btn op-btn bg-gray-300 p-4 rounded-lg text-xl" data-key="/"><i class="fas fa-divide"></i></button>
+                <button class="calc-btn op-btn bg-gray-300 p-4 rounded-lg text-xl" data-key="*"><i class="fas fa-times"></i></button>
+                <button class="calc-btn op-btn bg-gray-300 p-4 rounded-lg text-xl" data-key="-"><i class="fas fa-minus"></i></button>
                 <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl" data-key="7">7</button>
                 <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl" data-key="8">8</button>
                 <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl" data-key="9">9</button>
-                <button class="calc-btn bg-red-500 text-white p-4 rounded-lg text-xl" data-key="C">C</button>
+                <button class="calc-btn op-btn bg-gray-300 p-4 rounded-lg text-xl" data-key="+"><i class="fas fa-plus"></i></button>
                 <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl" data-key="4">4</button>
                 <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl" data-key="5">5</button>
                 <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl" data-key="6">6</button>
-                <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl" data-key=".">,</button>
+                <button class="calc-btn bg-red-500 text-white p-4 rounded-lg text-xl" data-key="C">C</button>
                 <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl" data-key="1">1</button>
                 <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl" data-key="2">2</button>
                 <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl" data-key="3">3</button>
-                <button class="calc-btn bg-indigo-500 text-white p-4 rounded-lg text-xl" data-key="ok">OK</button>
+                <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl" data-key=".">,</button>
                 <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl col-span-2" data-key="0">0</button>
-                <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl" data-key="00">00</button>
-                <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl" data-key="backspace"><i class="fas fa-backspace"></i></button>
+                <button class="calc-btn bg-indigo-500 text-white p-4 rounded-lg text-xl col-span-2" data-key="ok">OK</button>
             </div>
         </div>
     </div>
