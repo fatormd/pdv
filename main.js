@@ -113,10 +113,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- FUNÇÕES DA CALCULADORA (NOVO) ---
+    let currentCalcValue = 0;
+    let pendingOperation = null;
+
+    const performOperation = () => {
+        if (!pendingOperation || pendingOperation.operand === null) return;
+        const secondOperand = parseFloat(calcDisplay.value.replace('R$', '').replace('.', '').replace(',', '.'));
+        let result;
+        switch (pendingOperation.operator) {
+            case '+': result = pendingOperation.operand + secondOperand; break;
+            case '-': result = pendingOperation.operand - secondOperand; break;
+            case '*': result = pendingOperation.operand * secondOperand; break;
+            case '/': result = pendingOperation.operand / secondOperand; break;
+            case '%': result = pendingOperation.operand * (secondOperand / 100); break;
+        }
+        currentCalcValue = result;
+        updateDisplay(result.toFixed(2));
+        pendingOperation = null;
+    };
+
     const updateDisplay = (value) => {
         if (calcDisplay) {
-            const rawValue = value.replace(/\D/g, '');
-            calcDisplay.value = currencyMask(rawValue);
+            let numValue = parseFloat(value);
+            if (isNaN(numValue)) numValue = 0;
+            const formattedValue = `R$ ${numValue.toFixed(2).replace('.', ',')}`;
+            calcDisplay.value = formattedValue;
         }
     };
 
@@ -124,8 +145,17 @@ document.addEventListener('DOMContentLoaded', () => {
         openCalculatorBtn.addEventListener('click', () => {
             if (calculatorModal) {
                 calculatorModal.style.display = 'flex';
-                const rawValue = paymentValueInput.value.replace(/\D/g, '');
-                updateDisplay(rawValue);
+                const rawValue = paymentValueInput.value.replace('R$', '').replace('.', '').replace(',', '.');
+                currentCalcValue = parseFloat(rawValue) || 0;
+                updateDisplay(currentCalcValue);
+            }
+        });
+    }
+
+    if (document.getElementById('closeCalcBtn')) {
+        document.getElementById('closeCalcBtn').addEventListener('click', () => {
+            if (calculatorModal) {
+                calculatorModal.style.display = 'none';
             }
         });
     }
@@ -136,32 +166,36 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!btn) return;
 
             const key = btn.dataset.key;
-            let currentVal = calcDisplay.value.replace(/\D/g, '');
+            const isOperator = ['+', '-', '*', '/', '%'].includes(key);
 
             if (key === 'C') {
-                updateDisplay('0');
+                currentCalcValue = 0;
+                pendingOperation = null;
+                updateDisplay(0);
             } else if (key === 'ok') {
-                const finalValue = parseFloat(calcDisplay.value.replace('R$', '').replace('.', '').replace(',', '.').trim());
+                performOperation();
+                const finalValue = parseFloat(calcDisplay.value.replace('R$', '').replace('.', '').replace(',', '.'));
                 paymentValueInput.value = formatCurrency(finalValue);
                 if (calculatorModal) calculatorModal.style.display = 'none';
-            } else if (key === 'backspace') {
-                if (currentVal.length > 1) {
-                    updateDisplay(currentVal.slice(0, -1));
-                } else {
-                    updateDisplay('0');
+            } else if (isOperator) {
+                if (pendingOperation) {
+                    performOperation();
                 }
+                pendingOperation = {
+                    operand: parseFloat(calcDisplay.value.replace('R$', '').replace('.', '').replace(',', '.')),
+                    operator: key
+                };
             } else {
-                if (currentVal === '0' && key !== '.') {
-                    currentVal = key;
-                } else if (key === '.') {
-                    if (!currentVal.includes('.')) {
-                        currentVal += '00';
-                        updateDisplay(currentVal);
-                    }
+                let currentVal = calcDisplay.value.replace('R$', '').replace('.', '').replace(',', '.');
+                let newDisplayValue;
+                if (pendingOperation) {
+                    newDisplayValue = key;
+                    pendingOperation = { ...pendingOperation, operand: parseFloat(currentVal) };
                 } else {
-                    currentVal += key;
+                    currentVal = currentVal.replace(',', '.');
+                    newDisplayValue = (currentVal === '0.00' ? key : currentVal + key);
                 }
-                updateDisplay(currentVal);
+                updateDisplay(newDisplayValue.replace('.', ','));
             }
         });
     }
