@@ -645,11 +645,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     selectedItems: [] 
                 });
 
-                // CORREÇÃO: Zera a lista de selectedItems para evitar que itens de sessões anteriores apareçam em mesas novas.
+                // Zera a lista de itens selecionados e atualiza a UI imediatamente para evitar a aparição temporária.
                 selectedItems = [];
-
-                // A LINHA ABAIXO É A CORREÇÃO.
-                renderSelectedItems();
+                renderSelectedItems(); 
 
                 currentTableId = tableNumber.toString();
                 document.getElementById('current-table-number').textContent = `Mesa ${currentTableId}`;
@@ -658,6 +656,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 mesaInput.value = '';
                 pessoasInput.value = '';
                 abrirMesaBtn.disabled = true;
+
+                // ATIVA a escuta para a nova mesa logo após a criação, para sincronizar os dados.
+                loadTableOrder(currentTableId);
+
                 goToScreen('orderScreen');
             } catch (e) {
                 console.error("Erro ao criar nova mesa: ", e);
