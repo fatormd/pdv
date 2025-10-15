@@ -89,9 +89,6 @@
                         <span class="text-2xl font-semibold mr-3" id="current-table-number">Mesa Selecionada</span>
                     </div>
                     
-                    <button id="openActionsModalBtn" class="rounded-full bg-gray-500 p-3 text-white shadow-lg hover:bg-gray-600 transition duration-150 w-12 h-12 flex items-center justify-center" title="Ações Gerenciais">
-                        <i class="fas fa-cog text-xl"></i>
-                    </button>
                     
                     <button id="goToPaymentBtn" class="rounded-full bg-indigo-600 p-3 text-white shadow-lg hover:bg-green-600 transition duration-150 w-12 h-12 flex items-center justify-center" title="Ir para Pagamento" onclick="goToScreen('paymentScreen')">
                         <i class="fas fa-money-bill-wave text-xl"></i>
@@ -197,11 +194,13 @@
                 <div id="chargeInputs" class="p-4 pt-0 content-card bg-white mt-6">
                     <h4 class="text-lg font-semibold text-gray-700 mb-3">Registrar Pagamento</h4>
                     <div class="space-y-3">
-                        <div id="paymentMethodButtons" class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        <div id="paymentMethodButtons" class="grid grid-cols-3 md:grid-cols-3 gap-2">
                             <button class="payment-method-btn" data-method="Dinheiro">Dinheiro</button>
                             <button class="payment-method-btn" data-method="Pix">Pix</button>
                             <button class="payment-method-btn" data-method="Credito">Crédito</button>
                             <button class="payment-method-btn" data-method="Debito">Débito</button>
+                            <button class="payment-method-btn" data-method="Ticket">Ticket</button>
+                            <button class="payment-method-btn" data-method="Voucher">Voucher</button>
                         </div>
                         <div class="flex space-x-2">
                             <input type="text" id="paymentValueInput" placeholder="Valor Pago (R$ 0,00)" class="w-full p-3 input-pdv border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base text-right" value="R$ 0,00">
@@ -275,7 +274,31 @@
             </div>
         </div>
     </div>
-
+    
+    <div id="calculatorModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+            <h3 class="text-xl font-bold mb-4 text-indigo-700">Calculadora</h3>
+            <input type="text" id="calcDisplay" class="w-full text-right text-3xl font-bold mb-4 p-2 bg-gray-100 rounded-lg border border-gray-300" value="0" disabled>
+            <div class="grid grid-cols-4 gap-2">
+                <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl" data-key="7">7</button>
+                <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl" data-key="8">8</button>
+                <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl" data-key="9">9</button>
+                <button class="calc-btn bg-red-500 text-white p-4 rounded-lg text-xl" data-key="C">C</button>
+                <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl" data-key="4">4</button>
+                <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl" data-key="5">5</button>
+                <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl" data-key="6">6</button>
+                <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl" data-key=".">,</button>
+                <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl" data-key="1">1</button>
+                <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl" data-key="2">2</button>
+                <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl" data-key="3">3</button>
+                <button class="calc-btn bg-indigo-500 text-white p-4 rounded-lg text-xl" data-key="ok">OK</button>
+                <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl col-span-2" data-key="0">0</button>
+                <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl" data-key="00">00</button>
+                <button class="calc-btn bg-gray-200 p-4 rounded-lg text-xl" data-key="backspace"><i class="fas fa-backspace"></i></button>
+            </div>
+        </div>
+    </div>
+    
     <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         </div>
 
@@ -317,7 +340,7 @@
 
         // Variáveis de Configuração (passadas para main.js via window)
         window.__app_id = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        window.__firebase_config = typeof __firebase_config !== 'undefined' ? __firebase_config : '{"apiKey": "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY", "authDomain": "fator-pdv.firebaseapp.com", "projectId": "fator-pdv", "storageBucket": "fator-pdv.appspot.com", "messagingSenderId": "1097659747429", "appId": "1:1097659747429:web:8ec0a7c3978c311dbe0a8c", "measurementId": "G-02QWNRXRCV"}';
+        window.__firebase_config = typeof __firebase_config !== 'undefined' ? window.__firebase_config : '{"apiKey": "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY", "authDomain": "fator-pdv.firebaseapp.com", "projectId": "fator-pdv", "storageBucket": "fator-pdv.appspot.com", "messagingSenderId": "1097659747429", "appId": "1:1097659747429:web:8ec0a7c3978c311dbe0a8c", "measurementId": "G-02QWNRXRCV"}';
         window.__initial_auth_token = typeof __initial_auth_token !== 'undefined' ? window.__initial_auth_token : undefined;
 
     </script>
