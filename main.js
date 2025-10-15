@@ -648,6 +648,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 // CORREÇÃO: Zera a lista de selectedItems para evitar que itens de sessões anteriores apareçam em mesas novas.
                 selectedItems = [];
 
+                // A LINHA ABAIXO É A CORREÇÃO.
+                renderSelectedItems();
+
                 currentTableId = tableNumber.toString();
                 document.getElementById('current-table-number').textContent = `Mesa ${currentTableId}`;
                 document.getElementById('payment-table-number').textContent = `Mesa ${currentTableId}`;
