@@ -17,7 +17,6 @@ const getDoc = window.getDoc;
 const arrayRemove = window.arrayRemove;
 const arrayUnion = window.arrayUnion;
 const writeBatch = window.writeBatch;
-const orderBy = window.orderBy;
 
 
 // O código é envolvido em DOMContentLoaded para garantir que os elementos HTML existam
@@ -646,6 +645,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     selectedItems: [] 
                 });
 
+                // CORREÇÃO: Zera a lista de selectedItems para evitar que itens de sessões anteriores apareçam em mesas novas.
                 selectedItems = [];
 
                 currentTableId = tableNumber.toString();
@@ -1030,10 +1030,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const itemsToHold = selectedItems.filter(item => item.note && item.note.toLowerCase().includes('espera'));
 
             if (itemsToSend.length === 0) {
-                alert("Nenhum item pronto para envio (todos estão marcados como 'Espera').");
+                alert("Nenhum item pronto para envio (todos estão marcados como 'Esperam').");
                 return;
             }
 
+            // CORREÇÃO: A lista local de selectedItems agora é atualizada com a lista de itens a serem retidos (itensToHold)
             selectedItems = [...itemsToHold];
 
             const itemsGroupedBySector = itemsToSend.reduce((acc, item) => {
