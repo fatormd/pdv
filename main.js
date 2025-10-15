@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- MAPAS DE REFERÊNCIA ---
     const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2 };
     const password = '1234'; // Senha simulada de gerente
-    const PAYMENT_METHODS = ['Dinheiro', 'Pix', 'Crédito', 'Débito'];
+    const PAYMENT_METHODS = ['Dinheiro', 'Pix', 'Crédito', 'Débito', 'Ticket', 'Voucher'];
     
     // --- WooCommerce Configuração ---
     const WOOCOMMERCE_URL = 'https://nossotempero.fatormd.com';
@@ -74,6 +74,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const esperaSwitch = document.getElementById('esperaSwitch');
     const paymentMethodButtonsContainer = document.getElementById('paymentMethodButtons');
 
+    // NOVOS: Elementos da calculadora
+    const calculatorModal = document.getElementById('calculatorModal');
+    const openCalculatorBtn = document.getElementById('openCalculatorBtn');
+    const calcDisplay = document.getElementById('calcDisplay');
+    const calcButtons = calculatorModal?.querySelector('.grid');
+
 
     // Variável para rastrear o item/grupo que está no modal de OBS
     let currentObsGroup = null;
@@ -104,6 +110,60 @@ document.addEventListener('DOMContentLoaded', () => {
         const newCursorPos = e.target.value.length;
         e.target.setSelectionRange(newCursorPos, newCursorPos);
     });
+    }
+
+    // --- FUNÇÕES DA CALCULADORA (NOVO) ---
+    const updateDisplay = (value) => {
+        if (calcDisplay) {
+            const rawValue = value.replace(/\D/g, '');
+            calcDisplay.value = currencyMask(rawValue);
+        }
+    };
+
+    if (openCalculatorBtn) {
+        openCalculatorBtn.addEventListener('click', () => {
+            if (calculatorModal) {
+                calculatorModal.style.display = 'flex';
+                const rawValue = paymentValueInput.value.replace(/\D/g, '');
+                updateDisplay(rawValue);
+            }
+        });
+    }
+
+    if (calcButtons) {
+        calcButtons.addEventListener('click', (e) => {
+            const btn = e.target.closest('.calc-btn');
+            if (!btn) return;
+
+            const key = btn.dataset.key;
+            let currentVal = calcDisplay.value.replace(/\D/g, '');
+
+            if (key === 'C') {
+                updateDisplay('0');
+            } else if (key === 'ok') {
+                const finalValue = parseFloat(calcDisplay.value.replace('R$', '').replace('.', '').replace(',', '.').trim());
+                paymentValueInput.value = formatCurrency(finalValue);
+                if (calculatorModal) calculatorModal.style.display = 'none';
+            } else if (key === 'backspace') {
+                if (currentVal.length > 1) {
+                    updateDisplay(currentVal.slice(0, -1));
+                } else {
+                    updateDisplay('0');
+                }
+            } else {
+                if (currentVal === '0' && key !== '.') {
+                    currentVal = key;
+                } else if (key === '.') {
+                    if (!currentVal.includes('.')) {
+                        currentVal += '00';
+                        updateDisplay(currentVal);
+                    }
+                } else {
+                    currentVal += key;
+                }
+                updateDisplay(currentVal);
+            }
+        });
     }
 
 
@@ -440,20 +500,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span>${remainingBalance <= 0 ? 'TROCO' : 'VALOR RESTANTE'}:</span>
                 <span id="remainingBalanceDisplayNested" class="font-extrabold ${isClosedClass}">${formatCurrency(displayBalance)}</span>
             </div>
-            <div class="flex justify-between space-x-3 pt-2">
-                <button id="finalizeOrderBtnNested" class="w-1/2 px-4 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition text-base disabled:opacity-50" disabled>FECHAR CONTA</button>
-                <button id="openNfeModalBtnNested" class="w-1/2 px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition text-base disabled:opacity-50" disabled>NF-e</button>
-            </div>
         `;
-        
-        const finalizeBtnNested = document.getElementById('finalizeOrderBtnNested');
-        const nfeBtnNested = document.getElementById('openNfeModalBtnNested');
-
-        if (finalizeBtnNested) finalizeBtnNested.disabled = !isClosed;
-        if (nfeBtnNested) nfeBtnNested.disabled = !isClosed;
-
-        if (finalizeBtnNested) finalizeBtnNested.addEventListener('click', finalizeOrder);
-        if (nfeBtnNested) nfeBtnNested.addEventListener('click', openNfeModal);
         
         if (addPaymentBtn && tableData.currentTotal) addPaymentBtn.disabled = remainingBalance <= 0;
     };
