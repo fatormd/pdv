@@ -29,7 +29,7 @@
 </head>
 <body class="bg-gray-100 min-h-screen"> 
     
-    <div id="statusScreen" class="absolute inset-0 bg-gray-100 z-50 flex items-center justify-center p-6" style="display: none;">
+    <div id="statusScreen" class="absolute inset-0 bg-gray-100 z-50 flex items-center justify-center p-6" style="display: flex;">
         <div id="statusContent" class="flex flex-col items-center content-card bg-white p-8 max-w-sm w-full text-center">
             <i class="fas fa-spinner fa-spin text-4xl text-indigo-500 mb-4"></i>
             <h2 class="text-xl font-bold mb-2">Iniciando PDV...</h2>
@@ -47,7 +47,7 @@
         </div>
     </div>
     
-    <main id="mainContent" class="relative overflow-hidden">
+    <main id="mainContent" class="relative overflow-hidden" style="display: none;">
         <div id="appContainer" class="flex transition-transform duration-300 ease-out">
             
             <div id="panelScreen" class="flex-shrink-0">
