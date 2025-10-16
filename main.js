@@ -319,14 +319,35 @@ document.addEventListener('DOMContentLoaded', () => {
             // Simulação de login - aqui você faria a chamada para a API do WooCommerce/JWT
             if (username === 'gerente' && password === '1234') {
                 alert('Login de Gerente bem-sucedido!');
-                hideLoginModal();
-                userId = 'gerente_id_mock'; // Atribui um ID de usuário mock
+                
+                // CORREÇÃO: Inicializa o PDV após o login (substitui o onAuthStateChanged.else)
+                hideLoginModal(); 
+                hideStatus(); // Oculta a tela de status inicial que estava sobrepondo o conteúdo
+                
+                userId = 'gerente_id_mock'; 
+                document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)}... (${appId})`;
+
                 loadOpenTables();
+                await fetchWooCommerceProducts();
+                await fetchWooCommerceCategories();
+                renderMenu();
+                renderPaymentMethodButtons();
+
             } else if (username === 'garcom' && password === '1234') {
                 alert('Login de Garçom bem-sucedido!');
+                
+                // CORREÇÃO: Inicializa o PDV após o login (substitui o onAuthStateChanged.else)
                 hideLoginModal();
-                userId = 'garcom_id_mock'; // Atribui um ID de usuário mock
+                hideStatus(); // Oculta a tela de status inicial que estava sobrepondo o conteúdo
+                
+                userId = 'garcom_id_mock'; 
+                document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)}... (${appId})`;
+
                 loadOpenTables();
+                await fetchWooCommerceProducts();
+                await fetchWooCommerceCategories();
+                renderMenu();
+                renderPaymentMethodButtons();
             } else {
                 alert('Credenciais inválidas.');
             }
