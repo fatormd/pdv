@@ -17,6 +17,7 @@ const getDoc = window.getDoc;
 const arrayRemove = window.arrayRemove;
 const arrayUnion = window.arrayUnion;
 const writeBatch = window.writeBatch;
+const orderBy = window.orderBy;
 
 
 // O código é envolvido em DOMContentLoaded para garantir que os elementos HTML existam
@@ -73,6 +74,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const quickObsButtons = document.getElementById('quickObsButtons');
     const esperaSwitch = document.getElementById('esperaSwitch');
     const paymentMethodButtonsContainer = document.getElementById('paymentMethodButtons');
+    const searchTableInput = document.getElementById('searchTableInput');
+    const searchTableBtn = document.getElementById('searchTableBtn');
+
 
     // NOVOS: Elementos da calculadora
     const calculatorModal = document.getElementById('calculatorModal');
@@ -80,6 +84,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const calcDisplay = document.getElementById('calcDisplay');
     const calcButtons = calculatorModal?.querySelector('.grid');
 
+    // NOVOS: Elementos de login
+    const loginModal = document.getElementById('loginModal');
+    const loginBtn = document.getElementById('loginBtn');
+    const loginUsernameInput = document.getElementById('loginUsername');
+    const loginPasswordInput = document.getElementById('loginPassword');
 
     // Variável para rastrear o item/grupo que está no modal de OBS
     let currentObsGroup = null;
@@ -88,19 +97,51 @@ document.addEventListener('DOMContentLoaded', () => {
     const formatCurrency = (value) => `R$ ${parseFloat(value || 0).toFixed(2).replace('.', ',')}`;
 
     // Máscara de Moeda (da esquerda para a direita)
-    const currencyMask = (input) => {
-        let value = input.replace(/\D/g, "");
-        if (value.length > 2) {
-            value = value.padStart(3, '0');
-        } else if (value.length < 3) {
-            value = value.padStart(3, '0');
+    const currencyMask = (value) => {
+        if (!value) return 'R$ 0,00';
+        let rawValue = value.toString().replace(/\D/g, "");
+        if (rawValue.length > 2) {
+            rawValue = rawValue.padStart(3, '0');
+        } else if (rawValue.length < 3) {
+            rawValue = rawValue.padStart(3, '0');
         }
         
-        const integerPart = value.substring(0, value.length - 2);
-        const decimalPart = value.substring(value.length - 2);
+        const integerPart = rawValue.substring(0, rawValue.length - 2);
+        const decimalPart = rawValue.substring(rawValue.length - 2);
 
-        return `R$ ${parseInt(integerPart).toLocaleString('pt-BR')},${decimalPart}`;
+        // Remove zeros à esquerda da parte inteira, exceto se for '0'
+        const cleanIntegerPart = integerPart.replace(/^0+/, '');
+        const finalIntegerPart = cleanIntegerPart === '' ? '0' : cleanIntegerPart;
+
+
+        return `R$ ${parseInt(finalIntegerPart).toLocaleString('pt-BR')},${decimalPart}`;
     };
+
+    // Função para obter o valor numérico (float) do R$
+    const getNumericValueFromCurrency = (currencyString) => {
+        return parseFloat(currencyString.replace('R$', '').replace(/\./g, '').replace(',', '.').trim()) || 0;
+    };
+
+    // Função para formatar o tempo (H:M:S ou M min/S seg atrás)
+    const formatElapsedTime = (timestamp) => {
+        if (!timestamp) return 'Carregando...';
+        
+        const now = Date.now();
+        const diffMs = now - timestamp;
+        
+        const seconds = Math.floor(diffMs / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(minutes / 60);
+
+        if (hours > 0) {
+            return `${hours}h ${minutes % 60}m atrás`;
+        } else if (minutes > 0) {
+            return `${minutes}m ${seconds % 60}s atrás`;
+        } else {
+            return `${seconds}s atrás`;
+        }
+    };
+
 
     // Event handler para máscara (garante apenas números e formata)
     if (paymentValueInput) {
@@ -113,41 +154,103 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- FUNÇÕES DA CALCULADORA (NOVO) ---
-    let currentCalcValue = 0;
-    let pendingOperation = null;
+    let currentInput = '0';
+    let storedValue = 0;
+    let selectedOperator = null;
+    let shouldClearDisplay = false; // Flag para limpar a tela após operação/igual
 
-    const performOperation = () => {
-        if (!pendingOperation || pendingOperation.operand === null) return;
-        const secondOperand = parseFloat(calcDisplay.value.replace('R$', '').replace('.', '').replace(',', '.'));
-        let result;
-        switch (pendingOperation.operator) {
-            case '+': result = pendingOperation.operand + secondOperand; break;
-            case '-': result = pendingOperation.operand - secondOperand; break;
-            case '*': result = pendingOperation.operand * secondOperand; break;
-            case '/': result = pendingOperation.operand / secondOperand; break;
-            case '%': result = pendingOperation.operand * (secondOperand / 100); break;
+    const calculate = (first, operator, second) => {
+        switch (operator) {
+            case '+': return first + second;
+            case '-': return first - second;
+            case '*': return first * second;
+            case '/': return first / second;
+            case '%': return first * (second / 100);
+            default: return second;
         }
-        currentCalcValue = result;
-        updateDisplay(result.toFixed(2));
-        pendingOperation = null;
     };
 
-    const updateDisplay = (value) => {
+    const updateCalcDisplay = (value) => {
         if (calcDisplay) {
-            let numValue = parseFloat(value);
-            if (isNaN(numValue)) numValue = 0;
-            const formattedValue = `R$ ${numValue.toFixed(2).replace('.', ',')}`;
-            calcDisplay.value = formattedValue;
+            calcDisplay.value = currencyMask(value.toString().replace('.', ''));
         }
     };
+
+    const handleNumberInput = (key) => {
+        if (shouldClearDisplay) {
+            currentInput = '0';
+            shouldClearDisplay = false;
+        }
+
+        let rawInput = currentInput.replace(/\D/g, '');
+
+        if (key === '.') {
+             // Simula o decimal input no formato de moeda (adiciona 00 no final)
+            if (rawInput.length < 3) {
+                rawInput = rawInput.padStart(3, '0');
+            }
+            // Não faz nada ao pressionar o ponto, pois o formato já é mantido com 2 casas decimais.
+            return;
+        }
+        
+        if (rawInput === '0' && key !== '0') {
+            rawInput = key;
+        } else if (rawInput !== '0') {
+            rawInput += key;
+        }
+        
+        currentInput = rawInput;
+        updateCalcDisplay(currentInput);
+    };
+
+    const handleOperator = (key) => {
+        if (selectedOperator && !shouldClearDisplay) {
+            // Se já há uma operação pendente e não é a primeira vez, executa a operação
+            performCalculation('=');
+            storedValue = getNumericValueFromCurrency(calcDisplay.value);
+            selectedOperator = key;
+            shouldClearDisplay = true;
+        } else {
+            storedValue = getNumericValueFromCurrency(calcDisplay.value);
+            selectedOperator = key;
+            shouldClearDisplay = true;
+        }
+    };
+
+    const performCalculation = (key) => {
+        if (!selectedOperator) {
+            // Se não há operador, o botão de igual apenas define o valor
+            if (key === '=') shouldClearDisplay = true;
+            return;
+        }
+
+        const currentValue = getNumericValueFromCurrency(calcDisplay.value);
+        let result = calculate(storedValue, selectedOperator, currentValue);
+
+        updateCalcDisplay(result.toFixed(2).replace('.', ''));
+
+        if (key === '=') {
+            storedValue = result;
+            selectedOperator = null;
+        } else {
+            storedValue = result;
+            selectedOperator = key;
+        }
+        shouldClearDisplay = true;
+    };
+
 
     if (openCalculatorBtn) {
         openCalculatorBtn.addEventListener('click', () => {
             if (calculatorModal) {
                 calculatorModal.style.display = 'flex';
-                const rawValue = paymentValueInput.value.replace('R$', '').replace('.', '').replace(',', '.');
-                currentCalcValue = parseFloat(rawValue) || 0;
-                updateDisplay(currentCalcValue);
+                // Inicializa a calculadora com o valor atual do campo de pagamento
+                const rawValue = paymentValueInput.value.replace('R$', '').replace(/\./g, '').replace(',', '');
+                currentInput = rawValue || '0';
+                storedValue = 0;
+                selectedOperator = null;
+                shouldClearDisplay = false;
+                updateCalcDisplay(currentInput);
             }
         });
     }
@@ -166,36 +269,66 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!btn) return;
 
             const key = btn.dataset.key;
+            const isNumber = /^[0-9]$/.test(key);
             const isOperator = ['+', '-', '*', '/', '%'].includes(key);
 
-            if (key === 'C') {
-                currentCalcValue = 0;
-                pendingOperation = null;
-                updateDisplay(0);
+            if (isNumber) {
+                handleNumberInput(key);
+            } else if (key === '.') {
+                 handleNumberInput('0'); // Adiciona um zero, mas mantém a formatação
+            } else if (isOperator) {
+                handleOperator(key);
+            } else if (key === '=') {
+                performCalculation(key);
+            } else if (key === 'C') {
+                currentInput = '0';
+                storedValue = 0;
+                selectedOperator = null;
+                shouldClearDisplay = false;
+                updateCalcDisplay(0);
             } else if (key === 'ok') {
-                performOperation();
-                const finalValue = parseFloat(calcDisplay.value.replace('R$', '').replace('.', '').replace(',', '.'));
+                performCalculation('=');
+                const finalValue = getNumericValueFromCurrency(calcDisplay.value);
                 paymentValueInput.value = formatCurrency(finalValue);
                 if (calculatorModal) calculatorModal.style.display = 'none';
-            } else if (isOperator) {
-                if (pendingOperation) {
-                    performOperation();
-                }
-                pendingOperation = {
-                    operand: parseFloat(calcDisplay.value.replace('R$', '').replace('.', '').replace(',', '.')),
-                    operator: key
-                };
+            }
+        });
+    }
+    // FIM - FUNÇÕES DA CALCULADORA
+
+    // --- FUNÇÕES DE LOGIN (NOVO) ---
+    const showLoginModal = () => {
+        if (loginModal) {
+            loginModal.style.display = 'flex';
+            mainContent.style.display = 'none';
+        }
+    };
+
+    const hideLoginModal = () => {
+        if (loginModal) {
+            loginModal.style.display = 'none';
+            mainContent.style.display = 'block';
+        }
+    };
+
+    if (loginBtn) {
+        loginBtn.addEventListener('click', async () => {
+            const username = loginUsernameInput.value;
+            const password = loginPasswordInput.value;
+            
+            // Simulação de login - aqui você faria a chamada para a API do WooCommerce/JWT
+            if (username === 'gerente' && password === '1234') {
+                alert('Login de Gerente bem-sucedido!');
+                hideLoginModal();
+                userId = 'gerente_id_mock'; // Atribui um ID de usuário mock
+                loadOpenTables();
+            } else if (username === 'garcom' && password === '1234') {
+                alert('Login de Garçom bem-sucedido!');
+                hideLoginModal();
+                userId = 'garcom_id_mock'; // Atribui um ID de usuário mock
+                loadOpenTables();
             } else {
-                let currentVal = calcDisplay.value.replace('R$', '').replace('.', '').replace(',', '.');
-                let newDisplayValue;
-                if (pendingOperation) {
-                    newDisplayValue = key;
-                    pendingOperation = { ...pendingOperation, operand: parseFloat(currentVal) };
-                } else {
-                    currentVal = currentVal.replace(',', '.');
-                    newDisplayValue = (currentVal === '0.00' ? key : currentVal + key);
-                }
-                updateDisplay(newDisplayValue.replace('.', ','));
+                alert('Credenciais inválidas.');
             }
         });
     }
@@ -241,34 +374,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p id="transferStatus" class="text-sm text-red-500 mb-4 italic hidden"></p>
 
                 <div id="transferItemsList" class="max-h-60 overflow-y-auto space-y-2 p-2 border border-gray-200 rounded-lg bg-gray-50">
-                    <p class="text-center text-gray-500">Carregando itens...</p>
+                    <p class="text-center text-gray-500">Funcionalidade de Seleção de Itens (Transferir o Item: ${itemId} - ${itemNote}) não implementada nesta versão, mas o botão está ativo.</p>
                 </div>
                 
                 <div class="flex justify-end space-x-3 mt-4">
                     <button class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition" onclick="document.getElementById('selectiveTransferModal').style.display='none'">Cancelar</button>
-                    <button id="confirmTransferBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50" disabled>Confirmar Transferência</button>
+                    <button id="confirmTransferBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50">Confirmar Transferência</button>
                 </div>
             </div>
         `;
         
-        const renderTransferItems = () => {
-             const listEl = document.getElementById('transferItemsList');
-             if (!currentOrderSnapshot || currentOrderSnapshot.sentItems.length === 0) {
-                 if (listEl) listEl.innerHTML = `<p class="text-center text-gray-500">Nenhum item para transferir.</p>`;
-                 return;
-             }
-             
-             if (listEl) {
-                 listEl.innerHTML = `<p class="text-center text-gray-500">Funcionalidade de Seleção de Itens não implementada nesta versão, mas o botão está ativo.</p>`;
-             }
-        };
-        
         const checkTargetTableBtn = document.getElementById('checkTargetTableBtn');
+        const confirmTransferBtn = document.getElementById('confirmTransferBtn');
+        if (confirmTransferBtn) confirmTransferBtn.disabled = true; // Desabilita por padrão
+
         if (checkTargetTableBtn) {
             checkTargetTableBtn.addEventListener('click', () => {
                 const targetTable = parseInt(document.getElementById('targetTableInput')?.value);
                 const transferStatus = document.getElementById('transferStatus');
-                const confirmTransferBtn = document.getElementById('confirmTransferBtn');
                 
                 if (!targetTable || targetTable === parseInt(currentTableId)) {
                     if (transferStatus) {
@@ -278,6 +401,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (confirmTransferBtn) confirmTransferBtn.disabled = true;
                     return;
                 }
+                // Simulação: A mesa de destino existe.
                 if (transferStatus) {
                     transferStatus.textContent = `Mesa ${targetTable} verificada.`;
                     transferStatus.classList.remove('hidden');
@@ -286,7 +410,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        const confirmTransferBtn = document.getElementById('confirmTransferBtn');
         if (confirmTransferBtn) {
             confirmTransferBtn.addEventListener('click', async () => {
                 alert(`Simulação: Itens da Mesa ${currentTableId} transferidos para Mesa ${document.getElementById('targetTableInput')?.value}.`);
@@ -294,7 +417,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        renderTransferItems();
         modal.style.display = 'flex';
     };
 
@@ -345,25 +467,19 @@ document.addEventListener('DOMContentLoaded', () => {
         
         onAuthStateChanged(auth, async (user) => {
             if (!user) {
-                if (window.__initial_auth_token) {
-                    try {
-                        await signInWithCustomToken(auth, window.__initial_auth_token);
-                    } catch (tokenError) {
-                        await signInAnonymously(auth);
-                    }
-                } else {
-                    await signInAnonymously(auth);
-                }
+                // Ao carregar a página, mostra o modal de login em vez de fazer login anônimo
+                showLoginModal();
+            } else {
+                userId = auth.currentUser?.uid || crypto.randomUUID();
+                document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)}... (${appId})`;
+                hideStatus();
+                loadOpenTables();
+                
+                await fetchWooCommerceProducts();
+                await fetchWooCommerceCategories();
+                renderMenu();
+                renderPaymentMethodButtons();
             }
-            userId = auth.currentUser?.uid || crypto.randomUUID();
-            document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)}... (${appId})`;
-            hideStatus();
-            loadOpenTables();
-            
-            await fetchWooCommerceProducts();
-            await fetchWooCommerceCategories();
-            renderMenu();
-            renderPaymentMethodButtons();
         });
 
     } catch (e) {
@@ -563,7 +679,7 @@ document.addEventListener('DOMContentLoaded', () => {
         addPaymentBtn.addEventListener('click', async () => {
             if (!currentTableId) return;
 
-            const valueRaw = paymentValueInput.value.replace('R$', '').replace('.', '').replace(',', '.').trim();
+            const valueRaw = paymentValueInput.value.replace('R$', '').replace(/\./g, '').replace(',', '.').trim();
             const value = parseFloat(valueRaw);
             const methodEl = document.querySelector('.payment-method-btn.active');
             const method = methodEl ? methodEl.dataset.method : null;
@@ -719,6 +835,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     diners: diners,
                     status: 'open',
                     createdAt: serverTimestamp(),
+                    lastOrderTimestamp: Date.now(), // NOVO: Timestamp do último pedido/criação
                     total: 0,
                     sentItems: [], 
                     payments: [],
@@ -773,6 +890,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (table.status === 'open') {
                 count++;
                 const total = table.total || 0;
+                const lastOrderTime = table.lastOrderTimestamp || (table.createdAt?.toDate ? table.createdAt.toDate().getTime() : null); // Usa o timestamp do último pedido
+                
+                const timeText = lastOrderTime ? formatElapsedTime(lastOrderTime) : 'Novo';
+
                 const cardColor = total > 0 ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200';
 
                 const cardHtml = `
@@ -780,6 +901,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <h3 class="font-bold text-2xl">Mesa ${table.tableNumber}</h3>
                         <p class="text-xs font-light">Pessoas: ${table.diners}</p>
                         <span class="font-bold text-lg mt-2">${formatCurrency(total)}</span>
+                        <p class="text-xs font-light mt-1 text-gray-500">Últ. Pedido: ${timeText}</p>
                     </div>
                 `;
                 openTablesList.innerHTML += cardHtml;
@@ -789,9 +911,14 @@ document.addEventListener('DOMContentLoaded', () => {
         openTablesCount.textContent = count;
     };
 
-    const loadOpenTables = () => {
+    const loadOpenTables = (filterTableId = null) => {
         const tablesCollection = getTablesCollectionRef();
-        const q = query(tablesCollection, where('status', '==', 'open'), orderBy('tableNumber', 'asc'));
+        let q = query(tablesCollection, where('status', '==', 'open'), orderBy('tableNumber', 'asc'));
+
+        if (filterTableId) {
+            // Se um ID de mesa for fornecido, filtra apenas por esse ID
+            q = query(tablesCollection, where('status', '==', 'open'), where('tableNumber', '==', filterTableId), orderBy('tableNumber', 'asc'));
+        }
 
         onSnapshot(q, (snapshot) => {
             const docs = snapshot.docs;
@@ -803,6 +930,28 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     };
+    
+    // NOVO: Event Listener para o botão de busca de mesa
+    if (searchTableBtn) {
+        searchTableBtn.addEventListener('click', () => {
+            const tableNumber = parseInt(searchTableInput.value);
+            if (tableNumber > 0) {
+                loadOpenTables(tableNumber);
+            } else {
+                loadOpenTables(null); // Recarrega todas as mesas se o campo estiver vazio ou inválido
+            }
+        });
+    }
+    
+    // NOVO: Recarrega todas as mesas se o usuário limpar o campo de busca
+    if (searchTableInput) {
+        searchTableInput.addEventListener('input', (e) => {
+            if (e.target.value === '') {
+                loadOpenTables(null);
+            }
+        });
+    }
+
 
     if (openTablesList) {
       openTablesList.addEventListener('click', async (e) => {
@@ -1164,7 +1313,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 await updateDoc(tableRef, {
                     sentItems: arrayUnion(...itemsForUpdate), 
-                    selectedItems: selectedItems 
+                    selectedItems: selectedItems,
+                    lastOrderTimestamp: Date.now() // NOVO: Atualiza o timestamp do último pedido
                 });
                 
                 renderSelectedItems(); 
@@ -1231,8 +1381,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const groupedItems = currentOrderSnapshot.sentItems.reduce((acc, item) => {
             const key = `${item.id}-${item.note || ''}`;
-            acc[key] = acc[key] || { ...item, qty: 0 };
+            acc[key] = acc[key] || { ...item, qty: 0, items: [] }; // Adiciona array para rastrear itens
             acc[key].qty++;
+            acc[key].items.push(item);
             return acc;
         }, {});
 
@@ -1242,6 +1393,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const lineTotal = item.qty * item.price;
             totalRecalculated += lineTotal;
             const obsText = item.note ? ` (${item.note})` : '';
+
+            // Pega o JSON stringify do item original completo para passar para a função de delete
+            // Usamos o primeiro item do grupo, pois eles são idênticos em ID e Note
+            const itemJsonString = JSON.stringify(item.items[0]).replace(/'/g, '&#39;');
 
             if (listEl) { 
                 listEl.innerHTML += `
@@ -1255,7 +1410,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <button class="text-indigo-500 hover:text-indigo-700 transition" onclick="openManagerModal('openSelectiveTransfer', '${item.id}', '${item.note || ''}')" title="Transferir Item (Gerente)">
                                  <i class="fas fa-exchange-alt text-sm"></i>
                             </button>
-                            <button class="text-red-500 hover:text-red-700 transition" onclick="openManagerModal('deleteItem', '${item.id}', '${item.note || ''}')" title="Excluir Item (Gerente)">
+                            <button class="text-red-500 hover:text-red-700 transition" onclick="openManagerModal('deleteItem', '${itemJsonString}')" title="Excluir Item (Gerente)">
                                 <i class="fas fa-trash text-sm"></i>
                             </button>
                         </div>
@@ -1302,7 +1457,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    window.openManagerModal = (action, itemId = null, itemNote = null) => {
+    window.openManagerModal = (action, itemJsonString = null, itemNote = null) => {
         const managerModal = document.getElementById('managerModal');
         if (!managerModal) return; 
 
@@ -1325,9 +1480,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (input && input.value === password) {
                 managerModal.style.display = 'none';
                 if (action === 'deleteItem') {
-                    deleteSentItem(itemId, itemNote);
+                    // Passa o objeto completo desserializado
+                    const itemToDelete = JSON.parse(itemJsonString.replace(/&#39;/g, "'"));
+                    deleteSentItem(itemToDelete);
                 } else if (action === 'openSelectiveTransfer') {
-                    openSelectiveTransferModal(itemId, itemNote);
+                    // A função openSelectiveTransferModal espera ID e Note (String, String)
+                    openSelectiveTransferModal(itemJsonString, itemNote);
                 } else if (action === 'openActions') {
                     openActionsModal();
                 }
@@ -1338,20 +1496,31 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     };
     
-    const deleteSentItem = async (itemId, itemNote) => {
-        if (!currentTableId || !currentOrderSnapshot) return;
+    // Função corrigida para usar o item completo para arrayRemove
+    const deleteSentItem = async (itemToRemove) => {
+        if (!currentTableId || !currentOrderSnapshot || !itemToRemove) return;
         
-        const itemToDelete = currentOrderSnapshot.sentItems.find(item => 
-            item.id === itemId && (item.note || '') === itemNote
+        const tableRef = getTableDocRef(currentTableId);
+        
+        // CORREÇÃO DE LÓGICA: Encontra o item exato para remover
+        const indexToDelete = currentOrderSnapshot.sentItems.findIndex(item => 
+            item.id === itemToRemove.id && 
+            (item.note || '') === (itemToRemove.note || '') &&
+            (item.orderId || '') === (itemToRemove.orderId || '')
         );
 
-        if (!itemToDelete) return;
+        if (indexToDelete === -1) {
+             console.error("Item não encontrado para exclusão.");
+             alert("Erro: Item não encontrado para exclusão.");
+             return;
+        }
 
-        const tableRef = getTableDocRef(currentTableId);
-
+        const itemExactToRemove = currentOrderSnapshot.sentItems[indexToDelete];
+        
         try {
             await updateDoc(tableRef, {
-                sentItems: arrayRemove(itemToDelete)
+                // arrayRemove funciona encontrando o item exato no array.
+                sentItems: arrayRemove(itemExactToRemove)
             });
             alert("Item removido da conta.");
         } catch (e) {
