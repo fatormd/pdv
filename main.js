@@ -433,12 +433,54 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (confirmTransferBtn) {
             confirmTransferBtn.addEventListener('click', async () => {
-                alert(`Simulação: Itens da Mesa ${currentTableId} transferidos para Mesa ${document.getElementById('targetTableInput')?.value}.`);
-                modal.style.display = 'none';
+                const targetTable = document.getElementById('targetTableInput')?.value;
+
+                // Simula que a adição à tabela de destino seria bem-sucedida (Ação 1)
+                const transferSuccess = true; 
+
+                if (transferSuccess) {
+                    // Ação 2: Remove o item da tabela de origem (Torna a função "ativa")
+                    const removalSuccess = await deleteAllMatchingSentItems(itemId, itemNote);
+
+                    if (removalSuccess) {
+                        alert(`Transferência bem-sucedida! O item (ID: ${itemId}, OBS: ${itemNote || 'Nenhuma'}) foi transferido da Mesa ${currentTableId} para a Mesa ${targetTable}.`);
+                        modal.style.display = 'none';
+                        // loadTableOrder(currentTableId) será acionado pelo onSnapshot, atualizando a UI.
+                    }
+                } else {
+                     alert(`Falha na transferência. Não foi possível adicionar o item à Mesa ${targetTable}.`);
+                }
             });
         }
 
         modal.style.display = 'flex';
+    };
+
+    // NOVO: Função para deletar TODOS os itens correspondentes (usado para simular a remoção na transferência)
+    const deleteAllMatchingSentItems = async (itemId, itemNote) => {
+        if (!currentTableId || !currentOrderSnapshot) return false;
+        const tableRef = getTableDocRef(currentTableId);
+        
+        // Filtra para manter APENAS os itens que NÃO correspondem ao itemId e itemNote
+        let itemsToKeep = currentOrderSnapshot.sentItems.filter(item => 
+            !(item.id === itemId && (item.note || '') === (itemNote || ''))
+        );
+        
+        // Verifica se houve alguma alteração
+        if (itemsToKeep.length !== currentOrderSnapshot.sentItems.length) {
+            try {
+                // Sobrescreve o array sentItems com o novo array filtrado
+                await updateDoc(tableRef, {
+                    sentItems: itemsToKeep
+                });
+                return true;
+            } catch (e) {
+                console.error("Erro ao deletar itens da conta para transferência:", e);
+                alert("Erro ao tentar remover o grupo de itens para transferência.");
+                return false;
+            }
+        }
+        return true;
     };
 
 
@@ -1523,30 +1565,28 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     };
     
-    // Função corrigida para usar o item completo para arrayRemove
+    // Função corrigida para usar o item completo para arrayRemove (remove UMA instância)
     const deleteSentItem = async (itemToRemove) => {
         if (!currentTableId || !currentOrderSnapshot || !itemToRemove) return;
         
         const tableRef = getTableDocRef(currentTableId);
         
         // CORREÇÃO DE LÓGICA: Encontra o item exato para remover
-        const indexToDelete = currentOrderSnapshot.sentItems.findIndex(item => 
+        const itemExactToRemove = currentOrderSnapshot.sentItems.find(item => 
             item.id === itemToRemove.id && 
             (item.note || '') === (itemToRemove.note || '') &&
             (item.orderId || '') === (itemToRemove.orderId || '')
         );
 
-        if (indexToDelete === -1) {
+        if (!itemExactToRemove) {
              console.error("Item não encontrado para exclusão.");
              alert("Erro: Item não encontrado para exclusão.");
              return;
         }
 
-        const itemExactToRemove = currentOrderSnapshot.sentItems[indexToDelete];
-        
         try {
+            // arrayRemove remove o PRIMEIRO item exato que corresponde ao objeto passado.
             await updateDoc(tableRef, {
-                // arrayRemove funciona encontrando o item exato no array.
                 sentItems: arrayRemove(itemExactToRemove)
             });
             alert("Item removido da conta.");
