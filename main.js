@@ -491,6 +491,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Ao carregar a página, mostra o modal de login em vez de fazer login anônimo
                 showLoginModal();
             } else {
+                // Este bloco só é executado se o usuário já estiver autenticado (e.g., sessão persistente), o que é improvável no fluxo do PDV
                 userId = auth.currentUser?.uid || crypto.randomUUID();
                 document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)}... (${appId})`;
                 hideStatus();
@@ -1301,7 +1302,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     price: item.price,
                     category: item.category,
                     sector: item.sector,
-                    note: item.note || ''
+                    note: item.note || '',
                 };
                 acc[sector] = acc[sector] || [];
                 acc[sector].push(itemToSend);
@@ -1330,6 +1331,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     sector: item.sector,
                     note: item.note || '',
                     orderId: kdsOrderRef.id,
+                    waiterId: userId, // ADICIONADO: ID do garçom que enviou o item
                 }));
                 
                 await updateDoc(tableRef, {
@@ -1415,8 +1417,11 @@ document.addEventListener('DOMContentLoaded', () => {
             totalRecalculated += lineTotal;
             const obsText = item.note ? ` (${item.note})` : '';
 
+            // NOVO: Pega o ID do garçom responsável pelo primeiro item do grupo
+            const waiterId = item.items[0].waiterId || 'Desconhecido'; 
+            const displayWaiterId = waiterId.includes('_mock') ? waiterId.replace('_mock', '') : waiterId.substring(0, 8); // Simplifica para exibição
+            
             // Pega o JSON stringify do item original completo para passar para a função de delete
-            // Usamos o primeiro item do grupo, pois eles são idênticos em ID e Note
             const itemJsonString = JSON.stringify(item.items[0]).replace(/'/g, '&#39;');
 
             if (listEl) { 
@@ -1425,6 +1430,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="flex flex-col flex-grow min-w-0 mr-2">
                             <span class="font-semibold text-gray-800">${item.name} (${item.qty}x)</span>
                             <span class="text-xs text-gray-500 truncate">${obsText}</span>
+                            <span class="text-xs text-gray-400 italic mt-1">Garçom: ${displayWaiterId}</span>
                         </div>
                         <div class="flex items-center space-x-2 flex-shrink-0">
                             <span class="font-bold text-base text-indigo-700">${formatCurrency(lineTotal)}</span>
