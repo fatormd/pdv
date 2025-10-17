@@ -36,9 +36,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ADICIONADO: Mapa global para armazenar usuários mock (incluindo garçons cadastrados)
     const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
+    const MANAGER_USERNAME = 'gerente';
+    const MANAGER_ID_MOCK = 'gerente_id_mock';
 
     // --- MAPAS DE REFERÊNCIA ---
-    const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2 };
+    const screens = { 'panelScreen': 0, 'managerScreen': 1, 'orderScreen': 2, 'paymentScreen': 3 };
     const password = '1234'; // Senha simulada de gerente
     const PAYMENT_METHODS = ['Dinheiro', 'Pix', 'Crédito', 'Débito', 'Ticket', 'Voucher'];
     
@@ -112,6 +114,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const confirmCustomerRegBtn = document.getElementById('confirmCustomerRegBtn');
     const cancelCustomerRegBtn = document.getElementById('cancelCustomerRegBtn');
 
+    // NOVOS: Elementos do Módulo Gerente
+    const managerScreen = document.getElementById('managerScreen');
+    const openManagerActionsBtn = document.getElementById('openManagerActionsBtn');
+    const managerOpenWaiterRegBtn = document.getElementById('managerOpenWaiterRegBtn');
+    const waitersList = document.getElementById('waitersList');
+    const editWaiterModal = document.getElementById('editWaiterModal');
+    const editWaiterUsernameDisplay = document.getElementById('editWaiterUsernameDisplay');
+    const editWaiterPasswordInput = document.getElementById('editWaiterPasswordInput');
+    const saveEditWaiterBtn = document.getElementById('saveEditWaiterBtn');
+    const deleteWaiterBtn = document.getElementById('deleteWaiterBtn');
+    const cancelEditWaiterBtn = document.getElementById('cancelEditWaiterBtn');
 
     // Variável para rastrear o item/grupo que está no modal de OBS
     let currentObsGroup = null;
@@ -381,7 +394,43 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- FUNÇÕES DE CADASTRO DE GARÇOM (NOVO) ---
+    // --- FUNÇÕES DE CADASTRO E GERENCIAMENTO DE GARÇOM (NOVO) ---
+    const renderWaitersList = () => {
+        if (!waitersList) return;
+
+        waitersList.innerHTML = '';
+        const usernames = Object.keys(mockUsers).filter(u => u !== MANAGER_USERNAME);
+        
+        if (usernames.length === 0) {
+            waitersList.innerHTML = `<p class="text-text-secondary-manager italic">Nenhum garçom cadastrado (exceto Gerente).</p>`;
+            return;
+        }
+
+        usernames.forEach(username => {
+            waitersList.innerHTML += `
+                <div class="flex justify-between items-center bg-gray-700 p-3 rounded-lg shadow-md">
+                    <span class="font-semibold text-white">${username}</span>
+                    <button data-username="${username}" class="edit-waiter-btn px-3 py-1 bg-yellow-600 text-white rounded-lg text-sm hover:bg-yellow-700 transition">
+                        Editar
+                    </button>
+                </div>
+            `;
+        });
+    };
+    
+    // Adiciona o listener para abrir o modal de cadastro de garçom no Manager Screen
+    if (managerOpenWaiterRegBtn) {
+         managerOpenWaiterRegBtn.addEventListener('click', () => {
+            if (waiterRegModal) {
+                waiterRegModal.style.display = 'flex';
+                // Limpa os campos ao abrir
+                if(managerPassRegInput) managerPassRegInput.value = '';
+                if(newWaiterNameInput) newWaiterNameInput.value = '';
+                if(newWaiterPasswordInput) newWaiterPasswordInput.value = '';
+            }
+        });
+    }
+
     if (openWaiterRegModalBtn) {
         openWaiterRegModalBtn.addEventListener('click', () => {
             if (waiterRegModal) {
@@ -420,17 +469,75 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert("Nome de usuário e Senha de login do garçom são obrigatórios.");
                 return;
             }
+
+            if (mockUsers[newWaiterUsername]) {
+                 alert(`Erro: O usuário "${newWaiterUsername}" já existe.`);
+                 return;
+            }
             
             // ADICIONADO: Armazena o novo usuário no mapa de mock
             mockUsers[newWaiterUsername] = newWaiterPassword;
 
             // Simulação: Aqui você faria uma chamada autenticada para criar o usuário no WordPress/WooCommerce
-            alert(`Simulação: Garçom ${newWaiterUsername} (Senha: ${newWaiterPassword}) cadastrado com sucesso! Agora você pode usar estas credenciais para logar.`);
+            alert(`Simulação: Garçom ${newWaiterUsername} cadastrado com sucesso!`);
             
-            // Simulação: Fechar modal após sucesso.
+            // Atualiza lista e fecha modal
+            renderWaitersList();
             if (waiterRegModal) waiterRegModal.style.display = 'none';
         });
     }
+
+    // Lógica para abrir o modal de edição
+    if (waitersList) {
+        waitersList.addEventListener('click', (e) => {
+            const btn = e.target.closest('.edit-waiter-btn');
+            if (!btn) return;
+            
+            const username = btn.dataset.username;
+            if (editWaiterModal && editWaiterUsernameDisplay && editWaiterPasswordInput) {
+                editWaiterModal.dataset.currentUsername = username;
+                editWaiterUsernameDisplay.textContent = username;
+                editWaiterPasswordInput.value = ''; // Limpa a senha por segurança
+                editWaiterModal.style.display = 'flex';
+            }
+        });
+    }
+    
+    // Lógica de edição/exclusão
+    if (cancelEditWaiterBtn) {
+        cancelEditWaiterBtn.addEventListener('click', () => {
+            if (editWaiterModal) editWaiterModal.style.display = 'none';
+        });
+    }
+    
+    if (saveEditWaiterBtn) {
+        saveEditWaiterBtn.addEventListener('click', () => {
+            const username = editWaiterModal.dataset.currentUsername;
+            const newPassword = editWaiterPasswordInput.value.trim();
+
+            if (!username || !newPassword) {
+                alert("Nova senha é obrigatória.");
+                return;
+            }
+
+            mockUsers[username] = newPassword;
+            alert(`Senha do garçom ${username} atualizada com sucesso (Simulação)!`);
+            if (editWaiterModal) editWaiterModal.style.display = 'none';
+        });
+    }
+    
+    if (deleteWaiterBtn) {
+        deleteWaiterBtn.addEventListener('click', () => {
+            const username = editWaiterModal.dataset.currentUsername;
+            if (confirm(`Tem certeza que deseja EXCLUIR permanentemente o garçom ${username}?`)) {
+                delete mockUsers[username];
+                alert(`Garçom ${username} excluído com sucesso (Simulação)!`);
+                renderWaitersList();
+                if (editWaiterModal) editWaiterModal.style.display = 'none';
+            }
+        });
+    }
+
 
     // --- FUNÇÕES DE LOGIN/LOGOUT ---
     const showLoginModal = () => {
@@ -453,6 +560,9 @@ document.addEventListener('DOMContentLoaded', () => {
         currentTableId = null;
         selectedItems = [];
         currentOrderSnapshot = null;
+        
+        // Esconde o botão de Ações Gerenciais
+        if (openManagerActionsBtn) openManagerActionsBtn.classList.add('hidden');
 
         // Redireciona para a tela inicial e mostra o modal de login
         goToScreen('panelScreen');
@@ -485,6 +595,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 userId = `${username}_id_mock`; 
                 document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)}... (${appId})`;
 
+                // Lógica de Redirecionamento e Permissão
+                if (username === MANAGER_USERNAME) {
+                    if (openManagerActionsBtn) openManagerActionsBtn.classList.remove('hidden');
+                    renderWaitersList(); // Carrega a lista de garçons para o painel de gerente
+                    goToScreen('managerScreen'); // Redireciona para a tela de gerenciamento
+                } else {
+                    if (openManagerActionsBtn) openManagerActionsBtn.classList.add('hidden');
+                    goToScreen('panelScreen'); // Garçom vai para o painel de mesas
+                }
+
+
                 loadOpenTables();
                 await fetchWooCommerceProducts();
                 await fetchWooCommerceCategories();
@@ -494,6 +615,13 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 alert('Credenciais inválidas.');
             }
+        });
+    }
+
+    // Adiciona o listener para o botão de ações gerenciais (Gerente)
+    if (openManagerActionsBtn) {
+        openManagerActionsBtn.addEventListener('click', () => {
+            goToScreen('managerScreen');
         });
     }
 
@@ -1643,6 +1771,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const displayWaiterId = waiterId.includes('_mock') ? waiterId.replace('_mock', '') : waiterId.substring(0, 8); // Simplifica para exibição
             
             // Pega o JSON stringify do item original completo para passar para a função de delete
+            // OBS: Não precisamos do item completo para exclusão em massa, apenas ID e Note, mas mantive o padrão.
             const itemJsonString = JSON.stringify(item.items[0]).replace(/'/g, '&#39;');
 
             if (listEl) { 
