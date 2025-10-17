@@ -14,14 +14,13 @@ body { overflow-x: hidden; }
 /* Contêiner principal para transição de telas */
 #appContainer {
     display: flex;
-    /* CORREÇÃO AQUI: 4 Telas (Painel, Gerente, Pedido, Pagamento) */
-    width: 400vw; 
+    width: 300vw; /* 3 Telas: Painel, Pedido, Pagamento */
     transition: transform 0.3s ease-out; 
     min-height: calc(100vh - 56px); /* Altura total - altura do header */
 }
 
 /* Cada tela ocupa 100vw */
-#panelScreen, #managerScreen, #orderScreen, #paymentScreen {
+#panelScreen, #orderScreen, #paymentScreen {
     width: 100vw;
     max-width: 100%;
     flex-shrink: 0;
