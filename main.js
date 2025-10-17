@@ -395,6 +395,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- FUNÇÕES DE CADASTRO E GERENCIAMENTO DE GARÇOM (NOVO) ---
+    let currentEditWaiterUsername = null;
+
     const renderWaitersList = () => {
         if (!waitersList) return;
 
@@ -479,7 +481,7 @@ document.addEventListener('DOMContentLoaded', () => {
             mockUsers[newWaiterUsername] = newWaiterPassword;
 
             // Simulação: Aqui você faria uma chamada autenticada para criar o usuário no WordPress/WooCommerce
-            alert(`Simulação: Garçom ${newWaiterUsername} cadastrado com sucesso!`);
+            alert(`Simulação: Garçom ${newWaiterUsername} cadastrado com sucesso! Agora você pode usar estas credenciais para logar.`);
             
             // Atualiza lista e fecha modal
             renderWaitersList();
@@ -494,8 +496,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!btn) return;
             
             const username = btn.dataset.username;
+            currentEditWaiterUsername = username;
+            
             if (editWaiterModal && editWaiterUsernameDisplay && editWaiterPasswordInput) {
-                editWaiterModal.dataset.currentUsername = username;
                 editWaiterUsernameDisplay.textContent = username;
                 editWaiterPasswordInput.value = ''; // Limpa a senha por segurança
                 editWaiterModal.style.display = 'flex';
@@ -512,14 +515,17 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (saveEditWaiterBtn) {
         saveEditWaiterBtn.addEventListener('click', () => {
-            const username = editWaiterModal.dataset.currentUsername;
+            const username = currentEditWaiterUsername;
             const newPassword = editWaiterPasswordInput.value.trim();
 
-            if (!username || !newPassword) {
+            if (!username) return;
+
+            if (!newPassword) {
                 alert("Nova senha é obrigatória.");
                 return;
             }
 
+            // Simulação de alteração de senha
             mockUsers[username] = newPassword;
             alert(`Senha do garçom ${username} atualizada com sucesso (Simulação)!`);
             if (editWaiterModal) editWaiterModal.style.display = 'none';
@@ -528,7 +534,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (deleteWaiterBtn) {
         deleteWaiterBtn.addEventListener('click', () => {
-            const username = editWaiterModal.dataset.currentUsername;
+            const username = currentEditWaiterUsername;
+            if (!username) return;
+            
             if (confirm(`Tem certeza que deseja EXCLUIR permanentemente o garçom ${username}?`)) {
                 delete mockUsers[username];
                 alert(`Garçom ${username} excluído com sucesso (Simulação)!`);
@@ -544,6 +552,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (loginModal) {
             loginModal.style.display = 'flex';
             mainContent.style.display = 'none';
+            if (openManagerActionsBtn) openManagerActionsBtn.classList.add('hidden');
         }
     };
 
