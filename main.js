@@ -90,6 +90,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginUsernameInput = document.getElementById('loginUsername');
     const loginPasswordInput = document.getElementById('loginPassword');
     const logoutBtnHeader = document.getElementById('logoutBtnHeader');
+    const openWaiterRegModalBtn = document.getElementById('openWaiterRegModalBtn');
+    
+    // NOVOS: Elementos de Cadastro de Garçom
+    const waiterRegModal = document.getElementById('waiterRegModal');
+    const managerPassRegInput = document.getElementById('managerPassRegInput');
+    const newWaiterNameInput = document.getElementById('newWaiterNameInput');
+    const newWaiterIdInput = document.getElementById('newWaiterIdInput');
+    const confirmWaiterRegBtn = document.getElementById('confirmWaiterRegBtn');
+    const cancelWaiterRegBtn = document.getElementById('cancelWaiterRegBtn');
     
     // NOVOS: Elementos de Cadastro de Cliente
     const openCustomerRegBtn = document.getElementById('openCustomerRegBtn');
@@ -99,6 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const regCustomerEmail = document.getElementById('regCustomerEmail');
     const confirmCustomerRegBtn = document.getElementById('confirmCustomerRegBtn');
     const cancelCustomerRegBtn = document.getElementById('cancelCustomerRegBtn');
+
 
     // Variável para rastrear o item/grupo que está no modal de OBS
     let currentObsGroup = null;
@@ -368,6 +378,47 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- FUNÇÕES DE CADASTRO DE GARÇOM (NOVO) ---
+    if (openWaiterRegModalBtn) {
+        openWaiterRegModalBtn.addEventListener('click', () => {
+            if (waiterRegModal) {
+                waiterRegModal.style.display = 'flex';
+                managerPassRegInput.value = '';
+                newWaiterNameInput.value = '';
+                newWaiterIdInput.value = '';
+            }
+        });
+    }
+    
+    if (cancelWaiterRegBtn) {
+        cancelWaiterRegBtn.addEventListener('click', () => {
+            if (waiterRegModal) waiterRegModal.style.display = 'none';
+        });
+    }
+
+    if (confirmWaiterRegBtn) {
+        confirmWaiterRegBtn.addEventListener('click', async () => {
+            const managerPassword = managerPassRegInput.value;
+            const newWaiterName = newWaiterNameInput.value.trim();
+            const newWaiterId = newWaiterIdInput.value.trim();
+            
+            if (managerPassword !== password) {
+                alert("Senha do gerente incorreta.");
+                return;
+            }
+            if (!newWaiterName || !newWaiterId) {
+                alert("Nome e ID do garçom são obrigatórios.");
+                return;
+            }
+            
+            // Simulação: Aqui você faria uma chamada autenticada para criar o usuário no WordPress/WooCommerce
+            alert(`Simulação: Garçom ${newWaiterName} (ID: ${newWaiterId}) cadastrado com sucesso!`);
+            
+            // Simulação: Fechar modal após sucesso.
+            if (waiterRegModal) waiterRegModal.style.display = 'none';
+        });
+    }
+
     // --- FUNÇÕES DE LOGIN/LOGOUT ---
     const showLoginModal = () => {
         if (loginModal) {
@@ -486,7 +537,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p id="transferStatus" class="text-sm text-red-500 mb-4 italic hidden"></p>
 
                 <div id="transferItemsList" class="max-h-60 overflow-y-auto space-y-2 p-2 border border-gray-200 rounded-lg bg-gray-50">
-                    <p class="text-center text-gray-500">Funcionalidade de Seleção de Itens (Transferir o Item: ${itemId} - ${itemNote}) não implementada nesta versão, mas o botão está ativo.</p>
+                    <p class="text-center text-gray-500">Funcionalidade de Seleção de Itens (Transferir o Item: ${itemId} - ${itemNote}) não implementada nesta versão, mas o botão está ativo. A transferência afetará TODAS as instâncias deste item.</p>
                 </div>
                 
                 <div class="flex justify-end space-x-3 mt-4">
@@ -558,17 +609,17 @@ document.addEventListener('DOMContentLoaded', () => {
             !(item.id === itemId && (item.note || '') === (itemNote || ''))
         );
         
-        // Verifica se houve alguma alteração
+        // Verifica se houve alguma alteração (se o item foi encontrado e removido)
         if (itemsToKeep.length !== currentOrderSnapshot.sentItems.length) {
             try {
-                // Sobrescreve o array sentItems com o novo array filtrado
+                // Sobrescreve o array sentItems com o novo array filtrado (Bulk Remove)
                 await updateDoc(tableRef, {
                     sentItems: itemsToKeep
                 });
                 return true;
             } catch (e) {
-                console.error("Erro ao deletar itens da conta para transferência:", e);
-                alert("Erro ao tentar remover o grupo de itens para transferência.");
+                console.error("Erro ao deletar itens da conta para transferência/exclusão em massa:", e);
+                alert("Erro ao tentar remover o grupo de itens.");
                 return false;
             }
         }
@@ -967,6 +1018,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- FUNÇÕES DO PAINEL DE MESAS (1) ---
+    // Variável para armazenar IDs das mesas abertas
+    let openTableIds = new Set();
+
 
     const checkInputs = () => {
         const mesaValida = parseInt(mesaInput.value) > 0;
@@ -984,6 +1038,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const tableNumber = parseInt(mesaInput.value);
             const diners = parseInt(pessoasInput.value);
             const newTableRef = getTableDocRef(tableNumber);
+
+            // CORREÇÃO: Validação de mesa já aberta
+            if (openTableIds.has(tableNumber.toString())) {
+                alert(`Erro: A Mesa ${tableNumber} já está aberta!`);
+                return; // Impede a abertura da mesa
+            }
+            // FIM CORREÇÃO
 
             try {
                 await setDoc(newTableRef, {
@@ -1032,6 +1093,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         openTablesList.innerHTML = '';
         let count = 0;
+        openTableIds.clear(); // Limpa a lista antes de preencher
 
         if (docs.length === 0) {
             openTablesList.innerHTML = `<div class="col-span-full text-sm text-gray-500 italic p-4 content-card bg-white">Nenhuma mesa aberta.</div>`;
@@ -1039,24 +1101,15 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // NOVO: Adiciona um array para ter a propriedade hasEsperaItems
-        const tablesWithStatus = docs.map(doc => {
-            const table = doc.data();
-            const hasEsperaItems = table.selectedItems?.some(item => 
-                item.note && item.note.toLowerCase().includes('espera')
-            );
-            return { id: doc.id, ...table, hasEsperaItems };
-        });
-
-
-        tablesWithStatus.forEach(tableDoc => {
-            const table = tableDoc;
+        docs.forEach(tableDoc => {
+            const table = tableDoc.data();
             const tableId = tableDoc.id;
             const hasEspera = tableDoc.hasEsperaItems;
 
             
             if (table.status === 'open') {
                 count++;
+                openTableIds.add(tableId); // Adiciona o ID à lista de mesas abertas
                 const total = table.total || 0;
                 const lastOrderTime = table.lastOrderTimestamp || (table.createdAt?.toDate ? table.createdAt.toDate().getTime() : null); // Usa o timestamp do último pedido
                 
@@ -1601,10 +1654,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         <div class="flex items-center space-x-2 flex-shrink-0">
                             <span class="font-bold text-base text-indigo-700">${formatCurrency(lineTotal)}</span>
-                            <button class="text-indigo-500 hover:text-indigo-700 transition" onclick="openManagerModal('openSelectiveTransfer', '${item.id}', '${item.note || ''}')" title="Transferir Item (Gerente)">
+                            <button class="text-indigo-500 hover:text-indigo-700 transition" onclick="openManagerModal('openSelectiveTransfer', '${item.id}', '${item.note || ''}')" title="Transferir Grupo de Itens (Gerente)">
                                  <i class="fas fa-exchange-alt text-sm"></i>
                             </button>
-                            <button class="text-red-500 hover:text-red-700 transition" onclick="openManagerModal('deleteItem', '${itemJsonString}')" title="Excluir Item (Gerente)">
+                            <button class="text-red-500 hover:text-red-700 transition" onclick="openManagerModal('deleteItem', '${itemJsonString}')" title="Excluir Grupo de Itens (Gerente)">
                                 <i class="fas fa-trash text-sm"></i>
                             </button>
                         </div>
@@ -1690,34 +1743,17 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     };
     
-    // Função corrigida para usar o item completo para arrayRemove (remove UMA instância)
+    // Função corrigida para usar a remoção em massa
     const deleteSentItem = async (itemToRemove) => {
         if (!currentTableId || !currentOrderSnapshot || !itemToRemove) return;
         
-        const tableRef = getTableDocRef(currentTableId);
-        
-        // CORREÇÃO DE LÓGICA: Encontra o item exato para remover
-        const itemExactToRemove = currentOrderSnapshot.sentItems.find(item => 
-            item.id === itemToRemove.id && 
-            (item.note || '') === (itemToRemove.note || '') &&
-            (item.orderId || '') === (itemToRemove.orderId || '')
-        );
+        // Usa a função de exclusão em massa (deleteAllMatchingSentItems) para remover TODOS os itens idênticos
+        const removalSuccess = await deleteAllMatchingSentItems(itemToRemove.id, itemToRemove.note);
 
-        if (!itemExactToRemove) {
-             console.error("Item não encontrado para exclusão.");
-             alert("Erro: Item não encontrado para exclusão.");
-             return;
-        }
-
-        try {
-            // arrayRemove remove o PRIMEIRO item exato que corresponde ao objeto passado.
-            await updateDoc(tableRef, {
-                sentItems: arrayRemove(itemExactToRemove)
-            });
-            alert("Item removido da conta.");
-        } catch (e) {
-            console.error("Erro ao deletar item da conta:", e);
-            alert("Erro ao tentar remover o item.");
+        if (removalSuccess) {
+            alert("Grupo de itens removido da conta.");
+        } else {
+            alert("Erro ao tentar remover o grupo de itens.");
         }
     };
     
