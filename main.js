@@ -34,6 +34,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let WOOCOMMERCE_PRODUCTS = []; // NOVO: Armazena produtos do WooCommerce
     let WOOCOMMERCE_CATEGORIES = []; // NOVO: Armazena categorias do WooCommerce
 
+    // ADICIONADO: Mapa global para armazenar usuários mock (incluindo garçons cadastrados)
+    const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
+
     // --- MAPAS DE REFERÊNCIA ---
     const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2 };
     const password = '1234'; // Senha simulada de gerente
@@ -418,8 +421,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             
+            // ADICIONADO: Armazena o novo usuário no mapa de mock
+            mockUsers[newWaiterUsername] = newWaiterPassword;
+
             // Simulação: Aqui você faria uma chamada autenticada para criar o usuário no WordPress/WooCommerce
-            alert(`Simulação: Garçom ${newWaiterUsername} (Senha: ${newWaiterPassword}) cadastrado com sucesso!`);
+            alert(`Simulação: Garçom ${newWaiterUsername} (Senha: ${newWaiterPassword}) cadastrado com sucesso! Agora você pode usar estas credenciais para logar.`);
             
             // Simulação: Fechar modal após sucesso.
             if (waiterRegModal) waiterRegModal.style.display = 'none';
@@ -465,15 +471,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const username = loginUsernameInput.value;
             const password = loginPasswordInput.value;
             
-            // Simulação de login - aqui você faria a chamada para a API do WooCommerce/JWT
-            if (username === 'gerente' && password === '1234') {
-                alert('Login de Gerente bem-sucedido!');
+            // ADICIONADO: Verifica se o usuário existe no mapa de mockUsers
+            const isAuthenticated = mockUsers[username] === password;
+
+            if (isAuthenticated) {
+                alert(`Login de ${username} bem-sucedido!`);
                 
                 // Inicializa o PDV após o login
                 hideLoginModal(); 
                 hideStatus(); 
                 
-                userId = 'gerente_id_mock'; 
+                // Determina o userId mock baseado no nome de usuário
+                userId = `${username}_id_mock`; 
                 document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)}... (${appId})`;
 
                 loadOpenTables();
@@ -482,21 +491,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderMenu();
                 renderPaymentMethodButtons();
 
-            } else if (username === 'garcom' && password === '1234') {
-                alert('Login de Garçom bem-sucedido!');
-                
-                // Inicializa o PDV após o login
-                hideLoginModal();
-                hideStatus(); 
-                
-                userId = 'garcom_id_mock'; 
-                document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)}... (${appId})`;
-
-                loadOpenTables();
-                await fetchWooCommerceProducts();
-                await fetchWooCommerceCategories();
-                renderMenu();
-                renderPaymentMethodButtons();
             } else {
                 alert('Credenciais inválidas.');
             }
