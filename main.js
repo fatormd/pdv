@@ -84,11 +84,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const calcDisplay = document.getElementById('calcDisplay');
     const calcButtons = calculatorModal?.querySelector('.grid');
 
-    // NOVOS: Elementos de login
+    // NOVOS: Elementos de login/logout
     const loginModal = document.getElementById('loginModal');
     const loginBtn = document.getElementById('loginBtn');
     const loginUsernameInput = document.getElementById('loginUsername');
     const loginPasswordInput = document.getElementById('loginPassword');
+    const logoutBtnHeader = document.getElementById('logoutBtnHeader');
+    
+    // NOVOS: Elementos de Cadastro de Cliente
+    const openCustomerRegBtn = document.getElementById('openCustomerRegBtn');
+    const customerRegModal = document.getElementById('customerRegModal');
+    const regCustomerName = document.getElementById('regCustomerName');
+    const regCustomerPhone = document.getElementById('regCustomerPhone');
+    const regCustomerEmail = document.getElementById('regCustomerEmail');
+    const confirmCustomerRegBtn = document.getElementById('confirmCustomerRegBtn');
+    const cancelCustomerRegBtn = document.getElementById('cancelCustomerRegBtn');
 
     // Variável para rastrear o item/grupo que está no modal de OBS
     let currentObsGroup = null;
@@ -295,8 +305,70 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     // FIM - FUNÇÕES DA CALCULADORA
+    
+    // --- FUNÇÕES DE CADASTRO DE CLIENTE (NOVO) ---
+    const registerCustomer = async (name, phone, email) => {
+        // Simulação de cadastro no WooCommerce (endpoint: /customers)
+        // No cenário real, aqui seria feita uma requisição POST autenticada para o WooCommerce
+        console.log(`Simulação: Tentativa de cadastro de cliente no WooCommerce. Nome: ${name}, WhatsApp: ${phone}, Email: ${email}`);
+        
+        // Simulação de sucesso:
+        return { 
+            id: Math.floor(Math.random() * 1000), 
+            name: name,
+            phone: phone 
+        };
+    };
 
-    // --- FUNÇÕES DE LOGIN (NOVO) ---
+    if (openCustomerRegBtn) {
+        openCustomerRegBtn.addEventListener('click', () => {
+            if (customerRegModal) {
+                customerRegModal.style.display = 'flex';
+                regCustomerName.value = '';
+                regCustomerPhone.value = '';
+                regCustomerEmail.value = '';
+            }
+        });
+    }
+
+    if (cancelCustomerRegBtn) {
+        cancelCustomerRegBtn.addEventListener('click', () => {
+            if (customerRegModal) customerRegModal.style.display = 'none';
+        });
+    }
+
+    if (confirmCustomerRegBtn) {
+        confirmCustomerRegBtn.addEventListener('click', async () => {
+            const name = regCustomerName.value.trim();
+            const phone = regCustomerPhone.value.trim();
+            const email = regCustomerEmail.value.trim();
+
+            if (!name || !phone) {
+                alert('Nome e WhatsApp são obrigatórios.');
+                return;
+            }
+
+            try {
+                const customer = await registerCustomer(name, phone, email);
+                alert(`Cliente ${customer.name} (WhatsApp: ${customer.phone}) cadastrado com sucesso e integrado ao WooCommerce (Simulação)!`);
+                if (customerRegModal) customerRegModal.style.display = 'none';
+            } catch (error) {
+                console.error("Erro ao cadastrar cliente:", error);
+                alert("Falha ao cadastrar cliente. Verifique a conexão com a API do WooCommerce.");
+            }
+        });
+    }
+    
+    const customerSearchInput = document.getElementById('customerSearchInput');
+    if (customerSearchInput) {
+        customerSearchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            // Lógica de busca de cliente (no cenário real, faria uma requisição filtrada à API do WooCommerce ou a um cache local)
+            console.log(`Simulação: Buscando cliente por: ${query}`);
+        });
+    }
+
+    // --- FUNÇÕES DE LOGIN/LOGOUT ---
     const showLoginModal = () => {
         if (loginModal) {
             loginModal.style.display = 'flex';
@@ -311,6 +383,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    const handleLogout = () => {
+        // Implementação mock: Limpa o estado local
+        userId = null;
+        currentTableId = null;
+        selectedItems = [];
+        currentOrderSnapshot = null;
+
+        // Redireciona para a tela inicial e mostra o modal de login
+        goToScreen('panelScreen');
+        showLoginModal();
+        // Limpa a exibição do ID do usuário
+        document.getElementById('user-id-display').textContent = 'Usuário ID: Deslogado...';
+    };
+
+    if (logoutBtnHeader) {
+        logoutBtnHeader.addEventListener('click', handleLogout);
+    }
+
+
     if (loginBtn) {
         loginBtn.addEventListener('click', async () => {
             const username = loginUsernameInput.value;
@@ -320,9 +411,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (username === 'gerente' && password === '1234') {
                 alert('Login de Gerente bem-sucedido!');
                 
-                // CORREÇÃO: Inicializa o PDV após o login (substitui o onAuthStateChanged.else)
+                // Inicializa o PDV após o login
                 hideLoginModal(); 
-                hideStatus(); // Oculta a tela de status inicial que estava sobrepondo o conteúdo
+                hideStatus(); 
                 
                 userId = 'gerente_id_mock'; 
                 document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)}... (${appId})`;
@@ -336,9 +427,9 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (username === 'garcom' && password === '1234') {
                 alert('Login de Garçom bem-sucedido!');
                 
-                // CORREÇÃO: Inicializa o PDV após o login (substitui o onAuthStateChanged.else)
+                // Inicializa o PDV após o login
                 hideLoginModal();
-                hideStatus(); // Oculta a tela de status inicial que estava sobrepondo o conteúdo
+                hideStatus(); 
                 
                 userId = 'garcom_id_mock'; 
                 document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)}... (${appId})`;
@@ -440,6 +531,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (transferSuccess) {
                     // Ação 2: Remove o item da tabela de origem (Torna a função "ativa")
+                    // Chamamos a função de exclusão de grupo
                     const removalSuccess = await deleteAllMatchingSentItems(itemId, itemNote);
 
                     if (removalSuccess) {
@@ -947,9 +1039,21 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        docs.forEach(doc => {
+        // NOVO: Adiciona um array para ter a propriedade hasEsperaItems
+        const tablesWithStatus = docs.map(doc => {
             const table = doc.data();
-            const tableId = doc.id;
+            const hasEsperaItems = table.selectedItems?.some(item => 
+                item.note && item.note.toLowerCase().includes('espera')
+            );
+            return { id: doc.id, ...table, hasEsperaItems };
+        });
+
+
+        tablesWithStatus.forEach(tableDoc => {
+            const table = tableDoc;
+            const tableId = tableDoc.id;
+            const hasEspera = tableDoc.hasEsperaItems;
+
             
             if (table.status === 'open') {
                 count++;
@@ -959,10 +1063,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 const timeText = lastOrderTime ? formatElapsedTime(lastOrderTime) : 'Novo';
 
                 const cardColor = total > 0 ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200';
+                
+                // NOVO: Ícone de Alerta
+                const alertIcon = hasEspera 
+                    ? `<i class="fas fa-exclamation-triangle text-yellow-600 text-base ml-2" title="Itens em Espera"></i>`
+                    : '';
 
                 const cardHtml = `
                     <div class="table-card-panel ${cardColor} shadow-md transition-colors duration-200" data-table-id="${tableId}">
-                        <h3 class="font-bold text-2xl">Mesa ${table.tableNumber}</h3>
+                        <h3 class="font-bold text-2xl flex items-center">Mesa ${table.tableNumber} ${alertIcon}</h3>
                         <p class="text-xs font-light">Pessoas: ${table.diners}</p>
                         <span class="font-bold text-lg mt-2">${formatCurrency(total)}</span>
                         <p class="text-xs font-light mt-1 text-gray-500">Últ. Pedido: ${timeText}</p>
@@ -981,12 +1090,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (filterTableId) {
             // Se um ID de mesa for fornecido, filtra apenas por esse ID
-            q = query(tablesCollection, where('status', '==', 'open'), where('tableNumber', '==', filterTableId), orderBy('tableNumber', 'asc'));
+            const tableNumber = parseInt(filterTableId);
+            if (!isNaN(tableNumber) && tableNumber > 0) {
+                 q = query(tablesCollection, where('status', '==', 'open'), where('tableNumber', '==', tableNumber), orderBy('tableNumber', 'asc'));
+            } else {
+                // Se for um filtro inválido, apenas recarrega todas as mesas.
+                searchTableInput.value = '';
+            }
         }
 
         onSnapshot(q, (snapshot) => {
             const docs = snapshot.docs;
-            renderTables(docs);
+            
+            // Mapeia os documentos para incluir o status de 'Espera'
+            const tablesWithStatus = docs.map(doc => {
+                const table = doc.data();
+                const hasEsperaItems = table.selectedItems?.some(item => 
+                    item.note && item.note.toLowerCase().includes('espera')
+                );
+                return { data: () => table, id: doc.id, hasEsperaItems };
+            });
+
+            renderTables(tablesWithStatus);
         }, (error) => {
             console.error("Erro ao carregar mesas (onSnapshot):", error);
             if (openTablesList) {
@@ -1098,7 +1223,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('.category-btn').forEach(b => {
                 b.classList.remove('bg-indigo-600', 'text-white');
                 b.classList.add('bg-white', 'text-gray-700', 'border', 'border-gray-300');
-            });
+                    });
             btn.classList.remove('bg-white', 'text-gray-700', 'border', 'border-gray-300');
             btn.classList.add('bg-indigo-600', 'text-white');
             
