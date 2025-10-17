@@ -383,9 +383,10 @@ document.addEventListener('DOMContentLoaded', () => {
         openWaiterRegModalBtn.addEventListener('click', () => {
             if (waiterRegModal) {
                 waiterRegModal.style.display = 'flex';
-                managerPassRegInput.value = '';
-                newWaiterNameInput.value = '';
-                newWaiterPasswordInput.value = '';
+                // CORREÇÃO: Adicionando checagens de null antes de setar valor
+                if(managerPassRegInput) managerPassRegInput.value = '';
+                if(newWaiterNameInput) newWaiterNameInput.value = '';
+                if(newWaiterPasswordInput) newWaiterPasswordInput.value = '';
             }
         });
     }
@@ -398,6 +399,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (confirmWaiterRegBtn) {
         confirmWaiterRegBtn.addEventListener('click', async () => {
+            // CORREÇÃO: Adicionando checagens de null antes de ler valor
+            if (!managerPassRegInput || !newWaiterNameInput || !newWaiterPasswordInput) {
+                alert("Erro interno: Campos do modal de cadastro não carregados.");
+                return;
+            }
+            
             const managerPassword = managerPassRegInput.value;
             const newWaiterUsername = newWaiterNameInput.value.trim();
             const newWaiterPassword = newWaiterPasswordInput.value.trim();
