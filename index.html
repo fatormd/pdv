@@ -39,10 +39,15 @@
 
     <div class="header-bar text-white p-4 flex justify-between items-center sticky top-0 z-20">
         <h1 class="text-xl font-bold">Fator PDV</h1>
-        <div id="notification-badge-container" class="relative">
-            <span id="kds-notification-badge" class="hidden absolute top-0 right-0 h-3 w-3 bg-red-500 rounded-full ring-2 ring-white"></span>
-            <div class="rounded-full bg-white p-2 text-indigo-700">
-                <i class="fas fa-tablet-alt text-lg"></i>
+        <div class="flex items-center space-x-3">
+            <button id="logoutBtnHeader" class="rounded-full bg-red-600 p-2 text-white shadow-lg hover:bg-red-700 transition duration-150 w-10 h-10 flex items-center justify-center" title="Sair / Logout">
+                 <i class="fas fa-sign-out-alt text-lg"></i>
+            </button>
+            <div id="notification-badge-container" class="relative">
+                <span id="kds-notification-badge" class="hidden absolute top-0 right-0 h-3 w-3 bg-red-500 rounded-full ring-2 ring-white"></span>
+                <div class="rounded-full bg-white p-2 text-indigo-700">
+                    <i class="fas fa-tablet-alt text-lg"></i>
+                </div>
             </div>
         </div>
     </div>
@@ -193,6 +198,13 @@
 
                 <div id="chargeInputs" class="p-4 pt-0 content-card bg-white mt-6">
                     <h4 class="text-lg font-semibold text-gray-700 mb-3">Registrar Pagamento</h4>
+                    
+                    <div class="flex items-center space-x-2 mb-3">
+                        <button id="openCustomerRegBtn" class="bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 transition duration-150 text-base disabled:opacity-50" title="Cadastrar Cliente">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                        <input type="text" id="customerSearchInput" placeholder="Buscar Cliente (Nome/WhatsApp)" class="w-full p-3 input-pdv border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
+                    </div>
                     <div class="space-y-3">
                         <div id="paymentMethodButtons" class="grid grid-cols-3 md:grid-cols-3 gap-2">
                             <button class="payment-method-btn" data-method="Dinheiro">Dinheiro</button>
@@ -322,6 +334,24 @@
             <input type="text" id="loginUsername" placeholder="Usuário" class="w-full p-4 mb-4 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
             <input type="password" id="loginPassword" placeholder="Senha" class="w-full p-4 mb-6 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
             <button id="loginBtn" class="w-full bg-indigo-600 text-white font-bold py-4 rounded-lg hover:bg-indigo-700 transition text-lg disabled:opacity-50">Entrar</button>
+        </div>
+    </div>
+
+    <div id="customerRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+            <h3 class="text-xl font-bold mb-4 text-indigo-700">Cadastrar Novo Cliente</h3>
+            <input type="text" id="regCustomerName" placeholder="Nome do Cliente" class="w-full p-3 mb-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
+            <input type="text" id="regCustomerPhone" placeholder="WhatsApp (Ex: 11988887777)" class="w-full p-3 mb-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
+            <input type="email" id="regCustomerEmail" placeholder="Email (Opcional, mas recomendado)" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
+            
+            <div class="flex justify-end space-x-3 mt-4">
+                <button id="cancelCustomerRegBtn" class="px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition text-base font-bold">
+                    Cancelar
+                </button>
+                <button id="confirmCustomerRegBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base font-bold">
+                    Cadastrar
+                </button>
+            </div>
         </div>
     </div>
 
