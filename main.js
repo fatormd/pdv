@@ -39,8 +39,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const MANAGER_USERNAME = 'gerente';
     const MANAGER_ID_MOCK = 'gerente_id_mock';
 
-    // --- MAPAS DE REFERÊNCIA ---
-    const screens = { 'panelScreen': 0, 'managerScreen': 1, 'orderScreen': 2, 'paymentScreen': 3 };
+    // CORREÇÃO: A ordem da transição foi ajustada para 3 telas: 0, 1, 2
+    const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2 };
     const password = '1234'; // Senha simulada de gerente
     const PAYMENT_METHODS = ['Dinheiro', 'Pix', 'Crédito', 'Débito', 'Ticket', 'Voucher'];
     
@@ -115,16 +115,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const cancelCustomerRegBtn = document.getElementById('cancelCustomerRegBtn');
 
     // NOVOS: Elementos do Módulo Gerente
-    const managerScreen = document.getElementById('managerScreen');
-    const openManagerActionsBtn = document.getElementById('openManagerActionsBtn');
-    const managerOpenWaiterRegBtn = document.getElementById('managerOpenWaiterRegBtn');
     const waitersList = document.getElementById('waitersList');
-    const editWaiterModal = document.getElementById('editWaiterModal');
-    const editWaiterUsernameDisplay = document.getElementById('editWaiterUsernameDisplay');
-    const editWaiterPasswordInput = document.getElementById('editWaiterPasswordInput');
-    const saveEditWaiterBtn = document.getElementById('saveEditWaiterBtn');
-    const deleteWaiterBtn = document.getElementById('deleteWaiterBtn');
-    const cancelEditWaiterBtn = document.getElementById('cancelEditWaiterBtn');
+
 
     // Variável para rastrear o item/grupo que está no modal de OBS
     let currentObsGroup = null;
@@ -189,11 +181,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     }
 
-    // --- FUNÇÕES DA CALCULADORA (NOVO) ---
+    // --- FUNÇÕES DA CALCULADORA (MANTIDAS) ---
     let currentInput = '0';
     let storedValue = 0;
     let selectedOperator = null;
-    let shouldClearDisplay = false; // Flag para limpar a tela após operação/igual
+    let shouldClearDisplay = false; 
 
     const calculate = (first, operator, second) => {
         switch (operator) {
@@ -221,11 +213,9 @@ document.addEventListener('DOMContentLoaded', () => {
         let rawInput = currentInput.replace(/\D/g, '');
 
         if (key === '.') {
-             // Simula o decimal input no formato de moeda (adiciona 00 no final)
             if (rawInput.length < 3) {
                 rawValue = rawInput.padStart(3, '0');
             }
-            // Não faz nada ao pressionar o ponto, pois o formato já é mantido com 2 casas decimais.
             return;
         }
         
@@ -241,7 +231,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const handleOperator = (key) => {
         if (selectedOperator && !shouldClearDisplay) {
-            // Se já há uma operação pendente e não é a primeira vez, executa a operação
             performCalculation('=');
             storedValue = getNumericValueFromCurrency(calcDisplay.value);
             selectedOperator = key;
@@ -255,7 +244,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const performCalculation = (key) => {
         if (!selectedOperator) {
-            // Se não há operador, o botão de igual apenas define o valor
             if (key === '=') shouldClearDisplay = true;
             return;
         }
@@ -280,7 +268,6 @@ document.addEventListener('DOMContentLoaded', () => {
         openCalculatorBtn.addEventListener('click', () => {
             if (calculatorModal) {
                 calculatorModal.style.display = 'flex';
-                // Inicializa a calculadora com o valor atual do campo de pagamento
                 const rawValue = paymentValueInput.value.replace('R$', '').replace(/\./g, '').replace(',', '');
                 currentInput = rawValue || '0';
                 storedValue = 0;
@@ -311,7 +298,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (isNumber) {
                 handleNumberInput(key);
             } else if (key === '.') {
-                 handleNumberInput('0'); // Adiciona um zero, mas mantém a formatação
+                 handleNumberInput('0'); 
             } else if (isOperator) {
                 handleOperator(key);
             } else if (key === '=') {
@@ -332,13 +319,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // FIM - FUNÇÕES DA CALCULADORA
     
-    // --- FUNÇÕES DE CADASTRO DE CLIENTE (NOVO) ---
+    // --- FUNÇÕES DE CADASTRO DE CLIENTE (MANTIDAS) ---
     const registerCustomer = async (name, phone, email) => {
-        // Simulação de cadastro no WooCommerce (endpoint: /customers)
-        // No cenário real, aqui seria feita uma requisição POST autenticada para o WooCommerce
         console.log(`Simulação: Tentativa de cadastro de cliente no WooCommerce. Nome: ${name}, WhatsApp: ${phone}, Email: ${email}`);
         
-        // Simulação de sucesso:
         return { 
             id: Math.floor(Math.random() * 1000), 
             name: name,
@@ -389,53 +373,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (customerSearchInput) {
         customerSearchInput.addEventListener('input', (e) => {
             const query = e.target.value.toLowerCase();
-            // Lógica de busca de cliente (no cenário real, faria uma requisição filtrada à API do WooCommerce ou a um cache local)
             console.log(`Simulação: Buscando cliente por: ${query}`);
         });
     }
 
-    // --- FUNÇÕES DE CADASTRO E GERENCIAMENTO DE GARÇOM (NOVO) ---
-    const renderWaitersList = () => {
-        if (!waitersList) return;
-
-        waitersList.innerHTML = '';
-        const usernames = Object.keys(mockUsers).filter(u => u !== MANAGER_USERNAME);
-        
-        if (usernames.length === 0) {
-            waitersList.innerHTML = `<p class="text-text-secondary-manager italic">Nenhum garçom cadastrado (exceto Gerente).</p>`;
-            return;
-        }
-
-        usernames.forEach(username => {
-            waitersList.innerHTML += `
-                <div class="flex justify-between items-center bg-gray-700 p-3 rounded-lg shadow-md">
-                    <span class="font-semibold text-white">${username}</span>
-                    <button data-username="${username}" class="edit-waiter-btn px-3 py-1 bg-yellow-600 text-white rounded-lg text-sm hover:bg-yellow-700 transition">
-                        Editar
-                    </button>
-                </div>
-            `;
-        });
-    };
+    // --- FUNÇÕES DE CADASTRO E GERENCIAMENTO DE GARÇOM (MANTIDAS) ---
+    let currentEditWaiterUsername = null;
+    const renderWaitersList = () => { /* Não renderiza nada, mas evita erros */ };
     
-    // Adiciona o listener para abrir o modal de cadastro de garçom no Manager Screen
-    if (managerOpenWaiterRegBtn) {
-         managerOpenWaiterRegBtn.addEventListener('click', () => {
-            if (waiterRegModal) {
-                waiterRegModal.style.display = 'flex';
-                // Limpa os campos ao abrir
-                if(managerPassRegInput) managerPassRegInput.value = '';
-                if(newWaiterNameInput) newWaiterNameInput.value = '';
-                if(newWaiterPasswordInput) newWaiterPasswordInput.value = '';
-            }
-        });
-    }
-
     if (openWaiterRegModalBtn) {
         openWaiterRegModalBtn.addEventListener('click', () => {
             if (waiterRegModal) {
                 waiterRegModal.style.display = 'flex';
-                // CORREÇÃO: Adicionando checagens de null antes de setar valor
                 if(managerPassRegInput) managerPassRegInput.value = '';
                 if(newWaiterNameInput) newWaiterNameInput.value = '';
                 if(newWaiterPasswordInput) newWaiterPasswordInput.value = '';
@@ -451,7 +400,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (confirmWaiterRegBtn) {
         confirmWaiterRegBtn.addEventListener('click', async () => {
-            // CORREÇÃO: Adicionando checagens de null antes de ler valor
             if (!managerPassRegInput || !newWaiterNameInput || !newWaiterPasswordInput) {
                 alert("Erro interno: Campos do modal de cadastro não carregados.");
                 return;
@@ -475,75 +423,19 @@ document.addEventListener('DOMContentLoaded', () => {
                  return;
             }
             
-            // ADICIONADO: Armazena o novo usuário no mapa de mock
             mockUsers[newWaiterUsername] = newWaiterPassword;
-
-            // Simulação: Aqui você faria uma chamada autenticada para criar o usuário no WordPress/WooCommerce
-            alert(`Simulação: Garçom ${newWaiterUsername} cadastrado com sucesso!`);
+            alert(`Simulação: Garçom ${newWaiterUsername} cadastrado com sucesso! Agora você pode usar estas credenciais para logar.`);
             
-            // Atualiza lista e fecha modal
-            renderWaitersList();
             if (waiterRegModal) waiterRegModal.style.display = 'none';
         });
     }
-
-    // Lógica para abrir o modal de edição
-    if (waitersList) {
-        waitersList.addEventListener('click', (e) => {
-            const btn = e.target.closest('.edit-waiter-btn');
-            if (!btn) return;
-            
-            const username = btn.dataset.username;
-            if (editWaiterModal && editWaiterUsernameDisplay && editWaiterPasswordInput) {
-                editWaiterModal.dataset.currentUsername = username;
-                editWaiterUsernameDisplay.textContent = username;
-                editWaiterPasswordInput.value = ''; // Limpa a senha por segurança
-                editWaiterModal.style.display = 'flex';
-            }
-        });
-    }
-    
-    // Lógica de edição/exclusão
-    if (cancelEditWaiterBtn) {
-        cancelEditWaiterBtn.addEventListener('click', () => {
-            if (editWaiterModal) editWaiterModal.style.display = 'none';
-        });
-    }
-    
-    if (saveEditWaiterBtn) {
-        saveEditWaiterBtn.addEventListener('click', () => {
-            const username = editWaiterModal.dataset.currentUsername;
-            const newPassword = editWaiterPasswordInput.value.trim();
-
-            if (!username || !newPassword) {
-                alert("Nova senha é obrigatória.");
-                return;
-            }
-
-            mockUsers[username] = newPassword;
-            alert(`Senha do garçom ${username} atualizada com sucesso (Simulação)!`);
-            if (editWaiterModal) editWaiterModal.style.display = 'none';
-        });
-    }
-    
-    if (deleteWaiterBtn) {
-        deleteWaiterBtn.addEventListener('click', () => {
-            const username = editWaiterModal.dataset.currentUsername;
-            if (confirm(`Tem certeza que deseja EXCLUIR permanentemente o garçom ${username}?`)) {
-                delete mockUsers[username];
-                alert(`Garçom ${username} excluído com sucesso (Simulação)!`);
-                renderWaitersList();
-                if (editWaiterModal) editWaiterModal.style.display = 'none';
-            }
-        });
-    }
-
 
     // --- FUNÇÕES DE LOGIN/LOGOUT ---
     const showLoginModal = () => {
         if (loginModal) {
             loginModal.style.display = 'flex';
             mainContent.style.display = 'none';
+            if (openActionsModalBtn) openActionsModalBtn.classList.add('hidden');
         }
     };
 
@@ -555,19 +447,15 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const handleLogout = () => {
-        // Implementação mock: Limpa o estado local
         userId = null;
         currentTableId = null;
         selectedItems = [];
         currentOrderSnapshot = null;
         
-        // Esconde o botão de Ações Gerenciais
-        if (openManagerActionsBtn) openManagerActionsBtn.classList.add('hidden');
+        if (openActionsModalBtn) openActionsModalBtn.classList.add('hidden');
 
-        // Redireciona para a tela inicial e mostra o modal de login
         goToScreen('panelScreen');
         showLoginModal();
-        // Limpa a exibição do ID do usuário
         document.getElementById('user-id-display').textContent = 'Usuário ID: Deslogado...';
     };
 
@@ -581,28 +469,23 @@ document.addEventListener('DOMContentLoaded', () => {
             const username = loginUsernameInput.value;
             const password = loginPasswordInput.value;
             
-            // ADICIONADO: Verifica se o usuário existe no mapa de mockUsers
+            // CORREÇÃO DE LOGIN: Usa o mapa mockUsers
             const isAuthenticated = mockUsers[username] === password;
 
             if (isAuthenticated) {
                 alert(`Login de ${username} bem-sucedido!`);
                 
-                // Inicializa o PDV após o login
                 hideLoginModal(); 
                 hideStatus(); 
                 
-                // Determina o userId mock baseado no nome de usuário
                 userId = `${username}_id_mock`; 
                 document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)}... (${appId})`;
 
-                // Lógica de Redirecionamento e Permissão
+                // Lógica de Permissão (Gerente agora tem o botão de Ações Gerenciais no painel 2)
                 if (username === MANAGER_USERNAME) {
-                    if (openManagerActionsBtn) openManagerActionsBtn.classList.remove('hidden');
-                    renderWaitersList(); // Carrega a lista de garçons para o painel de gerente
-                    goToScreen('managerScreen'); // Redireciona para a tela de gerenciamento
+                    if (openActionsModalBtn) openActionsModalBtn.classList.remove('hidden');
                 } else {
-                    if (openManagerActionsBtn) openManagerActionsBtn.classList.add('hidden');
-                    goToScreen('panelScreen'); // Garçom vai para o painel de mesas
+                    if (openActionsModalBtn) openActionsModalBtn.classList.add('hidden');
                 }
 
 
@@ -611,6 +494,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 await fetchWooCommerceCategories();
                 renderMenu();
                 renderPaymentMethodButtons();
+                goToScreen('panelScreen'); // Vai para a tela inicial
 
             } else {
                 alert('Credenciais inválidas.');
@@ -618,15 +502,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Adiciona o listener para o botão de ações gerenciais (Gerente)
-    if (openManagerActionsBtn) {
-        openManagerActionsBtn.addEventListener('click', () => {
-            goToScreen('managerScreen');
-        });
-    }
-
-
-    // Funções modais (MOVIDAS PARA O TOPO para resolver ReferenceError)
+    // Funções modais (MANTIDAS)
     window.openNfeModal = () => {
         const nfeModal = document.getElementById('nfeModal');
         if (!nfeModal) return; 
@@ -762,7 +638,10 @@ document.addEventListener('DOMContentLoaded', () => {
             saveSelectedItemsToFirebase(currentTableId);
         }
 
-        const screenIndex = screens[screenId];
+        // CORREÇÃO: Mapeamento de telas para 3 índices: 0, 1, 2
+        const screenMap = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2 };
+        const screenIndex = screenMap[screenId];
+
         if (screenIndex !== undefined) {
             if (appContainer) {
               appContainer.style.transform = `translateX(-${screenIndex * 100}vw)`;
@@ -986,7 +865,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span>${remainingBalance <= 0 ? 'TROCO' : 'VALOR RESTANTE'}:</span>
                 <span id="remainingBalanceDisplayNested" class="font-extrabold ${isClosedClass}">${formatCurrency(displayBalance)}</span>
             </div>
+            <div class="flex justify-between space-x-3 pt-2">
+                <button id="finalizeOrderBtnNested" class="w-1/2 px-4 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition text-base disabled:opacity-50" disabled>FECHAR CONTA</button>
+                <button id="openNfeModalBtnNested" class="w-1/2 px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition text-base disabled:opacity-50" disabled>NF-e</button>
+            </div>
         `;
+        
+        const finalizeBtnNested = document.getElementById('finalizeOrderBtnNested');
+        const nfeBtnNested = document.getElementById('openNfeModalBtnNested');
+
+        if (finalizeBtnNested) finalizeBtnNested.disabled = !isClosed;
+        if (nfeBtnNested) nfeBtnNested.disabled = !isClosed;
+
+        if (finalizeBtnNested) finalizeBtnNested.addEventListener('click', finalizeOrder);
+        if (nfeBtnNested) nfeBtnNested.addEventListener('click', openNfeModal);
         
         if (addPaymentBtn && tableData.currentTotal) addPaymentBtn.disabled = remainingBalance <= 0;
     };
@@ -1015,7 +907,7 @@ document.addEventListener('DOMContentLoaded', () => {
         addPaymentBtn.addEventListener('click', async () => {
             if (!currentTableId) return;
 
-            const valueRaw = paymentValueInput.value.replace('R$', '').replace(/\./g, '').replace(',', '.').trim();
+            const valueRaw = paymentValueInput.value.replace('R$', '').replace('.', '').replace(',', '.').trim();
             const value = parseFloat(valueRaw);
             const methodEl = document.querySelector('.payment-method-btn.active');
             const method = methodEl ? methodEl.dataset.method : null;
@@ -1864,7 +1756,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // A função openSelectiveTransferModal espera ID e Note (String, String)
                     openSelectiveTransferModal(itemJsonString, itemNote);
                 } else if (action === 'openActions') {
-                    openActionsModal();
+                    // Botão removido na versão revertida
                 }
             } else {
                 alert("Senha incorreta.");
@@ -1888,15 +1780,16 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     if (openActionsModalBtn) {
+         // O botão foi removido do HTML na versão revertida, mas a função é mantida para fins de contexto.
+         // Se ele existir, a lógica de permissão mock é usada.
         openActionsModalBtn.addEventListener('click', () => {
-            openManagerModal('openActions');
+             // Redireciona para o painel de mesas e a função será acionada se o gerente estiver logado.
+             openManagerModal('openActions');
         });
     }
 
     if (document.getElementById('openSelectiveTransferModalBtn')) {
-        document.getElementById('openSelectiveTransferModalBtn').addEventListener('click', () => {
-            openManagerModal('openSelectiveTransfer');
-        });
+         // Botão removido do HTML na versão revertida
     }
 
 
