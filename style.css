@@ -14,7 +14,8 @@ body { overflow-x: hidden; }
 /* Contêiner principal para transição de telas */
 #appContainer {
     display: flex;
-    width: 300vw; /* 3 Telas: Painel, Pedido, Pagamento */
+    /* CORREÇÃO PARA 3 TELAS (Painel, Pedido, Pagamento) */
+    width: 300vw; 
     transition: transform 0.3s ease-out; 
     min-height: calc(100vh - 56px); /* Altura total - altura do header */
 }
