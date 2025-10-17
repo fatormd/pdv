@@ -96,7 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const waiterRegModal = document.getElementById('waiterRegModal');
     const managerPassRegInput = document.getElementById('managerPassRegInput');
     const newWaiterNameInput = document.getElementById('newWaiterNameInput');
-    const newWaiterIdInput = document.getElementById('newWaiterIdInput');
+    const newWaiterPasswordInput = document.getElementById('newWaiterPasswordInput');
     const confirmWaiterRegBtn = document.getElementById('confirmWaiterRegBtn');
     const cancelWaiterRegBtn = document.getElementById('cancelWaiterRegBtn');
     
@@ -207,7 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (key === '.') {
              // Simula o decimal input no formato de moeda (adiciona 00 no final)
             if (rawInput.length < 3) {
-                rawInput = rawInput.padStart(3, '0');
+                rawValue = rawInput.padStart(3, '0');
             }
             // Não faz nada ao pressionar o ponto, pois o formato já é mantido com 2 casas decimais.
             return;
@@ -383,9 +383,10 @@ document.addEventListener('DOMContentLoaded', () => {
         openWaiterRegModalBtn.addEventListener('click', () => {
             if (waiterRegModal) {
                 waiterRegModal.style.display = 'flex';
-                managerPassRegInput.value = '';
-                newWaiterNameInput.value = '';
-                newWaiterIdInput.value = '';
+                // CORREÇÃO: Adicionando checagens de null antes de setar valor
+                if(managerPassRegInput) managerPassRegInput.value = '';
+                if(newWaiterNameInput) newWaiterNameInput.value = '';
+                if(newWaiterPasswordInput) newWaiterPasswordInput.value = '';
             }
         });
     }
@@ -398,21 +399,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (confirmWaiterRegBtn) {
         confirmWaiterRegBtn.addEventListener('click', async () => {
+            // CORREÇÃO: Adicionando checagens de null antes de ler valor
+            if (!managerPassRegInput || !newWaiterNameInput || !newWaiterPasswordInput) {
+                alert("Erro interno: Campos do modal de cadastro não carregados.");
+                return;
+            }
+            
             const managerPassword = managerPassRegInput.value;
-            const newWaiterName = newWaiterNameInput.value.trim();
-            const newWaiterId = newWaiterIdInput.value.trim();
+            const newWaiterUsername = newWaiterNameInput.value.trim();
+            const newWaiterPassword = newWaiterPasswordInput.value.trim();
             
             if (managerPassword !== password) {
                 alert("Senha do gerente incorreta.");
                 return;
             }
-            if (!newWaiterName || !newWaiterId) {
-                alert("Nome e ID do garçom são obrigatórios.");
+            if (!newWaiterUsername || !newWaiterPassword) {
+                alert("Nome de usuário e Senha de login do garçom são obrigatórios.");
                 return;
             }
             
             // Simulação: Aqui você faria uma chamada autenticada para criar o usuário no WordPress/WooCommerce
-            alert(`Simulação: Garçom ${newWaiterName} (ID: ${newWaiterId}) cadastrado com sucesso!`);
+            alert(`Simulação: Garçom ${newWaiterUsername} (Senha: ${newWaiterPassword}) cadastrado com sucesso!`);
             
             // Simulação: Fechar modal após sucesso.
             if (waiterRegModal) waiterRegModal.style.display = 'none';
