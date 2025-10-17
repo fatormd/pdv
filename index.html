@@ -21,6 +21,10 @@
                     },
                     colors: {
                         'primary': '#4f46e5', // Índigo
+                        // NOVO: Cores customizadas para o Módulo Gerente
+                        'bg-manager': '#1f2937', // Cinza escuro (Dark Gray-800)
+                        'title-manager': '#fb923c', // Laranja (Orange-400)
+                        'text-secondary-manager': '#d1d5db', // Cinza claro (Gray-300)
                     },
                 }
             }
@@ -40,6 +44,11 @@
     <div class="header-bar text-white p-4 flex justify-between items-center sticky top-0 z-20">
         <h1 class="text-xl font-bold">Fator PDV</h1>
         <div class="flex items-center space-x-3">
+            
+             <button id="openManagerActionsBtn" class="hidden rounded-full bg-yellow-600 p-2 text-white shadow-lg hover:bg-yellow-700 transition duration-150 w-10 h-10 flex items-center justify-center" title="Ações Gerenciais">
+                 <i class="fas fa-cog text-lg"></i>
+            </button>
+
             <button id="logoutBtnHeader" class="rounded-full bg-red-600 p-2 text-white shadow-lg hover:bg-red-700 transition duration-150 w-10 h-10 flex items-center justify-center" title="Sair / Logout">
                  <i class="fas fa-sign-out-alt text-lg"></i>
             </button>
@@ -84,6 +93,33 @@
                     </div>
                 </div>
             </div>
+            
+            <div id="managerScreen" class="flex-shrink-0 bg-bg-manager min-h-screen text-white">
+                <div class="p-4">
+                    <h2 class="text-2xl font-bold text-title-manager mb-4">Painel de Gerenciamento</h2>
+                    
+                    <div class="content-card bg-gray-800 p-4 mb-6">
+                        <h3 class="text-xl font-semibold text-text-secondary-manager mb-3">Vendas e Relatórios</h3>
+                        <p class="text-text-secondary-manager">Aqui ficarão os filtros e relatórios (Total Vendido, Taxa de Serviço, etc.).</p>
+                        <button id="openReportsModalBtn" class="mt-3 px-4 py-2 bg-title-manager text-bg-manager font-bold rounded-lg hover:bg-orange-500 transition">
+                            Ver Relatórios
+                        </button>
+                    </div>
+                    
+                    <div class="content-card bg-gray-800 p-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-semibold text-text-secondary-manager">Gestão de Garçons</h3>
+                            <button id="managerOpenWaiterRegBtn" class="px-3 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition">
+                                + Novo Garçom
+                            </button>
+                        </div>
+                        <div id="waitersList" class="space-y-3">
+                            <p class="text-text-secondary-manager italic">Lista de garçons será carregada aqui...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
 
             <div id="orderScreen" class="flex-shrink-0">
                 <div class="flex items-center justify-between mb-4">
@@ -360,6 +396,29 @@
             </div>
         </div>
     </div>
+    
+    <div id="editWaiterModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+            <h3 class="text-xl font-bold mb-4 text-indigo-700">Editar Garçom</h3>
+            <p class="text-base mb-3">Usuário: <span id="editWaiterUsernameDisplay" class="font-semibold text-gray-800"></span></p>
+            <input type="password" id="editWaiterPasswordInput" placeholder="Nova Senha" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
+            
+            <div class="flex justify-between space-x-3 mt-4">
+                <button id="deleteWaiterBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-base font-bold">
+                    Excluir Garçom
+                </button>
+                <div class="flex space-x-3">
+                    <button id="cancelEditWaiterBtn" class="px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition text-base font-bold">
+                        Cancelar
+                    </button>
+                    <button id="saveEditWaiterBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base font-bold">
+                        Salvar Senha
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 
     <div id="customerRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
