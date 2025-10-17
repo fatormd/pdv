@@ -39,7 +39,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const MANAGER_USERNAME = 'gerente';
     const MANAGER_ID_MOCK = 'gerente_id_mock';
 
-    // --- MAPAS DE REFERÊNCIA ---
+    // CORREÇÃO CRUCIAL AQUI: A ordem da transição foi ajustada para 4 telas.
+    // Index: 0: Painel | 1: Gerente | 2: Pedido | 3: Pagamento
     const screens = { 'panelScreen': 0, 'managerScreen': 1, 'orderScreen': 2, 'paymentScreen': 3 };
     const password = '1234'; // Senha simulada de gerente
     const PAYMENT_METHODS = ['Dinheiro', 'Pix', 'Crédito', 'Débito', 'Ticket', 'Voucher'];
@@ -1897,8 +1898,15 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     if (openActionsModalBtn) {
-        openActionsModalBtn.addEventListener('click', () => {
-            openManagerModal('openActions');
+        openManagerActionsBtn.addEventListener('click', () => {
+             // Garante que o usuário logado é o gerente
+            if (userId && userId.includes(MANAGER_USERNAME)) {
+                renderWaitersList();
+                goToScreen('managerScreen');
+            } else {
+                // Caso seja um garçom que de alguma forma ativou o botão (o que não deve acontecer se estiver hidden)
+                 alert("Acesso negado. Funcionalidade exclusiva do Gerente.");
+            }
         });
     }
 
