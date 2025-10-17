@@ -200,7 +200,7 @@
                     <h4 class="text-lg font-semibold text-gray-700 mb-3">Registrar Pagamento</h4>
                     
                     <div class="flex items-center space-x-2 mb-3">
-                        <button id="openCustomerRegBtn" class="bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 transition duration-150 text-base disabled:opacity-50" title="Cadastrar Cliente">
+                        <button id="openCustomerRegBtn" class="bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 transition duration-150 disabled:opacity-50" title="Cadastrar Cliente">
                             <i class="fas fa-plus"></i>
                         </button>
                         <input type="text" id="customerSearchInput" placeholder="Buscar Cliente (Nome/WhatsApp)" class="w-full p-3 input-pdv border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
@@ -333,7 +333,31 @@
             <h3 class="text-2xl font-bold text-indigo-700 mb-6">Login do PDV</h3>
             <input type="text" id="loginUsername" placeholder="Usuário" class="w-full p-4 mb-4 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
             <input type="password" id="loginPassword" placeholder="Senha" class="w-full p-4 mb-6 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
-            <button id="loginBtn" class="w-full bg-indigo-600 text-white font-bold py-4 rounded-lg hover:bg-indigo-700 transition text-lg disabled:opacity-50">Entrar</button>
+            
+            <div class="flex space-x-3">
+                <button id="openWaiterRegModalBtn" class="w-1/4 bg-gray-500 text-white font-bold py-4 rounded-lg hover:bg-gray-600 transition text-lg" title="Cadastrar Novo Garçom (Gerente)">
+                    <i class="fas fa-user-plus"></i>
+                </button>
+                <button id="loginBtn" class="w-3/4 bg-indigo-600 text-white font-bold py-4 rounded-lg hover:bg-indigo-700 transition text-lg disabled:opacity-50">Entrar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="waiterRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+            <h3 class="text-xl font-bold mb-4 text-indigo-700">Novo Garçom (Acesso Gerente)</h3>
+            <input type="password" id="managerPassRegInput" placeholder="Senha do Gerente (1234)" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 text-base">
+            <input type="text" id="newWaiterNameInput" placeholder="Nome Completo (Para ID)" class="w-full p-3 mb-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
+            <input type="text" id="newWaiterIdInput" placeholder="ID Único (Ex: garcom01)" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
+            
+            <div class="flex justify-end space-x-3 mt-4">
+                <button id="cancelWaiterRegBtn" class="px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition text-base font-bold">
+                    Cancelar
+                </button>
+                <button id="confirmWaiterRegBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base font-bold">
+                    Cadastrar Garçom
+                </button>
+            </div>
         </div>
     </div>
 
