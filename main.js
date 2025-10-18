@@ -29,17 +29,15 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentTableId = null;
     let selectedItems = []; // Itens selecionados na UI antes de enviar (lista de anotações)
     let currentOrderSnapshot = null; // Último estado da mesa no Firebase
-    let serviceTaxApplied = true; // CORREÇÃO: Taxa de serviço ativa por padrão
-    let currentPayments = []; // Pagamentos registrados localmente
+    let serviceTaxApplied = true; // Taxa de serviço ativa por padrão
     let WOOCOMMERCE_PRODUCTS = []; // Armazena produtos do WooCommerce
     let WOOCOMMERCE_CATEGORIES = []; // Armazena categorias do WooCommerce
 
     // MOCK: Usuários e Credenciais (usado para simulação de login/permissão)
     const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
     const MANAGER_USERNAME = 'gerente';
-    const MANAGER_ID_MOCK = 'gerente_id_mock';
 
-    // CORREÇÃO: Mapeamento de telas para 4 índices: 0, 1, 2, 3
+    // Mapeamento de telas para 4 índices: 0, 1, 2, 3
     const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2, 'managerScreen': 3 };
     const password = '1234'; // Senha simulada de gerente (usada para ações gerenciais)
     const PAYMENT_METHODS = ['Dinheiro', 'Pix', 'Crédito', 'Débito', 'Ticket', 'Voucher'];
@@ -74,29 +72,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const openNfeModalBtn = document.getElementById('openNfeModalBtn');
     const toggleServiceTaxBtn = document.getElementById('toggleServiceTaxBtn');
     const dinersSplitInput = document.getElementById('dinersSplitInput');
-    const openActionsModalBtn = document.getElementById('openActionsModalBtn'); 
     const sendSelectedItemsBtn = document.getElementById('sendSelectedItemsBtn');
     const quickObsButtons = document.getElementById('quickObsButtons');
     const esperaSwitch = document.getElementById('esperaSwitch');
     const paymentMethodButtonsContainer = document.getElementById('paymentMethodButtons');
-    const searchTableInput = document.getElementById('searchTableInput');
-    const searchTableBtn = document.getElementById('searchTableBtn');
 
 
-    // NOVOS: Elementos da calculadora
+    // Elementos da calculadora
     const calculatorModal = document.getElementById('calculatorModal');
     const openCalculatorBtn = document.getElementById('openCalculatorBtn');
     const calcDisplay = document.getElementById('calcDisplay');
     const calcButtons = calculatorModal?.querySelector('.grid');
 
-    // NOVOS: Elementos de login/logout
+    // Elementos de login/logout
     const loginModal = document.getElementById('loginModal');
     const loginBtn = document.getElementById('loginBtn');
     const loginUsernameInput = document.getElementById('loginUsername');
     const loginPasswordInput = document.getElementById('loginPassword');
     const logoutBtnHeader = document.getElementById('logoutBtnHeader');
     
-    // NOVOS: Modais Gerenciais (Recuperados do código anterior para o painel 4)
+    // Modais Gerenciais
     const waiterRegModal = document.getElementById('waiterRegModal');
     const managerPassRegInput = document.getElementById('managerPassRegInput');
     const newWaiterNameInput = document.getElementById('newWaiterNameInput');
@@ -104,13 +99,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const confirmWaiterRegBtn = document.getElementById('confirmWaiterRegBtn');
     const cancelWaiterRegBtn = document.getElementById('cancelWaiterRegBtn');
     
-    // NOVO: Ícone de Engrenagem (Botão de Gerente no Cabeçalho)
+    // Ícone de Engrenagem (Botão de Gerente no Cabeçalho)
     const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
     
     // Elementos da Transferência em Massa
     const selectiveTransferModal = document.getElementById('selectiveTransferModal');
 
     // Elementos de Cliente
+    const openCustomerRegBtn = document.getElementById('openCustomerRegBtn');
     const customerRegModal = document.getElementById('customerRegModal');
     const regCustomerName = document.getElementById('regCustomerName');
     const regCustomerPhone = document.getElementById('regCustomerPhone');
@@ -118,7 +114,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const cancelCustomerRegBtn = document.getElementById('cancelCustomerRegBtn');
     const confirmCustomerRegBtn = document.getElementById('confirmCustomerRegBtn');
     
-    // Variável para rastrear o item/grupo que está no modal de OBS
     let currentObsGroup = null;
 
     // --- UTILS ---
@@ -188,24 +183,28 @@ document.addEventListener('DOMContentLoaded', () => {
     let shouldClearDisplay = false; 
 
     const calculateCents = (firstCents, operator, secondCents) => {
-        let first = firstCents / 100;
-        let second = secondCents / 100;
+        // Usa números de ponto flutuante para a operação, mas multiplica por 100 para evitar erros no cálculo final
+        let first = firstCents; 
+        let second = secondCents; 
         let result;
 
         switch (operator) {
             case '+': result = first + second; break;
             case '-': result = first - second; break;
-            case '*': result = first * second; break;
+            case '*': result = first * second / 10000; break; // Multiplica R$ 10,00 (1000) por R$ 1,00 (100)
             case '/': result = second === 0 ? 0 : first / second; break;
             default: result = second; break;
         }
 
-        return Math.round(result * 100);
+        // Para as operações que não são * ou / (soma/subtração), o resultado já está em centavos.
+        // Para * e / voltamos o resultado para centavos.
+        return operator === '*' || operator === '/' ? Math.round(result * 100) : result; 
     };
 
     const updateCalcDisplay = (centsValue) => {
         calcValueCents = centsValue;
         if (calcDisplay) {
+            // Garante que o número de centavos tenha pelo menos 3 dígitos (para R$ 0,00)
             const stringValue = centsValue.toString().padStart(3, '0');
             calcDisplay.value = currencyMask(stringValue);
         }
@@ -214,6 +213,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const handleNumberInput = (key) => {
         if (shouldClearDisplay) {
             calcValueCents = 0;
+            storedValueCents = 0;
+            selectedOperator = null;
             shouldClearDisplay = false;
         }
 
@@ -273,6 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
         openCalculatorBtn.addEventListener('click', () => {
             if (calculatorModal) {
                 calculatorModal.style.display = 'flex';
+                // Converte o valor do input R$ para centavos para iniciar a calculadora
                 const rawValue = paymentValueInput.value.replace('R$', '').replace(/\./g, '').replace(',', '');
                 calcValueCents = parseInt(rawValue) || 0;
                 storedValueCents = 0;
@@ -315,6 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateCalcDisplay(0);
             } else if (key === 'ok') {
                 performCalculation('=');
+                // Converte o resultado de centavos de volta para a máscara de moeda
                 paymentValueInput.value = formatCurrency(calcValueCents / 100);
                 if (calculatorModal) calculatorModal.style.display = 'none';
             }
@@ -372,6 +375,45 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- FUNÇÕES DE CADASTRO DE GARÇOM (MANTIDAS) ---
+    if (cancelWaiterRegBtn) {
+        cancelWaiterRegBtn.addEventListener('click', () => {
+            if (waiterRegModal) waiterRegModal.style.display = 'none';
+        });
+    }
+
+    if (confirmWaiterRegBtn) {
+        confirmWaiterRegBtn.addEventListener('click', async () => {
+            if (!managerPassRegInput || !newWaiterNameInput || !newWaiterPasswordInput) {
+                alert("Erro interno: Campos do modal de cadastro não carregados.");
+                return;
+            }
+            
+            const managerPassword = managerPassRegInput.value;
+            const newWaiterUsername = newWaiterNameInput.value.trim();
+            const newWaiterPassword = newWaiterPasswordInput.value.trim();
+            
+            if (managerPassword !== password) {
+                alert("Senha do gerente incorreta.");
+                return;
+            }
+            if (!newWaiterUsername || !newWaiterPassword) {
+                alert("Nome de usuário e Senha de login do garçom são obrigatórios.");
+                return;
+            }
+
+            if (mockUsers[newWaiterUsername]) {
+                 alert(`Erro: O usuário "${newWaiterUsername}" já existe.`);
+                 return;
+            }
+            
+            mockUsers[newWaiterUsername] = newWaiterPassword;
+            alert(`Simulação: Garçom ${newWaiterUsername} cadastrado com sucesso! Agora você pode usar estas credenciais para logar.`);
+            
+            if (waiterRegModal) waiterRegModal.style.display = 'none';
+        });
+    }
+
     // --- FUNÇÕES DE LOGIN/LOGOUT ---
     const showLoginModal = () => {
         if (loginModal) {
@@ -394,7 +436,6 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedItems = [];
         currentOrderSnapshot = null;
         
-        if (openActionsModalBtn) openActionsModalBtn.classList.add('hidden');
         if (openManagerPanelBtn) openManagerPanelBtn.classList.add('hidden');
 
         goToScreen('panelScreen');
@@ -406,15 +447,14 @@ document.addEventListener('DOMContentLoaded', () => {
         logoutBtnHeader.addEventListener('click', handleLogout);
     }
     
-    // NOVO: Adiciona a lógica para o botão de engrenagem no cabeçalho
+    // Botão de Gerente no Cabeçalho
     if (openManagerPanelBtn) {
          openManagerPanelBtn.addEventListener('click', () => {
-             // Reutilizamos o modal de gerente para autenticar o acesso ao painel
              openManagerAuthModal('goToManagerPanel');
          });
     }
 
-    // NOVO: Modal de autenticação Gerencial (antes da ação)
+    // Modal de autenticação Gerencial (antes da ação)
     const openManagerAuthModal = (action) => {
         const managerModal = document.getElementById('managerModal');
         if (!managerModal) return; 
@@ -422,7 +462,7 @@ document.addEventListener('DOMContentLoaded', () => {
         managerModal.innerHTML = `
             <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
                 <h3 class="text-xl font-bold mb-4 text-red-600">Acesso Gerencial</h3>
-                <p class="text-base mb-3">Insira a senha do gerente para acessar as configurações.</p>
+                <p class="text-base mb-3">Insira a senha do gerente para prosseguir.</p>
                 <input type="password" id="managerPasswordInput" placeholder="Senha (Ex: 1234)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 text-base" maxlength="4">
                 
                 <div class="flex justify-end space-x-3 mt-4">
@@ -473,7 +513,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 userId = `${username}_id_mock`; 
                 document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)}... (${appId})`;
 
-                // CORREÇÃO: Botão de Gerente SEMPRE VISÍVEL após login
+                // Botão de Gerente SEMPRE VISÍVEL após login
                 if (openManagerPanelBtn) {
                     openManagerPanelBtn.classList.remove('hidden');
                 }
@@ -491,9 +531,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // NOVO/CORRIGIDO: Ações em Massa no Resumo da Conta
+    // --- FUNÇÕES DE EXCLUSÃO/TRANSFERÊNCIA EM MASSA ---
     const deleteSelectedSentItems = async () => {
-        const selectedCheckboxes = document.querySelectorAll('#reviewItemsList input[type="checkbox"]:checked');
+        const selectedCheckboxes = document.querySelectorAll('#reviewItemsList input[type="checkbox"].item-checkbox:checked');
         if (selectedCheckboxes.length === 0) {
             alert("Nenhum item selecionado para exclusão.");
             return;
@@ -510,6 +550,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Procura todas as instâncias que correspondem ao grupo (id e note)
             if (currentOrderSnapshot && currentOrderSnapshot.sentItems) {
                 currentOrderSnapshot.sentItems.forEach(sentItem => {
+                    // Nota: O valor do checkbox é 'itemId-itemNote'
                     if (sentItem.id == itemId && (sentItem.note || '') === itemNote) {
                         itemsToRemove.push(sentItem);
                     }
@@ -541,7 +582,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // NOVO/CORRIGIDO: Transferência em Massa
+    // Transferência em Massa
     const transferSelectedSentItems = async () => {
         const targetTableInput = document.getElementById('targetTableInput');
         const targetTable = parseInt(targetTableInput.value);
@@ -551,7 +592,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const selectedCheckboxes = document.querySelectorAll('#reviewItemsList input[type="checkbox"]:checked');
+        const selectedCheckboxes = document.querySelectorAll('#reviewItemsList input[type="checkbox"].item-checkbox:checked');
         if (selectedCheckboxes.length === 0) {
             alert("Nenhum item selecionado para transferência.");
             return;
@@ -598,7 +639,6 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             await batch.commit();
             alert(`${itemsToTransfer.length} item(s) transferido(s) da Mesa ${currentTableId} para a Mesa ${targetTable}.`);
-            // Fecha o modal após o sucesso
             if (selectiveTransferModal) selectiveTransferModal.style.display = 'none';
         } catch (e) {
             console.error("Erro ao transferir itens:", e);
@@ -613,8 +653,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const modal = document.getElementById('selectiveTransferModal');
         if (!modal) return; 
         
-        // Verifica se há itens selecionados na tela de pagamento (Painel 3)
-        const selectedItemsToTransfer = document.querySelectorAll('#reviewItemsList input[type="checkbox"]:checked');
+        const selectedItemsToTransfer = document.querySelectorAll('#reviewItemsList input[type="checkbox"].item-checkbox:checked');
         if (selectedItemsToTransfer.length === 0) {
             alert("Selecione um ou mais itens no Resumo da Conta para realizar a transferência.");
             return;
@@ -646,6 +685,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 
+                // Simulação de verificação
                 if (transferStatus) {
                     transferStatus.textContent = `Mesa ${targetTable} verificada.`;
                     transferStatus.classList.remove('hidden');
@@ -658,6 +698,7 @@ document.addEventListener('DOMContentLoaded', () => {
             confirmTransferBtn.onclick = transferSelectedSentItems;
         }
     };
+    // --- FIM FUNÇÕES DE EXCLUSÃO/TRANSFERÊNCIA EM MASSA ---
 
     // Função de Navegação
     window.goToScreen = (screenId) => {
@@ -665,7 +706,6 @@ document.addEventListener('DOMContentLoaded', () => {
             saveSelectedItemsToFirebase(currentTableId);
         }
 
-        // Mapeamento de telas para 4 índices: 0, 1, 2, 3
         const screenMap = screens; 
 
         const screenIndex = screenMap[screenId];
@@ -691,9 +731,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const getTablesCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'tables');
     const getTableDocRef = (tableNumber) => doc(db, 'artifacts', appId, 'public', 'data', 'tables', tableNumber.toString());
     const getKdsCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'kds_orders');
-    const getManagerCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'manager_logs');
 
-    // --- FUNÇÃO PARA SALVAR A LISTA selectedItems NO FIREBASE ---
+    // FUNÇÃO PARA SALVAR A LISTA selectedItems NO FIREBASE
     const saveSelectedItemsToFirebase = async (tableId) => {
         if (!tableId) return;
 
@@ -739,7 +778,6 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error("Erro ao inicializar Firebase: ", e);
         document.getElementById('statusContent').innerHTML = `<h2 class="text-xl font-bold mb-2 text-red-600">Erro de Configuração</h2><p>Verifique as variáveis do Firebase. ${e.message}</p>`;
     }
-
 
     // --- FUNÇÕES DE INTEGRAÇÃO WOOCOMMERCE (MANTIDAS) ---
     const fetchWooCommerceData = async (endpoint) => {
@@ -828,7 +866,9 @@ document.addEventListener('DOMContentLoaded', () => {
     window.deletePayment = async (timestamp) => {
         if (!currentTableId || !currentOrderSnapshot) return;
         
-        const paymentToDelete = currentOrderSnapshot.payments.find(p => p.timestamp == timestamp);
+        // Converte o timestamp para número para garantir a comparação
+        const tsNumber = parseInt(timestamp);
+        const paymentToDelete = currentOrderSnapshot.payments.find(p => p.timestamp === tsNumber);
         
         if (!paymentToDelete) {
              alert("Pagamento não encontrado.");
@@ -844,12 +884,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 payments: arrayRemove(paymentToDelete)
             });
             alert("Pagamento removido da lista.");
+            // O onSnapshot se encarregará de chamar renderPaymentSummary novamente
         } catch (e) {
             console.error("Erro ao deletar pagamento:", e);
             alert("Erro ao tentar remover o pagamento.");
         }
     }
-
 
     // Calcula o total geral (subtotal + serviço)
     const calculateTotal = (subtotal, applyServiceTax) => {
@@ -1064,7 +1104,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tableNumber: currentTableId,
             items: currentOrderSnapshot.sentItems,
             payments: currentOrderSnapshot.payments,
-            total: currentOrderSnapshot.currentTotal,
+            total: currentOrderSnapshot.total,
             serviceTaxApplied: currentOrderSnapshot.serviceTaxApplied,
             source: 'PDV_FATOR'
         };
@@ -1192,17 +1232,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         openTablesCount.textContent = count;
+        
+        // Atualiza o timer a cada 5 segundos (repetido no onSnapshot para manter vivo)
+        setTimeout(loadOpenTables, 5000); 
     };
 
     const loadOpenTables = () => {
         const tablesCollection = getTablesCollectionRef();
         const q = query(tablesCollection, where('status', '==', 'open'), orderBy('tableNumber', 'asc'));
 
+        // Usa onSnapshot para atualizações em tempo real
         onSnapshot(q, (snapshot) => {
             const docs = snapshot.docs;
             renderTables(docs);
-            // Atualiza o timer a cada 5 segundos
-            setTimeout(loadOpenTables, 5000); 
         }, (error) => {
             console.error("Erro ao carregar mesas (onSnapshot):", error);
             if (openTablesList) {
@@ -1527,6 +1569,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            // A lista local de selectedItems agora é atualizada com a lista de itens a serem retidos (itensToHold)
             selectedItems = [...itemsToHold];
 
             const itemsGroupedBySector = itemsToSend.reduce((acc, item) => {
@@ -1572,7 +1615,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 await updateDoc(tableRef, {
                     sentItems: arrayUnion(...itemsForUpdate), 
                     selectedItems: selectedItems,
-                    lastSentAt: currentTimestamp // NOVO: Atualiza o campo de último envio
+                    lastSentAt: currentTimestamp // Atualiza o campo de último envio
                 });
                 
                 renderSelectedItems(); 
@@ -1641,7 +1684,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Agrupa itens, mantendo a chave única para a checkbox (id-note)
         const groupedItems = currentOrderSnapshot.sentItems.reduce((acc, item) => {
             const key = `${item.id}-${item.note || ''}`;
-            acc[key] = acc[key] || { ...item, qty: 0 };
+            acc[key] = acc[key] || { ...item, qty: 0, key: key };
             acc[key].qty++;
             return acc;
         }, {});
@@ -1651,5 +1694,183 @@ document.addEventListener('DOMContentLoaded', () => {
         // Adiciona cabeçalho e botões de Ações em Massa
         if (listEl) {
              listEl.innerHTML += `
-                <div class="flex justify-between items-center pb-2 border-b border-gray-200">
-                    <span class="font-bold
+                <div class="flex justify-between items-center pb-2 border-b border-gray-200 mb-2">
+                    <label class="flex items-center space-x-2 text-sm font-semibold text-gray-700">
+                        <input type="checkbox" id="selectAllItems" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                        <span>Selecionar Todos</span>
+                    </label>
+                    <div class="flex space-x-2">
+                        <button id="massTransferBtn" class="px-2 py-1 text-xs bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition disabled:opacity-50" title="Transferir Itens Selecionados (Gerente)">
+                            Transferir (<span id="selectedItemsCount">0</span>)
+                        </button>
+                        <button id="massDeleteBtn" class="px-2 py-1 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 transition disabled:opacity-50" title="Excluir Itens Selecionados (Gerente)">
+                            Excluir (<span id="selectedItemsCountDelete">0</span>)
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+
+        Object.values(groupedItems).forEach((item, index) => {
+            const lineTotal = item.qty * item.price;
+            totalRecalculated += lineTotal;
+            const obsText = item.note ? ` (${item.note})` : '';
+            const itemKey = `${item.id}-${item.note || ''}`; // Chave única para o valor do checkbox
+
+            if (listEl) { 
+                listEl.innerHTML += `
+                    <div class="flex items-center py-2 border-b border-gray-100">
+                        <input type="checkbox" class="item-checkbox h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 mr-2" value="${itemKey}">
+                        <div class="flex justify-between flex-grow min-w-0">
+                            <div class="flex flex-col flex-grow min-w-0 mr-2">
+                                <span class="font-semibold text-gray-800">${item.name} (${item.qty}x)</span>
+                                <span class="text-xs text-gray-500 truncate">${obsText}</span>
+                            </div>
+                            <span class="font-bold text-base text-indigo-700 flex-shrink-0">${formatCurrency(lineTotal)}</span>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+        
+        if (totalRecalculated !== currentOrderSnapshot.total) {
+            const tableRef = getTableDocRef(currentTableId);
+            updateDoc(tableRef, { total: totalRecalculated }).catch(e => console.error("Erro ao sincronizar total:", e));
+        }
+        
+        // Adiciona event listeners para os botões e checkboxes
+        const massDeleteBtn = document.getElementById('massDeleteBtn');
+        const massTransferBtn = document.getElementById('massTransferBtn');
+        const selectAllItems = document.getElementById('selectAllItems');
+        const itemCheckboxes = document.querySelectorAll('.item-checkbox');
+        const selectedItemsCountEl = document.getElementById('selectedItemsCount');
+        const selectedItemsCountDeleteEl = document.getElementById('selectedItemsCountDelete');
+        
+        const updateMassActionButtons = () => {
+            const checkedCount = document.querySelectorAll('#reviewItemsList .item-checkbox:checked').length;
+            if (massDeleteBtn) massDeleteBtn.disabled = checkedCount === 0;
+            if (massTransferBtn) massTransferBtn.disabled = checkedCount === 0;
+            if (selectedItemsCountEl) selectedItemsCountEl.textContent = checkedCount;
+            if (selectedItemsCountDeleteEl) selectedItemsCountDeleteEl.textContent = checkedCount;
+            if (selectAllItems) selectAllItems.checked = checkedCount === itemCheckboxes.length && itemCheckboxes.length > 0;
+        };
+        
+        if (selectAllItems) {
+            selectAllItems.addEventListener('change', () => {
+                itemCheckboxes.forEach(cb => cb.checked = selectAllItems.checked);
+                updateMassActionButtons();
+            });
+        }
+        
+        itemCheckboxes.forEach(cb => cb.addEventListener('change', updateMassActionButtons));
+        
+        if (massDeleteBtn) massDeleteBtn.addEventListener('click', () => openManagerAuthModal('deleteMass'));
+        if (massTransferBtn) massTransferBtn.addEventListener('click', () => openManagerAuthModal('openSelectiveTransfer'));
+        
+        updateMassActionButtons();
+    };
+
+    
+    let unsubscribeKds = null;
+    
+    const subscribeToKdsNotifications = (tableId) => {
+        if (unsubscribeKds) unsubscribeKds();
+        
+        const q = query(getKdsCollectionRef(), where('tableNumber', '==', parseInt(tableId)), where('status', '==', 'ready'));
+
+        unsubscribeKds = onSnapshot(q, (snapshot) => {
+            if (snapshot.docs.length > 0) {
+                const badge = document.getElementById('kds-notification-badge');
+                const container = document.getElementById('notification-badge-container');
+                if (badge) badge.classList.remove('hidden');
+                if (container) container.classList.add('animate-pulse');
+            } else {
+                const badge = document.getElementById('kds-notification-badge');
+                const container = document.getElementById('notification-badge-container');
+                if (badge) badge.classList.add('hidden');
+                if (container) container.classList.remove('animate-pulse');
+            }
+        }, (error) => {
+            console.error("Erro no listener de notificação KDS:", error);
+        });
+    };
+
+    const hideStatus = () => {
+        if (statusScreen && mainContent) {
+            statusScreen.style.display = 'none';
+            mainContent.style.display = 'block';
+        }
+    };
+
+    // Usado para ações de gerente que precisam de senha
+    window.openManagerModal = (action, itemId = null, itemNote = null) => {
+        const managerModal = document.getElementById('managerModal');
+        if (!managerModal) return; 
+
+        managerModal.innerHTML = `
+            <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+                <h3 class="text-xl font-bold mb-4 text-red-600">Ação Gerencial Necessária</h3>
+                <p class="text-base mb-3">Insira a senha do gerente para prosseguir.</p>
+                <input type="password" id="managerPasswordInput" placeholder="Senha (Ex: 1234)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 text-base" maxlength="4">
+                
+                <div class="flex justify-end space-x-3 mt-4">
+                    <button class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-base" onclick="document.getElementById('managerModal').style.display='none'">Cancelar</button>
+                    <button id="authManagerBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-base">Autenticar</button>
+                </div>
+            </div>
+        `;
+        managerModal.style.display = 'flex';
+        
+        document.getElementById('authManagerBtn').onclick = () => {
+            const input = document.getElementById('managerPasswordInput');
+            if (input && input.value === password) {
+                managerModal.style.display = 'none';
+                if (action === 'deleteItem') {
+                    // Esta lógica não é usada mais (substituída por deleteMass), mas mantida para consistência com chamadas legadas
+                    // deleteSentItem(itemId, itemNote); 
+                } else if (action === 'deleteMass') {
+                    deleteSelectedSentItems();
+                } else if (action === 'openSelectiveTransfer') {
+                    openSelectiveTransferModal();
+                }
+            } else {
+                alert("Senha incorreta.");
+                if (input) input.value = '';
+            }
+        };
+    };
+    
+    // Antiga função de exclusão individual (mantida, mas não referenciada pelos novos botões)
+    const deleteSentItem = async (itemId, itemNote) => {
+        if (!currentTableId || !currentOrderSnapshot) return;
+        
+        const itemToDelete = currentOrderSnapshot.sentItems.find(item => 
+            item.id === itemId && (item.note || '') === itemNote
+        );
+
+        if (!itemToDelete) return;
+
+        const tableRef = getTableDocRef(currentTableId);
+
+        try {
+            await updateDoc(tableRef, {
+                sentItems: arrayRemove(itemToDelete)
+            });
+            alert("Item removido da conta.");
+        } catch (e) {
+            console.error("Erro ao deletar item da conta:", e);
+            alert("Erro ao tentar remover o item.");
+        }
+    };
+
+    if (finalizeOrderBtn) finalizeOrderBtn.addEventListener('click', finalizeOrder);
+    if (openNfeModalBtn) openNfeModalBtn.addEventListener('click', window.openNfeModal); // Usando window para o modal
+
+    // Garante que o status inicial seja exibido
+    if (statusScreen && mainContent) {
+        statusScreen.style.display = 'flex';
+        mainContent.style.display = 'none';
+    }
+
+}); // FIM DO document.addEventListener('DOMContentLoaded', ... )
