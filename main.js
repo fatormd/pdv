@@ -476,10 +476,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Botão de Gerente no Cabeçalho
     if (openManagerPanelBtn) {
          openManagerPanelBtn.addEventListener('click', () => {
-             openManagerAuthModal('goToManagerPanel');
+             // Chamamos com window. para garantir acesso global
+             window.openManagerAuthModal('goToManagerPanel');
          });
     }
-
+    
     // NOVO: Função para executar a exclusão de pagamento APÓS autenticação
     const executeDeletePayment = async (timestamp) => {
         if (!currentTableId || !currentOrderSnapshot) return;
@@ -508,7 +509,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // Modal de autenticação Gerencial (antes da ação)
-    const openManagerAuthModal = (action, payload = null) => {
+    // FIX: Change definition to window.openManagerAuthModal to fix "not a function" error
+    window.openManagerAuthModal = (action, payload = null) => {
         const managerModal = document.getElementById('managerModal');
         if (!managerModal) return; 
 
@@ -540,7 +542,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     deleteSelectedSentItems();
                 } else if (action === 'openSelectiveTransfer') {
                     window.openSelectiveTransferModal(); 
-                } else if (action === 'deletePayment') { // NOVO: Deleção de Pagamento
+                } else if (action === 'deletePayment') { // Chamada de exclusão
                     executeDeletePayment(payload); 
                 }
                 
@@ -551,40 +553,12 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     };
 
-
-    if (loginBtn) {
-        loginBtn.addEventListener('click', async () => {
-            const username = loginUsernameInput.value;
-            const password = loginPasswordInput.value;
-            
-            const isAuthenticated = mockUsers[username] === password;
-
-            if (isAuthenticated) {
-                alert(`Login de ${username} bem-sucedido!`);
-                
-                hideLoginModal(); 
-                hideStatus(); 
-                
-                userId = `${username}_id_mock`; 
-                document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)}... (${appId})`;
-
-                // Botão de Gerente SEMPRE VISÍVEL após login
-                if (openManagerPanelBtn) {
-                    openManagerPanelBtn.classList.remove('hidden');
-                }
-
-                loadOpenTables();
-                await fetchWooCommerceProducts();
-                await fetchWooCommerceCategories();
-                renderMenu();
-                renderPaymentMethodButtons();
-                goToScreen('panelScreen'); 
-
-            } else {
-                alert('Credenciais inválidas.');
-            }
-        });
+    // CORRIGIDO: Função para deletar um pagamento (agora chama autenticação)
+    window.deletePayment = async (timestamp) => {
+        // Chama o modal de autenticação, passando a ação e o timestamp do pagamento como payload
+        window.openManagerAuthModal('deletePayment', timestamp);
     }
+
 
     // --- FUNÇÕES DE EXCLUSÃO/TRANSFERÊNCIA EM MASSA (CORRIGIDO RECALC TOTAL) ---
     // NOVO HELPER: Calcula o valor total (em float) de uma lista de itens
@@ -953,12 +927,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // CORRIGIDO: Função para deletar um pagamento (agora chama autenticação)
-    window.deletePayment = async (timestamp) => {
-        // Chama o modal de autenticação, passando a ação e o timestamp do pagamento como payload
-        window.openManagerAuthModal('deletePayment', timestamp);
-    }
-
     // Calcula o total geral (subtotal + serviço)
     const calculateTotal = (subtotal, applyServiceTax) => {
         const taxRate = applyServiceTax ? 0.10 : 0;
@@ -1023,7 +991,6 @@ document.addEventListener('DOMContentLoaded', () => {
             paymentListEl.innerHTML += `<p class="text-xs text-gray-500 italic p-2">Nenhum pagamento registrado.</p>`;
         } else {
             payments.forEach(p => {
-                // CORRIGIDO: Exclusão de pagamento agora exige senha de gerente
                 paymentListEl.innerHTML += `
                     <div class="flex justify-between items-center py-1 border-b border-gray-100">
                         <div class="flex flex-col">
@@ -1173,7 +1140,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tableNumber: currentTableId,
             items: currentOrderSnapshot.sentItems,
             payments: currentOrderSnapshot.payments,
-            total: currentOrderSnapshot.total,
+            total: currentOrderSnapshot.currentTotal,
             serviceTaxApplied: currentOrderSnapshot.serviceTaxApplied,
             source: 'PDV_FATOR'
         };
@@ -1196,7 +1163,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- FUNÇÕES DO PAINEL DE MESAS (1 - CORRIGIDO) ---
+    // --- FUNÇÕES DO PAINEL DE MESAS (1) ---
 
     const checkInputs = () => {
         const mesaValida = parseInt(mesaInput.value) > 0;
@@ -1224,11 +1191,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     total: 0,
                     sentItems: [], 
                     payments: [],
-                    serviceTaxApplied: true, // Taxa de serviço ativa por padrão
-                    selectedItems: [],
-                    lastSentAt: null, // Campo para o timer
+                    serviceTaxApplied: true, // CORREÇÃO: Taxa de serviço ativa por padrão
+                    selectedItems: [] 
                 });
 
+                // CORREÇÃO: Zera a lista de selectedItems para evitar que itens de sessões anteriores apareçam em mesas novas.
                 selectedItems = [];
 
                 currentTableId = tableNumber.toString();
@@ -1282,6 +1249,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+
     const renderTables = (docs) => {
         if (!openTablesList || !openTablesCount) return;
 
@@ -1302,29 +1270,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 count++;
                 const total = table.total || 0;
                 const cardColor = total > 0 ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200';
-                
-                // Lógica do Ícone de Atenção 'Espera'
-                const hasEspera = (table.selectedItems || []).some(item => 
-                    item.note && item.note.toLowerCase().includes('espera')
-                );
-                const attentionIconHtml = hasEspera 
-                    ? `<i class="fas fa-exclamation-triangle attention-icon" title="Itens em Espera"></i>` 
-                    : '';
-
-                // Lógica do Timer (último pedido enviado)
-                const lastSentAtTime = table.lastSentAt ? table.lastSentAt : null;
-                const timerHtml = lastSentAtTime 
-                    ? `<span class="table-timer">Último Pedido: ${formatElapsedTime(lastSentAtTime)}</span>`
-                    : `<span class="table-timer">Nenhum pedido enviado</span>`;
-
 
                 const cardHtml = `
                     <div class="table-card-panel ${cardColor} shadow-md transition-colors duration-200" data-table-id="${tableId}">
-                        ${attentionIconHtml}
                         <h3 class="font-bold text-2xl">Mesa ${table.tableNumber}</h3>
                         <p class="text-xs font-light">Pessoas: ${table.diners}</p>
                         <span class="font-bold text-lg mt-2">${formatCurrency(total)}</span>
-                        ${timerHtml}
                     </div>
                 `;
                 openTablesList.innerHTML += cardHtml;
@@ -1332,15 +1283,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         openTablesCount.textContent = count;
-        
-        // CORREÇÃO (BUG 2): Remoção do setTimeout/setInterval problemático. O onSnapshot agora é o único motor de atualização.
     };
 
     const loadOpenTables = () => {
         const tablesCollection = getTablesCollectionRef();
         const q = query(tablesCollection, where('status', '==', 'open'), orderBy('tableNumber', 'asc'));
 
-        // Usa onSnapshot para atualizações em tempo real
         onSnapshot(q, (snapshot) => {
             const docs = snapshot.docs;
             renderTables(docs);
@@ -1378,7 +1326,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- FUNÇÕES DO CARDÁPIO (2) ---
     
-    // renderiza os itens do cardápio com botão de adição (MANTIDA)
+    // renderiza os itens do cardápio com botão de adição (AGORA USANDO DADOS DO WOOCOMMERCE)
     const renderMenu = (filter = 'all', search = '') => {
         let filteredItems = WOOCOMMERCE_PRODUCTS;
         
@@ -1433,7 +1381,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('.category-btn').forEach(b => {
                 b.classList.remove('bg-indigo-600', 'text-white');
                 b.classList.add('bg-white', 'text-gray-700', 'border', 'border-gray-300');
-                    });
+            });
             btn.classList.remove('bg-white', 'text-gray-700', 'border', 'border-gray-300');
             btn.classList.add('bg-indigo-600', 'text-white');
             
@@ -1668,7 +1616,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // A lista local de selectedItems agora é atualizada com a lista de itens a serem retidos (itensToHold)
+            // CORREÇÃO: A lista local de selectedItems agora é atualizada com a lista de itens a serem retidos (itensToHold)
             selectedItems = [...itemsToHold];
 
             const itemsGroupedBySector = itemsToSend.reduce((acc, item) => {
@@ -1687,13 +1635,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }, {});
             
             const kdsOrderRef = doc(getKdsCollectionRef());
-            const currentTimestamp = Date.now();
             
             try {
                 await setDoc(kdsOrderRef, {
                     orderId: kdsOrderRef.id,
                     tableNumber: parseInt(currentTableId),
-                    timestamp: currentTimestamp,
+                    timestamp: Date.now(),
                     sentAt: serverTimestamp(),
                     sectors: itemsGroupedBySector,
                     status: 'pending'
@@ -1713,8 +1660,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 await updateDoc(tableRef, {
                     sentItems: arrayUnion(...itemsForUpdate), 
-                    selectedItems: selectedItems,
-                    lastSentAt: currentTimestamp // Atualiza o campo de último envio
+                    selectedItems: selectedItems 
                 });
                 
                 renderSelectedItems(); 
@@ -1767,7 +1713,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // CORRIGIDO/NOVO: Adiciona checkboxes e botões de ação em massa
     const renderSentItems = () => {
         const listEl = document.getElementById('reviewItemsList'); 
 
@@ -1780,94 +1725,47 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (listEl) listEl.innerHTML = ''; 
 
-        // Agrupa itens, mantendo a chave única para a checkbox (id-note)
         const groupedItems = currentOrderSnapshot.sentItems.reduce((acc, item) => {
             const key = `${item.id}-${item.note || ''}`;
-            acc[key] = acc[key] || { ...item, qty: 0, key: key };
+            acc[key] = acc[key] || { ...item, qty: 0 };
             acc[key].qty++;
             return acc;
         }, {});
 
         let totalRecalculated = 0;
-        
-        // Adiciona cabeçalho e botões de Ações em Massa
-        if (listEl) {
-             listEl.innerHTML += `
-                <div class="flex justify-between items-center pb-2 border-b border-gray-200 mb-2">
-                    <label class="flex items-center space-x-2 text-sm font-semibold text-gray-700">
-                        <input type="checkbox" id="selectAllItems" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
-                        <span>Selecionar Todos</span>
-                    </label>
-                    <div class="flex space-x-2">
-                        <button id="massTransferBtn" class="px-2 py-1 text-xs bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition disabled:opacity-50" title="Transferir Itens Selecionados (Gerente)">
-                            Transferir (<span id="selectedItemsCount">0</span>)
-                        </button>
-                        <button id="massDeleteBtn" class="px-2 py-1 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 transition disabled:opacity-50" title="Excluir Itens Selecionados (Gerente)">
-                            Excluir (<span id="selectedItemsCountDelete">0</span>)
-                        </button>
-                    </div>
-                </div>
-            `;
-        }
-
 
         Object.values(groupedItems).forEach((item, index) => {
             const lineTotal = item.qty * item.price;
             totalRecalculated += lineTotal;
             const obsText = item.note ? ` (${item.note})` : '';
-            const itemKey = `${item.id}-${item.note || ''}`; // Chave única para o valor do checkbox
 
             if (listEl) { 
                 listEl.innerHTML += `
-                    <div class="flex items-center py-2 border-b border-gray-100">
-                        <input type="checkbox" class="item-checkbox h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 mr-2" value="${itemKey}">
-                        <div class="flex justify-between flex-grow min-w-0">
-                            <div class="flex flex-col flex-grow min-w-0 mr-2">
-                                <span class="font-semibold text-gray-800">${item.name} (${item.qty}x)</span>
-                                <span class="text-xs text-gray-500 truncate">${obsText}</span>
-                            </div>
-                            <span class="font-bold text-base text-indigo-700 flex-shrink-0">${formatCurrency(lineTotal)}</span>
+                    <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                        <div class="flex flex-col flex-grow min-w-0 mr-2">
+                            <span class="font-semibold text-gray-800">${item.name} (${item.qty}x)</span>
+                            <span class="text-xs text-gray-500 truncate">${obsText}</span>
+                        </div>
+                        <div class="flex items-center space-x-2 flex-shrink-0">
+                            <span class="font-bold text-base text-indigo-700">${formatCurrency(lineTotal)}</span>
+                            <button class="text-indigo-500 hover:text-indigo-700 transition" onclick="openManagerModal('openSelectiveTransfer', '${item.id}', '${item.note || ''}')" title="Transferir Item (Gerente)">
+                                 <i class="fas fa-exchange-alt text-sm"></i>
+                            </button>
+                            <button class="text-red-500 hover:text-red-700 transition" onclick="openManagerModal('deleteItem', '${item.id}', '${item.note || ''}')" title="Excluir Item (Gerente)">
+                                <i class="fas fa-trash text-sm"></i>
+                            </button>
                         </div>
                     </div>
                 `;
             }
         });
         
-        // NOTA: A atualização do campo 'total' é agora feita *explicitamente* nas funções de exclusão/transferência, 
-        // e este onSnapshot garante a re-renderização completa da tela de pagamento após o commit do batch.
-        
-        // Adiciona event listeners para os botões e checkboxes
-        const massDeleteBtn = document.getElementById('massDeleteBtn');
-        const massTransferBtn = document.getElementById('massTransferBtn');
-        const selectAllItems = document.getElementById('selectAllItems');
-        const itemCheckboxes = document.querySelectorAll('.item-checkbox');
-        const selectedItemsCountEl = document.getElementById('selectedItemsCount');
-        const selectedItemsCountDeleteEl = document.getElementById('selectedItemsCountDelete');
-        
-        const updateMassActionButtons = () => {
-            const checkedCount = document.querySelectorAll('#reviewItemsList .item-checkbox:checked').length;
-            if (massDeleteBtn) massDeleteBtn.disabled = checkedCount === 0;
-            if (massTransferBtn) massTransferBtn.disabled = checkedCount === 0;
-            if (selectedItemsCountEl) selectedItemsCountEl.textContent = checkedCount;
-            if (selectedItemsCountDeleteEl) selectedItemsCountDeleteEl.textContent = checkedCount;
-            if (selectAllItems) selectAllItems.checked = checkedCount === itemCheckboxes.length && itemCheckboxes.length > 0;
-        };
-        
-        if (selectAllItems) {
-            selectAllItems.addEventListener('change', () => {
-                itemCheckboxes.forEach(cb => cb.checked = selectAllItems.checked);
-                updateMassActionButtons();
-            });
+        if (totalRecalculated !== currentOrderSnapshot.total) {
+            const tableRef = getTableDocRef(currentTableId);
+            updateDoc(tableRef, { total: totalRecalculated }).catch(e => console.error("Erro ao sincronizar total:", e));
         }
-        
-        itemCheckboxes.forEach(cb => cb.addEventListener('change', updateMassActionButtons));
-        
-        if (massDeleteBtn) massDeleteBtn.addEventListener('click', () => openManagerAuthModal('deleteMass'));
-        if (massTransferBtn) massTransferBtn.addEventListener('click', () => openManagerAuthModal('openSelectiveTransfer'));
-        
-        updateMassActionButtons();
-    };
 
+    };
     
     let unsubscribeKds = null;
     
@@ -1900,8 +1798,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Usado para ações de gerente que precisam de senha
-    window.openManagerModal = (action, payload = null) => {
+    window.openManagerModal = (action, itemId = null, itemNote = null) => {
         const managerModal = document.getElementById('managerModal');
         if (!managerModal) return; 
 
@@ -1923,12 +1820,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const input = document.getElementById('managerPasswordInput');
             if (input && input.value === password) {
                 managerModal.style.display = 'none';
-                if (action === 'deleteMass') {
-                    deleteSelectedSentItems();
+                if (action === 'deleteItem') {
+                    deleteSentItem(itemId, itemNote);
                 } else if (action === 'openSelectiveTransfer') {
-                    openSelectiveTransferModal();
-                } else if (action === 'deletePayment') {
-                    executeDeletePayment(payload);
+                    openSelectiveTransferModal(itemId, itemNote);
+                } else if (action === 'openActions') {
+                    openActionsModal();
                 }
             } else {
                 alert("Senha incorreta.");
@@ -1936,11 +1833,45 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
     };
+    
+    const deleteSentItem = async (itemId, itemNote) => {
+        if (!currentTableId || !currentOrderSnapshot) return;
+        
+        const itemToDelete = currentOrderSnapshot.sentItems.find(item => 
+            item.id === itemId && (item.note || '') === itemNote
+        );
+
+        if (!itemToDelete) return;
+
+        const tableRef = getTableDocRef(currentTableId);
+
+        try {
+            await updateDoc(tableRef, {
+                sentItems: arrayRemove(itemToDelete)
+            });
+            alert("Item removido da conta.");
+        } catch (e) {
+            console.error("Erro ao deletar item da conta:", e);
+            alert("Erro ao tentar remover o item.");
+        }
+    };
+    
+    if (openActionsModalBtn) {
+        openActionsModalBtn.addEventListener('click', () => {
+            openManagerModal('openActions');
+        });
+    }
+
+    if (document.getElementById('openSelectiveTransferModalBtn')) {
+        document.getElementById('openSelectiveTransferModalBtn').addEventListener('click', () => {
+            openManagerModal('openSelectiveTransfer');
+        });
+    }
+
 
     if (finalizeOrderBtn) finalizeOrderBtn.addEventListener('click', finalizeOrder);
-    if (openNfeModalBtn) openNfeModalBtn.addEventListener('click', window.openNfeModal);
-
-    // Garante que o status inicial seja exibido
+    if (openNfeModalBtn) openNfeModalBtn.addEventListener('click', openNfeModal);
+    
     if (statusScreen && mainContent) {
         statusScreen.style.display = 'flex';
         mainContent.style.display = 'none';
