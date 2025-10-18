@@ -586,7 +586,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- FUNÇÕES DE EXCLUSÃO/TRANSFERÊNCIA EM MASSA ---
+    // --- FUNÇÕES DE EXCLUSÃO/TRANSFERÊNCIA EM MASSA (CORRIGIDO RECALC TOTAL) ---
+    // NOVO HELPER: Calcula o valor total (em float) de uma lista de itens
+    const calculateItemsValue = (items) => {
+        return items.reduce((sum, item) => sum + (item.price || 0), 0);
+    };
+
     const deleteSelectedSentItems = async () => {
         const selectedCheckboxes = document.querySelectorAll('#reviewItemsList input[type="checkbox"].item-checkbox:checked');
         if (selectedCheckboxes.length === 0) {
@@ -616,6 +621,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
+        // CORREÇÃO (BUG 1): Calcula o novo total antes do commit
+        const itemsToRemoveValue = calculateItemsValue(itemsToRemove);
+        const currentTotal = currentOrderSnapshot.total || 0;
+        const newTotal = Math.max(0, currentTotal - itemsToRemoveValue); // Garante que o total não seja negativo
+
         const tableRef = getTableDocRef(currentTableId);
         const batch = writeBatch(db);
         
@@ -624,6 +634,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 sentItems: arrayRemove(item)
             });
         });
+        
+        // EXPLICIT UPDATE: Atualiza o total da mesa de origem
+        batch.update(tableRef, { total: newTotal });
 
         try {
             await batch.commit();
@@ -672,20 +685,40 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
+        // CORREÇÃO (BUG 1): Calcula o novo total antes do commit
+        const itemsToTransferValue = calculateItemsValue(itemsToTransfer);
+        
+        // 1. Source Table: Subtract item value from source total
         const sourceTableRef = getTableDocRef(currentTableId);
+        const sourceCurrentTotal = currentOrderSnapshot.total || 0;
+        const sourceNewTotal = Math.max(0, sourceCurrentTotal - itemsToTransferValue);
+
+        // 2. Target Table: Fetch current total to add to it
         const targetTableRef = getTableDocRef(targetTable);
+        const targetDocSnap = await getDoc(targetTableRef);
+        
+        if (!targetDocSnap.exists() || targetDocSnap.data().status === 'closed') {
+             alert(`A Mesa de destino ${targetTable} não está aberta.`);
+             return;
+        }
+        
+        const targetCurrentTotal = targetDocSnap.data()?.total || 0;
+        const targetNewTotal = targetCurrentTotal + itemsToTransferValue; 
+
         const batch = writeBatch(db);
 
-        // 1. Remove os itens da mesa de origem
+        // 1. Remove os itens e atualiza o total da mesa de origem
         itemsToTransfer.forEach(item => {
             batch.update(sourceTableRef, {
                 sentItems: arrayRemove(item)
             });
         });
+        batch.update(sourceTableRef, { total: sourceNewTotal }); // EXPLICIT UPDATE SOURCE
 
-        // 2. Adiciona os itens à mesa de destino
+        // 2. Adiciona os itens e atualiza o total da mesa de destino
         batch.update(targetTableRef, {
             sentItems: arrayUnion(...itemsToTransfer),
+            total: targetNewTotal // EXPLICIT UPDATE TARGET
         });
 
         try {
@@ -756,6 +789,12 @@ document.addEventListener('DOMContentLoaded', () => {
     window.goToScreen = (screenId) => {
         if (screenId === 'panelScreen' && currentTableId) {
             saveSelectedItemsToFirebase(currentTableId);
+        }
+        
+        // CORREÇÃO (BUG 3): Desinscreve o listener da mesa ao sair do Painel 2/3, para evitar conflitos ao abrir a próxima mesa.
+        if (screenId === 'panelScreen' && currentTableId && unsubscribeTable) {
+            unsubscribeTable(); 
+            unsubscribeTable = null; 
         }
 
         const screenMap = screens; 
@@ -984,6 +1023,7 @@ document.addEventListener('DOMContentLoaded', () => {
             paymentListEl.innerHTML += `<p class="text-xs text-gray-500 italic p-2">Nenhum pagamento registrado.</p>`;
         } else {
             payments.forEach(p => {
+                // CORRIGIDO: Exclusão de pagamento agora exige senha de gerente
                 paymentListEl.innerHTML += `
                     <div class="flex justify-between items-center py-1 border-b border-gray-100">
                         <div class="flex flex-col">
@@ -1293,8 +1333,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         openTablesCount.textContent = count;
         
-        // Atualiza o timer a cada 5 segundos
-        setTimeout(loadOpenTables, 5000); 
+        // CORREÇÃO (BUG 2): Remoção do setTimeout/setInterval problemático. O onSnapshot agora é o único motor de atualização.
     };
 
     const loadOpenTables = () => {
@@ -1394,7 +1433,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('.category-btn').forEach(b => {
                 b.classList.remove('bg-indigo-600', 'text-white');
                 b.classList.add('bg-white', 'text-gray-700', 'border', 'border-gray-300');
-            });
+                    });
             btn.classList.remove('bg-white', 'text-gray-700', 'border', 'border-gray-300');
             btn.classList.add('bg-indigo-600', 'text-white');
             
@@ -1794,11 +1833,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
-        // NOVO: Chamada para updateDoc fora do onSnapshot para evitar loops/re-render, mas ainda assim garantindo o refresh
-        if (totalRecalculated !== currentOrderSnapshot.total) {
-            const tableRef = getTableDocRef(currentTableId);
-            updateDoc(tableRef, { total: totalRecalculated }).catch(e => console.error("Erro ao sincronizar total:", e));
-        }
+        // NOTA: A atualização do campo 'total' é agora feita *explicitamente* nas funções de exclusão/transferência, 
+        // e este onSnapshot garante a re-renderização completa da tela de pagamento após o commit do batch.
         
         // Adiciona event listeners para os botões e checkboxes
         const massDeleteBtn = document.getElementById('massDeleteBtn');
