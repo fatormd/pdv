@@ -77,12 +77,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const esperaSwitch = document.getElementById('esperaSwitch');
     const paymentMethodButtonsContainer = document.getElementById('paymentMethodButtons');
 
-
     // Elementos da calculadora
     const calculatorModal = document.getElementById('calculatorModal');
     const openCalculatorBtn = document.getElementById('openCalculatorBtn');
     const calcDisplay = document.getElementById('calcDisplay');
     const calcButtons = calculatorModal?.querySelector('.grid');
+    const closeCalcBtnX = document.getElementById('closeCalcBtnX');
 
     // Elementos de login/logout
     const loginModal = document.getElementById('loginModal');
@@ -113,6 +113,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const regCustomerEmail = document.getElementById('regCustomerEmail');
     const cancelCustomerRegBtn = document.getElementById('cancelCustomerRegBtn');
     const confirmCustomerRegBtn = document.getElementById('confirmCustomerRegBtn');
+
+    // Elementos de busca de mesa
+    const searchTableInput = document.getElementById('searchTableInput');
+    const searchTableBtn = document.getElementById('searchTableBtn');
     
     let currentObsGroup = null;
 
@@ -140,12 +144,32 @@ document.addEventListener('DOMContentLoaded', () => {
         return `R$ ${parseInt(finalIntegerPart).toLocaleString('pt-BR')},${decimalPart}`;
     };
 
+    // NOVO: Máscara de número para a calculadora (sem R$)
+    const calculatorNumberMask = (value) => {
+        if (!value) return '0,00';
+        let rawValue = value.toString().replace(/\D/g, "");
+        if (rawValue.length > 2) {
+            rawValue = rawValue.padStart(3, '0');
+        } else if (rawValue.length < 3) {
+            rawValue = rawValue.padStart(3, '0');
+        }
+        
+        const integerPart = rawValue.substring(0, rawValue.length - 2);
+        const decimalPart = rawValue.substring(rawValue.length - 2);
+
+        const cleanIntegerPart = integerPart.replace(/^0+/, '');
+        const finalIntegerPart = cleanIntegerPart === '' ? '0' : cleanIntegerPart;
+
+
+        return `${parseInt(finalIntegerPart).toLocaleString('pt-BR')},${decimalPart}`;
+    };
+
     // Função para obter o valor numérico (float) do R$
     const getNumericValueFromCurrency = (currencyString) => {
         return parseFloat(currencyString.replace('R$', '').replace(/\./g, '').replace(',', '.').trim()) || 0;
     };
 
-    // Função para formatar o tempo (H:M:S ou M min/S seg atrás)
+    // CORRIGIDO: Função para formatar o tempo (apenas minutos)
     const formatElapsedTime = (timestamp) => {
         if (!timestamp) return 'N/A';
         
@@ -154,14 +178,14 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const seconds = Math.floor(diffMs / 1000);
         const minutes = Math.floor(seconds / 60);
-        const hours = Math.floor(minutes / 60);
 
-        if (hours > 0) {
-            return `${hours}h ${minutes % 60}m atrás`;
+        if (minutes >= 60) {
+             const hours = Math.floor(minutes / 60);
+             return `> ${hours}h atrás`;
         } else if (minutes > 0) {
-            return `${minutes}m ${seconds % 60}s atrás`;
+            return `${minutes} min atrás`;
         } else {
-            return `${seconds}s atrás`;
+            return `Recém-enviado`;
         }
     };
 
@@ -183,7 +207,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let shouldClearDisplay = false; 
 
     const calculateCents = (firstCents, operator, secondCents) => {
-        // Usa números de ponto flutuante para a operação, mas multiplica por 100 para evitar erros no cálculo final
         let first = firstCents; 
         let second = secondCents; 
         let result;
@@ -191,22 +214,20 @@ document.addEventListener('DOMContentLoaded', () => {
         switch (operator) {
             case '+': result = first + second; break;
             case '-': result = first - second; break;
-            case '*': result = first * second / 10000; break; // Multiplica R$ 10,00 (1000) por R$ 1,00 (100)
-            case '/': result = second === 0 ? 0 : first / second; break;
+            // Multiplicação em centavos: (1000 centavos * 200 centavos) / 100 = 2000 centavos (R$ 20,00)
+            case '*': result = Math.round(first * second / 100); break; 
+            case '/': result = second === 0 ? 0 : Math.round(first / second); break;
             default: result = second; break;
         }
 
-        // Para as operações que não são * ou / (soma/subtração), o resultado já está em centavos.
-        // Para * e / voltamos o resultado para centavos.
-        return operator === '*' || operator === '/' ? Math.round(result * 100) : result; 
+        return result;
     };
 
     const updateCalcDisplay = (centsValue) => {
         calcValueCents = centsValue;
         if (calcDisplay) {
-            // Garante que o número de centavos tenha pelo menos 3 dígitos (para R$ 0,00)
             const stringValue = centsValue.toString().padStart(3, '0');
-            calcDisplay.value = currencyMask(stringValue);
+            calcDisplay.value = calculatorNumberMask(stringValue);
         }
     };
 
@@ -222,6 +243,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (key === '00') {
             rawInput += '00';
+        } else if (key === ',' || key === '.') {
+            // Ignora o ponto ou vírgula no input, pois a máscara já a adiciona
+            return;
         } else {
             if (rawInput === '0' && key !== '0') {
                 rawInput = key;
@@ -285,11 +309,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if (document.getElementById('closeCalcBtn')) {
-        document.getElementById('closeCalcBtn').addEventListener('click', () => {
-            if (calculatorModal) {
-                calculatorModal.style.display = 'none';
-            }
+    // CORRIGIDO: Listener para o botão 'X' de fechar (closeCalcBtnX)
+    if (closeCalcBtnX) {
+        closeCalcBtnX.addEventListener('click', () => {
+            if (calculatorModal) calculatorModal.style.display = 'none';
         });
     }
 
@@ -319,6 +342,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 performCalculation('=');
                 // Converte o resultado de centavos de volta para a máscara de moeda
                 paymentValueInput.value = formatCurrency(calcValueCents / 100);
+                if (calculatorModal) calculatorModal.style.display = 'none';
+            } else if (key === 'close') {
+                // Nova ação de fechar
                 if (calculatorModal) calculatorModal.style.display = 'none';
             }
         });
@@ -454,14 +480,41 @@ document.addEventListener('DOMContentLoaded', () => {
          });
     }
 
+    // NOVO: Função para executar a exclusão de pagamento APÓS autenticação
+    const executeDeletePayment = async (timestamp) => {
+        if (!currentTableId || !currentOrderSnapshot) return;
+        
+        // Converte o timestamp para número para garantir a comparação
+        const tsNumber = parseInt(timestamp);
+        const paymentToDelete = currentOrderSnapshot.payments.find(p => p.timestamp === tsNumber);
+        
+        if (!paymentToDelete) {
+             alert("Pagamento não encontrado.");
+             return;
+        }
+        
+        // Remoção sem confirmação extra, pois já foi autenticado e confirmado no openManagerModal
+        const tableRef = getTableDocRef(currentTableId);
+        try {
+            await updateDoc(tableRef, {
+                payments: arrayRemove(paymentToDelete)
+            });
+            alert("Pagamento removido da lista.");
+        } catch (e) {
+            console.error("Erro ao deletar pagamento:", e);
+            alert("Erro ao tentar remover o pagamento.");
+        }
+    }
+
+
     // Modal de autenticação Gerencial (antes da ação)
-    const openManagerAuthModal = (action) => {
+    const openManagerAuthModal = (action, payload = null) => {
         const managerModal = document.getElementById('managerModal');
         if (!managerModal) return; 
 
         managerModal.innerHTML = `
             <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
-                <h3 class="text-xl font-bold mb-4 text-red-600">Acesso Gerencial</h3>
+                <h3 class="text-xl font-bold mb-4 text-red-600">Ação Gerencial Necessária</h3>
                 <p class="text-base mb-3">Insira a senha do gerente para prosseguir.</p>
                 <input type="password" id="managerPasswordInput" placeholder="Senha (Ex: 1234)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 text-base" maxlength="4">
                 
@@ -487,6 +540,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     deleteSelectedSentItems();
                 } else if (action === 'openSelectiveTransfer') {
                     window.openSelectiveTransferModal(); 
+                } else if (action === 'deletePayment') { // NOVO: Deleção de Pagamento
+                    executeDeletePayment(payload); 
                 }
                 
             } else {
@@ -547,10 +602,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const itemKey = checkbox.value; 
             const [itemId, itemNote] = itemKey.split('-');
             
-            // Procura todas as instâncias que correspondem ao grupo (id e note)
             if (currentOrderSnapshot && currentOrderSnapshot.sentItems) {
                 currentOrderSnapshot.sentItems.forEach(sentItem => {
-                    // Nota: O valor do checkbox é 'itemId-itemNote'
                     if (sentItem.id == itemId && (sentItem.note || '') === itemNote) {
                         itemsToRemove.push(sentItem);
                     }
@@ -566,7 +619,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const tableRef = getTableDocRef(currentTableId);
         const batch = writeBatch(db);
         
-        // Remove individualmente para garantir que o arrayRemove funcione corretamente
         itemsToRemove.forEach(item => {
             batch.update(tableRef, {
                 sentItems: arrayRemove(item)
@@ -862,33 +914,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // NOVO: Função para deletar um pagamento
+    // CORRIGIDO: Função para deletar um pagamento (agora chama autenticação)
     window.deletePayment = async (timestamp) => {
-        if (!currentTableId || !currentOrderSnapshot) return;
-        
-        // Converte o timestamp para número para garantir a comparação
-        const tsNumber = parseInt(timestamp);
-        const paymentToDelete = currentOrderSnapshot.payments.find(p => p.timestamp === tsNumber);
-        
-        if (!paymentToDelete) {
-             alert("Pagamento não encontrado.");
-             return;
-        }
-
-        if (!confirm(`Tem certeza que deseja EXCLUIR o pagamento de ${formatCurrency(paymentToDelete.value)} (${paymentToDelete.method})?`)) return;
-
-        const tableRef = getTableDocRef(currentTableId);
-
-        try {
-            await updateDoc(tableRef, {
-                payments: arrayRemove(paymentToDelete)
-            });
-            alert("Pagamento removido da lista.");
-            // O onSnapshot se encarregará de chamar renderPaymentSummary novamente
-        } catch (e) {
-            console.error("Erro ao deletar pagamento:", e);
-            alert("Erro ao tentar remover o pagamento.");
-        }
+        // Chama o modal de autenticação, passando a ação e o timestamp do pagamento como payload
+        window.openManagerAuthModal('deletePayment', timestamp);
     }
 
     // Calcula o total geral (subtotal + serviço)
@@ -961,7 +990,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span class="text-xs text-gray-700">${p.method}</span>
                             <span class="font-semibold text-sm">${formatCurrency(p.value)}</span>
                         </div>
-                        <button class="text-red-500 hover:text-red-700 transition" onclick="deletePayment(${p.timestamp})" title="Excluir Pagamento">
+                        <button class="text-red-500 hover:text-red-700 transition" onclick="deletePayment(${p.timestamp})" title="Excluir Pagamento (Gerente)">
                             <i class="fas fa-trash text-sm"></i>
                         </button>
                     </div>
@@ -1157,7 +1186,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     payments: [],
                     serviceTaxApplied: true, // Taxa de serviço ativa por padrão
                     selectedItems: [],
-                    lastSentAt: null, // NOVO: Campo para o timer
+                    lastSentAt: null, // Campo para o timer
                 });
 
                 selectedItems = [];
@@ -1181,6 +1210,37 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // NOVO: Lógica de Busca de Mesa
+    if (searchTableBtn) {
+        searchTableBtn.addEventListener('click', async () => {
+            const tableNumber = searchTableInput.value.trim();
+            if (!tableNumber || isNaN(parseInt(tableNumber))) {
+                alert("Insira um número de mesa válido para buscar.");
+                return;
+            }
+
+            const tableRef = getTableDocRef(tableNumber);
+            const docSnap = await getDoc(tableRef);
+
+            if (docSnap.exists() && docSnap.data().status === 'open') {
+                currentTableId = tableNumber;
+                document.getElementById('current-table-number').textContent = `Mesa ${currentTableId}`;
+                document.getElementById('payment-table-number').textContent = `Mesa ${currentTableId}`;
+                
+                if (docSnap.data().selectedItems) {
+                    selectedItems = docSnap.data().selectedItems;
+                } else {
+                    selectedItems = [];
+                }
+                
+                renderSelectedItems();
+                loadTableOrder(currentTableId); 
+                goToScreen('orderScreen');
+            } else {
+                alert(`A Mesa ${tableNumber} não está aberta.`);
+            }
+        });
+    }
 
     const renderTables = (docs) => {
         if (!openTablesList || !openTablesCount) return;
@@ -1203,7 +1263,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const total = table.total || 0;
                 const cardColor = total > 0 ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200';
                 
-                // NOVO: Lógica do Ícone de Atenção 'Espera'
+                // Lógica do Ícone de Atenção 'Espera'
                 const hasEspera = (table.selectedItems || []).some(item => 
                     item.note && item.note.toLowerCase().includes('espera')
                 );
@@ -1211,7 +1271,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? `<i class="fas fa-exclamation-triangle attention-icon" title="Itens em Espera"></i>` 
                     : '';
 
-                // NOVO: Lógica do Timer (último pedido enviado)
+                // Lógica do Timer (último pedido enviado)
                 const lastSentAtTime = table.lastSentAt ? table.lastSentAt : null;
                 const timerHtml = lastSentAtTime 
                     ? `<span class="table-timer">Último Pedido: ${formatElapsedTime(lastSentAtTime)}</span>`
@@ -1233,7 +1293,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         openTablesCount.textContent = count;
         
-        // Atualiza o timer a cada 5 segundos (repetido no onSnapshot para manter vivo)
+        // Atualiza o timer a cada 5 segundos
         setTimeout(loadOpenTables, 5000); 
     };
 
@@ -1734,6 +1794,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
+        // NOVO: Chamada para updateDoc fora do onSnapshot para evitar loops/re-render, mas ainda assim garantindo o refresh
         if (totalRecalculated !== currentOrderSnapshot.total) {
             const tableRef = getTableDocRef(currentTableId);
             updateDoc(tableRef, { total: totalRecalculated }).catch(e => console.error("Erro ao sincronizar total:", e));
@@ -1804,7 +1865,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Usado para ações de gerente que precisam de senha
-    window.openManagerModal = (action, itemId = null, itemNote = null) => {
+    window.openManagerModal = (action, payload = null) => {
         const managerModal = document.getElementById('managerModal');
         if (!managerModal) return; 
 
@@ -1826,13 +1887,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const input = document.getElementById('managerPasswordInput');
             if (input && input.value === password) {
                 managerModal.style.display = 'none';
-                if (action === 'deleteItem') {
-                    // Esta lógica não é usada mais (substituída por deleteMass), mas mantida para consistência com chamadas legadas
-                    // deleteSentItem(itemId, itemNote); 
-                } else if (action === 'deleteMass') {
+                if (action === 'deleteMass') {
                     deleteSelectedSentItems();
                 } else if (action === 'openSelectiveTransfer') {
                     openSelectiveTransferModal();
+                } else if (action === 'deletePayment') {
+                    executeDeletePayment(payload);
                 }
             } else {
                 alert("Senha incorreta.");
@@ -1840,32 +1900,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
     };
-    
-    // Antiga função de exclusão individual (mantida, mas não referenciada pelos novos botões)
-    const deleteSentItem = async (itemId, itemNote) => {
-        if (!currentTableId || !currentOrderSnapshot) return;
-        
-        const itemToDelete = currentOrderSnapshot.sentItems.find(item => 
-            item.id === itemId && (item.note || '') === itemNote
-        );
-
-        if (!itemToDelete) return;
-
-        const tableRef = getTableDocRef(currentTableId);
-
-        try {
-            await updateDoc(tableRef, {
-                sentItems: arrayRemove(itemToDelete)
-            });
-            alert("Item removido da conta.");
-        } catch (e) {
-            console.error("Erro ao deletar item da conta:", e);
-            alert("Erro ao tentar remover o item.");
-        }
-    };
 
     if (finalizeOrderBtn) finalizeOrderBtn.addEventListener('click', finalizeOrder);
-    if (openNfeModalBtn) openNfeModalBtn.addEventListener('click', window.openNfeModal); // Usando window para o modal
+    if (openNfeModalBtn) openNfeModalBtn.addEventListener('click', window.openNfeModal);
 
     // Garante que o status inicial seja exibido
     if (statusScreen && mainContent) {
@@ -1873,4 +1910,4 @@ document.addEventListener('DOMContentLoaded', () => {
         mainContent.style.display = 'none';
     }
 
-}); // FIM DO document.addEventListener('DOMContentLoaded', ... )
+});
