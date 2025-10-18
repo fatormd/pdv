@@ -21,6 +21,8 @@
                     },
                     colors: {
                         'primary': '#4f46e5', // Índigo
+                        // NOVO: Adicionando cores para o tema Gerencial
+                        'pumpkin': '#ff7518', 
                     },
                 }
             }
@@ -242,6 +244,53 @@
                 </div>
             </div>
             
+            <div id="managerScreen" class="flex-shrink-0 bg-gray-900 text-gray-200">
+                <div class="flex items-center mb-6 border-b border-orange-600 pb-3">
+                    <button id="backToPanelFromManagerBtn" class="mr-2 text-3xl p-2 text-orange-400 hover:text-orange-500 transition duration-150" title="Voltar para o Painel" onclick="goToScreen('panelScreen')">
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                    <span class="text-2xl font-semibold text-orange-400">Painel Gerencial</span>
+                </div>
+                
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div class="manager-card bg-gray-800 border-2 border-orange-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="alert('Funcionalidade de Gerenciamento de Produtos em desenvolvimento.')">
+                        <i class="fas fa-burger text-4xl text-orange-400 mb-2"></i>
+                        <h4 class="font-bold text-lg text-gray-100">Produtos</h4>
+                        <p class="text-sm text-gray-400">Criar, Editar, Excluir</p>
+                    </div>
+                    
+                    <div class="manager-card bg-gray-800 border-2 border-orange-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="alert('Funcionalidade de Gerenciamento de Categorias em desenvolvimento.')">
+                        <i class="fas fa-tags text-4xl text-orange-400 mb-2"></i>
+                        <h4 class="font-bold text-lg text-gray-100">Categorias</h4>
+                        <p class="text-sm text-gray-400">Criar, Editar, Excluir</p>
+                    </div>
+
+                    <div class="manager-card bg-gray-800 border-2 border-orange-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="alert('Funcionalidade de Gerenciamento de Garçons em desenvolvimento.')">
+                        <i class="fas fa-users text-4xl text-orange-400 mb-2"></i>
+                        <h4 class="font-bold text-lg text-gray-100">Usuários (Garçons)</h4>
+                        <p class="text-sm text-gray-400">Criar, Editar, Excluir</p>
+                    </div>
+                    
+                    <div class="manager-card bg-gray-800 border-2 border-orange-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="alert('Funcionalidade de Gerenciamento de Clientes em desenvolvimento.')">
+                        <i class="fas fa-address-book text-4xl text-orange-400 mb-2"></i>
+                        <h4 class="font-bold text-lg text-gray-100">Clientes</h4>
+                        <p class="text-sm text-gray-400">Cadastrar, Consultar</p>
+                    </div>
+
+                    <div class="manager-card bg-gray-800 border-2 border-orange-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="alert('Funcionalidade de Gerenciamento de Pedidos WooCommerce em desenvolvimento.')">
+                        <i class="fas fa-receipt text-4xl text-orange-400 mb-2"></i>
+                        <h4 class="font-bold text-lg text-gray-100">Pedidos (Woo)</h4>
+                        <p class="text-sm text-gray-400">Verificar, Sincronizar</p>
+                    </div>
+
+                    <div class="manager-card bg-gray-800 border-2 border-orange-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="document.getElementById('reportsModal').style.display='flex'">
+                        <i class="fas fa-chart-line text-4xl text-orange-400 mb-2"></i>
+                        <h4 class="font-bold text-lg text-gray-100">Relatórios</h4>
+                        <p class="text-sm text-gray-400">Vendas, Garçons, Métodos</p>
+                    </div>
+                </div>
+            </div>
+            
         </div>
     </main>
 
@@ -302,28 +351,7 @@
             <input type="password" id="loginPassword" placeholder="Senha" class="w-full p-4 mb-6 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
             
             <div class="flex space-x-3">
-                <button id="openWaiterRegModalBtn" class="w-1/4 bg-gray-500 text-white font-bold py-4 rounded-lg hover:bg-gray-600 transition text-lg" title="Cadastrar Novo Garçom (Gerente)">
-                    <i class="fas fa-user-plus"></i>
-                </button>
-                <button id="loginBtn" class="w-3/4 bg-indigo-600 text-white font-bold py-4 rounded-lg hover:bg-indigo-700 transition text-lg disabled:opacity-50">Entrar</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="waiterRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
-            <h3 class="text-xl font-bold mb-4 text-indigo-700">Novo Garçom (Acesso Gerente)</h3>
-            <input type="password" id="managerPassRegInput" placeholder="Senha do Gerente (1234)" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 text-base">
-            <input type="text" id="newWaiterNameInput" placeholder="Usuário de Login (Ex: garcom01)" class="w-full p-3 mb-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
-            <input type="password" id="newWaiterPasswordInput" placeholder="Senha de Login" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
-            
-            <div class="flex justify-end space-x-3 mt-4">
-                <button id="cancelWaiterRegBtn" class="px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition text-base font-bold">
-                    Cancelar
-                </button>
-                <button id="confirmWaiterRegBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base font-bold">
-                    Cadastrar Garçom
-                </button>
+                <button id="loginBtn" class="w-full bg-indigo-600 text-white font-bold py-4 rounded-lg hover:bg-indigo-700 transition text-lg disabled:opacity-50">Entrar</button>
             </div>
         </div>
     </div>
