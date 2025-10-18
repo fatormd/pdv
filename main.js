@@ -1929,14 +1929,35 @@ document.addEventListener('DOMContentLoaded', () => {
             alert("Erro ao tentar remover o item.");
         }
     };
+
     
-    // FIX: Remove residual listeners that caused the ReferenceError
-    // if (openActionsModalBtn) { ... } // REMOVED
-    // if (document.getElementById('openSelectiveTransferModalBtn')) { ... } // REMOVED
+    // FIX: Define window.openNfeModal in global scope
+    window.openNfeModal = () => {
+        const nfeModal = document.getElementById('nfeModal');
+        if (!nfeModal) return; 
+        
+        nfeModal.innerHTML = `
+            <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+                <h3 class="text-xl font-bold mb-4 text-green-700">NF-e / Recibo</h3>
+                <p class="text-base mb-3">Deseja incluir CPF/CNPJ?</p>
+                <input type="text" id="nfeCpfCnpjInput" placeholder="CPF ou CNPJ (Opcional)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-base">
+                
+                <div class="flex flex-col space-y-2 mt-4">
+                    <button class="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-base">Imprimir Recibo</button>
+                    <button class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base">Enviar por Email</button>
+                </div>
+
+                <div class="flex justify-end mt-4">
+                    <button class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-base" onclick="document.getElementById('nfeModal').style.display='none'">Fechar</button>
+                </div>
+            </div>
+        `;
+        nfeModal.style.display = 'flex';
+    };
 
 
     if (finalizeOrderBtn) finalizeOrderBtn.addEventListener('click', finalizeOrder);
-    if (openNfeModalBtn) openNfeModalBtn.addEventListener('click', openNfeModal);
+    if (openNfeModalBtn) openNfeModalBtn.addEventListener('click', window.openNfeModal);
     
     if (statusScreen && mainContent) {
         statusScreen.style.display = 'flex';
