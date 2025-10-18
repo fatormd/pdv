@@ -31,8 +31,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentOrderSnapshot = null; // Último estado da mesa no Firebase
     let serviceTaxApplied = true; // CORREÇÃO: Taxa de serviço ativa por padrão
     let currentPayments = []; // Pagamentos registrados localmente
-    let WOOCOMMERCE_PRODUCTS = []; // NOVO: Armazena produtos do WooCommerce
-    let WOOCOMMERCE_CATEGORIES = []; // NOVO: Armazena categorias do WooCommerce
+    let WOOCOMMERCE_PRODUCTS = []; // Armazena produtos do WooCommerce
+    let WOOCOMMERCE_CATEGORIES = []; // Armazena categorias do WooCommerce
 
     // MOCK: Usuários e Credenciais (usado para simulação de login/permissão)
     const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
@@ -96,8 +96,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginPasswordInput = document.getElementById('loginPassword');
     const logoutBtnHeader = document.getElementById('logoutBtnHeader');
     
+    // NOVOS: Modais Gerenciais (Recuperados do código anterior para o painel 4)
+    const waiterRegModal = document.getElementById('waiterRegModal');
+    const managerPassRegInput = document.getElementById('managerPassRegInput');
+    const newWaiterNameInput = document.getElementById('newWaiterNameInput');
+    const newWaiterPasswordInput = document.getElementById('newWaiterPasswordInput');
+    const confirmWaiterRegBtn = document.getElementById('confirmWaiterRegBtn');
+    const cancelWaiterRegBtn = document.getElementById('cancelWaiterRegBtn');
+    
     // NOVO: Ícone de Engrenagem (Botão de Gerente no Cabeçalho)
     const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
+    
+    // Elementos da Transferência em Massa
+    const selectiveTransferModal = document.getElementById('selectiveTransferModal');
+
+    // Elementos de Cliente
+    const customerRegModal = document.getElementById('customerRegModal');
+    const regCustomerName = document.getElementById('regCustomerName');
+    const regCustomerPhone = document.getElementById('regCustomerPhone');
+    const regCustomerEmail = document.getElementById('regCustomerEmail');
+    const cancelCustomerRegBtn = document.getElementById('cancelCustomerRegBtn');
+    const confirmCustomerRegBtn = document.getElementById('confirmCustomerRegBtn');
     
     // Variável para rastrear o item/grupo que está no modal de OBS
     let currentObsGroup = null;
@@ -133,7 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Função para formatar o tempo (H:M:S ou M min/S seg atrás)
     const formatElapsedTime = (timestamp) => {
-        if (!timestamp) return 'Carregando...';
+        if (!timestamp) return 'N/A';
         
         const now = Date.now();
         const diffMs = now - timestamp;
@@ -162,65 +181,71 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     }
 
-    // --- FUNÇÕES DA CALCULADORA (MANTIDAS) ---
-    let currentInput = '0';
-    let storedValue = 0;
+    // --- FUNÇÕES DA CALCULADORA (CORRIGIDO) ---
+    let calcValueCents = 0; 
+    let storedValueCents = 0; 
     let selectedOperator = null;
     let shouldClearDisplay = false; 
 
-    const calculate = (first, operator, second) => {
+    const calculateCents = (firstCents, operator, secondCents) => {
+        let first = firstCents / 100;
+        let second = secondCents / 100;
+        let result;
+
         switch (operator) {
-            case '+': return first + second;
-            case '-': return first - second;
-            case '*': return first * second;
-            case '/': return first / second;
-            case '%': return first * (second / 100);
-            default: return second;
+            case '+': result = first + second; break;
+            case '-': result = first - second; break;
+            case '*': result = first * second; break;
+            case '/': result = second === 0 ? 0 : first / second; break;
+            default: result = second; break;
         }
+
+        return Math.round(result * 100);
     };
 
-    const updateCalcDisplay = (value) => {
+    const updateCalcDisplay = (centsValue) => {
+        calcValueCents = centsValue;
         if (calcDisplay) {
-            calcDisplay.value = currencyMask(value.toString().replace('.', ''));
+            const stringValue = centsValue.toString().padStart(3, '0');
+            calcDisplay.value = currencyMask(stringValue);
         }
     };
 
     const handleNumberInput = (key) => {
         if (shouldClearDisplay) {
-            currentInput = '0';
+            calcValueCents = 0;
             shouldClearDisplay = false;
         }
 
-        let rawInput = currentInput.replace(/\D/g, '');
+        let rawInput = calcValueCents.toString().replace(/\D/g, '');
 
-        if (key === '.') {
-            if (rawInput.length < 3) {
-                rawValue = rawInput.padStart(3, '0');
+        if (key === '00') {
+            rawInput += '00';
+        } else {
+            if (rawInput === '0' && key !== '0') {
+                rawInput = key;
+            } else if (rawInput !== '0') {
+                rawInput += key;
+            } else if (rawInput === '0' && key === '0') {
+                return; 
             }
-            return;
         }
         
-        if (rawInput === '0' && key !== '0') {
-            rawInput = key;
-        } else if (rawInput !== '0') {
-            rawInput += key;
+        if (rawInput.length > 12) {
+             rawInput = rawInput.substring(0, 12);
         }
         
-        currentInput = rawInput;
-        updateCalcDisplay(currentInput);
+        updateCalcDisplay(parseInt(rawInput));
     };
 
     const handleOperator = (key) => {
         if (selectedOperator && !shouldClearDisplay) {
             performCalculation('=');
-            storedValue = getNumericValueFromCurrency(calcDisplay.value);
-            selectedOperator = key;
-            shouldClearDisplay = true;
-        } else {
-            storedValue = getNumericValueFromCurrency(calcDisplay.value);
-            selectedOperator = key;
-            shouldClearDisplay = true;
         }
+        
+        storedValueCents = calcValueCents;
+        selectedOperator = key;
+        shouldClearDisplay = true;
     };
 
     const performCalculation = (key) => {
@@ -229,16 +254,15 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const currentValue = getNumericValueFromCurrency(calcDisplay.value);
-        let result = calculate(storedValue, selectedOperator, currentValue);
-
-        updateCalcDisplay(result.toFixed(2).replace('.', ''));
+        let resultCents = calculateCents(storedValueCents, selectedOperator, calcValueCents);
+        
+        updateCalcDisplay(resultCents);
 
         if (key === '=') {
-            storedValue = result;
+            storedValueCents = resultCents;
             selectedOperator = null;
         } else {
-            storedValue = result;
+            storedValueCents = resultCents;
             selectedOperator = key;
         }
         shouldClearDisplay = true;
@@ -250,11 +274,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (calculatorModal) {
                 calculatorModal.style.display = 'flex';
                 const rawValue = paymentValueInput.value.replace('R$', '').replace(/\./g, '').replace(',', '');
-                currentInput = rawValue || '0';
-                storedValue = 0;
+                calcValueCents = parseInt(rawValue) || 0;
+                storedValueCents = 0;
                 selectedOperator = null;
                 shouldClearDisplay = false;
-                updateCalcDisplay(currentInput);
+                updateCalcDisplay(calcValueCents);
             }
         });
     }
@@ -274,33 +298,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const key = btn.dataset.key;
             const isNumber = /^[0-9]$/.test(key);
-            const isOperator = ['+', '-', '*', '/', '%'].includes(key);
+            const isDoubleZero = key === '00';
+            const isOperator = ['+', '-', '*', '/'].includes(key);
 
-            if (isNumber) {
+            if (isNumber || isDoubleZero) {
                 handleNumberInput(key);
-            } else if (key === '.') {
-                 handleNumberInput('0'); 
             } else if (isOperator) {
                 handleOperator(key);
             } else if (key === '=') {
                 performCalculation(key);
             } else if (key === 'C') {
-                currentInput = '0';
-                storedValue = 0;
+                calcValueCents = 0;
+                storedValueCents = 0;
                 selectedOperator = null;
                 shouldClearDisplay = false;
                 updateCalcDisplay(0);
             } else if (key === 'ok') {
                 performCalculation('=');
-                const finalValue = getNumericValueFromCurrency(calcDisplay.value);
-                paymentValueInput.value = formatCurrency(finalValue);
+                paymentValueInput.value = formatCurrency(calcValueCents / 100);
                 if (calculatorModal) calculatorModal.style.display = 'none';
             }
         });
     }
     // FIM - FUNÇÕES DA CALCULADORA
     
-    // --- FUNÇÕES DE CADASTRO DE CLIENTE (MANTIDAS) ---
+    // --- FUNÇÕES DE CADASTRO DE CLIENTE (CORRIGIDO) ---
     const registerCustomer = async (name, phone, email) => {
         console.log(`Simulação: Tentativa de cadastro de cliente no WooCommerce. Nome: ${name}, WhatsApp: ${phone}, Email: ${email}`);
         
@@ -311,12 +333,50 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     };
 
+    if (openCustomerRegBtn) {
+        openCustomerRegBtn.addEventListener('click', () => {
+            if (customerRegModal) {
+                customerRegModal.style.display = 'flex';
+                regCustomerName.value = '';
+                regCustomerPhone.value = '';
+                regCustomerEmail.value = '';
+            }
+        });
+    }
+
+    if (cancelCustomerRegBtn) {
+        cancelCustomerRegBtn.addEventListener('click', () => {
+            if (customerRegModal) customerRegModal.style.display = 'none';
+        });
+    }
+
+    if (confirmCustomerRegBtn) {
+        confirmCustomerRegBtn.addEventListener('click', async () => {
+            const name = regCustomerName.value.trim();
+            const phone = regCustomerPhone.value.trim();
+            const email = regCustomerEmail.value.trim();
+
+            if (!name || !phone) {
+                alert('Nome e WhatsApp são obrigatórios.');
+                return;
+            }
+
+            try {
+                const customer = await registerCustomer(name, phone, email);
+                alert(`Cliente ${customer.name} (WhatsApp: ${customer.phone}) cadastrado com sucesso e integrado ao WooCommerce (Simulação)!`);
+                if (customerRegModal) customerRegModal.style.display = 'none';
+            } catch (error) {
+                console.error("Erro ao cadastrar cliente:", error);
+                alert("Falha ao cadastrar cliente. Verifique a conexão com a API do WooCommerce.");
+            }
+        });
+    }
+
     // --- FUNÇÕES DE LOGIN/LOGOUT ---
     const showLoginModal = () => {
         if (loginModal) {
             loginModal.style.display = 'flex';
             mainContent.style.display = 'none';
-            // Garante que o botão esteja escondido antes do login (estado inicial)
             if (openManagerPanelBtn) openManagerPanelBtn.classList.add('hidden');
         }
     };
@@ -380,10 +440,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if (action === 'goToManagerPanel') {
                     alert("Acesso de Gerente liberado! Entrando no Painel Gerencial.");
-                    // Redireciona para o novo Painel Gerencial
                     goToScreen('managerScreen'); 
-                } 
-                // As outras ações (deleteItem, openSelectiveTransfer, openActions) são tratadas por window.openManagerModal
+                } else if (action === 'openWaiterReg') {
+                     if (waiterRegModal) waiterRegModal.style.display = 'flex';
+                } else if (action === 'deleteMass') {
+                    deleteSelectedSentItems();
+                } else if (action === 'openSelectiveTransfer') {
+                    window.openSelectiveTransferModal(); 
+                }
                 
             } else {
                 alert("Senha incorreta.");
@@ -409,7 +473,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 userId = `${username}_id_mock`; 
                 document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)}... (${appId})`;
 
-                // LÓGICA CORRIGIDA: O botão é sempre visível após o login, pois o acesso é restrito pelo modal de senha.
+                // CORREÇÃO: Botão de Gerente SEMPRE VISÍVEL após login
                 if (openManagerPanelBtn) {
                     openManagerPanelBtn.classList.remove('hidden');
                 }
@@ -427,62 +491,149 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Funções modais (MANTIDAS)
-    window.openNfeModal = () => {
-        const nfeModal = document.getElementById('nfeModal');
-        if (!nfeModal) return; 
+    // NOVO/CORRIGIDO: Ações em Massa no Resumo da Conta
+    const deleteSelectedSentItems = async () => {
+        const selectedCheckboxes = document.querySelectorAll('#reviewItemsList input[type="checkbox"]:checked');
+        if (selectedCheckboxes.length === 0) {
+            alert("Nenhum item selecionado para exclusão.");
+            return;
+        }
+
+        if (!confirm(`Tem certeza que deseja EXCLUIR ${selectedCheckboxes.length} grupo(s) de item(s) da conta? Esta ação é irreversível!`)) return;
+
+        const itemsToRemove = [];
         
-        nfeModal.innerHTML = `
-            <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
-                <h3 class="text-xl font-bold mb-4 text-green-700">NF-e / Recibo</h3>
-                <p class="text-base mb-3">Deseja incluir CPF/CNPJ?</p>
-                <input type="text" id="nfeCpfCnpjInput" placeholder="CPF ou CNPJ (Opcional)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-base">
-                
-                <div class="flex flex-col space-y-2 mt-4">
-                    <button class="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-base">Imprimir Recibo</button>
-                    <button class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base">Enviar por Email</button>
-                </div>
+        selectedCheckboxes.forEach(checkbox => {
+            const itemKey = checkbox.value; 
+            const [itemId, itemNote] = itemKey.split('-');
+            
+            // Procura todas as instâncias que correspondem ao grupo (id e note)
+            if (currentOrderSnapshot && currentOrderSnapshot.sentItems) {
+                currentOrderSnapshot.sentItems.forEach(sentItem => {
+                    if (sentItem.id == itemId && (sentItem.note || '') === itemNote) {
+                        itemsToRemove.push(sentItem);
+                    }
+                });
+            }
+        });
+        
+        if (itemsToRemove.length === 0) {
+            alert("Nenhum item correspondente encontrado na conta.");
+            return;
+        }
+        
+        const tableRef = getTableDocRef(currentTableId);
+        const batch = writeBatch(db);
+        
+        // Remove individualmente para garantir que o arrayRemove funcione corretamente
+        itemsToRemove.forEach(item => {
+            batch.update(tableRef, {
+                sentItems: arrayRemove(item)
+            });
+        });
 
-                <div class="flex justify-end mt-4">
-                    <button class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-base" onclick="document.getElementById('nfeModal').style.display='none'">Fechar</button>
-                </div>
-            </div>
-        `;
-        nfeModal.style.display = 'flex';
-    };
+        try {
+            await batch.commit();
+            alert(`${itemsToRemove.length} item(s) removido(s) da conta.`);
+        } catch (e) {
+            console.error("Erro ao deletar itens da conta:", e);
+            alert("Erro ao tentar remover os itens.");
+        }
+    }
+    
+    // NOVO/CORRIGIDO: Transferência em Massa
+    const transferSelectedSentItems = async () => {
+        const targetTableInput = document.getElementById('targetTableInput');
+        const targetTable = parseInt(targetTableInput.value);
+        
+        if (!targetTable || targetTable === parseInt(currentTableId)) {
+            alert("Selecione uma mesa de destino válida e diferente da atual.");
+            return;
+        }
 
-    window.openSelectiveTransferModal = (itemId = null, itemNote = null) => {
+        const selectedCheckboxes = document.querySelectorAll('#reviewItemsList input[type="checkbox"]:checked');
+        if (selectedCheckboxes.length === 0) {
+            alert("Nenhum item selecionado para transferência.");
+            return;
+        }
+        
+        if (!confirm(`Tem certeza que deseja TRANSFERIR ${selectedCheckboxes.length} grupo(s) de item(s) para a Mesa ${targetTable}?`)) return;
+
+        const itemsToTransfer = [];
+        
+        selectedCheckboxes.forEach(checkbox => {
+            const itemKey = checkbox.value; 
+            const [itemId, itemNote] = itemKey.split('-');
+            
+            if (currentOrderSnapshot && currentOrderSnapshot.sentItems) {
+                currentOrderSnapshot.sentItems.forEach(sentItem => {
+                    if (sentItem.id == itemId && (sentItem.note || '') === itemNote) {
+                        itemsToTransfer.push(sentItem);
+                    }
+                });
+            }
+        });
+        
+        if (itemsToTransfer.length === 0) {
+            alert("Nenhum item correspondente encontrado na conta para transferência.");
+            return;
+        }
+        
+        const sourceTableRef = getTableDocRef(currentTableId);
+        const targetTableRef = getTableDocRef(targetTable);
+        const batch = writeBatch(db);
+
+        // 1. Remove os itens da mesa de origem
+        itemsToTransfer.forEach(item => {
+            batch.update(sourceTableRef, {
+                sentItems: arrayRemove(item)
+            });
+        });
+
+        // 2. Adiciona os itens à mesa de destino
+        batch.update(targetTableRef, {
+            sentItems: arrayUnion(...itemsToTransfer),
+        });
+
+        try {
+            await batch.commit();
+            alert(`${itemsToTransfer.length} item(s) transferido(s) da Mesa ${currentTableId} para a Mesa ${targetTable}.`);
+            // Fecha o modal após o sucesso
+            if (selectiveTransferModal) selectiveTransferModal.style.display = 'none';
+        } catch (e) {
+            console.error("Erro ao transferir itens:", e);
+            alert("Erro ao tentar transferir os itens. Verifique se a mesa de destino existe.");
+        }
+    }
+
+    // Sobrescreve a função original para usar o fluxo de massa/modal
+    window.openSelectiveTransferModal = () => {
+        if (!currentTableId) return;
+
         const modal = document.getElementById('selectiveTransferModal');
         if (!modal) return; 
+        
+        // Verifica se há itens selecionados na tela de pagamento (Painel 3)
+        const selectedItemsToTransfer = document.querySelectorAll('#reviewItemsList input[type="checkbox"]:checked');
+        if (selectedItemsToTransfer.length === 0) {
+            alert("Selecione um ou mais itens no Resumo da Conta para realizar a transferência.");
+            return;
+        }
+        
+        const transferItemsList = document.getElementById('transferItemsList');
+        if (transferItemsList) {
+             transferItemsList.innerHTML = `<p class="text-center text-gray-500">${selectedItemsToTransfer.length} grupo(s) de item selecionado(s) para transferência.</p>`;
+        }
 
-        modal.innerHTML = `
-            <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg">
-                <h3 class="text-xl font-bold mb-4 text-indigo-700">Transferência Seletiva</h3>
-                <p class="text-sm text-gray-600 mb-4">Selecione os itens e a mesa de destino para transferir.</p>
 
-                <div class="flex space-x-2 mb-4">
-                    <input type="number" id="targetTableInput" placeholder="Nº Mesa Destino" class="w-2/3 p-3 border border-gray-300 rounded-lg focus:ring-indigo-500" min="1">
-                    <button id="checkTargetTableBtn" class="w-1/3 bg-blue-500 text-white p-3 rounded-lg hover:bg-blue-600 transition disabled:opacity-50">Verificar</button>
-                </div>
-                <p id="transferStatus" class="text-sm text-red-500 mb-4 italic hidden"></p>
-
-                <div id="transferItemsList" class="max-h-60 overflow-y-auto space-y-2 p-2 border border-gray-200 rounded-lg bg-gray-50">
-                    <p class="text-center text-gray-500">Funcionalidade de Seleção de Itens (Transferir o Item: ${itemId} - ${itemNote}) não implementada nesta versão, mas o botão está ativo. A transferência afetará TODAS as instâncias deste item.</p>
-                </div>
-                
-                <div class="flex justify-end space-x-3 mt-4">
-                    <button class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition" onclick="document.getElementById('selectiveTransferModal').style.display='none'">Cancelar</button>
-                    <button id="confirmTransferBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50">Confirmar Transferência</button>
-                </div>
-            </div>
-        `;
+        modal.style.display = 'flex';
         
         const checkTargetTableBtn = document.getElementById('checkTargetTableBtn');
         const confirmTransferBtn = document.getElementById('confirmTransferBtn');
-        if (confirmTransferBtn) confirmTransferBtn.disabled = true; // Desabilita por padrão
+        if (confirmTransferBtn) confirmTransferBtn.disabled = true; 
 
         if (checkTargetTableBtn) {
-            checkTargetTableBtn.addEventListener('click', () => {
+            checkTargetTableBtn.onclick = () => {
                 const targetTable = parseInt(document.getElementById('targetTableInput')?.value);
                 const transferStatus = document.getElementById('transferStatus');
                 
@@ -494,68 +645,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (confirmTransferBtn) confirmTransferBtn.disabled = true;
                     return;
                 }
-                // Simulação: A mesa de destino existe.
+                
                 if (transferStatus) {
                     transferStatus.textContent = `Mesa ${targetTable} verificada.`;
                     transferStatus.classList.remove('hidden');
                 }
                 if (confirmTransferBtn) confirmTransferBtn.disabled = false;
-            });
+            };
         }
 
         if (confirmTransferBtn) {
-            confirmTransferBtn.addEventListener('click', async () => {
-                const targetTable = document.getElementById('targetTableInput')?.value;
-
-                // Simula que a adição à tabela de destino seria bem-sucedida (Ação 1)
-                const transferSuccess = true; 
-
-                if (transferSuccess) {
-                    // Ação 2: Remove o item da tabela de origem (Torna a função "ativa")
-                    // Chamamos a função de exclusão de grupo
-                    const removalSuccess = await deleteAllMatchingSentItems(itemId, itemNote);
-
-                    if (removalSuccess) {
-                        alert(`Transferência bem-sucedida! O item (ID: ${itemId}, OBS: ${itemNote || 'Nenhuma'}) foi transferido da Mesa ${currentTableId} para a Mesa ${targetTable}.`);
-                        modal.style.display = 'none';
-                        // loadTableOrder(currentTableId) será acionado pelo onSnapshot, atualizando a UI.
-                    }
-                } else {
-                     alert(`Falha na transferência. Não foi possível adicionar o item à Mesa ${targetTable}.`);
-                }
-            });
+            confirmTransferBtn.onclick = transferSelectedSentItems;
         }
-
-        modal.style.display = 'flex';
     };
-
-    // NOVO: Função para deletar TODOS os itens correspondentes (usado para simular a remoção na transferência)
-    const deleteAllMatchingSentItems = async (itemId, itemNote) => {
-        if (!currentTableId || !currentOrderSnapshot) return false;
-        const tableRef = getTableDocRef(currentTableId);
-        
-        // Filtra para manter APENAS os itens que NÃO correspondem ao itemId e itemNote
-        let itemsToKeep = currentOrderSnapshot.sentItems.filter(item => 
-            !(item.id === itemId && (item.note || '') === (itemNote || ''))
-        );
-        
-        // Verifica se houve alguma alteração (se o item foi encontrado e removido)
-        if (itemsToKeep.length !== currentOrderSnapshot.sentItems.length) {
-            try {
-                // Sobrescreve o array sentItems com o novo array filtrado (Bulk Remove)
-                await updateDoc(tableRef, {
-                    sentItems: itemsToKeep
-                });
-                return true;
-            } catch (e) {
-                console.error("Erro ao deletar itens da conta para transferência/exclusão em massa:", e);
-                alert("Erro ao tentar remover o grupo de itens.");
-                return false;
-            }
-        }
-        return true;
-    };
-
 
     // Função de Navegação
     window.goToScreen = (screenId) => {
@@ -616,13 +718,14 @@ document.addEventListener('DOMContentLoaded', () => {
         
         onAuthStateChanged(auth, async (user) => {
             if (!user) {
-                // Ao carregar a página, mostra o modal de login em vez de fazer login anônimo
                 showLoginModal();
             } else {
-                // Este bloco só é executado se o usuário já estiver autenticado (e.g., sessão persistente), o que é improvável no fluxo do PDV
                 userId = auth.currentUser?.uid || crypto.randomUUID();
                 document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)}... (${appId})`;
                 hideStatus();
+                if (openManagerPanelBtn) {
+                    openManagerPanelBtn.classList.remove('hidden');
+                }
                 loadOpenTables();
                 
                 await fetchWooCommerceProducts();
@@ -637,7 +740,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('statusContent').innerHTML = `<h2 class="text-xl font-bold mb-2 text-red-600">Erro de Configuração</h2><p>Verifique as variáveis do Firebase. ${e.message}</p>`;
     }
 
-    // --- FUNÇÕES DE INTEGRAÇÃO WOOCOMMERCE (NOVO) ---
+
+    // --- FUNÇÕES DE INTEGRAÇÃO WOOCOMMERCE (MANTIDAS) ---
     const fetchWooCommerceData = async (endpoint) => {
         const querySeparator = endpoint.includes('?') ? '&' : '?';
         const url = `${WOOCOMMERCE_URL}/wp-json/wc/v3/${endpoint}${querySeparator}consumer_key=${CONSUMER_KEY}&consumer_secret=${CONSUMER_SECRET}`;
@@ -720,6 +824,33 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
+    // NOVO: Função para deletar um pagamento
+    window.deletePayment = async (timestamp) => {
+        if (!currentTableId || !currentOrderSnapshot) return;
+        
+        const paymentToDelete = currentOrderSnapshot.payments.find(p => p.timestamp == timestamp);
+        
+        if (!paymentToDelete) {
+             alert("Pagamento não encontrado.");
+             return;
+        }
+
+        if (!confirm(`Tem certeza que deseja EXCLUIR o pagamento de ${formatCurrency(paymentToDelete.value)} (${paymentToDelete.method})?`)) return;
+
+        const tableRef = getTableDocRef(currentTableId);
+
+        try {
+            await updateDoc(tableRef, {
+                payments: arrayRemove(paymentToDelete)
+            });
+            alert("Pagamento removido da lista.");
+        } catch (e) {
+            console.error("Erro ao deletar pagamento:", e);
+            alert("Erro ao tentar remover o pagamento.");
+        }
+    }
+
+
     // Calcula o total geral (subtotal + serviço)
     const calculateTotal = (subtotal, applyServiceTax) => {
         const taxRate = applyServiceTax ? 0.10 : 0;
@@ -786,34 +917,17 @@ document.addEventListener('DOMContentLoaded', () => {
             payments.forEach(p => {
                 paymentListEl.innerHTML += `
                     <div class="flex justify-between items-center py-1 border-b border-gray-100">
-                        <span class="text-xs text-gray-700">${p.method}</span>
-                        <span class="font-semibold text-sm">${formatCurrency(p.value)}</span>
+                        <div class="flex flex-col">
+                            <span class="text-xs text-gray-700">${p.method}</span>
+                            <span class="font-semibold text-sm">${formatCurrency(p.value)}</span>
+                        </div>
+                        <button class="text-red-500 hover:text-red-700 transition" onclick="deletePayment(${p.timestamp})" title="Excluir Pagamento">
+                            <i class="fas fa-trash text-sm"></i>
+                        </button>
                     </div>
                 `;
             });
         }
-        
-        const isClosedClass = isClosed ? 'text-green-600' : 'text-red-600';
-
-        paymentListEl.innerHTML += `
-            <div class="flex justify-between items-center py-1 font-bold border-t border-gray-200 mt-2 pt-2">
-                <span>${remainingBalance <= 0 ? 'TROCO' : 'VALOR RESTANTE'}:</span>
-                <span id="remainingBalanceDisplayNested" class="font-extrabold ${isClosedClass}">${formatCurrency(displayBalance)}</span>
-            </div>
-            <div class="flex justify-between space-x-3 pt-2">
-                <button id="finalizeOrderBtnNested" class="w-1/2 px-4 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition text-base disabled:opacity-50" disabled>FECHAR CONTA</button>
-                <button id="openNfeModalBtnNested" class="w-1/2 px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition text-base disabled:opacity-50" disabled>NF-e</button>
-            </div>
-        `;
-        
-        const finalizeBtnNested = document.getElementById('finalizeOrderBtnNested');
-        const nfeBtnNested = document.getElementById('openNfeModalBtnNested');
-
-        if (finalizeBtnNested) finalizeBtnNested.disabled = !isClosed;
-        if (nfeBtnNested) nfeBtnNested.disabled = !isClosed;
-
-        if (finalizeBtnNested) finalizeBtnNested.addEventListener('click', finalizeOrder);
-        if (nfeBtnNested) nfeBtnNested.addEventListener('click', openNfeModal);
         
         if (addPaymentBtn && tableData.currentTotal) addPaymentBtn.disabled = remainingBalance <= 0;
     };
@@ -973,7 +1087,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- FUNÇÕES DO PAINEL DE MESAS (1) ---
+    // --- FUNÇÕES DO PAINEL DE MESAS (1 - CORRIGIDO) ---
 
     const checkInputs = () => {
         const mesaValida = parseInt(mesaInput.value) > 0;
@@ -1001,11 +1115,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     total: 0,
                     sentItems: [], 
                     payments: [],
-                    serviceTaxApplied: true, // CORREÇÃO: Taxa de serviço ativa por padrão
-                    selectedItems: [] 
+                    serviceTaxApplied: true, // Taxa de serviço ativa por padrão
+                    selectedItems: [],
+                    lastSentAt: null, // NOVO: Campo para o timer
                 });
 
-                // CORREÇÃO: Zera a lista de selectedItems para evitar que itens de sessões anteriores apareçam em mesas novas.
                 selectedItems = [];
 
                 currentTableId = tableNumber.toString();
@@ -1048,12 +1162,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 count++;
                 const total = table.total || 0;
                 const cardColor = total > 0 ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200';
+                
+                // NOVO: Lógica do Ícone de Atenção 'Espera'
+                const hasEspera = (table.selectedItems || []).some(item => 
+                    item.note && item.note.toLowerCase().includes('espera')
+                );
+                const attentionIconHtml = hasEspera 
+                    ? `<i class="fas fa-exclamation-triangle attention-icon" title="Itens em Espera"></i>` 
+                    : '';
+
+                // NOVO: Lógica do Timer (último pedido enviado)
+                const lastSentAtTime = table.lastSentAt ? table.lastSentAt : null;
+                const timerHtml = lastSentAtTime 
+                    ? `<span class="table-timer">Último Pedido: ${formatElapsedTime(lastSentAtTime)}</span>`
+                    : `<span class="table-timer">Nenhum pedido enviado</span>`;
+
 
                 const cardHtml = `
                     <div class="table-card-panel ${cardColor} shadow-md transition-colors duration-200" data-table-id="${tableId}">
+                        ${attentionIconHtml}
                         <h3 class="font-bold text-2xl">Mesa ${table.tableNumber}</h3>
                         <p class="text-xs font-light">Pessoas: ${table.diners}</p>
                         <span class="font-bold text-lg mt-2">${formatCurrency(total)}</span>
+                        ${timerHtml}
                     </div>
                 `;
                 openTablesList.innerHTML += cardHtml;
@@ -1070,6 +1201,8 @@ document.addEventListener('DOMContentLoaded', () => {
         onSnapshot(q, (snapshot) => {
             const docs = snapshot.docs;
             renderTables(docs);
+            // Atualiza o timer a cada 5 segundos
+            setTimeout(loadOpenTables, 5000); 
         }, (error) => {
             console.error("Erro ao carregar mesas (onSnapshot):", error);
             if (openTablesList) {
@@ -1104,7 +1237,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- FUNÇÕES DO CARDÁPIO (2) ---
     
-    // renderiza os itens do cardápio com botão de adição (AGORA USANDO DADOS DO WOOCOMMERCE)
+    // renderiza os itens do cardápio com botão de adição (MANTIDA)
     const renderMenu = (filter = 'all', search = '') => {
         let filteredItems = WOOCOMMERCE_PRODUCTS;
         
@@ -1186,7 +1319,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 acc[key] = acc[key] || { ...item, qty: 0, firstIndex: -1 };
                 acc[key].qty++;
                 if (acc[key].firstIndex === -1) {
-                    acc[key].firstIndex = selectedItems.findIndex(i => i.id === item.id && (i.note || '') === (i.note || ''));
+                    acc[key].firstIndex = selectedItems.findIndex(i => i.id === item.id && (i.note || '') === (item.note || ''));
                 }
                 return acc;
             }, {});
@@ -1394,7 +1527,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // CORREÇÃO: A lista local de selectedItems agora é atualizada com a lista de itens a serem retidos (itensToHold)
             selectedItems = [...itemsToHold];
 
             const itemsGroupedBySector = itemsToSend.reduce((acc, item) => {
@@ -1413,12 +1545,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }, {});
             
             const kdsOrderRef = doc(getKdsCollectionRef());
+            const currentTimestamp = Date.now();
             
             try {
                 await setDoc(kdsOrderRef, {
                     orderId: kdsOrderRef.id,
                     tableNumber: parseInt(currentTableId),
-                    timestamp: Date.now(),
+                    timestamp: currentTimestamp,
                     sentAt: serverTimestamp(),
                     sectors: itemsGroupedBySector,
                     status: 'pending'
@@ -1438,7 +1571,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 await updateDoc(tableRef, {
                     sentItems: arrayUnion(...itemsForUpdate), 
-                    selectedItems: selectedItems 
+                    selectedItems: selectedItems,
+                    lastSentAt: currentTimestamp // NOVO: Atualiza o campo de último envio
                 });
                 
                 renderSelectedItems(); 
@@ -1491,6 +1625,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
+    // CORRIGIDO/NOVO: Adiciona checkboxes e botões de ação em massa
     const renderSentItems = () => {
         const listEl = document.getElementById('reviewItemsList'); 
 
@@ -1503,6 +1638,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (listEl) listEl.innerHTML = ''; 
 
+        // Agrupa itens, mantendo a chave única para a checkbox (id-note)
         const groupedItems = currentOrderSnapshot.sentItems.reduce((acc, item) => {
             const key = `${item.id}-${item.note || ''}`;
             acc[key] = acc[key] || { ...item, qty: 0 };
@@ -1511,148 +1647,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }, {});
 
         let totalRecalculated = 0;
-
-        Object.values(groupedItems).forEach((item, index) => {
-            const lineTotal = item.qty * item.price;
-            totalRecalculated += lineTotal;
-            const obsText = item.note ? ` (${item.note})` : '';
-
-            if (listEl) { 
-                listEl.innerHTML += `
-                    <div class="flex justify-between items-center py-2 border-b border-gray-100">
-                        <div class="flex flex-col flex-grow min-w-0 mr-2">
-                            <span class="font-semibold text-gray-800">${item.name} (${item.qty}x)</span>
-                            <span class="text-xs text-gray-500 truncate">${obsText}</span>
-                        </div>
-                        <div class="flex items-center space-x-2 flex-shrink-0">
-                            <span class="font-bold text-base text-indigo-700">${formatCurrency(lineTotal)}</span>
-                            <button class="text-indigo-500 hover:text-indigo-700 transition" onclick="openManagerModal('openSelectiveTransfer', '${item.id}', '${item.note || ''}')" title="Transferir Item (Gerente)">
-                                 <i class="fas fa-exchange-alt text-sm"></i>
-                            </button>
-                            <button class="text-red-500 hover:text-red-700 transition" onclick="openManagerModal('deleteItem', '${item.id}', '${item.note || ''}')" title="Excluir Item (Gerente)">
-                                <i class="fas fa-trash text-sm"></i>
-                            </button>
-                        </div>
-                    </div>
-                `;
-            }
-        });
         
-        if (totalRecalculated !== currentOrderSnapshot.total) {
-            const tableRef = getTableDocRef(currentTableId);
-            updateDoc(tableRef, { total: totalRecalculated }).catch(e => console.error("Erro ao sincronizar total:", e));
-        }
-
-    };
-    
-    let unsubscribeKds = null;
-    
-    const subscribeToKdsNotifications = (tableId) => {
-        if (unsubscribeKds) unsubscribeKds();
-        
-        const q = query(getKdsCollectionRef(), where('tableNumber', '==', parseInt(tableId)), where('status', '==', 'ready'));
-
-        unsubscribeKds = onSnapshot(q, (snapshot) => {
-            if (snapshot.docs.length > 0) {
-                const badge = document.getElementById('kds-notification-badge');
-                const container = document.getElementById('notification-badge-container');
-                if (badge) badge.classList.remove('hidden');
-                if (container) container.classList.add('animate-pulse');
-            } else {
-                const badge = document.getElementById('kds-notification-badge');
-                const container = document.getElementById('notification-badge-container');
-                if (badge) badge.classList.add('hidden');
-                if (container) container.classList.remove('animate-pulse');
-            }
-        }, (error) => {
-            console.error("Erro no listener de notificação KDS:", error);
-        });
-    };
-
-    const hideStatus = () => {
-        if (statusScreen && mainContent) {
-            statusScreen.style.display = 'none';
-            mainContent.style.display = 'block';
-        }
-    };
-
-    window.openManagerModal = (action, itemId = null, itemNote = null) => {
-        const managerModal = document.getElementById('managerModal');
-        if (!managerModal) return; 
-
-        managerModal.innerHTML = `
-            <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
-                <h3 class="text-xl font-bold mb-4 text-red-600">Ação Gerencial Necessária</h3>
-                <p class="text-base mb-3">Insira a senha do gerente para prosseguir.</p>
-                <input type="password" id="managerPasswordInput" placeholder="Senha (Ex: 1234)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 text-base" maxlength="4">
-                
-                <div class="flex justify-end space-x-3 mt-4">
-                    <button class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-base" onclick="document.getElementById('managerModal').style.display='none'">Cancelar</button>
-                    <button id="authManagerBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-base">Autenticar</button>
-                </div>
-            </div>
-        `;
-        managerModal.style.display = 'flex';
-        
-        document.getElementById('authManagerBtn').onclick = () => {
-            const input = document.getElementById('managerPasswordInput');
-            if (input && input.value === password) {
-                managerModal.style.display = 'none';
-                if (action === 'deleteItem') {
-                    deleteSentItem(itemId, itemNote);
-                } else if (action === 'openSelectiveTransfer') {
-                    openSelectiveTransferModal(itemId, itemNote);
-                } else if (action === 'openActions') {
-                    openActionsModal();
-                }
-            } else {
-                alert("Senha incorreta.");
-                if (input) input.value = '';
-            }
-        };
-    };
-    
-    const deleteSentItem = async (itemId, itemNote) => {
-        if (!currentTableId || !currentOrderSnapshot) return;
-        
-        const itemToDelete = currentOrderSnapshot.sentItems.find(item => 
-            item.id === itemId && (item.note || '') === itemNote
-        );
-
-        if (!itemToDelete) return;
-
-        const tableRef = getTableDocRef(currentTableId);
-
-        try {
-            await updateDoc(tableRef, {
-                sentItems: arrayRemove(itemToDelete)
-            });
-            alert("Item removido da conta.");
-        } catch (e) {
-            console.error("Erro ao deletar item da conta:", e);
-            alert("Erro ao tentar remover o item.");
-        }
-    };
-    
-    if (openActionsModalBtn) {
-        openActionsModalBtn.addEventListener('click', () => {
-            openManagerModal('openActions');
-        });
-    }
-
-    if (document.getElementById('openSelectiveTransferModalBtn')) {
-        document.getElementById('openSelectiveTransferModalBtn').addEventListener('click', () => {
-            openManagerModal('openSelectiveTransfer');
-        });
-    }
-
-
-    if (finalizeOrderBtn) finalizeOrderBtn.addEventListener('click', finalizeOrder);
-    if (openNfeModalBtn) openNfeModalBtn.addEventListener('click', openNfeModal);
-    
-    if (statusScreen && mainContent) {
-        statusScreen.style.display = 'flex';
-        mainContent.style.display = 'none';
-    }
-
-});
+        // Adiciona cabeçalho e botões de Ações em Massa
+        if (listEl) {
+             listEl.innerHTML += `
+                <div class="flex justify-between items-center pb-2 border-b border-gray-200">
+                    <span class="font-bold
