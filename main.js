@@ -34,14 +34,14 @@ document.addEventListener('DOMContentLoaded', () => {
     let WOOCOMMERCE_PRODUCTS = []; // NOVO: Armazena produtos do WooCommerce
     let WOOCOMMERCE_CATEGORIES = []; // NOVO: Armazena categorias do WooCommerce
 
-    // ADICIONADO: Mapa global para armazenar usuários mock (incluindo garçons cadastrados)
+    // MOCK: Usuários e Credenciais (usado para simulação de login/permissão)
     const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
     const MANAGER_USERNAME = 'gerente';
     const MANAGER_ID_MOCK = 'gerente_id_mock';
 
     // CORREÇÃO: A ordem da transição foi ajustada para 3 telas: 0, 1, 2
     const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2 };
-    const password = '1234'; // Senha simulada de gerente
+    const password = '1234'; // Senha simulada de gerente (usada para ações gerenciais)
     const PAYMENT_METHODS = ['Dinheiro', 'Pix', 'Crédito', 'Débito', 'Ticket', 'Voucher'];
     
     // --- WooCommerce Configuração ---
@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const openNfeModalBtn = document.getElementById('openNfeModalBtn');
     const toggleServiceTaxBtn = document.getElementById('toggleServiceTaxBtn');
     const dinersSplitInput = document.getElementById('dinersSplitInput');
-    const openActionsModalBtn = document.getElementById('openActionsModalBtn');
+    const openActionsModalBtn = document.getElementById('openActionsModalBtn'); // Botão do painel 2 (Gerente)
     const sendSelectedItemsBtn = document.getElementById('sendSelectedItemsBtn');
     const quickObsButtons = document.getElementById('quickObsButtons');
     const esperaSwitch = document.getElementById('esperaSwitch');
@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const logoutBtnHeader = document.getElementById('logoutBtnHeader');
     const openWaiterRegModalBtn = document.getElementById('openWaiterRegModalBtn');
     
-    // NOVOS: Elementos de Cadastro de Garçom
+    // NOVOS: Modais de Gerente (Ajustados)
     const waiterRegModal = document.getElementById('waiterRegModal');
     const managerPassRegInput = document.getElementById('managerPassRegInput');
     const newWaiterNameInput = document.getElementById('newWaiterNameInput');
@@ -105,19 +105,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const confirmWaiterRegBtn = document.getElementById('confirmWaiterRegBtn');
     const cancelWaiterRegBtn = document.getElementById('cancelWaiterRegBtn');
     
-    // NOVOS: Elementos de Cadastro de Cliente
-    const openCustomerRegBtn = document.getElementById('openCustomerRegBtn');
-    const customerRegModal = document.getElementById('customerRegModal');
-    const regCustomerName = document.getElementById('regCustomerName');
-    const regCustomerPhone = document.getElementById('regCustomerPhone');
-    const regCustomerEmail = document.getElementById('regCustomerEmail');
-    const confirmCustomerRegBtn = document.getElementById('confirmCustomerRegBtn');
-    const cancelCustomerRegBtn = document.getElementById('cancelCustomerRegBtn');
-
-    // NOVOS: Elementos do Módulo Gerente
-    const waitersList = document.getElementById('waitersList');
-
-
+    // NOVO: Ícone de Engrenagem (Ajuste)
+    const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
+    
     // Variável para rastrear o item/grupo que está no modal de OBS
     let currentObsGroup = null;
 
@@ -435,7 +425,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (loginModal) {
             loginModal.style.display = 'flex';
             mainContent.style.display = 'none';
-            if (openActionsModalBtn) openActionsModalBtn.classList.add('hidden');
+            // Esconde a engrenagem ao fazer logout
+            if (openManagerPanelBtn) openManagerPanelBtn.classList.add('hidden');
         }
     };
 
@@ -453,6 +444,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentOrderSnapshot = null;
         
         if (openActionsModalBtn) openActionsModalBtn.classList.add('hidden');
+        if (openManagerPanelBtn) openManagerPanelBtn.classList.add('hidden');
 
         goToScreen('panelScreen');
         showLoginModal();
@@ -462,6 +454,51 @@ document.addEventListener('DOMContentLoaded', () => {
     if (logoutBtnHeader) {
         logoutBtnHeader.addEventListener('click', handleLogout);
     }
+    
+    // NOVO: Adiciona a lógica para o botão de engrenagem
+    if (openManagerPanelBtn) {
+         openManagerPanelBtn.addEventListener('click', () => {
+             // Reutilizamos o modal de gerente para autenticar o acesso ao painel
+             openManagerAuthModal('goToManagerPanel');
+         });
+    }
+
+    // NOVO: Modal de autenticação Gerencial (antes da ação)
+    const openManagerAuthModal = (action) => {
+        const managerModal = document.getElementById('managerModal');
+        if (!managerModal) return; 
+
+        managerModal.innerHTML = `
+            <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+                <h3 class="text-xl font-bold mb-4 text-red-600">Acesso Gerencial</h3>
+                <p class="text-base mb-3">Insira a senha do gerente para acessar as configurações.</p>
+                <input type="password" id="managerPasswordInput" placeholder="Senha (Ex: 1234)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 text-base" maxlength="4">
+                
+                <div class="flex justify-end space-x-3 mt-4">
+                    <button class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-base" onclick="document.getElementById('managerModal').style.display='none'">Cancelar</button>
+                    <button id="authManagerBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-base">Autenticar</button>
+                </div>
+            </div>
+        `;
+        managerModal.style.display = 'flex';
+        
+        document.getElementById('authManagerBtn').onclick = () => {
+            const input = document.getElementById('managerPasswordInput');
+            if (input && input.value === password) {
+                managerModal.style.display = 'none';
+                if (action === 'goToManagerPanel') {
+                    // MUDANÇA: O painel de gerente não existe mais neste código,
+                    // então apenas redirecionamos para o painel principal (0) como fallback,
+                    // mas podemos adicionar uma simulação de sucesso.
+                    alert("Acesso de Gerente liberado! (Painel principal será carregado)");
+                    goToScreen('panelScreen'); 
+                }
+            } else {
+                alert("Senha incorreta.");
+                if (input) input.value = '';
+            }
+        };
+    };
 
 
     if (loginBtn) {
@@ -481,20 +518,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 userId = `${username}_id_mock`; 
                 document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)}... (${appId})`;
 
-                // Lógica de Permissão (Gerente agora tem o botão de Ações Gerenciais no painel 2)
+                // Lógica de Permissão
                 if (username === MANAGER_USERNAME) {
-                    if (openActionsModalBtn) openActionsModalBtn.classList.remove('hidden');
+                    // Gerente loga, exibe o botão de engrenagem
+                    if (openManagerPanelBtn) openManagerPanelBtn.classList.remove('hidden');
                 } else {
-                    if (openActionsModalBtn) openActionsModalBtn.classList.add('hidden');
+                    // Garçom loga, não exibe
+                    if (openManagerPanelBtn) openManagerPanelBtn.classList.add('hidden');
                 }
-
 
                 loadOpenTables();
                 await fetchWooCommerceProducts();
                 await fetchWooCommerceCategories();
                 renderMenu();
                 renderPaymentMethodButtons();
-                goToScreen('panelScreen'); // Vai para a tela inicial
+                goToScreen('panelScreen'); // Vai para a tela inicial (Painel de Mesas)
 
             } else {
                 alert('Credenciais inválidas.');
@@ -1039,9 +1077,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- FUNÇÕES DO PAINEL DE MESAS (1) ---
-    // Variável para armazenar IDs das mesas abertas
-    let openTableIds = new Set();
-
 
     const checkInputs = () => {
         const mesaValida = parseInt(mesaInput.value) > 0;
@@ -1060,20 +1095,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const diners = parseInt(pessoasInput.value);
             const newTableRef = getTableDocRef(tableNumber);
 
-            // CORREÇÃO: Validação de mesa já aberta
-            if (openTableIds.has(tableNumber.toString())) {
-                alert(`Erro: A Mesa ${tableNumber} já está aberta!`);
-                return; // Impede a abertura da mesa
-            }
-            // FIM CORREÇÃO
-
             try {
                 await setDoc(newTableRef, {
                     tableNumber: tableNumber,
                     diners: diners,
                     status: 'open',
                     createdAt: serverTimestamp(),
-                    lastOrderTimestamp: Date.now(), // NOVO: Timestamp do último pedido/criação
                     total: 0,
                     sentItems: [], 
                     payments: [],
@@ -1081,9 +1108,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     selectedItems: [] 
                 });
 
-                // Zera a lista de itens selecionados e atualiza a UI imediatamente para evitar a aparição temporária.
+                // CORREÇÃO: Zera a lista de selectedItems para evitar que itens de sessões anteriores apareçam em mesas novas.
                 selectedItems = [];
-                renderSelectedItems(); 
 
                 currentTableId = tableNumber.toString();
                 document.getElementById('current-table-number').textContent = `Mesa ${currentTableId}`;
@@ -1092,10 +1118,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 mesaInput.value = '';
                 pessoasInput.value = '';
                 abrirMesaBtn.disabled = true;
-
-                // ATIVA a escuta para a nova mesa logo após a criação, para sincronizar os dados.
-                loadTableOrder(currentTableId);
-
                 goToScreen('orderScreen');
             } catch (e) {
                 console.error("Erro ao criar nova mesa: ", e);
@@ -1114,7 +1136,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         openTablesList.innerHTML = '';
         let count = 0;
-        openTableIds.clear(); // Limpa a lista antes de preencher
 
         if (docs.length === 0) {
             openTablesList.innerHTML = `<div class="col-span-full text-sm text-gray-500 italic p-4 content-card bg-white">Nenhuma mesa aberta.</div>`;
@@ -1122,33 +1143,20 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        docs.forEach(tableDoc => {
-            const table = tableDoc.data();
-            const tableId = tableDoc.id;
-            const hasEspera = tableDoc.hasEsperaItems;
-
+        docs.forEach(doc => {
+            const table = doc.data();
+            const tableId = doc.id;
             
             if (table.status === 'open') {
                 count++;
-                openTableIds.add(tableId); // Adiciona o ID à lista de mesas abertas
                 const total = table.total || 0;
-                const lastOrderTime = table.lastOrderTimestamp || (table.createdAt?.toDate ? table.createdAt.toDate().getTime() : null); // Usa o timestamp do último pedido
-                
-                const timeText = lastOrderTime ? formatElapsedTime(lastOrderTime) : 'Novo';
-
                 const cardColor = total > 0 ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200';
-                
-                // NOVO: Ícone de Alerta
-                const alertIcon = hasEspera 
-                    ? `<i class="fas fa-exclamation-triangle text-yellow-600 text-base ml-2" title="Itens em Espera"></i>`
-                    : '';
 
                 const cardHtml = `
                     <div class="table-card-panel ${cardColor} shadow-md transition-colors duration-200" data-table-id="${tableId}">
-                        <h3 class="font-bold text-2xl flex items-center">Mesa ${table.tableNumber} ${alertIcon}</h3>
+                        <h3 class="font-bold text-2xl">Mesa ${table.tableNumber}</h3>
                         <p class="text-xs font-light">Pessoas: ${table.diners}</p>
                         <span class="font-bold text-lg mt-2">${formatCurrency(total)}</span>
-                        <p class="text-xs font-light mt-1 text-gray-500">Últ. Pedido: ${timeText}</p>
                     </div>
                 `;
                 openTablesList.innerHTML += cardHtml;
@@ -1158,34 +1166,13 @@ document.addEventListener('DOMContentLoaded', () => {
         openTablesCount.textContent = count;
     };
 
-    const loadOpenTables = (filterTableId = null) => {
+    const loadOpenTables = () => {
         const tablesCollection = getTablesCollectionRef();
-        let q = query(tablesCollection, where('status', '==', 'open'), orderBy('tableNumber', 'asc'));
-
-        if (filterTableId) {
-            // Se um ID de mesa for fornecido, filtra apenas por esse ID
-            const tableNumber = parseInt(filterTableId);
-            if (!isNaN(tableNumber) && tableNumber > 0) {
-                 q = query(tablesCollection, where('status', '==', 'open'), where('tableNumber', '==', tableNumber), orderBy('tableNumber', 'asc'));
-            } else {
-                // Se for um filtro inválido, apenas recarrega todas as mesas.
-                searchTableInput.value = '';
-            }
-        }
+        const q = query(tablesCollection, where('status', '==', 'open'), orderBy('tableNumber', 'asc'));
 
         onSnapshot(q, (snapshot) => {
             const docs = snapshot.docs;
-            
-            // Mapeia os documentos para incluir o status de 'Espera'
-            const tablesWithStatus = docs.map(doc => {
-                const table = doc.data();
-                const hasEsperaItems = table.selectedItems?.some(item => 
-                    item.note && item.note.toLowerCase().includes('espera')
-                );
-                return { data: () => table, id: doc.id, hasEsperaItems };
-            });
-
-            renderTables(tablesWithStatus);
+            renderTables(docs);
         }, (error) => {
             console.error("Erro ao carregar mesas (onSnapshot):", error);
             if (openTablesList) {
@@ -1193,28 +1180,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     };
-    
-    // NOVO: Event Listener para o botão de busca de mesa
-    if (searchTableBtn) {
-        searchTableBtn.addEventListener('click', () => {
-            const tableNumber = parseInt(searchTableInput.value);
-            if (tableNumber > 0) {
-                loadOpenTables(tableNumber);
-            } else {
-                loadOpenTables(null); // Recarrega todas as mesas se o campo estiver vazio ou inválido
-            }
-        });
-    }
-    
-    // NOVO: Recarrega todas as mesas se o usuário limpar o campo de busca
-    if (searchTableInput) {
-        searchTableInput.addEventListener('input', (e) => {
-            if (e.target.value === '') {
-                loadOpenTables(null);
-            }
-        });
-    }
-
 
     if (openTablesList) {
       openTablesList.addEventListener('click', async (e) => {
@@ -1297,7 +1262,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('.category-btn').forEach(b => {
                 b.classList.remove('bg-indigo-600', 'text-white');
                 b.classList.add('bg-white', 'text-gray-700', 'border', 'border-gray-300');
-                    });
+            });
             btn.classList.remove('bg-white', 'text-gray-700', 'border', 'border-gray-300');
             btn.classList.add('bg-indigo-600', 'text-white');
             
@@ -1543,7 +1508,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     price: item.price,
                     category: item.category,
                     sector: item.sector,
-                    note: item.note || '',
+                    note: item.note || ''
                 };
                 acc[sector] = acc[sector] || [];
                 acc[sector].push(itemToSend);
@@ -1572,13 +1537,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     sector: item.sector,
                     note: item.note || '',
                     orderId: kdsOrderRef.id,
-                    waiterId: userId, // ADICIONADO: ID do garçom que enviou o item
                 }));
                 
                 await updateDoc(tableRef, {
                     sentItems: arrayUnion(...itemsForUpdate), 
-                    selectedItems: selectedItems,
-                    lastOrderTimestamp: Date.now() // NOVO: Atualiza o timestamp do último pedido
+                    selectedItems: selectedItems 
                 });
                 
                 renderSelectedItems(); 
@@ -1645,9 +1608,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const groupedItems = currentOrderSnapshot.sentItems.reduce((acc, item) => {
             const key = `${item.id}-${item.note || ''}`;
-            acc[key] = acc[key] || { ...item, qty: 0, items: [] }; // Adiciona array para rastrear itens
+            acc[key] = acc[key] || { ...item, qty: 0 };
             acc[key].qty++;
-            acc[key].items.push(item);
             return acc;
         }, {});
 
@@ -1658,28 +1620,19 @@ document.addEventListener('DOMContentLoaded', () => {
             totalRecalculated += lineTotal;
             const obsText = item.note ? ` (${item.note})` : '';
 
-            // NOVO: Pega o ID do garçom responsável pelo primeiro item do grupo
-            const waiterId = item.items[0].waiterId || 'Desconhecido'; 
-            const displayWaiterId = waiterId.includes('_mock') ? waiterId.replace('_mock', '') : waiterId.substring(0, 8); // Simplifica para exibição
-            
-            // Pega o JSON stringify do item original completo para passar para a função de delete
-            // OBS: Não precisamos do item completo para exclusão em massa, apenas ID e Note, mas mantive o padrão.
-            const itemJsonString = JSON.stringify(item.items[0]).replace(/'/g, '&#39;');
-
             if (listEl) { 
                 listEl.innerHTML += `
                     <div class="flex justify-between items-center py-2 border-b border-gray-100">
                         <div class="flex flex-col flex-grow min-w-0 mr-2">
                             <span class="font-semibold text-gray-800">${item.name} (${item.qty}x)</span>
                             <span class="text-xs text-gray-500 truncate">${obsText}</span>
-                            <span class="text-xs text-gray-400 italic mt-1">Garçom: ${displayWaiterId}</span>
                         </div>
                         <div class="flex items-center space-x-2 flex-shrink-0">
                             <span class="font-bold text-base text-indigo-700">${formatCurrency(lineTotal)}</span>
-                            <button class="text-indigo-500 hover:text-indigo-700 transition" onclick="openManagerModal('openSelectiveTransfer', '${item.id}', '${item.note || ''}')" title="Transferir Grupo de Itens (Gerente)">
+                            <button class="text-indigo-500 hover:text-indigo-700 transition" onclick="openManagerModal('openSelectiveTransfer', '${item.id}', '${item.note || ''}')" title="Transferir Item (Gerente)">
                                  <i class="fas fa-exchange-alt text-sm"></i>
                             </button>
-                            <button class="text-red-500 hover:text-red-700 transition" onclick="openManagerModal('deleteItem', '${itemJsonString}')" title="Excluir Grupo de Itens (Gerente)">
+                            <button class="text-red-500 hover:text-red-700 transition" onclick="openManagerModal('deleteItem', '${item.id}', '${item.note || ''}')" title="Excluir Item (Gerente)">
                                 <i class="fas fa-trash text-sm"></i>
                             </button>
                         </div>
@@ -1726,7 +1679,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    window.openManagerModal = (action, itemJsonString = null, itemNote = null) => {
+    window.openManagerModal = (action, itemId = null, itemNote = null) => {
         const managerModal = document.getElementById('managerModal');
         if (!managerModal) return; 
 
@@ -1749,14 +1702,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (input && input.value === password) {
                 managerModal.style.display = 'none';
                 if (action === 'deleteItem') {
-                    // Passa o objeto completo desserializado
-                    const itemToDelete = JSON.parse(itemJsonString.replace(/&#39;/g, "'"));
-                    deleteSentItem(itemToDelete);
+                    deleteSentItem(itemId, itemNote);
                 } else if (action === 'openSelectiveTransfer') {
-                    // A função openSelectiveTransferModal espera ID e Note (String, String)
-                    openSelectiveTransferModal(itemJsonString, itemNote);
+                    openSelectiveTransferModal(itemId, itemNote);
                 } else if (action === 'openActions') {
-                    // Botão removido na versão revertida
+                    openActionsModal();
                 }
             } else {
                 alert("Senha incorreta.");
@@ -1765,31 +1715,38 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     };
     
-    // Função corrigida para usar a remoção em massa
-    const deleteSentItem = async (itemToRemove) => {
-        if (!currentTableId || !currentOrderSnapshot || !itemToRemove) return;
+    const deleteSentItem = async (itemId, itemNote) => {
+        if (!currentTableId || !currentOrderSnapshot) return;
         
-        // Usa a função de exclusão em massa (deleteAllMatchingSentItems) para remover TODOS os itens idênticos
-        const removalSuccess = await deleteAllMatchingSentItems(itemToRemove.id, itemToRemove.note);
+        const itemToDelete = currentOrderSnapshot.sentItems.find(item => 
+            item.id === itemId && (item.note || '') === itemNote
+        );
 
-        if (removalSuccess) {
-            alert("Grupo de itens removido da conta.");
-        } else {
-            alert("Erro ao tentar remover o grupo de itens.");
+        if (!itemToDelete) return;
+
+        const tableRef = getTableDocRef(currentTableId);
+
+        try {
+            await updateDoc(tableRef, {
+                sentItems: arrayRemove(itemToDelete)
+            });
+            alert("Item removido da conta.");
+        } catch (e) {
+            console.error("Erro ao deletar item da conta:", e);
+            alert("Erro ao tentar remover o item.");
         }
     };
     
     if (openActionsModalBtn) {
-         // O botão foi removido do HTML na versão revertida, mas a função é mantida para fins de contexto.
-         // Se ele existir, a lógica de permissão mock é usada.
         openActionsModalBtn.addEventListener('click', () => {
-             // Redireciona para o painel de mesas e a função será acionada se o gerente estiver logado.
-             openManagerModal('openActions');
+            openManagerModal('openActions');
         });
     }
 
     if (document.getElementById('openSelectiveTransferModalBtn')) {
-         // Botão removido do HTML na versão revertida
+        document.getElementById('openSelectiveTransferModalBtn').addEventListener('click', () => {
+            openManagerModal('openSelectiveTransfer');
+        });
     }
 
 
