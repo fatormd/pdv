@@ -41,7 +41,25 @@ body { overflow-x: hidden; }
     text-align: center;
     cursor: pointer;
     border-radius: 0.75rem;
+    position: relative; /* Para posicionar o ícone de atenção */
 }
+
+/* NOVO: Estilo para ícone de atenção na mesa */
+.attention-icon {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    color: #f59e0b; /* yellow-500 */
+    font-size: 1.25rem;
+}
+
+/* NOVO: Estilo para timer na mesa */
+.table-timer {
+    font-size: 0.75rem;
+    color: #6b7280; /* gray-500 */
+    margin-top: 0.5rem;
+}
+
 .qty-btn { width: 36px; height: 36px; }
 .add-to-order-btn { 
     padding-top: 0.75rem; 
