@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const MANAGER_USERNAME = 'gerente';
     const MANAGER_ID_MOCK = 'gerente_id_mock';
 
-    // CORREÇÃO: A ordem da transição foi ajustada para 3 telas: 0, 1, 2
+    // CORREÇÃO: Mapeamento de telas para 3 índices: 0, 1, 2
     const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2 };
     const password = '1234'; // Senha simulada de gerente (usada para ações gerenciais)
     const PAYMENT_METHODS = ['Dinheiro', 'Pix', 'Crédito', 'Débito', 'Ticket', 'Voucher'];
@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const openNfeModalBtn = document.getElementById('openNfeModalBtn');
     const toggleServiceTaxBtn = document.getElementById('toggleServiceTaxBtn');
     const dinersSplitInput = document.getElementById('dinersSplitInput');
-    const openActionsModalBtn = document.getElementById('openActionsModalBtn'); // Botão do painel 2 (Gerente)
+    const openActionsModalBtn = document.getElementById('openActionsModalBtn'); 
     const sendSelectedItemsBtn = document.getElementById('sendSelectedItemsBtn');
     const quickObsButtons = document.getElementById('quickObsButtons');
     const esperaSwitch = document.getElementById('esperaSwitch');
@@ -95,9 +95,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginUsernameInput = document.getElementById('loginUsername');
     const loginPasswordInput = document.getElementById('loginPassword');
     const logoutBtnHeader = document.getElementById('logoutBtnHeader');
-    const openWaiterRegModalBtn = document.getElementById('openWaiterRegModalBtn');
+    const openWaiterRegModalBtn = document.getElementById('openWaiterRegModalBtn'); // Botão Cadastrar Garçom do Modal de Login
     
-    // NOVOS: Modais de Gerente (Ajustados)
+    // NOVOS: Modais Gerenciais (Removidos do HTML, mas mantidos os Modais Secundários)
     const waiterRegModal = document.getElementById('waiterRegModal');
     const managerPassRegInput = document.getElementById('managerPassRegInput');
     const newWaiterNameInput = document.getElementById('newWaiterNameInput');
@@ -105,7 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const confirmWaiterRegBtn = document.getElementById('confirmWaiterRegBtn');
     const cancelWaiterRegBtn = document.getElementById('cancelWaiterRegBtn');
     
-    // NOVO: Ícone de Engrenagem (Ajuste)
+    // NOVO: Ícone de Engrenagem (Botão de Gerente no Cabeçalho)
     const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
     
     // Variável para rastrear o item/grupo que está no modal de OBS
@@ -368,16 +368,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- FUNÇÕES DE CADASTRO E GERENCIAMENTO DE GARÇOM (MANTIDAS) ---
-    let currentEditWaiterUsername = null;
     const renderWaitersList = () => { /* Não renderiza nada, mas evita erros */ };
     
     if (openWaiterRegModalBtn) {
         openWaiterRegModalBtn.addEventListener('click', () => {
             if (waiterRegModal) {
-                waiterRegModal.style.display = 'flex';
-                if(managerPassRegInput) managerPassRegInput.value = '';
-                if(newWaiterNameInput) newWaiterNameInput.value = '';
-                if(newWaiterPasswordInput) newWaiterPasswordInput.value = '';
+                // A Engrenagem no cabeçalho será o ponto de entrada principal para a gestão
+                // Reutilizamos o modal de gerente para autenticar o acesso
+                openManagerAuthModal('openWaiterReg');
             }
         });
     }
@@ -425,7 +423,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (loginModal) {
             loginModal.style.display = 'flex';
             mainContent.style.display = 'none';
-            // Esconde a engrenagem ao fazer logout
             if (openManagerPanelBtn) openManagerPanelBtn.classList.add('hidden');
         }
     };
@@ -455,7 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
         logoutBtnHeader.addEventListener('click', handleLogout);
     }
     
-    // NOVO: Adiciona a lógica para o botão de engrenagem
+    // NOVO: Adiciona a lógica para o botão de engrenagem no cabeçalho
     if (openManagerPanelBtn) {
          openManagerPanelBtn.addEventListener('click', () => {
              // Reutilizamos o modal de gerente para autenticar o acesso ao painel
@@ -486,13 +483,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const input = document.getElementById('managerPasswordInput');
             if (input && input.value === password) {
                 managerModal.style.display = 'none';
+                
                 if (action === 'goToManagerPanel') {
-                    // MUDANÇA: O painel de gerente não existe mais neste código,
-                    // então apenas redirecionamos para o painel principal (0) como fallback,
-                    // mas podemos adicionar uma simulação de sucesso.
-                    alert("Acesso de Gerente liberado! (Painel principal será carregado)");
+                    // Simulação de acesso liberado (Gerente logado)
+                    alert("Acesso de Gerente liberado! (Navegação para o Painel de Mesas)");
+                    // Voltamos para o Painel de Mesas, pois a tela de Gerente (managerScreen) foi removida.
                     goToScreen('panelScreen'); 
+                } else if (action === 'openWaiterReg') {
+                     // Se a senha for correta, abre o modal de cadastro de garçom
+                     if (waiterRegModal) waiterRegModal.style.display = 'flex';
                 }
+                
             } else {
                 alert("Senha incorreta.");
                 if (input) input.value = '';
@@ -506,7 +507,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const username = loginUsernameInput.value;
             const password = loginPasswordInput.value;
             
-            // CORREÇÃO DE LOGIN: Usa o mapa mockUsers
             const isAuthenticated = mockUsers[username] === password;
 
             if (isAuthenticated) {
@@ -532,7 +532,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 await fetchWooCommerceCategories();
                 renderMenu();
                 renderPaymentMethodButtons();
-                goToScreen('panelScreen'); // Vai para a tela inicial (Painel de Mesas)
+                goToScreen('panelScreen'); 
 
             } else {
                 alert('Credenciais inválidas.');
