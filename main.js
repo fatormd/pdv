@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const openNfeModalBtn = document.getElementById('openNfeModalBtn');
     const toggleServiceTaxBtn = document.getElementById('toggleServiceTaxBtn');
     const dinersSplitInput = document.getElementById('dinersSplitInput');
-    const openActionsModalBtn = document.getElementById('openActionsModalBtn'); 
+    const openActionsModalBtn = document.getElementById('openActionsModalBtn'); // Botão Gerencial do Painel de Pedidos (Não mais usado)
     const sendSelectedItemsBtn = document.getElementById('sendSelectedItemsBtn');
     const quickObsButtons = document.getElementById('quickObsButtons');
     const esperaSwitch = document.getElementById('esperaSwitch');
@@ -485,10 +485,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 managerModal.style.display = 'none';
                 
                 if (action === 'goToManagerPanel') {
-                    // Simulação de acesso liberado (Gerente logado)
-                    alert("Acesso de Gerente liberado! (Navegação para o Painel de Mesas)");
-                    // Voltamos para o Painel de Mesas, pois a tela de Gerente (managerScreen) foi removida.
-                    goToScreen('panelScreen'); 
+                    // Se o gerente autenticar, ele acessa o Painel de Gerente (Index 1)
+                    goToScreen('managerScreen'); 
                 } else if (action === 'openWaiterReg') {
                      // Se a senha for correta, abre o modal de cadastro de garçom
                      if (waiterRegModal) waiterRegModal.style.display = 'flex';
