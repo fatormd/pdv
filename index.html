@@ -21,6 +21,10 @@
                     },
                     colors: {
                         'primary': '#4f46e5', // Índigo
+                        // NOVO: Cores customizadas para o Módulo Gerente
+                        'bg-manager': '#1f2937', // Cinza escuro (Dark Gray-800)
+                        'title-manager': '#fb923c', // Laranja (Orange-400)
+                        'text-secondary-manager': '#d1d5db', // Cinza claro (Gray-300)
                     },
                 }
             }
@@ -40,16 +44,15 @@
     <div class="header-bar text-white p-4 flex justify-between items-center sticky top-0 z-20">
         <h1 class="text-xl font-bold">Fator PDV</h1>
         <div class="flex items-center space-x-3">
+            
+             <button id="openManagerPanelBtn" class="hidden rounded-full bg-yellow-600 p-2 text-white shadow-lg hover:bg-yellow-700 transition duration-150 w-10 h-10 flex items-center justify-center" title="Ações Gerenciais">
+                 <i class="fas fa-cog text-lg"></i>
+            </button>
+
             <button id="logoutBtnHeader" class="rounded-full bg-red-600 p-2 text-white shadow-lg hover:bg-red-700 transition duration-150 w-10 h-10 flex items-center justify-center" title="Sair / Logout">
                  <i class="fas fa-sign-out-alt text-lg"></i>
             </button>
-            <div id="notification-badge-container" class="relative">
-                <span id="kds-notification-badge" class="hidden absolute top-0 right-0 h-3 w-3 bg-red-500 rounded-full ring-2 ring-white"></span>
-                <div class="rounded-full bg-white p-2 text-indigo-700">
-                    <i class="fas fa-tablet-alt text-lg"></i>
-                </div>
             </div>
-        </div>
     </div>
     
     <main id="mainContent" class="relative overflow-hidden" style="display: none;">
@@ -85,6 +88,40 @@
                 </div>
             </div>
 
+            <div id="managerScreen" class="flex-shrink-0 bg-bg-manager min-h-screen text-white">
+                <div class="p-4">
+                    <h2 class="text-2xl font-bold text-title-manager mb-4">Painel de Gerenciamento</h2>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        
+                        <div class="content-card bg-gray-800 p-4 hover:bg-gray-700 cursor-pointer" id="cardManageWaiters">
+                            <h3 class="text-xl font-semibold text-title-manager mb-1">Garçons (Usuários)</h3>
+                            <p class="text-text-secondary-manager text-sm">Cadastro, Senha e Exclusão.</p>
+                        </div>
+                        
+                        <div class="content-card bg-gray-800 p-4 hover:bg-gray-700 cursor-pointer" id="cardManageProducts">
+                            <h3 class="text-xl font-semibold text-title-manager mb-1">Produtos & Categorias</h3>
+                            <p class="text-text-secondary-manager text-sm">CRUD de Itens (via WooCommerce).</p>
+                        </div>
+                        
+                        <div class="content-card bg-gray-800 p-4 hover:bg-gray-700 cursor-pointer" id="cardManageClients">
+                            <h3 class="text-xl font-semibold text-title-manager mb-1">Clientes</h3>
+                            <p class="text-text-secondary-manager text-sm">Busca e Edição de Cadastro.</p>
+                        </div>
+                        
+                        <div class="content-card bg-gray-800 p-4 hover:bg-gray-700 cursor-pointer" id="cardReports">
+                            <h3 class="text-xl font-semibold text-title-manager mb-1">Relatórios de Vendas</h3>
+                            <p class="text-text-secondary-manager text-sm">Totais, Taxas e Desempenho.</p>
+                        </div>
+                        
+                        <div class="content-card bg-gray-800 p-4 hover:bg-gray-700 cursor-pointer" id="cardManageOrders">
+                            <h3 class="text-xl font-semibold text-title-manager mb-1">Pedidos Faturados</h3>
+                            <p class="text-text-secondary-manager text-sm">Gerenciar e Consultar Pedidos do Woo.</p>
+                        </div>
+                        
+                    </div>
+                </div>
+            </div>
             <div id="orderScreen" class="flex-shrink-0">
                 <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center text-indigo-700">
@@ -335,10 +372,7 @@
             <input type="password" id="loginPassword" placeholder="Senha" class="w-full p-4 mb-6 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
             
             <div class="flex space-x-3">
-                <button id="openWaiterRegModalBtn" class="w-1/4 bg-gray-500 text-white font-bold py-4 rounded-lg hover:bg-gray-600 transition text-lg" title="Cadastrar Novo Garçom (Gerente)">
-                    <i class="fas fa-user-plus"></i>
-                </button>
-                <button id="loginBtn" class="w-3/4 bg-indigo-600 text-white font-bold py-4 rounded-lg hover:bg-indigo-700 transition text-lg disabled:opacity-50">Entrar</button>
+                <button id="loginBtn" class="w-full bg-indigo-600 text-white font-bold py-4 rounded-lg hover:bg-indigo-700 transition text-lg disabled:opacity-50">Entrar</button>
             </div>
         </div>
     </div>
