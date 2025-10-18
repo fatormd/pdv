@@ -39,8 +39,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const MANAGER_USERNAME = 'gerente';
     const MANAGER_ID_MOCK = 'gerente_id_mock';
 
-    // CORREÇÃO: Mapeamento de telas para 3 índices: 0, 1, 2
-    const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2 };
+    // CORREÇÃO: Mapeamento de telas para 4 índices: 0, 1, 2, 3
+    const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2, 'managerScreen': 3 };
     const password = '1234'; // Senha simulada de gerente (usada para ações gerenciais)
     const PAYMENT_METHODS = ['Dinheiro', 'Pix', 'Crédito', 'Débito', 'Ticket', 'Voucher'];
     
@@ -95,15 +95,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginUsernameInput = document.getElementById('loginUsername');
     const loginPasswordInput = document.getElementById('loginPassword');
     const logoutBtnHeader = document.getElementById('logoutBtnHeader');
-    const openWaiterRegModalBtn = document.getElementById('openWaiterRegModalBtn'); // Botão Cadastrar Garçom do Modal de Login
-    
-    // NOVOS: Modais Gerenciais (Removidos do HTML, mas mantidos os Modais Secundários)
-    const waiterRegModal = document.getElementById('waiterRegModal');
-    const managerPassRegInput = document.getElementById('managerPassRegInput');
-    const newWaiterNameInput = document.getElementById('newWaiterNameInput');
-    const newWaiterPasswordInput = document.getElementById('newWaiterPasswordInput');
-    const confirmWaiterRegBtn = document.getElementById('confirmWaiterRegBtn');
-    const cancelWaiterRegBtn = document.getElementById('cancelWaiterRegBtn');
     
     // NOVO: Ícone de Engrenagem (Botão de Gerente no Cabeçalho)
     const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
@@ -310,6 +301,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // FIM - FUNÇÕES DA CALCULADORA
     
     // --- FUNÇÕES DE CADASTRO DE CLIENTE (MANTIDAS) ---
+    // (Não mexer nessas, embora 'openCustomerRegBtn' não esteja definido, o bloco já estava assim.)
     const registerCustomer = async (name, phone, email) => {
         console.log(`Simulação: Tentativa de cadastro de cliente no WooCommerce. Nome: ${name}, WhatsApp: ${phone}, Email: ${email}`);
         
@@ -320,103 +312,11 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     };
 
-    if (openCustomerRegBtn) {
-        openCustomerRegBtn.addEventListener('click', () => {
-            if (customerRegModal) {
-                customerRegModal.style.display = 'flex';
-                regCustomerName.value = '';
-                regCustomerPhone.value = '';
-                regCustomerEmail.value = '';
-            }
-        });
-    }
+    // Bloco `if (openCustomerRegBtn)` e relacionados removidos (ou não definidos) no HTML fornecido, 
+    // mas a função `registerCustomer` é mantida.
 
-    if (cancelCustomerRegBtn) {
-        cancelCustomerRegBtn.addEventListener('click', () => {
-            if (customerRegModal) customerRegModal.style.display = 'none';
-        });
-    }
-
-    if (confirmCustomerRegBtn) {
-        confirmCustomerRegBtn.addEventListener('click', async () => {
-            const name = regCustomerName.value.trim();
-            const phone = regCustomerPhone.value.trim();
-            const email = regCustomerEmail.value.trim();
-
-            if (!name || !phone) {
-                alert('Nome e WhatsApp são obrigatórios.');
-                return;
-            }
-
-            try {
-                const customer = await registerCustomer(name, phone, email);
-                alert(`Cliente ${customer.name} (WhatsApp: ${customer.phone}) cadastrado com sucesso e integrado ao WooCommerce (Simulação)!`);
-                if (customerRegModal) customerRegModal.style.display = 'none';
-            } catch (error) {
-                console.error("Erro ao cadastrar cliente:", error);
-                alert("Falha ao cadastrar cliente. Verifique a conexão com a API do WooCommerce.");
-            }
-        });
-    }
-    
-    const customerSearchInput = document.getElementById('customerSearchInput');
-    if (customerSearchInput) {
-        customerSearchInput.addEventListener('input', (e) => {
-            const query = e.target.value.toLowerCase();
-            console.log(`Simulação: Buscando cliente por: ${query}`);
-        });
-    }
-
-    // --- FUNÇÕES DE CADASTRO E GERENCIAMENTO DE GARÇOM (MANTIDAS) ---
-    const renderWaitersList = () => { /* Não renderiza nada, mas evita erros */ };
-    
-    if (openWaiterRegModalBtn) {
-        openWaiterRegModalBtn.addEventListener('click', () => {
-            if (waiterRegModal) {
-                // A Engrenagem no cabeçalho será o ponto de entrada principal para a gestão
-                // Reutilizamos o modal de gerente para autenticar o acesso
-                openManagerAuthModal('openWaiterReg');
-            }
-        });
-    }
-    
-    if (cancelWaiterRegBtn) {
-        cancelWaiterRegBtn.addEventListener('click', () => {
-            if (waiterRegModal) waiterRegModal.style.display = 'none';
-        });
-    }
-
-    if (confirmWaiterRegBtn) {
-        confirmWaiterRegBtn.addEventListener('click', async () => {
-            if (!managerPassRegInput || !newWaiterNameInput || !newWaiterPasswordInput) {
-                alert("Erro interno: Campos do modal de cadastro não carregados.");
-                return;
-            }
-            
-            const managerPassword = managerPassRegInput.value;
-            const newWaiterUsername = newWaiterNameInput.value.trim();
-            const newWaiterPassword = newWaiterPasswordInput.value.trim();
-            
-            if (managerPassword !== password) {
-                alert("Senha do gerente incorreta.");
-                return;
-            }
-            if (!newWaiterUsername || !newWaiterPassword) {
-                alert("Nome de usuário e Senha de login do garçom são obrigatórios.");
-                return;
-            }
-
-            if (mockUsers[newWaiterUsername]) {
-                 alert(`Erro: O usuário "${newWaiterUsername}" já existe.`);
-                 return;
-            }
-            
-            mockUsers[newWaiterUsername] = newWaiterPassword;
-            alert(`Simulação: Garçom ${newWaiterUsername} cadastrado com sucesso! Agora você pode usar estas credenciais para logar.`);
-            
-            if (waiterRegModal) waiterRegModal.style.display = 'none';
-        });
-    }
+    // --- FUNÇÕES DE CADASTRO E GERENCIAMENTO DE GARÇOM (REMOVIDAS) ---
+    // A lógica de cadastro de garçom foi removida/simplificada para a nova tela de Gerente.
 
     // --- FUNÇÕES DE LOGIN/LOGOUT ---
     const showLoginModal = () => {
@@ -485,14 +385,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 managerModal.style.display = 'none';
                 
                 if (action === 'goToManagerPanel') {
-                    // Simulação de acesso liberado (Gerente logado)
-                    alert("Acesso de Gerente liberado! (Navegação para o Painel de Mesas)");
-                    // Voltamos para o Painel de Mesas, pois a tela de Gerente (managerScreen) foi removida.
-                    goToScreen('panelScreen'); 
-                } else if (action === 'openWaiterReg') {
-                     // Se a senha for correta, abre o modal de cadastro de garçom
-                     if (waiterRegModal) waiterRegModal.style.display = 'flex';
-                }
+                    alert("Acesso de Gerente liberado! Entrando no Painel Gerencial.");
+                    // Redireciona para o novo Painel Gerencial
+                    goToScreen('managerScreen'); 
+                } 
+                // As outras ações (deleteItem, openSelectiveTransfer, openActions) são tratadas por window.openManagerModal
                 
             } else {
                 alert("Senha incorreta.");
@@ -676,13 +573,23 @@ document.addEventListener('DOMContentLoaded', () => {
             saveSelectedItemsToFirebase(currentTableId);
         }
 
-        // CORREÇÃO: Mapeamento de telas para 3 índices: 0, 1, 2
-        const screenMap = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2 };
+        // Mapeamento de telas para 4 índices: 0, 1, 2, 3
+        const screenMap = screens; 
+
         const screenIndex = screenMap[screenId];
 
         if (screenIndex !== undefined) {
             if (appContainer) {
               appContainer.style.transform = `translateX(-${screenIndex * 100}vw)`;
+            }
+            
+            // Lógica para alternar o modo escuro no body para a tela Gerencial
+            if (screenId === 'managerScreen') {
+                document.body.classList.remove('bg-gray-100');
+                document.body.classList.add('bg-gray-900');
+            } else {
+                document.body.classList.remove('bg-gray-900');
+                document.body.classList.add('bg-gray-100');
             }
         }
     };
@@ -1289,7 +1196,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 acc[key] = acc[key] || { ...item, qty: 0, firstIndex: -1 };
                 acc[key].qty++;
                 if (acc[key].firstIndex === -1) {
-                    acc[key].firstIndex = selectedItems.findIndex(i => i.id === item.id && (i.note || '') === (item.note || ''));
+                    acc[key].firstIndex = selectedItems.findIndex(i => i.id === item.id && (i.note || '') === (i.note || ''));
                 }
                 return acc;
             }, {});
