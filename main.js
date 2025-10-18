@@ -301,7 +301,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // FIM - FUNÇÕES DA CALCULADORA
     
     // --- FUNÇÕES DE CADASTRO DE CLIENTE (MANTIDAS) ---
-    // (Não mexer nessas, embora 'openCustomerRegBtn' não esteja definido, o bloco já estava assim.)
     const registerCustomer = async (name, phone, email) => {
         console.log(`Simulação: Tentativa de cadastro de cliente no WooCommerce. Nome: ${name}, WhatsApp: ${phone}, Email: ${email}`);
         
@@ -312,17 +311,12 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     };
 
-    // Bloco `if (openCustomerRegBtn)` e relacionados removidos (ou não definidos) no HTML fornecido, 
-    // mas a função `registerCustomer` é mantida.
-
-    // --- FUNÇÕES DE CADASTRO E GERENCIAMENTO DE GARÇOM (REMOVIDAS) ---
-    // A lógica de cadastro de garçom foi removida/simplificada para a nova tela de Gerente.
-
     // --- FUNÇÕES DE LOGIN/LOGOUT ---
     const showLoginModal = () => {
         if (loginModal) {
             loginModal.style.display = 'flex';
             mainContent.style.display = 'none';
+            // Garante que o botão esteja escondido antes do login (estado inicial)
             if (openManagerPanelBtn) openManagerPanelBtn.classList.add('hidden');
         }
     };
@@ -415,13 +409,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 userId = `${username}_id_mock`; 
                 document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)}... (${appId})`;
 
-                // Lógica de Permissão
-                if (username === MANAGER_USERNAME) {
-                    // Gerente loga, exibe o botão de engrenagem
-                    if (openManagerPanelBtn) openManagerPanelBtn.classList.remove('hidden');
-                } else {
-                    // Garçom loga, não exibe
-                    if (openManagerPanelBtn) openManagerPanelBtn.classList.add('hidden');
+                // LÓGICA CORRIGIDA: O botão é sempre visível após o login, pois o acesso é restrito pelo modal de senha.
+                if (openManagerPanelBtn) {
+                    openManagerPanelBtn.classList.remove('hidden');
                 }
 
                 loadOpenTables();
