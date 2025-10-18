@@ -22,7 +22,7 @@
                     colors: {
                         'primary': '#4f46e5', // Índigo
                         // NOVO: Adicionando cores para o tema Gerencial
-                        'pumpkin': '#ff7518', 
+                        'pumpkin': '#ff7518',
                     },
                 }
             }
@@ -253,31 +253,31 @@
                 </div>
                 
                 <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <div class="manager-card bg-gray-800 border-2 border-orange-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="alert('Funcionalidade de Gerenciamento de Produtos em desenvolvimento.')">
+                    <div class="manager-card bg-gray-800 border-2 border-orange-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="alert('Funcionalidade de Gerenciamento de Produtos em desenvolvimento. Abre em novo painel.')">
                         <i class="fas fa-burger text-4xl text-orange-400 mb-2"></i>
                         <h4 class="font-bold text-lg text-gray-100">Produtos</h4>
                         <p class="text-sm text-gray-400">Criar, Editar, Excluir</p>
                     </div>
                     
-                    <div class="manager-card bg-gray-800 border-2 border-orange-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="alert('Funcionalidade de Gerenciamento de Categorias em desenvolvimento.')">
+                    <div class="manager-card bg-gray-800 border-2 border-orange-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="alert('Funcionalidade de Gerenciamento de Categorias em desenvolvimento. Abre em novo painel.')">
                         <i class="fas fa-tags text-4xl text-orange-400 mb-2"></i>
                         <h4 class="font-bold text-lg text-gray-100">Categorias</h4>
                         <p class="text-sm text-gray-400">Criar, Editar, Excluir</p>
                     </div>
 
-                    <div class="manager-card bg-gray-800 border-2 border-orange-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="alert('Funcionalidade de Gerenciamento de Garçons em desenvolvimento.')">
+                    <div class="manager-card bg-gray-800 border-2 border-orange-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="openManagerModal('openWaiterReg')">
                         <i class="fas fa-users text-4xl text-orange-400 mb-2"></i>
                         <h4 class="font-bold text-lg text-gray-100">Usuários (Garçons)</h4>
                         <p class="text-sm text-gray-400">Criar, Editar, Excluir</p>
                     </div>
                     
-                    <div class="manager-card bg-gray-800 border-2 border-orange-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="alert('Funcionalidade de Gerenciamento de Clientes em desenvolvimento.')">
+                    <div class="manager-card bg-gray-800 border-2 border-orange-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="alert('Funcionalidade de Gerenciamento de Clientes em desenvolvimento. Abre em novo painel.')">
                         <i class="fas fa-address-book text-4xl text-orange-400 mb-2"></i>
                         <h4 class="font-bold text-lg text-gray-100">Clientes</h4>
                         <p class="text-sm text-gray-400">Cadastrar, Consultar</p>
                     </div>
 
-                    <div class="manager-card bg-gray-800 border-2 border-orange-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="alert('Funcionalidade de Gerenciamento de Pedidos WooCommerce em desenvolvimento.')">
+                    <div class="manager-card bg-gray-800 border-2 border-orange-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="alert('Funcionalidade de Gerenciamento de Pedidos WooCommerce em desenvolvimento. Abre em novo painel.')">
                         <i class="fas fa-receipt text-4xl text-orange-400 mb-2"></i>
                         <h4 class="font-bold text-lg text-gray-100">Pedidos (Woo)</h4>
                         <p class="text-sm text-gray-400">Verificar, Sincronizar</p>
@@ -335,6 +335,39 @@
         </div>
     </div>
 
+    <div id="calculatorModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-xs">
+            <h3 class="text-xl font-bold mb-4 text-indigo-700">Calculadora</h3>
+            <input type="text" id="calcDisplay" value="R$ 0,00" readonly class="w-full p-3 mb-4 text-4xl text-right font-mono border-2 border-indigo-500 rounded-lg bg-gray-100">
+            
+            <div class="grid grid-cols-4 gap-2">
+                <button class="calc-btn p-3 bg-gray-300 rounded-lg text-xl font-bold hover:bg-gray-400" data-key="C">C</button>
+                <button class="calc-btn p-3 bg-indigo-500 text-white rounded-lg text-xl font-bold hover:bg-indigo-600" data-key="/">/</button>
+                <button class="calc-btn p-3 bg-indigo-500 text-white rounded-lg text-xl font-bold hover:bg-indigo-600" data-key="*">x</button>
+                <button id="closeCalcBtn" class="calc-btn p-3 bg-red-500 text-white rounded-lg text-xl font-bold hover:bg-red-600" data-key="ok"><i class="fas fa-check"></i></button>
+
+                <button class="calc-btn p-3 bg-gray-200 rounded-lg text-xl font-bold hover:bg-gray-300" data-key="7">7</button>
+                <button class="calc-btn p-3 bg-gray-200 rounded-lg text-xl font-bold hover:bg-gray-300" data-key="8">8</button>
+                <button class="calc-btn p-3 bg-gray-200 rounded-lg text-xl font-bold hover:bg-gray-300" data-key="9">9</button>
+                <button class="calc-btn p-3 bg-indigo-500 text-white rounded-lg text-xl font-bold hover:bg-indigo-600" data-key="-">-</button>
+
+                <button class="calc-btn p-3 bg-gray-200 rounded-lg text-xl font-bold hover:bg-gray-300" data-key="4">4</button>
+                <button class="calc-btn p-3 bg-gray-200 rounded-lg text-xl font-bold hover:bg-gray-300" data-key="5">5</button>
+                <button class="calc-btn p-3 bg-gray-200 rounded-lg text-xl font-bold hover:bg-gray-300" data-key="6">6</button>
+                <button class="calc-btn p-3 bg-indigo-500 text-white rounded-lg text-xl font-bold hover:bg-indigo-600" data-key="+">+</button>
+
+                <button class="calc-btn p-3 bg-gray-200 rounded-lg text-xl font-bold" data-key="1">1</button>
+                <button class="calc-btn p-3 bg-gray-200 rounded-lg text-xl font-bold" data-key="2">2</button>
+                <button class="calc-btn p-3 bg-gray-200 rounded-lg text-xl font-bold" data-key="3">3</button>
+                <button class="calc-btn p-3 bg-green-500 text-white rounded-lg text-xl font-bold row-span-2 hover:bg-green-600" data-key="=">=</button>
+
+                <button class="calc-btn p-3 bg-gray-200 rounded-lg text-xl font-bold col-span-2 hover:bg-gray-300" data-key="0">0</button>
+                <button class="calc-btn p-3 bg-gray-200 rounded-lg text-xl font-bold hover:bg-gray-300" data-key="00">00</button>
+            </div>
+        </div>
+    </div>
+
+
     <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         </div>
 
@@ -342,7 +375,26 @@
         </div>
 
     <div id="selectiveTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg">
+            <h3 class="text-xl font-bold mb-4 text-indigo-700">Transferência Seletiva</h3>
+            <p class="text-sm text-gray-600 mb-4">Selecione os itens e a mesa de destino para transferir em massa.</p>
+
+            <div class="flex space-x-2 mb-4">
+                <input type="number" id="targetTableInput" placeholder="Nº Mesa Destino" class="w-2/3 p-3 border border-gray-300 rounded-lg focus:ring-indigo-500" min="1">
+                <button id="checkTargetTableBtn" class="w-1/3 bg-blue-500 text-white p-3 rounded-lg hover:bg-blue-600 transition disabled:opacity-50">Verificar</button>
+            </div>
+            <p id="transferStatus" class="text-sm text-red-500 mb-4 italic hidden"></p>
+
+            <div id="transferItemsList" class="max-h-60 overflow-y-auto space-y-2 p-2 border border-gray-200 rounded-lg bg-gray-50">
+                <p class="text-center text-gray-500">Selecione itens na tela de Pagamento para realizar a transferência.</p>
+            </div>
+            
+            <div class="flex justify-end space-x-3 mt-4">
+                <button class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition" onclick="document.getElementById('selectiveTransferModal').style.display='none'">Cancelar</button>
+                <button id="confirmTransferBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50">Confirmar Transferência</button>
+            </div>
         </div>
+    </div>
 
     <div id="loginModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
         <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm text-center">
@@ -352,6 +404,24 @@
             
             <div class="flex space-x-3">
                 <button id="loginBtn" class="w-full bg-indigo-600 text-white font-bold py-4 rounded-lg hover:bg-indigo-700 transition text-lg disabled:opacity-50">Entrar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="waiterRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+            <h3 class="text-xl font-bold mb-4 text-indigo-700">Novo Garçom (Acesso Gerente)</h3>
+            <input type="password" id="managerPassRegInput" placeholder="Senha do Gerente (1234)" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 text-base">
+            <input type="text" id="newWaiterNameInput" placeholder="Usuário de Login (Ex: garcom01)" class="w-full p-3 mb-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
+            <input type="password" id="newWaiterPasswordInput" placeholder="Senha de Login" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
+            
+            <div class="flex justify-end space-x-3 mt-4">
+                <button id="cancelWaiterRegBtn" class="px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition text-base font-bold">
+                    Cancelar
+                </button>
+                <button id="confirmWaiterRegBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base font-bold">
+                    Cadastrar Garçom
+                </button>
             </div>
         </div>
     </div>
