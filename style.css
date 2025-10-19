@@ -44,7 +44,7 @@ body { overflow-x: hidden; }
     position: relative; /* Para posicionar o ícone de atenção */
 }
 
-/* NOVO: Estilo para ícone de atenção na mesa */
+/* NOVO: Estilo para ícone de atenção na mesa (Direita Superior) */
 .attention-icon {
     position: absolute;
     top: 0.5rem;
@@ -53,12 +53,31 @@ body { overflow-x: hidden; }
     font-size: 1.25rem;
 }
 
-/* NOVO: Estilo para timer na mesa */
+/* NOVO: Estilo para o ícone de Status KDS na mesa (Esquerda Superior) */
+.kds-status-icon-btn {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    color: #4f46e5; /* indigo-600 */
+    font-size: 1.25rem;
+    padding: 0;
+    line-height: 1;
+}
+
+/* NOVO: Estilo para timer na mesa (APENAS ÍCONE E MINUTOS) */
 .table-timer {
     font-size: 0.75rem;
     color: #6b7280; /* gray-500 */
     margin-top: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    space-x: 0.25rem;
 }
+.table-timer i {
+    font-size: 0.75rem;
+}
+
 
 .qty-btn { width: 36px; height: 36px; }
 .add-to-order-btn { 
@@ -92,13 +111,21 @@ body { overflow-x: hidden; }
     font-size: 0.875rem; /* Redução do ícone (+) */
 }
 
-/* Estilos para botões de observação rápida */
+/* NOVO: Estilos para botões de observação rápida */
 .quick-obs-btn {
-    font-size: 1rem !important; /* Aumentado para 16px */
-    padding: 0.5rem 0.75rem !important; /* Ajuste de padding */
+    background-color: #e5e7eb; /* gray-200 */
+    color: #4b5563; /* gray-700 */
+    font-size: 0.875rem;
+    font-weight: 600;
+    padding: 0.5rem 0.75rem; 
+    border-radius: 9999px;
+    transition: background-color 0.15s;
+}
+.quick-obs-btn:hover {
+    background-color: #e0e0e0;
 }
 
-/* NOVO: Estilos para o Switch de Espera */
+/* NOVO: Estilos para o Switch de Espera (Amarelo) */
 .switch-obs {
   position: relative;
   display: inline-block;
@@ -132,15 +159,12 @@ body { overflow-x: hidden; }
   transition: .4s;
   border-radius: 50%;
 }
+/* Cor do slider quando está marcado como espera (ON) */
 input:checked + .slider-obs {
-  background-color: #fca5a5; /* Red-400 */
+  background-color: #fbbf24; /* Yellow-400 */
 }
 input:checked + .slider-obs:before {
   transform: translateX(22px);
-}
-/* Altera a cor do slider quando está marcado como espera (ON) */
-input:checked + .slider-obs {
-  background-color: #fbbf24; /* Yellow-400 */
 }
 /* Fim dos estilos do Switch */
 
