@@ -514,7 +514,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // Modal de autenticação Gerencial (antes da ação)
-    // FIX: A função openManagerAuthModal é definida no index.html, mas o handler deve estar aqui
     const managerModal = document.getElementById('managerModal');
     if (managerModal) {
         // Usa delegação de evento para o botão de autenticação
@@ -799,6 +798,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const screenIndex = screenMap[screenId];
 
         if (screenIndex !== undefined) {
+            const appContainer = document.getElementById('appContainer');
             if (appContainer) {
                 appContainer.style.transform = `translateX(-${screenIndex * 100}vw)`;
             }
@@ -838,7 +838,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- FIREBASE INIT ---
     try {
         const firebaseConfig = JSON.parse(window.__firebase_config);
-        // O ERRO ESTAVA AQUI: initializeApp agora é importado no topo, não precisa mais do window.
+        // O ERRO FOI CORRIGIDO AO IMPORTAR initializeApp no topo do arquivo.
         const app = initializeApp(firebaseConfig); 
         auth = getAuth(app);
         db = getFirestore(app);
@@ -892,6 +892,39 @@ document.addEventListener('DOMContentLoaded', () => {
         renderCategoryFilters();
     };
 
+    // CORRIGIDO: Função para renderizar o cardápio (Menu) - MOVENDO PARA CIMA
+    const renderMenu = (filterCategory = 'all', filterSearch = '') => {
+        if (!menuItemsGrid) return;
+        menuItemsGrid.innerHTML = '';
+
+        const searchLower = filterSearch.toLowerCase();
+        
+        const filteredProducts = WOOCOMMERCE_PRODUCTS.filter(p => {
+            const matchesCategory = filterCategory === 'all' || p.category.includes(filterCategory);
+            const matchesSearch = !filterSearch || p.name.toLowerCase().includes(searchLower);
+            return matchesCategory && matchesSearch;
+        });
+        
+        if (filteredProducts.length === 0) {
+            menuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-gray-500 italic">Nenhum produto encontrado.</div>`;
+            return;
+        }
+
+        filteredProducts.forEach(product => {
+            // Adicionado dataset com o produto completo para uso no addItemToSelection
+            menuItemsGrid.innerHTML += `
+                <div class="product-card bg-white p-4 rounded-xl shadow-md cursor-pointer hover:shadow-lg transition duration-150 border border-gray-200"
+                     data-product='${JSON.stringify(product).replace(/'/g, '&#39;')}'
+                     onclick='window.addItemToSelection(${JSON.stringify(product).replace(/'/g, '&#39;')})'>
+                    <h4 class="font-bold text-base text-gray-800">${product.name}</h4>
+                    <p class="text-xs text-gray-500">${product.category} (${product.sector})</p>
+                    <span class="font-bold text-lg text-indigo-700 mt-2">${formatCurrency(product.price)}</span>
+                </div>
+            `;
+        });
+    };
+    
+    // fetchWooCommerceProducts foi movida para depois de renderMenu
     const fetchWooCommerceProducts = async () => {
         const products = await fetchWooCommerceData('products?per_page=100');
         WOOCOMMERCE_PRODUCTS = products.map(p => ({
@@ -901,7 +934,7 @@ document.addEventListener('DOMContentLoaded', () => {
             category: p.categories.length > 0 ? p.categories[0].slug : 'uncategorized',
             sector: 'cozinha' // MOCK: Definindo setor padrão
         }));
-        renderMenu();
+        renderMenu(); // Agora renderMenu está definido.
     };
 
 
@@ -1360,13 +1393,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // Função que carrega as mesas abertas
     const loadOpenTables = () => {
         const tablesRef = getTablesCollectionRef();
+        // ESTA QUERY REQUER UM ÍNDICE COMPOSTO NO FIRESTORE
         const q = query(tablesRef, where('status', '==', 'open'), orderBy('createdAt', 'desc'));
 
         onSnapshot(q, (snapshot) => {
             renderTables(snapshot.docs);
         }, (error) => {
+            // O erro do índice do Firebase é capturado aqui
             console.error("Erro ao carregar mesas abertas:", error);
-            document.getElementById('openTablesList').innerHTML = '<div class="col-span-full text-sm text-red-500 italic p-4 content-card bg-white">Erro ao carregar mesas.</div>';
+            document.getElementById('openTablesList').innerHTML = `<div class="col-span-full text-sm text-red-500 italic p-4 content-card bg-white">Erro ao carregar mesas. ${error.code === 'failed-precondition' ? 'Falta o índice no Firestore. Crie-o via console.' : 'Verifique a conexão.'}</div>`;
         });
     };
     
@@ -1620,7 +1655,8 @@ document.addEventListener('DOMContentLoaded', () => {
         menuItemsGrid.addEventListener('click', (e) => {
             const productCard = e.target.closest('.product-card');
             if (productCard && productCard.dataset.product) {
-                const product = JSON.parse(productCard.dataset.product);
+                // CORREÇÃO: Usa o dado completo do produto
+                const product = JSON.parse(productCard.dataset.product.replace(/&#39;/g, "'"));
                 window.addItemToSelection(product);
             }
         });
@@ -1653,9 +1689,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 newNote = noteCleaned;
             }
 
-            // Se for um item novo e a nota for salva como vazia, mantemos o item.
-            // Se for um item existente, atualizamos o grupo.
-            
             // Mapeia para atualizar o grupo de itens na lista
             selectedItems = selectedItems.map(item => {
                 if (item.id == itemId && (item.note || '') === originalNoteKey) {
