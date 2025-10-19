@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- WooCommerce Configuração ---
     const WOOCOMMERCE_URL = 'https://nossotempero.fatormd.com';
     const CONSUMER_KEY = 'ck_e06515127d067eff5c39d6d93b3908b1baf9158a';
-    const CONSUMER_SECRET = 'cs_0a4cdf88eb7f16387cff8a6a6ee6697eb3952999';
+    const CONSUMER_SECRET = 'cs_0a4cdf88eb7f16383cff8a6a6ee6697eb3952999';
 
 
     // --- ELEMENTOS DA UI ---
@@ -199,14 +199,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Event handler para máscara (garante apenas números e formata)
     if (paymentValueInput) {
       paymentValueInput.addEventListener('input', (e) => {
-        const valueRaw = e.target.value.replace(/\D/g, ''); 
+        const valueRaw = e.target.value.replace(/\D/g, ""); 
         e.target.value = currencyMask(valueRaw);
         const newCursorPos = e.target.value.length;
         e.target.setSelectionRange(newCursorPos, newCursorPos);
     });
     }
 
-    // --- FUNÇÕES DA CALCULADORA (CORRIGIDO) ---
+    // --- FUNÇÕES DA CALCULADORA (MANTIDAS) ---
     let calcValueCents = 0; 
     let storedValueCents = 0; 
     let selectedOperator = null;
@@ -220,7 +220,6 @@ document.addEventListener('DOMContentLoaded', () => {
         switch (operator) {
             case '+': result = first + second; break;
             case '-': result = first - second; break;
-            // Multiplicação em centavos: (1000 centavos * 200 centavos) / 100 = 2000 centavos (R$ 20,00)
             case '*': result = Math.round(first * second / 100); break; 
             case '/': result = second === 0 ? 0 : Math.round(first / second); break;
             default: result = second; break;
@@ -250,7 +249,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (key === '00') {
             rawInput += '00';
         } else if (key === ',' || key === '.') {
-            // Ignora o ponto ou vírgula no input, pois a máscara já a adiciona
             return;
         } else {
             if (rawInput === '0' && key !== '0') {
@@ -304,7 +302,6 @@ document.addEventListener('DOMContentLoaded', () => {
         openCalculatorBtn.addEventListener('click', () => {
             if (calculatorModal) {
                 calculatorModal.style.display = 'flex';
-                // Converte o valor do input R$ para centavos para iniciar a calculadora
                 const rawValue = paymentValueInput.value.replace('R$', '').replace(/\./g, '').replace(',', '');
                 calcValueCents = parseInt(rawValue) || 0;
                 storedValueCents = 0;
@@ -315,7 +312,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // CORRIGIDO: Listener para o botão 'X' de fechar (closeCalcBtnX)
     if (closeCalcBtnX) {
         closeCalcBtnX.addEventListener('click', () => {
             if (calculatorModal) calculatorModal.style.display = 'none';
@@ -346,11 +342,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateCalcDisplay(0);
             } else if (key === 'ok') {
                 performCalculation('=');
-                // Converte o resultado de centavos de volta para a máscara de moeda
                 paymentValueInput.value = formatCurrency(calcValueCents / 100);
                 if (calculatorModal) calculatorModal.style.display = 'none';
             } else if (key === 'close') {
-                // Nova ação de fechar
                 if (calculatorModal) calculatorModal.style.display = 'none';
             }
         });
@@ -360,7 +354,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- FUNÇÕES DE CADASTRO DE CLIENTE (MANTIDAS) ---
     const registerCustomer = async (name, phone, email) => {
         console.log(`Simulação: Tentativa de cadastro de cliente no WooCommerce. Nome: ${name}, WhatsApp: ${phone}, Email: ${email}`);
-        
         return { 
             id: Math.floor(Math.random() * 1000), 
             name: name,
@@ -491,7 +484,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const executeDeletePayment = async (timestamp) => {
         if (!currentTableId || !currentOrderSnapshot) return;
         
-        // Converte o timestamp para número para garantir a comparação
         const tsNumber = parseInt(timestamp);
         const paymentToDelete = currentOrderSnapshot.payments.find(p => p.timestamp === tsNumber);
         
@@ -500,7 +492,6 @@ document.addEventListener('DOMContentLoaded', () => {
              return;
         }
         
-        // Remoção sem confirmação extra, pois já foi autenticado e confirmado no openManagerModal
         const tableRef = getTableDocRef(currentTableId);
         try {
             await updateDoc(tableRef, {
@@ -543,7 +534,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!authBtn) return;
             
             const input = document.getElementById('managerPasswordInput');
-            // A ação a ser executada é armazenada globalmente pelo código HTML
             const { action, payload } = window.__manager_auth_action || {};
 
             if (input && input.value === password) {
@@ -558,10 +548,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     deleteSelectedSentItems();
                 } else if (action === 'openSelectiveTransfer') {
                     window.openSelectiveTransferModal(); 
-                } else if (action === 'deletePayment') { // Chamada de exclusão
+                } else if (action === 'deletePayment') { 
                     executeDeletePayment(payload); 
-                } else if (action === 'toggleServiceTax') { // NOVO: Ação de Toggle Service Tax
+                } else if (action === 'toggleServiceTax') { 
                     executeToggleServiceTax();
+                } else if (action === 'openCustomerCRM') { // NOVO: Ação para CRM
+                     alert("Funcionalidade CRM em desenvolvimento.");
                 }
                 
                 window.__manager_auth_action = null; // Limpa a ação
@@ -595,7 +587,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 loadOpenTables();
-                await fetchWooCommerceProducts();
+                await fetchWooCommerceProducts(); 
                 await fetchWooCommerceCategories();
                 renderMenu();
                 renderPaymentMethodButtons();
@@ -607,8 +599,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- FUNÇÕES DE EXCLUSÃO/TRANSFERÊNCIA EM MASSA (CORRIGIDO RECALC TOTAL) ---
-    // NOVO HELPER: Calcula o valor total (em float) de uma lista de itens
+    // --- FUNÇÕES DE EXCLUSÃO/TRANSFERÊNCIA EM MASSA (MANTIDAS) ---
     const calculateItemsValue = (items) => {
         return items.reduce((sum, item) => sum + (item.price || 0), 0);
     };
@@ -667,7 +658,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Transferência em Massa
     const transferSelectedSentItems = async () => {
         const targetTableInput = document.getElementById('targetTableInput');
         const targetTable = parseInt(targetTableInput.value);
@@ -691,7 +681,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const [itemId, itemNote] = itemKey.split('-');
             
             if (currentOrderSnapshot && currentOrderSnapshot.sentItems) {
-                 // Usa find para encontrar o item correto para remoção
                 currentOrderSnapshot.sentItems.forEach(sentItem => {
                     if (sentItem.id.toString() === itemId && (sentItem.note || '') === itemNote) {
                         itemsToTransfer.push(sentItem);
@@ -707,12 +696,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const itemsToTransferValue = calculateItemsValue(itemsToTransfer);
 
-        // 1. Source Table: Subtract item value from source total
         const sourceTableRef = getTableDocRef(currentTableId);
         const sourceCurrentTotal = currentOrderSnapshot.total || 0;
         const sourceNewTotal = Math.max(0, sourceCurrentTotal - itemsToTransferValue);
 
-        // 2. Target Table: Fetch current total to add to it
         const targetTableRef = getTableDocRef(targetTable);
         const targetDocSnap = await getDoc(targetTableRef);
 
@@ -726,18 +713,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const batch = writeBatch(db);
 
-        // 1. Remove os itens e atualiza o total da mesa de origem
         itemsToTransfer.forEach(item => {
             batch.update(sourceTableRef, {
                 sentItems: arrayRemove(item)
             });
         });
-        batch.update(sourceTableRef, { total: sourceNewTotal }); // EXPLICIT UPDATE SOURCE
+        batch.update(sourceTableRef, { total: sourceNewTotal }); 
 
-        // 2. Adiciona os itens e atualiza o total da mesa de destino
         batch.update(targetTableRef, { 
             sentItems: arrayUnion(...itemsToTransfer),
-            total: targetNewTotal // EXPLICIT UPDATE TARGET
+            total: targetNewTotal 
         });
 
         try {
@@ -750,7 +735,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Sobrescreve a função original para usar o fluxo de massa/modal
     window.openSelectiveTransferModal = () => {
         if (!currentTableId) return;
 
@@ -789,7 +773,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 
-                // Simulação de verificação
                 if (transferStatus) {
                     transferStatus.textContent = `Mesa ${targetTable} verificada.`;
                     transferStatus.classList.remove('hidden');
@@ -810,7 +793,6 @@ document.addEventListener('DOMContentLoaded', () => {
             saveSelectedItemsToFirebase(currentTableId);
         }
 
-        // CORREÇÃO (BUG 3): Desinscreve o listener da mesa ao sair do Painel 2/3, para evitar conflitos ao abrir a próxima mesa.
         if (screenId === 'panelScreen' && currentTableId && unsubscribeTable) {
             unsubscribeTable();
             unsubscribeTable = null;
@@ -825,7 +807,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 appContainer.style.transform = `translateX(-${screenIndex * 100}vw)`;
             }
 
-            // Lógica para alternar o modo escuro no body para a tela Gerencial
             if (screenId === 'managerScreen') {
                 document.body.classList.remove('bg-gray-100');
                 document.body.classList.add('bg-gray-900');
@@ -875,7 +856,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     openManagerPanelBtn.classList.remove('hidden');
                 }
                 loadOpenTables();
-                // O await garante que os produtos estejam carregados antes de renderMenu ser chamado
                 await fetchWooCommerceProducts(); 
                 await fetchWooCommerceCategories();
                 renderMenu();
@@ -914,7 +894,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderCategoryFilters();
     };
 
-    // NOVO: Função para exibir detalhes do produto (Pedido 2 - Ponto 2)
     window.openProductInfoModal = (productId) => {
         const product = WOOCOMMERCE_PRODUCTS.find(p => p.id === productId);
         if (!product || !productInfoModal) return;
@@ -926,13 +905,11 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('productInfoPrice').textContent = formatCurrency(product.price);
         document.getElementById('productInfoCategory').textContent = category;
         document.getElementById('productInfoSector').textContent = product.sector;
-        // Mocked description since WooCommerce API usually requires another call for full details
         productInfoDescription.textContent = product.description || 'Descrição detalhada do produto não disponível na API mockada.'; 
 
         productInfoModal.style.display = 'flex';
     };
 
-    // CORRIGIDO: Função para renderizar o cardápio (Menu)
     const renderMenu = (filterCategory = 'all', filterSearch = '') => {
         if (!menuItemsGrid) return;
         menuItemsGrid.innerHTML = '';
@@ -951,7 +928,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         filteredProducts.forEach(product => {
-            // NOVO: Substituindo preço por botão 'Informações' (Pedido 2 - Ponto 2)
             menuItemsGrid.innerHTML += `
                 <div class="product-card bg-white p-4 rounded-xl shadow-md cursor-pointer hover:shadow-lg transition duration-150 border border-gray-200">
                     <h4 class="font-bold text-base text-gray-800">${product.name}</h4>
@@ -972,7 +948,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
     
-    // fetchWooCommerceProducts foi movida para depois de renderMenu
     const fetchWooCommerceProducts = async () => {
         const products = await fetchWooCommerceData('products?per_page=100');
         WOOCOMMERCE_PRODUCTS = products.map(p => ({
@@ -980,10 +955,10 @@ document.addEventListener('DOMContentLoaded', () => {
             name: p.name,
             price: parseFloat(p.price),
             category: p.categories.length > 0 ? p.categories[0].slug : 'uncategorized',
-            sector: 'cozinha', // MOCK: Definindo setor padrão
-            description: p.short_description || p.description || '' // Adicionando descrição (mock)
+            sector: 'cozinha', 
+            description: p.short_description || p.description || '' 
         }));
-        renderMenu(); // Agora renderMenu está definido.
+        renderMenu(); 
     };
 
 
@@ -1033,7 +1008,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // Calcula o total geral (subtotal + serviço)
     const calculateTotal = (subtotal, applyServiceTax) => {
         const taxRate = applyServiceTax ? 0.10 : 0;
         const serviceValue = subtotal * taxRate;
@@ -1041,41 +1015,35 @@ document.addEventListener('DOMContentLoaded', () => {
         return { total, serviceValue };
     };
 
-    // Função auxiliar para atualizar texto de elemento com verificação de nulo
     const updateText = (id, value) => {
         const el = document.getElementById(id);
         if (el) el.textContent = value;
     };
 
-    // Atualiza o resumo da conta (Painel 3) e exibe os pagamentos
     const updatePaymentSummary = () => {
         if (!currentOrderSnapshot) return;
 
-        const subtotal = currentOrderSnapshot.total || 0; // Usando 'total' como subtotal
+        const subtotal = currentOrderSnapshot.total || 0; 
         const isTaxApplied = currentOrderSnapshot.serviceTaxApplied !== false; 
         const { total, serviceValue } = calculateTotal(subtotal, isTaxApplied);
         const diners = parseInt(dinersSplitInput.value) || 1;
         const valuePerDiner = total / diners;
         
-        // Atualiza UI
         updateText('payment-table-number', `Mesa ${currentTableId}`);
         updateText('orderSubtotalDisplayPayment', formatCurrency(subtotal));
         updateText('orderServiceTaxDisplayPayment', formatCurrency(serviceValue));
         updateText('orderTotalDisplayPayment', formatCurrency(total));
         updateText('valuePerDinerDisplay', formatCurrency(valuePerDiner));
         
-        // Toggle do botão de serviço
         if (toggleServiceTaxBtn) {
             toggleServiceTaxBtn.textContent = isTaxApplied ? 'Remover' : 'Aplicar';
-            // Altera a classe e a cor para refletir o status, mas o botão está sempre ATIVO (habilitado)
             toggleServiceTaxBtn.classList.toggle('bg-green-600', isTaxApplied);
             toggleServiceTaxBtn.classList.toggle('bg-red-600', !isTaxApplied);
             toggleServiceTaxBtn.classList.toggle('hover:bg-green-700', isTaxApplied);
             toggleServiceTaxBtn.classList.toggle('hover:bg-red-700', !isTaxApplied);
-            toggleServiceTaxBtn.disabled = false; // Deve permanecer ativo, a permissão é via modal
+            toggleServiceTaxBtn.disabled = false; // Deve permanecer ativo
         }
 
-        // Pagamentos Registrados
         const paymentSummaryList = document.getElementById('paymentSummaryList');
         if (paymentSummaryList) {
             const payments = currentOrderSnapshot.payments || [];
@@ -1104,40 +1072,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
 
-            // Valor Restante
             const remainingBalance = total - paidAmount;
             const remainingBalanceDisplay = document.getElementById('remainingBalanceDisplay');
             if (remainingBalanceDisplay) {
                 remainingBalanceDisplay.textContent = formatCurrency(Math.abs(remainingBalance));
                 remainingBalanceDisplay.classList.remove('text-red-600', 'text-green-600', 'text-gray-800');
                 if (remainingBalance > 0.01) {
-                    remainingBalanceDisplay.classList.add('text-red-600'); // Falta pagar
+                    remainingBalanceDisplay.classList.add('text-red-600'); 
                 } else if (remainingBalance < -0.01) {
-                    remainingBalanceDisplay.classList.add('text-green-600'); // Troco
+                    remainingBalanceDisplay.classList.add('text-green-600'); 
                     remainingBalanceDisplay.textContent = `TROCO: ${formatCurrency(Math.abs(remainingBalance))}`;
                 } else {
-                    remainingBalanceDisplay.classList.add('text-gray-800'); // Pago
+                    remainingBalanceDisplay.classList.add('text-gray-800'); 
                 }
             }
             
-            // Habilita/Desabilita Finalizar
             if (finalizeOrderBtn) {
                 const canFinalize = remainingBalance <= 0.01 && paidAmount > 0;
                 finalizeOrderBtn.disabled = !canFinalize;
             }
         }
         
-        // Renderiza lista de itens para revisão
         renderReviewItemsList(currentOrderSnapshot.sentItems || []);
         
-        // Garante que o input de valor pago reflita o restante ao entrar
         if (paymentValueInput) {
              const remaining = total - (currentOrderSnapshot.payments || []).reduce((sum, p) => sum + (p.value || 0), 0);
              paymentValueInput.value = currencyMask(Math.max(0, remaining).toFixed(2).replace('.', ''));
         }
     };
 
-    // Renderiza a lista de itens da conta para exclusão/transferência
     const renderReviewItemsList = (items) => {
         const reviewItemsList = document.getElementById('reviewItemsList');
         if (!reviewItemsList) return;
@@ -1149,7 +1112,6 @@ document.addEventListener('DOMContentLoaded', () => {
              return;
         }
 
-        // Agrupa itens enviados por nome, observação, e setor para exibição
         const groupedItems = items.reduce((acc, item) => {
             const key = `${item.id}-${item.note || ''}`;
             if (!acc[key]) {
@@ -1161,8 +1123,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     price: item.price,
                     count: 0,
                     totalPrice: 0,
-                    // Usamos uma chave composta única para referência
-                    checkboxValue: `${item.id}-${item.note || ''}`
+                    checkboxValue: `${item.id.toString()}-${item.note || ''}`
                 };
             }
             acc[key].count += 1;
@@ -1170,7 +1131,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return acc;
         }, {});
 
-        // Adiciona cabeçalho e botões de Ações em Massa
         reviewItemsList.innerHTML += `
             <div class="flex justify-between items-center pb-2 border-b border-gray-200 mb-2">
                 <label class="flex items-center space-x-2 text-sm font-semibold text-gray-700">
@@ -1208,13 +1168,11 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const totalRecalculated = Object.values(groupedItems).reduce((sum, group) => sum + group.totalPrice, 0);
 
-        // Ação de sincronização do total da mesa (se necessário)
         if (currentOrderSnapshot && totalRecalculated.toFixed(2) !== currentOrderSnapshot.total.toFixed(2)) {
             const tableRef = getTableDocRef(currentTableId);
             updateDoc(tableRef, { total: totalRecalculated }).catch(e => console.error("Erro ao sincronizar total:", e));
         }
         
-        // Adiciona event listeners para os botões e checkboxes
         const massDeleteBtn = document.getElementById('massDeleteBtn');
         const massTransferBtn = document.getElementById('massTransferBtn');
         const selectAllItems = document.getElementById('selectAllItems');
@@ -1249,8 +1207,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- EVENT LISTENERS DE PAGAMENTO ---
     if (toggleServiceTaxBtn) {
         toggleServiceTaxBtn.addEventListener('click', async () => {
-            // Requisito: A chave deve sempre estar ativa, mas a desativação requer senha.
-            // Para toggle, chamamos o modal de autenticação
             window.openManagerAuthModal('toggleServiceTax');
         });
     }
@@ -1290,12 +1246,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     payments: arrayUnion(newPayment)
                 });
                 
-                paymentValueInput.value = currencyMask('000'); // Reseta o input de valor
+                paymentValueInput.value = currencyMask('000'); 
                 document.querySelectorAll('.payment-method-btn').forEach(btn => {
                     btn.classList.remove('active', 'bg-indigo-600', 'text-white');
                     btn.classList.add('bg-gray-200', 'text-gray-700');
                 });
-                // A atualização da UI será feita pelo onSnapshot
             } catch (e) {
                 console.error("Erro ao adicionar pagamento:", e);
                 alert("Erro ao tentar adicionar o pagamento.");
@@ -1334,7 +1289,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 alert(`Mesa ${currentTableId} finalizada com sucesso!`);
                 
-                // Limpa o estado local
                 currentTableId = null;
                 selectedItems = [];
                 currentOrderSnapshot = null;
@@ -1350,7 +1304,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- FUNÇÕES DE MESA ---
     let unsubscribeTable = null; 
 
-    // Função que renderiza as mesas abertas (Painel 1)
     const renderTables = (docs) => {
         if (!openTablesList || !openTablesCount) return;
 
@@ -1366,7 +1319,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const total = table.total || 0;
                 const cardColor = total > 0 ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200';
 
-                // NOVO: Lógica para o ícone de Espera (Pedido 1) - Canto Direito Superior
                 const hasAguardandoItem = (table.selectedItems || []).some(item => 
                     item.note && item.note.toLowerCase().includes('espera')
                 );
@@ -1374,7 +1326,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? `<i class="fas fa-exclamation-triangle attention-icon" title="Itens em Espera"></i>` 
                     : '';
                 
-                // NOVO: Lógica para o Timer (Pedido 2) - Apenas ícone e minutos
                 let timerHtml = '';
                 const lastSentAt = table.lastKdsSentAt?.toMillis() || null;
                 const elapsedTime = lastSentAt ? formatElapsedTime(lastSentAt) : null;
@@ -1388,7 +1339,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     `;
                 }
                 
-                // NOVO: Lógica para o Status KDS (Pedido 3) - Canto Esquerdo Superior
                 const statusIconHtml = lastSentAt ? `
                     <button class="kds-status-icon-btn" 
                             title="Status do Último Pedido"
@@ -1400,7 +1350,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const cardHtml = `
                     <div class="table-card-panel ${cardColor} shadow-md transition-colors duration-200 relative" data-table-id="${tableId}">
                         ${attentionIconHtml}
-                        ${statusIconHtml} <h3 class="font-bold text-2xl">Mesa ${table.tableNumber}</h3>
+                        ${statusIconHtml} 
+                        <h3 class="font-bold text-2xl">Mesa ${table.tableNumber}</h3>
                         <p class="text-xs font-light">Pessoas: ${table.diners}</p>
                         <span class="font-bold text-lg mt-2">${formatCurrency(total)}</span>
                         ${timerHtml}
@@ -1412,10 +1363,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         openTablesCount.textContent = count;
         
-        // Adiciona listener para abrir a mesa no Painel 2
         document.querySelectorAll('.table-card-panel').forEach(card => {
             card.addEventListener('click', (e) => {
-                // Impede que o clique nos ícones de status abra a mesa
                 if (e.target.closest('.kds-status-icon-btn') || e.target.closest('.attention-icon')) {
                     return; 
                 }
@@ -1427,42 +1376,38 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // Função que carrega as mesas abertas
     const loadOpenTables = () => {
         const tablesRef = getTablesCollectionRef();
-        // A consulta agora usa um índice composto: status e createdAt (desc)
+        // Index: status (asc), createdAt (desc)
         const q = query(tablesRef, where('status', '==', 'open'), orderBy('createdAt', 'desc'));
 
         onSnapshot(q, (snapshot) => {
             renderTables(snapshot.docs);
         }, (error) => {
-            // O erro do índice do Firebase é capturado aqui
             console.error("Erro ao carregar mesas abertas:", error);
             document.getElementById('openTablesList').innerHTML = `<div class="col-span-full text-sm text-red-500 italic p-4 content-card bg-white">Erro ao carregar mesas. ${error.code === 'failed-precondition' ? 'Falta o índice no Firestore. Crie-o via console.' : 'Verifique a conexão.'}</div>`;
         });
     };
     
-    // Função para abrir a mesa no Painel 2 (Pedido)
     const openTableForOrder = (tableId) => {
         currentTableId = tableId;
-        selectedItems = []; // Reseta a lista de itens selecionados (novos)
         document.getElementById('current-table-number').textContent = `Mesa ${tableId}`;
         
         goToScreen('orderScreen');
         
-        // Inicia o listener em tempo real para a mesa selecionada
         const tableRef = getTableDocRef(tableId);
         
         if (unsubscribeTable) {
-            unsubscribeTable(); // Desinscreve o listener anterior
+            unsubscribeTable(); 
         }
 
         unsubscribeTable = onSnapshot(tableRef, (doc) => {
             if (doc.exists()) {
                 currentOrderSnapshot = doc.data();
+                // O onSnapshot atualiza selectedItems
+                selectedItems = currentOrderSnapshot.selectedItems || []; 
                 renderOrderScreen(currentOrderSnapshot);
             } else {
-                // A mesa foi fechada/deletada
                 alert(`A Mesa ${tableId} foi fechada.`);
                 goToScreen('panelScreen');
                 currentTableId = null;
@@ -1478,7 +1423,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // Função para criar uma nova mesa
     if (abrirMesaBtn) {
         abrirMesaBtn.addEventListener('click', async () => {
             const tableNumber = mesaInput.value.trim();
@@ -1506,17 +1450,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     diners: parseInt(diners),
                     status: 'open',
                     createdAt: serverTimestamp(),
-                    selectedItems: [], // Itens selecionados para envio
-                    sentItems: [],     // Itens já enviados (na conta)
-                    payments: [],      // Pagamentos efetuados
-                    total: 0,          // Valor total (subtotal)
-                    serviceTaxApplied: true, // Taxa de serviço por padrão
-                    lastKdsSentAt: null // NOVO: Timestamp do último envio KDS
+                    selectedItems: [], 
+                    sentItems: [],     
+                    payments: [],      
+                    total: 0,          
+                    serviceTaxApplied: true, 
+                    lastKdsSentAt: null 
                 });
                 
                 alert(`Mesa ${tableNumber} aberta com sucesso!`);
                 
-                // Limpa os inputs e move para a tela de pedidos
                 openTableForOrder(tableNumber);
                 mesaInput.value = '';
                 pessoasInput.value = '';
@@ -1528,7 +1471,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Função de busca de mesa
     if (searchTableBtn) {
         searchTableBtn.addEventListener('click', () => {
             const tableId = searchTableInput.value.trim();
@@ -1549,11 +1491,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // --- FUNÇÕES DE PEDIDO (PAINEL 2) ---
-    // Renderiza a lista de itens selecionados (novos) e itens na conta (enviados)
     const renderOrderScreen = (tableData) => {
         if (!tableData) return;
 
-        // Renderiza Itens Selecionados (novos)
         selectedItems = tableData.selectedItems || [];
         const openItemsCount = selectedItems.length;
         const sendBtn = document.getElementById('sendSelectedItemsBtn');
@@ -1566,9 +1506,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (openItemsCount === 0) {
                  openOrderList.innerHTML = '<div class="text-base text-gray-500 italic p-2">Nenhum item selecionado.</div>';
             } else {
-                // Agrupamento é feito por ID do item + nota para visualização
                 const groupedItems = selectedItems.reduce((acc, item, index) => {
-                    // Item ID deve ser string para match correto
                     const key = `${item.id.toString()}-${item.note || ''}`;
                     if (!acc[key]) {
                         acc[key] = { ...item, count: 0, firstIndex: index };
@@ -1607,17 +1545,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
         }
+        
+        // Garante que o Painel 3 também é atualizado
+        updatePaymentSummary();
     };
 
-    // Funções de ajuste de quantidade local para itens selecionados
     window.increaseLocalItemQuantity = (itemId, noteKey) => {
-        // Encontra um item no grupo para replicar
         const itemToCopy = selectedItems.find(item => 
             item.id.toString() === itemId.toString() && (item.note || '') === noteKey
         );
 
         if (itemToCopy) {
-            // Cria uma cópia limpa antes de adicionar para não vazar propriedades
             const newItem = {
                 id: itemToCopy.id,
                 name: itemToCopy.name,
@@ -1643,21 +1581,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     
-    // NOVO: Abre o modal de observação para o grupo de itens
     window.openObsModalForGroup = (itemId, noteKey) => {
         const item = WOOCOMMERCE_PRODUCTS.find(i => i.id.toString() === itemId.toString()); 
         
         if (item && obsItemName && obsInput && obsModal && esperaSwitch) {
             obsItemName.textContent = item.name;
-            // Remove a tag [EM ESPERA] para que o usuário veja a nota limpa
             const currentNoteCleaned = noteKey.replace(' [EM ESPERA]', '').trim(); 
             obsInput.value = currentNoteCleaned;
             
-            // Armazena a chave do grupo para a ação de salvar
             obsModal.dataset.itemId = itemId;
-            obsModal.dataset.originalNoteKey = noteKey; // Usamos a nota COMPLETA como chave
+            obsModal.dataset.originalNoteKey = noteKey; 
             
-            // Verifica se a tag existe para setar o switch
             const isAguardando = noteKey.toLowerCase().includes('espera');
             esperaSwitch.checked = isAguardando;
             
@@ -1668,7 +1602,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
 
-    // Adiciona um item (produto) à lista de itens selecionados
     window.addItemToSelection = (product) => {
         if (!currentTableId) {
             alert("Selecione ou abra uma mesa primeiro.");
@@ -1679,7 +1612,7 @@ document.addEventListener('DOMContentLoaded', () => {
             id: product.id,
             name: product.name,
             price: product.price,
-            sector: product.sector, // Cozinha/Bar
+            sector: product.sector, 
             note: ''
         };
         
@@ -1688,7 +1621,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderOrderScreen(currentOrderSnapshot);
         saveSelectedItemsToFirebase(currentTableId); 
 
-        // Abre o modal de observação para o item recém-adicionado
         window.openObsModalForGroup(product.id, '');
     };
 
@@ -1702,19 +1634,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Salva a observação e fecha o modal
     if (saveObsBtn) {
-        saveObsBtn.addEventListener('click', () => {
+        saveObsBtn.addEventListener('click', async () => {
             const itemId = obsModal.dataset.itemId;
             const originalNoteKey = obsModal.dataset.originalNoteKey; 
             let newNote = obsInput.value.trim();
             const isEsperaActive = esperaSwitch.checked;
             const esperaTag = ' [EM ESPERA]';
 
-            // Remove a tag de qualquer lugar para começar com a nota limpa
+            // Lógica de manipulação da tag [EM ESPERA] - Simplificada
             let noteCleaned = newNote.replace(esperaTag, '').trim();
             noteCleaned = noteCleaned.replace(/,?\s*\[EM ESPERA\]/gi, '').trim();
 
             if (isEsperaActive) {
-                // Adiciona a tag no final se o switch estiver ligado
                 newNote = (noteCleaned + esperaTag).trim();
             } else {
                 newNote = noteCleaned;
@@ -1730,18 +1661,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             obsModal.style.display = 'none';
             renderOrderScreen(currentOrderSnapshot);
-            saveSelectedItemsToFirebase(currentTableId);
+            await saveSelectedItemsToFirebase(currentTableId); // Garante que o Firebase está atualizado
         });
     }
     
     // Cancela e fecha o modal
     if (cancelObsBtn) {
-        cancelObsBtn.addEventListener('click', () => {
+        cancelObsBtn.addEventListener('click', async () => {
             const itemId = obsModal.dataset.itemId;
             const originalNoteKey = obsModal.dataset.originalNoteKey; 
 
-            // Se o item foi adicionado e o modal aberto imediatamente (originalNoteKey é vazia),
-            // o cancelamento deve remover o item.
             if (originalNoteKey === '') {
                 const indexToRemove = selectedItems.findIndex(item => item.id.toString() === itemId.toString() && item.note === '');
                 if (indexToRemove !== -1) {
@@ -1751,19 +1680,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
             obsModal.style.display = 'none';
             renderOrderScreen(currentOrderSnapshot);
-            saveSelectedItemsToFirebase(currentTableId);
+            await saveSelectedItemsToFirebase(currentTableId);
         });
     }
 
 
-    // Envia os itens selecionados para a conta e KDS (MARCHA)
     if (sendSelectedItemsBtn) {
         sendSelectedItemsBtn.addEventListener('click', async () => {
             if (!currentTableId || selectedItems.length === 0) return;
 
             if (!confirm(`Confirmar o envio de ${selectedItems.length} item(s) para a produção (KDS)?`)) return;
             
-            // Itens a serem movidos para sentItems
             const itemsToSend = selectedItems.filter(item => !item.note || !item.note.toLowerCase().includes('espera')).map(item => ({
                 ...item,
                 sentAt: Date.now(),
@@ -1776,12 +1703,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // 1. Calcular o novo total
             const itemsToSendValue = calculateItemsValue(itemsToSend);
             const currentTotal = currentOrderSnapshot.total || 0;
             const newTotal = currentTotal + itemsToSendValue;
 
-            // 2. Agrupar por setor para o KDS (Simulação)
             const itemsGroupedBySector = itemsToSend.reduce((acc, item) => {
                 if (!acc[item.sector]) {
                     acc[item.sector] = [];
@@ -1794,7 +1719,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return acc;
             }, {});
 
-            // 3. Gravar o pedido KDS (Simulação de criação de documento)
             const kdsOrderRef = doc(getKdsCollectionRef());
             await setDoc(kdsOrderRef, {
                 orderId: kdsOrderRef.id,
@@ -1803,10 +1727,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 sentAt: serverTimestamp(),
                 sectors: itemsGroupedBySector,
                 status: 'pending',
-                statusHistory: [{ status: 'pending', timestamp: Date.now(), user: userId }] // NOVO: Incluir status inicial
+                statusHistory: [{ status: 'pending', timestamp: Date.now(), user: userId }] 
             });
 
-            // 4. Atualizar o documento da mesa
             const tableRef = getTableDocRef(currentTableId);
             
             const itemsForUpdate = itemsToSend.map(item => ({
@@ -1815,26 +1738,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 price: item.price,
                 sector: item.sector,
                 note: item.note,
-                sentAt: item.sentAt, // timestamp em número
+                sentAt: item.sentAt, 
                 sentBy: item.sentBy,
-                kdsId: kdsOrderRef.id // Referência ao pedido KDS
+                kdsId: kdsOrderRef.id 
             }));
 
             try {
                 await updateDoc(tableRef, {
-                    sentItems: arrayUnion(...itemsForUpdate), // Adiciona à lista de itens na conta (Painel 3)
-                    selectedItems: itemsToHold, // Mantém APENAS os itens em espera na lista de seleção (Painel 2)
-                    total: newTotal,   // Atualiza o total
-                    lastKdsSentAt: serverTimestamp() // NOVO: Timestamp do último envio
+                    sentItems: arrayUnion(...itemsForUpdate), 
+                    selectedItems: itemsToHold, // Mantém APENAS os itens em espera (CORRIGIDO)
+                    total: newTotal,   
+                    lastKdsSentAt: serverTimestamp() 
                 });
+                
+                // CORREÇÃO DE ESTADO LOCAL: Atualiza selectedItems localmente para que o Painel 2 reflita imediatamente a retenção.
+                selectedItems = itemsToHold; 
                 
                 alert(`Pedido enviado para a produção! Total da conta: ${formatCurrency(newTotal)}. ${itemsToHold.length} item(s) em Espera.`);
                 
-                // O listener da mesa (onSnapshot) irá atualizar a tela automaticamente.
+                renderOrderScreen(currentOrderSnapshot); // Força a re-renderização
             } catch (e) {
                 console.error("Erro ao enviar itens:", e);
                 alert("Erro ao tentar enviar o pedido para o KDS.");
-                // Em caso de falha, restaura a lista completa para que o usuário não perca o pedido
+                // Restaura a lista completa em caso de falha
                 selectedItems = [...itemsToSend.map(item => ({...item, sentAt: undefined, sentBy: undefined})), ...itemsToHold];
             }
         });
@@ -1848,9 +1774,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     }
 
-    // --- FUNÇÕES KDS STATUS (PEDIDO 3) ---
-
-    // Define KDS statuses e correspondentes colors/icons
+    // --- FUNÇÕES KDS STATUS (MANTIDAS) ---
     const KDS_STATUSES = [
         { key: 'pending', label: 'Pendente', color: 'text-gray-500', icon: 'fa-hourglass-start' },
         { key: 'received', label: 'Recebido', color: 'text-blue-500', icon: 'fa-box' },
@@ -1861,7 +1785,6 @@ document.addEventListener('DOMContentLoaded', () => {
         { key: 'delivered', label: 'Entregue', color: 'text-gray-500', icon: 'fa-handshake' },
     ];
     
-    // Helper para obter o documento KDS
     const getKdsDocRef = (kdsId) => doc(getKdsCollectionRef(), kdsId);
 
 
@@ -1872,12 +1795,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const content = document.getElementById('kdsStatusContent');
         if (!content) return;
         
-        // Exibe loading e o modal
         content.innerHTML = `<i class="fas fa-spinner fa-spin text-4xl text-indigo-500 mb-4"></i><p class="text-gray-600">Carregando status do último pedido...</p>`;
         modal.style.display = 'flex';
 
         try {
-            // Encontra o KDS mais recente para esta mesa
             const q = query(getKdsCollectionRef(), 
                             where('tableNumber', '==', parseInt(tableId)), 
                             orderBy('sentAt', 'desc'), 
@@ -1897,21 +1818,16 @@ document.addEventListener('DOMContentLoaded', () => {
             
             let statusHistoryHtml = '';
             
-            // Reversa a ordem para mostrar o status mais recente no topo (efeito sanfona reverso/cronológico)
             const reversedStatuses = [...KDS_STATUSES].reverse();
             
             reversedStatuses.forEach(statusDef => {
                 const historyEntry = history.find(h => h.status === statusDef.key);
                 const isChecked = !!historyEntry;
-                const isDelivered = statusDef.key === 'delivered';
-                const isReady = statusDef.key === 'ready';
-
                 const time = historyEntry?.timestamp || null;
                 const timeString = time 
                     ? new Date(time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
                     : 'Aguardando';
                 
-                // O checkbox é apenas visual, a ação é feita pelo botão no rodapé
                 const checkboxHtml = `
                     <input type="checkbox" class="kds-status-checkbox h-4 w-4 ${isChecked ? 'text-green-600' : 'text-gray-300'} border-gray-300 rounded focus:ring-green-500 cursor-not-allowed" 
                                 ${isChecked ? 'checked' : ''} disabled>`;
@@ -1927,7 +1843,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         <span class="text-xs font-mono ${timeColor}">${timeString}</span>
                     </div>
-                ` + statusHistoryHtml; // Prepend para ordem reversa
+                ` + statusHistoryHtml; 
             });
             
             const isDelivered = history.some(h => h.status === 'delivered');
@@ -1949,7 +1865,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
             
-            // Adiciona listener para o botão de Entregue
             document.getElementById('updateDeliveredStatusBtn').addEventListener('click', handleDeliveredUpdate);
             
         } catch (e) {
@@ -1958,7 +1873,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // Função para lidar com a atualização do status 'Entregue'
     const handleDeliveredUpdate = async (e) => {
         const btn = e.target.closest('button');
         if (!btn) return;
@@ -1980,30 +1894,26 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             
             try {
-                // Desabilita o botão para evitar cliques duplos
                 btn.disabled = true;
                 btn.textContent = 'Atualizando...';
 
                 await updateDoc(kdsRef, {
-                    status: 'delivered', // Atualiza o status principal
+                    status: 'delivered', 
                     statusHistory: arrayUnion(newHistoryEntry)
                 });
                 
                 alert("Status 'Entregue' atualizado com sucesso!");
-                // Reabre o modal para atualizar o visual
                 window.openKdsStatusModal(tableId); 
                 
             } catch (error) {
                 console.error("Erro ao atualizar status KDS:", error);
                 alert("Erro ao tentar atualizar o status. Tente novamente.");
-                // Em caso de erro, reabilita e restaura o texto
                 btn.disabled = false;
                 btn.textContent = 'MARCAR COMO ENTREGUE';
             }
         }
     }
     
-    // Define a função hideStatus
     const hideStatus = () => {
         if (statusScreen && mainContent) {
             statusScreen.style.display = 'none';
@@ -2011,7 +1921,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     
-    // Inicia a aplicação exibindo a tela de status/loading
     if (statusScreen && mainContent) {
         statusScreen.style.display = 'flex';
         mainContent.style.display = 'none';
