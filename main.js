@@ -45,8 +45,10 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- WooCommerce Configuração ---
     const WOOCOMMERCE_URL = 'https://nossotempero.fatormd.com';
-    const CONSUMER_KEY = 'ck_e06515127d067eff5c39d6d93b3908b1baf9158a';
-    const CONSUMER_SECRET = 'cs_0a4cdf88eb7f16383cff8a6a6ee6697eb3952999';
+    // CHAVES ATUALIZADAS: (Fix 401 Unauthorized)
+    const CONSUMER_KEY = 'ck_4dacda97b4e7bfbc4afe1c00902770718115a044';
+    const CONSUMER_SECRET = 'cs_4ac0b6b050ea25eb8457013551e4cdd926e3227f';
+    // --- FIM DA CONFIGURAÇÃO WOOCONMMERCE ---
 
 
     // --- ELEMENTOS DA UI ---
@@ -77,8 +79,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const quickObsButtons = document.getElementById('quickObsButtons');
     const esperaSwitch = document.getElementById('esperaSwitch');
     const paymentMethodButtonsContainer = document.getElementById('paymentMethodButtons');
-    const productInfoModal = document.getElementById('productInfoModal'); // NOVO: Modal de info
-    const productInfoDescription = document.getElementById('productInfoDescription'); // NOVO: Descrição
+    const productInfoModal = document.getElementById('productInfoModal'); 
+    const productInfoDescription = document.getElementById('productInfoDescription'); 
 
     // Elementos da calculadora
     const calculatorModal = document.getElementById('calculatorModal');
@@ -172,9 +174,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return parseFloat(currencyString.replace('R$', '').replace(/\./g, '').replace(',', '.').trim()) || 0;
     };
 
-    // CORRIGIDO: Função para formatar o tempo (apenas minutos) - Pedido 2
+    // CORRIGIDO: Função para formatar o tempo (apenas minutos) - Painel 1, Ponto 2
     const formatElapsedTime = (timestamp) => {
-        if (!timestamp) return null; // Retorna null se não houver timestamp
+        if (!timestamp) return null; 
         
         // Converte o timestamp para número, caso seja um objeto Timestamp do Firebase
         const timeMs = typeof timestamp.toMillis === 'function' ? timestamp.toMillis() : timestamp;
@@ -187,9 +189,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (minutes >= 60) {
              const hours = Math.floor(minutes / 60);
-             return `${hours}h`; // Removido "atrás"
+             return `${hours}h`; 
         } else if (minutes > 0) {
-            return `${minutes} min`; // Removido "atrás"
+            return `${minutes} min`; 
         } else {
             return `agora`;
         }
@@ -349,7 +351,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-    // FIM - FUNÇÕES DA CALCULADORA
     
     // --- FUNÇÕES DE CADASTRO DE CLIENTE (MANTIDAS) ---
     const registerCustomer = async (name, phone, email) => {
@@ -528,7 +529,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Modal de autenticação Gerencial (antes da ação)
     const managerModal = document.getElementById('managerModal');
     if (managerModal) {
-        // Usa delegação de evento para o botão de autenticação
         managerModal.addEventListener('click', (e) => {
             const authBtn = e.target.closest('#authManagerBtn');
             if (!authBtn) return;
@@ -552,11 +552,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     executeDeletePayment(payload); 
                 } else if (action === 'toggleServiceTax') { 
                     executeToggleServiceTax();
-                } else if (action === 'openCustomerCRM') { // NOVO: Ação para CRM
+                } else if (action === 'openCustomerCRM') { 
                      alert("Funcionalidade CRM em desenvolvimento.");
                 }
                 
-                window.__manager_auth_action = null; // Limpa a ação
+                window.__manager_auth_action = null; 
             } else {
                 alert("Senha incorreta.");
                 if (input) input.value = '';
@@ -581,7 +581,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 userId = `${username}_id_mock`; 
                 document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)}... (${appId})`;
 
-                // Botão de Gerente SEMPRE VISÍVEL após login
                 if (openManagerPanelBtn) {
                     openManagerPanelBtn.classList.remove('hidden');
                 }
@@ -621,7 +620,6 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (currentOrderSnapshot && currentOrderSnapshot.sentItems) {
                 currentOrderSnapshot.sentItems.forEach(sentItem => {
-                    // Item ID deve ser string para match correto
                     if (sentItem.id.toString() === itemId && (sentItem.note || '') === itemNote) {
                         itemsToRemove.push(sentItem);
                     }
@@ -636,7 +634,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const itemsToRemoveValue = calculateItemsValue(itemsToRemove);
         const currentTotal = currentOrderSnapshot.total || 0;
-        const newTotal = Math.max(0, currentTotal - itemsToRemoveValue); // Garante que o total não seja negativo
+        const newTotal = Math.max(0, currentTotal - itemsToRemoveValue); 
         
         const tableRef = getTableDocRef(currentTableId);
         const batch = writeBatch(db);
@@ -785,8 +783,7 @@ document.addEventListener('DOMContentLoaded', () => {
             confirmTransferBtn.onclick = transferSelectedSentItems;
         }
     };
-    // --- FIM FUNÇÕES DE EXCLUSÃO/TRANSFERÊNCIA EM MASSA ---
-
+    
     // Função de Navegação
     window.goToScreen = (screenId) => {
         if (screenId === 'panelScreen' && currentTableId) {
@@ -905,7 +902,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('productInfoPrice').textContent = formatCurrency(product.price);
         document.getElementById('productInfoCategory').textContent = category;
         document.getElementById('productInfoSector').textContent = product.sector;
-        productInfoDescription.textContent = product.description || 'Descrição detalhada do produto não disponível na API mockada.'; 
+        document.getElementById('productInfoDescription').textContent = product.description || 'Descrição detalhada do produto não disponível na API mockada.'; 
 
         productInfoModal.style.display = 'flex';
     };
@@ -1000,13 +997,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!paymentMethodButtonsContainer) return;
         paymentMethodButtonsContainer.innerHTML = '';
         PAYMENT_METHODS.forEach(method => {
+            const isActive = method === 'Dinheiro' ? 'active bg-green-600 text-white' : 'bg-gray-200 text-gray-700';
             paymentMethodButtonsContainer.innerHTML += `
-                <button class="payment-method-btn bg-gray-200 text-gray-700 font-bold py-3 rounded-lg hover:bg-gray-300 transition text-base" data-method="${method}">
+                <button class="payment-method-btn ${isActive} font-bold py-3 rounded-lg hover:bg-gray-300 transition text-base" data-method="${method}">
                     ${method}
                 </button>
             `;
         });
     };
+
 
     const calculateTotal = (subtotal, applyServiceTax) => {
         const taxRate = applyServiceTax ? 0.10 : 0;
@@ -1041,7 +1040,7 @@ document.addEventListener('DOMContentLoaded', () => {
             toggleServiceTaxBtn.classList.toggle('bg-red-600', !isTaxApplied);
             toggleServiceTaxBtn.classList.toggle('hover:bg-green-700', isTaxApplied);
             toggleServiceTaxBtn.classList.toggle('hover:bg-red-700', !isTaxApplied);
-            toggleServiceTaxBtn.disabled = false; // Deve permanecer ativo
+            toggleServiceTaxBtn.disabled = false; 
         }
 
         const paymentSummaryList = document.getElementById('paymentSummaryList');
@@ -1378,7 +1377,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const loadOpenTables = () => {
         const tablesRef = getTablesCollectionRef();
-        // Index: status (asc), createdAt (desc)
+        // A consulta usa um índice composto: status (asc), createdAt (desc)
         const q = query(tablesRef, where('status', '==', 'open'), orderBy('createdAt', 'desc'));
 
         onSnapshot(q, (snapshot) => {
@@ -1404,7 +1403,6 @@ document.addEventListener('DOMContentLoaded', () => {
         unsubscribeTable = onSnapshot(tableRef, (doc) => {
             if (doc.exists()) {
                 currentOrderSnapshot = doc.data();
-                // O onSnapshot atualiza selectedItems
                 selectedItems = currentOrderSnapshot.selectedItems || []; 
                 renderOrderScreen(currentOrderSnapshot);
             } else {
@@ -1546,7 +1544,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         
-        // Garante que o Painel 3 também é atualizado
         updatePaymentSummary();
     };
 
@@ -1624,7 +1621,6 @@ document.addEventListener('DOMContentLoaded', () => {
         window.openObsModalForGroup(product.id, '');
     };
 
-    // Função para adicionar observação rápida (Pedido 2 - Ponto 1)
     window.appendObs = (text) => {
         const currentNote = obsInput.value.trim();
         const separator = currentNote && !currentNote.endsWith('.') && !currentNote.endsWith(',') ? ', ' : '';
@@ -1632,7 +1628,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
 
-    // Salva a observação e fecha o modal
     if (saveObsBtn) {
         saveObsBtn.addEventListener('click', async () => {
             const itemId = obsModal.dataset.itemId;
@@ -1641,7 +1636,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const isEsperaActive = esperaSwitch.checked;
             const esperaTag = ' [EM ESPERA]';
 
-            // Lógica de manipulação da tag [EM ESPERA] - Simplificada
             let noteCleaned = newNote.replace(esperaTag, '').trim();
             noteCleaned = noteCleaned.replace(/,?\s*\[EM ESPERA\]/gi, '').trim();
 
@@ -1651,7 +1645,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 newNote = noteCleaned;
             }
 
-            // Mapeia para atualizar o grupo de itens na lista
             selectedItems = selectedItems.map(item => {
                 if (item.id.toString() === itemId.toString() && (item.note || '') === originalNoteKey) {
                     return { ...item, note: newNote };
@@ -1661,11 +1654,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             obsModal.style.display = 'none';
             renderOrderScreen(currentOrderSnapshot);
-            await saveSelectedItemsToFirebase(currentTableId); // Garante que o Firebase está atualizado
+            await saveSelectedItemsToFirebase(currentTableId); 
         });
     }
     
-    // Cancela e fecha o modal
     if (cancelObsBtn) {
         cancelObsBtn.addEventListener('click', async () => {
             const itemId = obsModal.dataset.itemId;
@@ -1691,6 +1683,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!confirm(`Confirmar o envio de ${selectedItems.length} item(s) para a produção (KDS)?`)) return;
             
+            // Separa itens para enviar e itens para segurar (em espera)
             const itemsToSend = selectedItems.filter(item => !item.note || !item.note.toLowerCase().includes('espera')).map(item => ({
                 ...item,
                 sentAt: Date.now(),
@@ -1707,6 +1700,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const currentTotal = currentOrderSnapshot.total || 0;
             const newTotal = currentTotal + itemsToSendValue;
 
+            // Agrupamento para o KDS
             const itemsGroupedBySector = itemsToSend.reduce((acc, item) => {
                 if (!acc[item.sector]) {
                     acc[item.sector] = [];
@@ -1719,6 +1713,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return acc;
             }, {});
 
+            // 1. Cria o Pedido KDS
             const kdsOrderRef = doc(getKdsCollectionRef());
             await setDoc(kdsOrderRef, {
                 orderId: kdsOrderRef.id,
@@ -1730,6 +1725,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 statusHistory: [{ status: 'pending', timestamp: Date.now(), user: userId }] 
             });
 
+            // 2. Atualiza a Mesa (move itens para sentItems e retém os em espera)
             const tableRef = getTableDocRef(currentTableId);
             
             const itemsForUpdate = itemsToSend.map(item => ({
@@ -1746,21 +1742,21 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 await updateDoc(tableRef, {
                     sentItems: arrayUnion(...itemsForUpdate), 
-                    selectedItems: itemsToHold, // Mantém APENAS os itens em espera (CORRIGIDO)
+                    selectedItems: itemsToHold, // CORRIGIDO: Mantém apenas os itens em espera
                     total: newTotal,   
                     lastKdsSentAt: serverTimestamp() 
                 });
                 
-                // CORREÇÃO DE ESTADO LOCAL: Atualiza selectedItems localmente para que o Painel 2 reflita imediatamente a retenção.
+                // CORREÇÃO DE ESTADO LOCAL: Atualiza selectedItems localmente
                 selectedItems = itemsToHold; 
                 
                 alert(`Pedido enviado para a produção! Total da conta: ${formatCurrency(newTotal)}. ${itemsToHold.length} item(s) em Espera.`);
                 
-                renderOrderScreen(currentOrderSnapshot); // Força a re-renderização
+                renderOrderScreen(currentOrderSnapshot); 
             } catch (e) {
                 console.error("Erro ao enviar itens:", e);
                 alert("Erro ao tentar enviar o pedido para o KDS.");
-                // Restaura a lista completa em caso de falha
+                // Restaura a lista em caso de falha (evita perda de dados)
                 selectedItems = [...itemsToSend.map(item => ({...item, sentAt: undefined, sentBy: undefined})), ...itemsToHold];
             }
         });
