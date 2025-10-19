@@ -234,59 +234,66 @@
                     </div>
 
                     <div class="flex justify-between space-x-3 pt-2">
-                        <button id="finalizeOrderBtn" class="w-1/2 px-4 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition text-base disabled:opacity-50" disabled>
-                            FECHAR CONTA
+                        <button id="finalizeOrderBtn" class="w-1/2 px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition duration-150 text-base disabled:opacity-50">
+                            FINALIZAR CONTA
                         </button>
-                        <button id="openNfeModalBtn" class="w-1/2 px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition text-base disabled:opacity-50">
-                            NF-e
+                        <button id="openNfeModalBtn" class="w-1/2 px-4 py-3 bg-yellow-600 text-white font-bold rounded-lg hover:bg-yellow-700 transition duration-150 text-base disabled:opacity-50" title="Emitir Nota Fiscal (em desenvolvimento)">
+                            NF-e (DEV)
                         </button>
                     </div>
                 </div>
             </div>
             
-            <div id="managerScreen" class="flex-shrink-0 bg-gray-900 text-gray-200">
-                <div class="flex items-center mb-6 border-b border-orange-600 pb-3">
-                    <button id="backToPanelFromManagerBtn" class="mr-2 text-3xl p-2 text-orange-400 hover:text-orange-500 transition duration-150" title="Voltar para o Painel" onclick="goToScreen('panelScreen')">
-                        <i class="fas fa-arrow-left"></i>
-                    </button>
-                    <span class="text-2xl font-semibold text-orange-400">Painel Gerencial</span>
+            <div id="managerScreen" class="flex-shrink-0">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center text-orange-400">
+                        <button id="backToPanelFromManagerBtn" class="mr-2 text-3xl p-2 hover:text-orange-500 transition duration-150" title="Voltar para o Painel" onclick="goToScreen('panelScreen')">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <span class="text-2xl font-semibold mr-3 text-gray-100">Painel Gerencial</span>
+                    </div>
                 </div>
-                
-                <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 p-4">
                     <div class="manager-card bg-gray-800 border-2 border-orange-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="alert('Funcionalidade de Gerenciamento de Produtos em desenvolvimento. Abre em novo painel.')">
-                        <i class="fas fa-burger text-4xl text-orange-400 mb-2"></i>
+                        <i class="fas fa-box-open text-4xl text-orange-400 mb-2"></i>
                         <h4 class="font-bold text-lg text-gray-100">Produtos</h4>
                         <p class="text-sm text-gray-400">Criar, Editar, Excluir</p>
                     </div>
-                    
                     <div class="manager-card bg-gray-800 border-2 border-orange-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="alert('Funcionalidade de Gerenciamento de Categorias em desenvolvimento. Abre em novo painel.')">
                         <i class="fas fa-tags text-4xl text-orange-400 mb-2"></i>
                         <h4 class="font-bold text-lg text-gray-100">Categorias</h4>
                         <p class="text-sm text-gray-400">Criar, Editar, Excluir</p>
                     </div>
-
                     <div class="manager-card bg-gray-800 border-2 border-orange-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="openManagerAuthModal('openWaiterReg')">
                         <i class="fas fa-users text-4xl text-orange-400 mb-2"></i>
                         <h4 class="font-bold text-lg text-gray-100">Usuários (Garçons)</h4>
                         <p class="text-sm text-gray-400">Criar, Editar, Excluir</p>
                     </div>
-                    
                     <div class="manager-card bg-gray-800 border-2 border-orange-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="alert('Funcionalidade de Gerenciamento de Clientes em desenvolvimento. Abre em novo painel.')">
                         <i class="fas fa-address-book text-4xl text-orange-400 mb-2"></i>
                         <h4 class="font-bold text-lg text-gray-100">Clientes</h4>
                         <p class="text-sm text-gray-400">Cadastrar, Consultar</p>
                     </div>
-
                     <div class="manager-card bg-gray-800 border-2 border-orange-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="alert('Funcionalidade de Gerenciamento de Pedidos WooCommerce em desenvolvimento. Abre em novo painel.')">
                         <i class="fas fa-receipt text-4xl text-orange-400 mb-2"></i>
                         <h4 class="font-bold text-lg text-gray-100">Pedidos (Woo)</h4>
                         <p class="text-sm text-gray-400">Verificar, Sincronizar</p>
                     </div>
-
                     <div class="manager-card bg-gray-800 border-2 border-orange-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="document.getElementById('reportsModal').style.display='flex'">
                         <i class="fas fa-chart-line text-4xl text-orange-400 mb-2"></i>
                         <h4 class="font-bold text-lg text-gray-100">Relatórios</h4>
-                        <p class="text-sm text-gray-400">Vendas, Garçons, Métodos</p>
+                        <p class="text-sm text-gray-400">Vendas, Itens, Estoque</p>
+                    </div>
+                    <div class="manager-card bg-gray-800 border-2 border-orange-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="openManagerAuthModal('deleteMass')">
+                        <i class="fas fa-trash-alt text-4xl text-orange-400 mb-2"></i>
+                        <h4 class="font-bold text-lg text-gray-100">Exclusão em Massa</h4>
+                        <p class="text-sm text-gray-400">Itens enviados da conta</p>
+                    </div>
+                    <div class="manager-card bg-gray-800 border-2 border-orange-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="openManagerAuthModal('openSelectiveTransfer')">
+                        <i class="fas fa-exchange-alt text-4xl text-orange-400 mb-2"></i>
+                        <h4 class="font-bold text-lg text-gray-100">Transferência Seletiva</h4>
+                        <p class="text-sm text-gray-400">Itens entre mesas</p>
                     </div>
                 </div>
             </div>
@@ -294,32 +301,51 @@
         </div>
     </main>
 
-    <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
-            <h3 class="text-xl font-bold mb-4 text-indigo-700">Detalhes do Item</h3>
-            <p class="text-base mb-3">Item: <span id="obsItemName" class="font-semibold text-gray-800"></span></p>
+    <div id="loginModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4 hidden">
+        <div class="content-card bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm text-center">
+            <h2 class="text-2xl font-bold mb-4 text-indigo-700">Acesso PDV</h2>
+            <div class="space-y-4">
+                 <input type="text" id="loginUsername" placeholder="Usuário (Ex: garcom)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
+                 <input type="password" id="loginPassword" placeholder="Senha (Ex: 1234)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base" maxlength="4">
+            </div>
+            <button id="loginBtn" class="w-full bg-indigo-600 text-white font-bold py-3 mt-6 rounded-lg hover:bg-indigo-700 transition duration-150 text-xl">
+                ENTRAR
+            </button>
+            <p class="mt-4 text-xs text-gray-400">Credenciais são mockadas. Gerente: gerente/1234. Garçom: garcom/1234.</p>
+        </div>
+    </div>
 
-            <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-4">
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">2CP</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">G</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">L</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">L.e</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">Sg</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">G/</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">L.e/</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">Mp</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">P-</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">Ao ponto</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">P+</button>
-                <button class="quick-obs-btn bg-gray-200 text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">Bp</button>
+    <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        </div>
+    
+    <div id="waiterRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md">
+            <h3 class="text-xl font-bold mb-4 text-indigo-700">Cadastro de Novo Garçom</h3>
+            <div class="space-y-3">
+                <input type="password" id="managerPassRegInput" placeholder="Senha Gerente (1234)" class="w-full p-3 border border-red-300 rounded-lg focus:ring-red-500 focus:border-red-500 text-base" maxlength="4" required>
+                <input type="text" id="newWaiterNameInput" placeholder="Novo Usuário (Nome ou Nick)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base" required>
+                <input type="password" id="newWaiterPasswordInput" placeholder="Senha de Login do Garçom (4 dígitos)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base" maxlength="4" required>
             </div>
             
-            <div class="flex items-center justify-between mb-4 mt-2">
-                <span class="text-sm font-semibold text-gray-600">Manter item em Espera:</span>
-                <label class="switch-obs">
-                    <input type="checkbox" id="esperaSwitch">
-                    <span class="slider-obs"></span>
+            <div class="flex justify-end space-x-3 mt-6">
+                <button id="cancelWaiterRegBtn" class="px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition text-base">Cancelar</button>
+                <button id="confirmWaiterRegBtn" class="px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-base">Cadastrar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md">
+            <h3 class="text-xl font-bold mb-4 text-indigo-700">Observação do Item: <span id="obsItemName" class="font-normal text-gray-700"></span></h3>
+            
+            <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-3">
+                </div>
+            
+            <div class="flex items-center space-x-3 mb-3 p-2 bg-gray-100 rounded-lg border border-gray-200">
+                <label for="esperaSwitch" class="text-sm font-semibold text-gray-700 flex-grow">
+                    Marcar como 'Em Espera' (Pedido 1)
                 </label>
+                <input type="checkbox" id="esperaSwitch" class="h-4 w-4 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500">
             </div>
 
             <textarea id="obsInput" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 resize-none text-base" rows="3" placeholder="Ex: Sem gelo, carne ao ponto, trocar batata por arroz..."></textarea>
@@ -334,12 +360,11 @@
             </div>
         </div>
     </div>
-
+    
     <div id="calculatorModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-xs">
             <h3 class="text-xl font-bold mb-4 text-indigo-700">Calculadora</h3>
             <input type="text" id="calcDisplay" value="0,00" readonly class="w-full p-3 mb-4 text-4xl text-right font-mono border-2 border-indigo-500 rounded-lg bg-gray-100">
-            
             <div class="grid grid-cols-4 gap-2">
                 <button class="calc-btn p-3 bg-gray-300 rounded-lg text-xl font-bold hover:bg-gray-400" data-key="C">C</button>
                 <button class="calc-btn p-3 bg-indigo-500 text-white rounded-lg text-xl font-bold hover:bg-indigo-600" data-key="/">/</button>
@@ -356,151 +381,107 @@
                 <button class="calc-btn p-3 bg-gray-200 rounded-lg text-xl font-bold hover:bg-gray-300" data-key="6">6</button>
                 <button class="calc-btn p-3 bg-indigo-500 text-white rounded-lg text-xl font-bold hover:bg-indigo-600" data-key="+">+</button>
 
-                <button class="calc-btn p-3 bg-gray-200 rounded-lg text-xl font-bold" data-key="1">1</button>
-                <button class="calc-btn p-3 bg-gray-200 rounded-lg text-xl font-bold" data-key="2">2</button>
-                <button class="calc-btn p-3 bg-gray-200 rounded-lg text-xl font-bold" data-key="3">3</button>
-                <button class="calc-btn p-3 bg-green-500 text-white rounded-lg text-xl font-bold row-span-2 hover:bg-green-600" data-key="=">=</button>
-
-                <button class="calc-btn p-3 bg-gray-200 rounded-lg text-xl font-bold col-span-2 hover:bg-gray-300" data-key="0">0</button>
+                <button class="calc-btn p-3 bg-gray-200 rounded-lg text-xl font-bold hover:bg-gray-300" data-key="1">1</button>
+                <button class="calc-btn p-3 bg-gray-200 rounded-lg text-xl font-bold hover:bg-gray-300" data-key="2">2</button>
+                <button class="calc-btn p-3 bg-gray-200 rounded-lg text-xl font-bold hover:bg-gray-300" data-key="3">3</button>
+                <button class="calc-btn p-3 bg-green-500 text-white rounded-lg text-xl font-bold hover:bg-green-600 row-span-2" data-key="ok">OK</button>
+                
+                <button class="calc-btn p-3 bg-gray-200 rounded-lg text-xl font-bold hover:bg-gray-300" data-key="0">0</button>
                 <button class="calc-btn p-3 bg-gray-200 rounded-lg text-xl font-bold hover:bg-gray-300" data-key="00">00</button>
+                <button class="calc-btn p-3 bg-indigo-500 text-white rounded-lg text-xl font-bold hover:bg-indigo-600" data-key="=">=</button>
             </div>
         </div>
     </div>
-
-
-    <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+    
+    <div id="reportsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg overflow-y-auto max-h-screen">
+            <h3 class="text-xl font-bold mb-4 text-indigo-700">Relatórios (Em Desenvolvimento)</h3>
+            <p class="text-gray-600 mb-4">Esta seção será usada para gerar relatórios diários de vendas, itens mais vendidos, performance de garçons e controle de estoque.</p>
+            <div class="flex justify-end">
+                <button class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition text-base" onclick="document.getElementById('reportsModal').style.display='none'">
+                    Fechar
+                </button>
+            </div>
         </div>
-
-    <div id="nfeModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-        </div>
+    </div>
 
     <div id="selectiveTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg">
-            <h3 class="text-xl font-bold mb-4 text-indigo-700">Transferência Seletiva</h3>
-            <p class="text-sm text-gray-600 mb-4">Selecione os itens e a mesa de destino para transferir em massa.</p>
-
-            <div class="flex space-x-2 mb-4">
-                <input type="number" id="targetTableInput" placeholder="Nº Mesa Destino" class="w-2/3 p-3 border border-gray-300 rounded-lg focus:ring-indigo-500" min="1">
-                <button id="checkTargetTableBtn" class="w-1/3 bg-blue-500 text-white p-3 rounded-lg hover:bg-blue-600 transition disabled:opacity-50">Verificar</button>
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md">
+            <h3 class="text-xl font-bold mb-4 text-indigo-700">Transferência Seletiva de Itens</h3>
+            
+            <div id="transferItemsList" class="p-3 mb-4 bg-yellow-100 rounded-lg border border-yellow-200">
+                <p class="text-center text-gray-500">Nenhum item selecionado.</p>
             </div>
-            <p id="transferStatus" class="text-sm text-red-500 mb-4 italic hidden"></p>
 
-            <div id="transferItemsList" class="max-h-60 overflow-y-auto space-y-2 p-2 border border-gray-200 rounded-lg bg-gray-50">
-                <p class="text-center text-gray-500">Selecione itens na tela de Pagamento para realizar a transferência.</p>
+            <div class="flex items-center space-x-3 mb-4">
+                <input type="number" id="targetTableInput" placeholder="Mesa de Destino" class="w-full p-3 input-pdv border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base" min="1">
+                <button id="checkTargetTableBtn" class="bg-indigo-600 text-white font-bold p-3 rounded-lg hover:bg-indigo-700 transition text-base" title="Verificar Mesa">
+                    <i class="fas fa-search"></i>
+                </button>
             </div>
             
+            <p id="transferStatus" class="text-sm text-center text-red-500 mb-4 hidden">Mesa verificada. Pode transferir.</p>
+
             <div class="flex justify-end space-x-3 mt-4">
-                <button class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition" onclick="document.getElementById('selectiveTransferModal').style.display='none'">Cancelar</button>
-                <button id="confirmTransferBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50">Confirmar Transferência</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="loginModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
-        <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm text-center">
-            <h3 class="text-2xl font-bold text-indigo-700 mb-6">Login do PDV</h3>
-            <input type="text" id="loginUsername" placeholder="Usuário" class="w-full p-4 mb-4 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
-            <input type="password" id="loginPassword" placeholder="Senha" class="w-full p-4 mb-6 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
-            
-            <div class="flex space-x-3">
-                <button id="loginBtn" class="w-full bg-indigo-600 text-white font-bold py-4 rounded-lg hover:bg-indigo-700 transition text-lg disabled:opacity-50">Entrar</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="waiterRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
-            <h3 class="text-xl font-bold mb-4 text-indigo-700">Novo Garçom (Acesso Gerente)</h3>
-            <input type="password" id="managerPassRegInput" placeholder="Senha do Gerente (1234)" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 text-base">
-            <input type="text" id="newWaiterNameInput" placeholder="Usuário de Login (Ex: garcom01)" class="w-full p-3 mb-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
-            <input type="password" id="newWaiterPasswordInput" placeholder="Senha de Login" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
-            
-            <div class="flex justify-end space-x-3 mt-4">
-                <button id="cancelWaiterRegBtn" class="px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition text-base font-bold">
+                <button class="px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition text-base" onclick="document.getElementById('selectiveTransferModal').style.display='none'">
                     Cancelar
                 </button>
-                <button id="confirmWaiterRegBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base font-bold">
-                    Cadastrar Garçom
+                <button id="confirmTransferBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-base" disabled>
+                    TRANSFERIR ITENS
                 </button>
             </div>
         </div>
     </div>
     
-    <div id="editWaiterModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
-            <h3 class="text-xl font-bold mb-4 text-indigo-700">Editar Garçom</h3>
-            <p class="text-base mb-3">Usuário: <span id="editWaiterUsernameDisplay" class="font-semibold text-gray-800"></span></p>
-            <input type="password" id="editWaiterPasswordInput" placeholder="Nova Senha" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
-            
-            <div class="flex justify-between space-x-3 mt-4">
-                <button id="deleteWaiterBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-base font-bold">
-                    Excluir Garçom
-                </button>
-                <div class="flex space-x-3">
-                    <button id="cancelEditWaiterBtn" class="px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition text-base font-bold">
-                        Cancelar
-                    </button>
-                    <button id="saveEditWaiterBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base font-bold">
-                        Salvar Senha
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-
     <div id="customerRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
-            <h3 class="text-xl font-bold mb-4 text-indigo-700">Cadastrar Novo Cliente</h3>
-            <input type="text" id="regCustomerName" placeholder="Nome do Cliente" class="w-full p-3 mb-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
-            <input type="text" id="regCustomerPhone" placeholder="WhatsApp (Ex: 11988887777)" class="w-full p-3 mb-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
-            <input type="email" id="regCustomerEmail" placeholder="Email (Opcional, mas recomendado)" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md">
+            <h3 class="text-xl font-bold mb-4 text-indigo-700">Cadastro de Cliente</h3>
+            <p class="text-sm text-gray-600 mb-4">Os dados serão integrados (mock) ao WooCommerce para emissão de NF-e/Fidelidade.</p>
+            <div class="space-y-3">
+                <input type="text" id="regCustomerName" placeholder="Nome Completo *" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base" required>
+                <input type="tel" id="regCustomerPhone" placeholder="WhatsApp (DDD + Número) *" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base" required>
+                <input type="email" id="regCustomerEmail" placeholder="E-mail (Opcional)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
+            </div>
             
-            <div class="flex justify-end space-x-3 mt-4">
-                <button id="cancelCustomerRegBtn" class="px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition text-base font-bold">
-                    Cancelar
-                </button>
-                <button id="confirmCustomerRegBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base font-bold">
-                    Cadastrar
+            <div class="flex justify-end space-x-3 mt-6">
+                <button id="cancelCustomerRegBtn" class="px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition text-base">Cancelar</button>
+                <button id="confirmCustomerRegBtn" class="px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-base">Cadastrar Cliente</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="kdsStatusModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+            <div id="kdsStatusContent" class="flex flex-col items-center w-full text-center">
+                </div>
+            <div class="flex justify-end mt-4">
+                <button class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition text-base" onclick="document.getElementById('kdsStatusModal').style.display='none'">
+                    Fechar
                 </button>
             </div>
         </div>
     </div>
-
-    <div id="reportsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg overflow-y-auto max-h-screen">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-bold text-indigo-700">Relatórios de Vendas</h3>
-                <button id="closeReportsModalBtn" class="text-gray-500 hover:text-gray-700 transition text-xl">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="space-y-4">
-                <div class="p-4 bg-gray-50 rounded-lg">
-                    <h4 class="text-lg font-semibold text-gray-700 mb-2">Relatório Geral</h4>
-                    <p>Total de Vendas: <span id="generalSalesTotal" class="font-bold">R$ 0,00</span></p>
-                    <p>Taxa de Serviço Arrecadada: <span id="generalServiceTax" class="font-bold">R$ 0,00</span></p>
-                </div>
-                <div class="p-4 bg-gray-50 rounded-lg">
-                    <h4 class="text-lg font-semibold text-gray-700 mb-2">Relatório por Garçom</h4>
-                    <select id="waiterSelect" class="w-full p-2 border border-gray-300 rounded-lg mb-2"></select>
-                    <p>Total Vendido: <span id="waiterSalesTotal" class="font-bold">R$ 0,00</span></p>
-                    <p>Total de Itens Vendidos: <span id="waiterItemsSold" class="font-bold">0</span></p>
-                    <p>Taxa de Serviço do Garçom: <span id="waiterServiceTax" class="font-bold">R$ 0,00</span></p>
-                </div>
-            </div>
-        </div>
-    </div>
-
 
     <p class="mt-8 text-center text-xs text-gray-400" id="user-id-display">Usuário ID: Carregando...</p>
-    <div id="statusMessage" class="mt-4 text-center text-sm hidden"></div>
-
-
+    
+    <script>
+        // MOCK: Este bloco DEVE ser substituído pela sua configuração real do Firebase
+        window.__firebase_config = JSON.stringify({
+            apiKey: "AIzaSyB...", // Sua chave real
+            authDomain: "pdv-fator.firebaseapp.com",
+            projectId: "pdv-fator",
+            storageBucket: "pdv-fator.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abcdefgh123456"
+        });
+        window.__app_id = "pdv_fator_instance_001"; // ID da instância do PDV (pasta raiz do Firestore)
+    </script>
+    
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, query, where, serverTimestamp, getDoc, arrayRemove, arrayUnion, writeBatch, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // IMPORT ATUALIZADO: Incluindo limit e getDocs para consultas ao KDS
+        import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, query, where, serverTimestamp, getDoc, arrayRemove, arrayUnion, writeBatch, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         // Expondo as referências do Firebase para o script principal (main.js)
         window.initializeApp = initializeApp;
@@ -522,14 +503,11 @@
         window.arrayUnion = arrayUnion;
         window.writeBatch = writeBatch;
         window.orderBy = orderBy;
-
-        // Variáveis de Configuração (passadas para main.js via window)
-        window.__app_id = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        window.__firebase_config = typeof __firebase_config !== 'undefined' ? window.__firebase_config : '{"apiKey": "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY", "authDomain": "fator-pdv.firebaseapp.com", "projectId": "fator-pdv", "storageBucket": "fator-pdv.appspot.com", "messagingSenderId": "1097659747429", "appId": "1:1097659747429:web:8ec0a7c3978c311dbe0a8c", "measurementId": "G-02QWNRXRCV"}';
-        window.__initial_auth_token = typeof __initial_auth_token !== 'undefined' ? window.__initial_auth_token : undefined;
-
+        window.limit = limit; // NOVO
+        window.getDocs = getDocs; // NOVO
     </script>
     
-    <script type="module" src="main.js"></script>
+    <script src="main.js"></script>
+    
 </body>
 </html>
