@@ -339,6 +339,7 @@
             <h3 class="text-xl font-bold mb-4 text-indigo-700">Observação do Item: <span id="obsItemName" class="font-normal text-gray-700"></span></h3>
             
             <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-3">
+                <button class="quick-obs-btn" onclick="window.appendObs('Natural')">Natural</button>
                 <button class="quick-obs-btn" onclick="window.appendObs('1cp')">1cp</button>
                 <button class="quick-obs-btn" onclick="window.appendObs('2cp')">2cp</button>
                 <button class="quick-obs-btn" onclick="window.appendObs('Gelo')">Gelo</button>
@@ -355,7 +356,7 @@
             
             <div class="flex items-center space-x-3 mb-3 p-2 bg-gray-100 rounded-lg border border-gray-200">
                 <label for="esperaSwitch" class="text-sm font-semibold text-gray-700 flex-grow">
-                    Marcar como 'Em Espera' (Apenas prepara após liberação)
+                    Em espera
                 </label>
                 <label class="switch-obs"> 
                     <input type="checkbox" id="esperaSwitch" class="h-4 w-4 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500">
