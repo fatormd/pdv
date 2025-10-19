@@ -1,25 +1,24 @@
-// O script principal agora usa as funções do Firebase expostas globalmente pelo index.html
-const initializeApp = window.initializeApp;
-const getAuth = window.getAuth;
-const signInAnonymously = window.signInAnonymously;
-const onAuthStateChanged = window.onAuthStateChanged;
-const signInWithCustomToken = window.signInWithCustomToken;
-const getFirestore = window.getFirestore;
-const collection = window.collection;
-const onSnapshot = window.onSnapshot;
-const doc = window.doc;
-const setDoc = window.setDoc;
-const updateDoc = window.updateDoc;
-const query = window.query;
-const where = window.where;
-const serverTimestamp = window.serverTimestamp;
-const getDoc = window.getDoc;
-const arrayRemove = window.arrayRemove;
-const arrayUnion = window.arrayUnion;
-const writeBatch = window.writeBatch;
-const orderBy = window.orderBy;
-const limit = window.limit; // NOVO
-const getDocs = window.getDocs; // NOVO
+// CORREÇÃO DE ERRO: Importando as funções diretamente, pois main.js AGORA é um MÓDULO.
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { 
+    getFirestore, 
+    collection, 
+    onSnapshot, 
+    doc, 
+    setDoc, 
+    updateDoc, 
+    query, 
+    where, 
+    serverTimestamp, 
+    getDoc, 
+    arrayRemove, 
+    arrayUnion, 
+    writeBatch, 
+    orderBy,
+    limit, // NOVO
+    getDocs // NOVO
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 
 // O código é envolvido em DOMContentLoaded para garantir que os elementos HTML existam
@@ -27,7 +26,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- VARIÁVEIS GLOBAIS ---
     let db, auth, userId;
-    const appId = window.__app_id;
+    // As variáveis de configuração globais (window.__app_id) permanecem
+    const appId = window.__app_id; 
     let currentTableId = null;
     let selectedItems = []; // Itens selecionados na UI antes de enviar (lista de anotações)
     let currentOrderSnapshot = null; // Último estado da mesa no Firebase
@@ -514,27 +514,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // Modal de autenticação Gerencial (antes da ação)
-    // FIX: Define function globally to fix "not a function" error
-    window.openManagerAuthModal = (action, payload = null) => {
-        const managerModal = document.getElementById('managerModal');
-        if (!managerModal) return; 
-
-        managerModal.innerHTML = `
-            <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
-                <h3 class="text-xl font-bold mb-4 text-red-600">Ação Gerencial Necessária</h3>
-                <p class="text-base mb-3">Insira a senha do gerente para prosseguir.</p>
-                <input type="password" id="managerPasswordInput" placeholder="Senha (Ex: 1234)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 text-base" maxlength="4">
-                
-                <div class="flex justify-end space-x-3 mt-4">
-                    <button class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-base" onclick="document.getElementById('managerModal').style.display='none'">Cancelar</button>
-                    <button id="authManagerBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-base">Autenticar</button>
-                </div>
-            </div>
-        `;
-        managerModal.style.display = 'flex';
-        
-        document.getElementById('authManagerBtn').onclick = () => {
+    // FIX: A função openManagerAuthModal é definida no index.html, mas o handler deve estar aqui
+    const managerModal = document.getElementById('managerModal');
+    if (managerModal) {
+        // Usa delegação de evento para o botão de autenticação
+        managerModal.addEventListener('click', (e) => {
+            const authBtn = e.target.closest('#authManagerBtn');
+            if (!authBtn) return;
+            
             const input = document.getElementById('managerPasswordInput');
+            // A ação a ser executada é armazenada globalmente pelo código HTML
+            const { action, payload } = window.__manager_auth_action || {};
+
             if (input && input.value === password) {
                 managerModal.style.display = 'none';
                 
@@ -551,12 +542,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     executeDeletePayment(payload); 
                 }
                 
+                window.__manager_auth_action = null; // Limpa a ação
             } else {
                 alert("Senha incorreta.");
                 if (input) input.value = '';
             }
-        };
-    };
+        });
+    }
 
 
     if (loginBtn) {
@@ -846,7 +838,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- FIREBASE INIT ---
     try {
         const firebaseConfig = JSON.parse(window.__firebase_config);
-        const app = initializeApp(firebaseConfig);
+        // O ERRO ESTAVA AQUI: initializeApp agora é importado no topo, não precisa mais do window.
+        const app = initializeApp(firebaseConfig); 
         auth = getAuth(app);
         db = getFirestore(app);
 
@@ -976,7 +969,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const updatePaymentSummary = () => {
         if (!currentOrderSnapshot) return;
 
-        const subtotal = currentOrderSnapshot.subtotal || 0;
+        const subtotal = currentOrderSnapshot.total || 0; // Usando 'total' como subtotal
         const isTaxApplied = currentOrderSnapshot.serviceTaxApplied !== false; 
         const { total, serviceValue } = calculateTotal(subtotal, isTaxApplied);
         const diners = parseInt(dinersSplitInput.value) || 1;
@@ -1017,7 +1010,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div class="flex items-center space-x-2">
                                 <span class="text-xs text-gray-500">${time}</span>
                                 <button class="text-red-500 hover:text-red-700 transition" 
-                                        onclick="openManagerAuthModal('deletePayment', ${p.timestamp})"
+                                        onclick="window.openManagerAuthModal('deletePayment', ${p.timestamp})"
                                         title="Excluir Pagamento">
                                     <i class="fas fa-trash-alt text-xs"></i>
                                 </button>
@@ -1093,13 +1086,31 @@ document.addEventListener('DOMContentLoaded', () => {
             return acc;
         }, {});
 
+        // Adiciona cabeçalho e botões de Ações em Massa
+        reviewItemsList.innerHTML += `
+            <div class="flex justify-between items-center pb-2 border-b border-gray-200 mb-2">
+                <label class="flex items-center space-x-2 text-sm font-semibold text-gray-700">
+                    <input type="checkbox" id="selectAllItems" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                    <span>Selecionar Todos</span>
+                </label>
+                <div class="flex space-x-2">
+                    <button id="massTransferBtn" class="px-2 py-1 text-xs bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition disabled:opacity-50" title="Transferir Itens Selecionados (Gerente)">
+                        Transferir (<span id="selectedItemsCount">0</span>)
+                    </button>
+                    <button id="massDeleteBtn" class="px-2 py-1 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 transition disabled:opacity-50" title="Excluir Itens Selecionados (Gerente)">
+                        Excluir (<span id="selectedItemsCountDelete">0</span>)
+                    </button>
+                </div>
+            </div>
+        `;
+
         Object.values(groupedItems).forEach(group => {
             const noteHtml = group.note ? `<p class="text-xs text-gray-500 italic ml-6">Obs: ${group.note}</p>` : '';
 
             reviewItemsList.innerHTML += `
                 <div class="flex items-start justify-between py-2 border-b border-gray-100">
                     <div class="flex items-start space-x-2">
-                        <input type="checkbox" class="item-checkbox h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" 
+                        <input type="checkbox" class="item-checkbox h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 mr-2" 
                                 value="${group.checkboxValue}">
                         <div>
                             <p class="font-semibold text-gray-800">(${group.count}x) ${group.name}</p>
@@ -1110,6 +1121,44 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
         });
+        
+        const totalRecalculated = Object.values(groupedItems).reduce((sum, group) => sum + group.totalPrice, 0);
+
+        if (totalRecalculated !== currentOrderSnapshot.total) {
+            const tableRef = getTableDocRef(currentTableId);
+            updateDoc(tableRef, { total: totalRecalculated }).catch(e => console.error("Erro ao sincronizar total:", e));
+        }
+        
+        // Adiciona event listeners para os botões e checkboxes
+        const massDeleteBtn = document.getElementById('massDeleteBtn');
+        const massTransferBtn = document.getElementById('massTransferBtn');
+        const selectAllItems = document.getElementById('selectAllItems');
+        const itemCheckboxes = document.querySelectorAll('.item-checkbox');
+        const selectedItemsCountEl = document.getElementById('selectedItemsCount');
+        const selectedItemsCountDeleteEl = document.getElementById('selectedItemsCountDelete');
+        
+        const updateMassActionButtons = () => {
+            const checkedCount = document.querySelectorAll('#reviewItemsList .item-checkbox:checked').length;
+            if (massDeleteBtn) massDeleteBtn.disabled = checkedCount === 0;
+            if (massTransferBtn) massTransferBtn.disabled = checkedCount === 0;
+            if (selectedItemsCountEl) selectedItemsCountEl.textContent = checkedCount;
+            if (selectedItemsCountDeleteEl) selectedItemsCountDeleteEl.textContent = checkedCount;
+            if (selectAllItems) selectAllItems.checked = checkedCount === itemCheckboxes.length && itemCheckboxes.length > 0;
+        };
+        
+        if (selectAllItems) {
+            selectAllItems.addEventListener('change', () => {
+                itemCheckboxes.forEach(cb => cb.checked = selectAllItems.checked);
+                updateMassActionButtons();
+            });
+        }
+        
+        itemCheckboxes.forEach(cb => cb.addEventListener('change', updateMassActionButtons));
+        
+        if (massDeleteBtn) massDeleteBtn.addEventListener('click', () => window.openManagerAuthModal('deleteMass'));
+        if (massTransferBtn) massTransferBtn.addEventListener('click', () => window.openManagerAuthModal('openSelectiveTransfer'));
+        
+        updateMassActionButtons();
     };
     
     // --- EVENT LISTENERS DE PAGAMENTO ---
@@ -1273,7 +1322,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const statusIconHtml = lastSentAt ? `
                     <button class="status-icon-btn absolute bottom-0 right-0 p-2 text-indigo-500 hover:text-indigo-700 transition" 
                             title="Status do Último Pedido"
-                            onclick="openKdsStatusModal(${tableId})">
+                            onclick="window.openKdsStatusModal(${tableId})">
                         <i class="fas fa-tasks"></i>
                     </button>
                 ` : '';
@@ -1445,25 +1494,38 @@ document.addEventListener('DOMContentLoaded', () => {
             if (openItemsCount === 0) {
                  openOrderList.innerHTML = '<div class="text-base text-gray-500 italic p-2">Nenhum item selecionado.</div>';
             } else {
-                selectedItems.forEach((item, index) => {
-                    const noteHtml = item.note ? `<p class="text-xs text-gray-500 italic ml-6">Obs: ${item.note}</p>` : '';
-                    const groupIndicator = item.obsGroup ? `<span class="bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full text-xs font-bold mr-2">Grupo ${item.obsGroup}</span>` : '';
+                // Agrupamento é feito por ID do item + nota para visualização
+                const groupedItems = selectedItems.reduce((acc, item, index) => {
+                    const key = `${item.id}-${item.note || ''}`;
+                    if (!acc[key]) {
+                        acc[key] = { ...item, count: 0, firstIndex: index };
+                    }
+                    acc[key].count++;
+                    return acc;
+                }, {});
+
+                Object.values(groupedItems).forEach(group => {
+                    const noteText = group.note || '';
+                    const isEspera = noteText.toLowerCase().includes('espera');
+                    const obsText = noteText 
+                        ? `<span class="italic text-indigo-600 font-normal">(${noteText})</span>` 
+                        : `<span class="italic text-gray-500">(Adicionar Obs.)</span>`;
                     
                     openOrderList.innerHTML += `
-                        <div class="flex items-start justify-between py-2 border-b border-gray-100">
-                            <div class="flex items-start">
-                                <button class="text-red-500 hover:text-red-700 transition mr-2" onclick="removeItemFromSelection(${index})" title="Remover Item">
-                                    <i class="fas fa-trash-alt text-sm"></i>
-                                </button>
-                                <div>
-                                    <p class="font-semibold text-gray-800">${groupIndicator}${item.name}</p>
-                                    ${noteHtml}
-                                </div>
+                        <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg shadow-sm">
+                            <div class="flex flex-col flex-grow min-w-0 mr-2">
+                                <span class="font-semibold text-gray-800">${group.name} (${group.count}x)</span>
+                                <span class="text-sm cursor-pointer ${isEspera ? 'text-yellow-600 font-bold' : ''}" onclick="window.openObsModalForGroup('${group.id}', '${group.note || ''}')">${obsText}</span>
                             </div>
-                            <button class="text-indigo-500 hover:text-indigo-700 transition" 
-                                    onclick="openObsModal(${index})" title="Adicionar/Editar Observação">
-                                <i class="fas fa-pencil-alt text-sm"></i>
-                            </button>
+
+                            <div class="flex items-center space-x-2 flex-shrink-0">
+                                <button class="qty-btn bg-red-500 text-white rounded-full text-lg hover:bg-red-600 transition duration-150" onclick="window.decreaseLocalItemQuantity('${group.id}', '${group.note || ''}')" title="Remover um">
+                                    <i class="fas fa-minus"></i>
+                                </button>
+                                <button class="qty-btn bg-green-500 text-white rounded-full text-lg hover:bg-green-600 transition duration-150" onclick="window.increaseLocalItemQuantity('${group.id}', '${group.note || ''}')" title="Adicionar um">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
                         </div>
                     `;
                 });
@@ -1471,60 +1533,98 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Adiciona um item (produto) à lista de itens selecionados
-    window.addItemToSelection = (product) => {
-        // Encontra o maior grupo de observação atual ou começa em 1
-        const maxGroup = selectedItems.reduce((max, item) => Math.max(max, item.obsGroup || 0), 0);
-        const newGroup = maxGroup + 1;
-        
-        const newItem = {
-            id: product.id,
-            name: product.name,
-            price: product.price,
-            sector: product.sector, // Cozinha/Bar
-            note: '',
-            obsGroup: newGroup, // Novo grupo para observação
-            addedAt: Date.now()
-        };
-        
-        selectedItems.push(newItem);
-        renderOrderScreen(currentOrderSnapshot);
-        saveSelectedItemsToFirebase(currentTableId); 
+    // Funções de ajuste de quantidade local para itens selecionados
+    window.increaseLocalItemQuantity = (itemId, noteKey) => {
+        // Encontra um item no grupo para replicar
+        const itemToCopy = selectedItems.find(item => 
+            item.id == itemId && (item.note || '') === noteKey
+        );
+
+        if (itemToCopy) {
+            // Cria uma cópia limpa antes de adicionar para não vazar propriedades
+            const newItem = {
+                id: itemToCopy.id,
+                name: itemToCopy.name,
+                price: itemToCopy.price,
+                sector: itemToCopy.sector, 
+                note: itemToCopy.note,
+            };
+            selectedItems.push(newItem);
+            renderOrderScreen(currentOrderSnapshot);
+            saveSelectedItemsToFirebase(currentTableId);
+        }
     };
-    
-    // Remove um item da lista de itens selecionados
-    window.removeItemFromSelection = (index) => {
-        if (index >= 0 && index < selectedItems.length) {
-            selectedItems.splice(index, 1);
+
+    window.decreaseLocalItemQuantity = (itemId, noteKey) => {
+        const indexToRemove = selectedItems.findIndex(item => 
+            item.id == itemId && (item.note || '') === noteKey
+        );
+
+        if (indexToRemove > -1) {
+            selectedItems.splice(indexToRemove, 1);
             renderOrderScreen(currentOrderSnapshot);
             saveSelectedItemsToFirebase(currentTableId);
         }
     };
     
-    // Abre o modal de observação
-    window.openObsModal = (index) => {
-        const item = selectedItems[index];
-        if (!item) return;
-
-        currentObsGroup = index; // Armazena o índice na lista de selectedItems
-        obsItemName.textContent = item.name;
-        obsInput.value = item.note || '';
+    window.openObsModalForGroup = (itemId, noteKey) => {
+        const item = WOOCOMMERCE_PRODUCTS.find(i => i.id == itemId); 
         
-        // Verifica se a nota contém 'espera' (Pedido 1)
-        const isAguardando = item.note && item.note.toLowerCase().includes('espera');
-        if (esperaSwitch) {
+        if (item && obsItemName && obsInput && obsModal && esperaSwitch) {
+            obsItemName.textContent = item.name;
+            obsInput.value = noteKey.replace(' [EM ESPERA]', '').trim(); // Remove a tag visual para edição
+            
+            // Armazena a chave do grupo para a ação de salvar
+            obsModal.dataset.itemId = itemId;
+            obsModal.dataset.originalNoteKey = noteKey;
+            
+            const isAguardando = noteKey.toLowerCase().includes('espera');
             esperaSwitch.checked = isAguardando;
+
+            obsModal.style.display = 'flex';
+        }
+    };
+
+
+    // Adiciona um item (produto) à lista de itens selecionados
+    window.addItemToSelection = (product) => {
+        if (!currentTableId) {
+            alert("Selecione ou abra uma mesa primeiro.");
+            return;
         }
 
-        // Simulação de botões de observação rápida
-        quickObsButtons.innerHTML = `
-            <button class="px-3 py-1 bg-gray-200 rounded-full text-sm hover:bg-gray-300 transition" onclick="appendObs('Sem gelo')">Sem gelo</button>
-            <button class="px-3 py-1 bg-gray-200 rounded-full text-sm hover:bg-gray-300 transition" onclick="appendObs('Ao ponto')">Ao ponto</button>
-            <button class="px-3 py-1 bg-gray-200 rounded-full text-sm hover:bg-gray-300 transition" onclick="appendObs('Retirar cebola')">Retirar cebola</button>
-        `;
+        const newItem = {
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            sector: product.sector, // Cozinha/Bar
+            note: ''
+        };
         
-        obsModal.style.display = 'flex';
+        selectedItems.push(newItem); 
+
+        renderOrderScreen(currentOrderSnapshot);
+        saveSelectedItemsToFirebase(currentTableId); 
+
+        // Abre o modal de observação para o item recém-adicionado
+        const lastItem = selectedItems[selectedItems.length - 1];
+        if (lastItem) {
+            window.openObsModalForGroup(lastItem.id, lastItem.note || '');
+            // Armazena a chave para que o CANCELAR remova o item se nenhuma obs for salva.
+            obsModal.dataset.originalNoteKey = '';
+        }
     };
+
+    // Função de clique no botão de menu (no HTML)
+    if (menuItemsGrid) {
+        menuItemsGrid.addEventListener('click', (e) => {
+            const productCard = e.target.closest('.product-card');
+            if (productCard && productCard.dataset.product) {
+                const product = JSON.parse(productCard.dataset.product);
+                window.addItemToSelection(product);
+            }
+        });
+    }
 
     // Função para adicionar observação rápida
     window.appendObs = (text) => {
@@ -1535,77 +1635,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // Salva a observação e fecha o modal
-    if (saveObsBtn) {
+    if (saveObsBtn && cancelObsBtn) {
         saveObsBtn.addEventListener('click', () => {
-            if (currentObsGroup !== null && currentObsGroup >= 0 && currentObsGroup < selectedItems.length) {
-                let note = obsInput.value.trim();
-                const isAguardando = esperaSwitch.checked;
-                const esperaTag = ' [EM ESPERA]';
+            const itemId = obsModal.dataset.itemId;
+            const originalNoteKey = obsModal.dataset.originalNoteKey; // key vazia se for um item novo
+            let newNote = obsInput.value.trim();
+            const isEsperaActive = esperaSwitch.checked;
+            const esperaTag = ' [EM ESPERA]';
 
-                // Lógica de manipulação da tag [EM ESPERA]
-                const currentNoteWithoutTag = note.replace(esperaTag, '').trim();
+            // Remove a tag de qualquer lugar para começar com a nota limpa
+            const noteCleaned = newNote.replace(esperaTag, '').trim();
 
-                if (isAguardando) {
-                    // Adiciona a tag se o switch estiver ligado
-                    note = (currentNoteWithoutTag + esperaTag).trim();
-                } else {
-                    // Remove a tag se o switch estiver desligado
-                    note = currentNoteWithoutTag;
-                }
-                
-                selectedItems[currentObsGroup].note = note;
-                renderOrderScreen(currentOrderSnapshot);
-                saveSelectedItemsToFirebase(currentTableId);
+            if (isEsperaActive) {
+                // Adiciona a tag no final se o switch estiver ligado
+                newNote = (noteCleaned + esperaTag).trim();
+            } else {
+                newNote = noteCleaned;
             }
-            obsModal.style.display = 'none';
-            currentObsGroup = null;
-        });
-    }
 
-    // Cancela e fecha o modal
-    if (cancelObsBtn) {
+            // Se for um item novo e a nota for salva como vazia, mantemos o item.
+            // Se for um item existente, atualizamos o grupo.
+            
+            // Mapeia para atualizar o grupo de itens na lista
+            selectedItems = selectedItems.map(item => {
+                if (item.id == itemId && (item.note || '') === originalNoteKey) {
+                    return { ...item, note: newNote };
+                }
+                return item;
+            });
+
+            obsModal.style.display = 'none';
+            renderOrderScreen(currentOrderSnapshot);
+            saveSelectedItemsToFirebase(currentTableId);
+        });
+
         cancelObsBtn.addEventListener('click', () => {
+            const itemId = obsModal.dataset.itemId;
+            const originalNoteKey = obsModal.dataset.originalNoteKey; 
+
+            // Se o item foi adicionado e o modal aberto imediatamente (originalNoteKey é vazia),
+            // o cancelamento deve remover o item.
+            if (originalNoteKey === '') {
+                const indexToRemove = selectedItems.findIndex(item => item.id == itemId && item.note === '');
+                if (indexToRemove !== -1) {
+                    selectedItems.splice(indexToRemove, 1);
+                }
+            }
+
             obsModal.style.display = 'none';
-            currentObsGroup = null;
-        });
-    }
-
-    // Função para renderizar o cardápio (Menu)
-    const renderMenu = (filterCategory = 'all', filterSearch = '') => {
-        if (!menuItemsGrid) return;
-        menuItemsGrid.innerHTML = '';
-
-        const searchLower = filterSearch.toLowerCase();
-        
-        const filteredProducts = WOOCOMMERCE_PRODUCTS.filter(p => {
-            const matchesCategory = filterCategory === 'all' || p.category.includes(filterCategory);
-            const matchesSearch = !filterSearch || p.name.toLowerCase().includes(searchLower);
-            return matchesCategory && matchesSearch;
-        });
-        
-        if (filteredProducts.length === 0) {
-            menuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-gray-500 italic">Nenhum produto encontrado.</div>`;
-            return;
-        }
-
-        filteredProducts.forEach(product => {
-            menuItemsGrid.innerHTML += `
-                <div class="product-card bg-white p-4 rounded-xl shadow-md cursor-pointer hover:shadow-lg transition duration-150 border border-gray-200"
-                     onclick='addItemToSelection(${JSON.stringify(product)})'>
-                    <h4 class="font-bold text-base text-gray-800">${product.name}</h4>
-                    <p class="text-xs text-gray-500">${product.category} (${product.sector})</p>
-                    <span class="font-bold text-lg text-indigo-700 mt-2">${formatCurrency(product.price)}</span>
-                </div>
-            `;
-        });
-    };
-    
-    // Listener para busca de produtos
-    if (searchProductInput) {
-        searchProductInput.addEventListener('input', (e) => {
-            const activeCategoryBtn = document.querySelector('#categoryFilters .bg-indigo-600');
-            const activeCategory = activeCategoryBtn ? activeCategoryBtn.dataset.category : 'all';
-            renderMenu(activeCategory, e.target.value);
+            renderOrderScreen(currentOrderSnapshot);
+            saveSelectedItemsToFirebase(currentTableId);
         });
     }
 
@@ -1839,5 +1918,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.textContent = 'MARCAR COMO ENTREGUE';
             }
         }
+    }
+    
+    // Define a função hideStatus
+    const hideStatus = () => {
+        if (statusScreen && mainContent) {
+            statusScreen.style.display = 'none';
+            mainContent.style.display = 'block';
+        }
+    };
+    
+    // Inicia a aplicação exibindo a tela de status/loading
+    if (statusScreen && mainContent) {
+        statusScreen.style.display = 'flex';
+        mainContent.style.display = 'none';
     }
 });
