@@ -1,10 +1,8 @@
 // --- CONTROLLERS/ORDERCONTROLLER.JS (Painel 2) ---
 import { getProducts, getCategories } from "../services/wooCommerceService.js";
 import { formatCurrency } from "../utils.js";
-// CRITICAL FIX: Importando saveSelectedItemsToFirebase do serviço, não do app.js
 import { saveSelectedItemsToFirebase } from "../services/firebaseService.js"; 
 import { currentTableId, selectedItems, userRole, currentOrderSnapshot } from "../app.js";
-import { openManagerAuthModal } from "./managerController.js";
 
 
 // --- FUNÇÕES DE EXIBIÇÃO DE TELA ---
@@ -65,7 +63,6 @@ export const renderOrderScreen = () => {
     openItemsCount.textContent = openItemsCountValue;
 
     if (sendSelectedItemsBtn) {
-        // Lógica de desabilitação: Cliente não pode enviar, Garçom/Gerente precisa de itens.
         if (userRole === 'client') {
             sendSelectedItemsBtn.disabled = true;
             sendSelectedItemsBtn.textContent = 'Aguardando Staff';
@@ -78,7 +75,6 @@ export const renderOrderScreen = () => {
     if (openItemsCountValue === 0) {
         openOrderList.innerHTML = `<div class="text-base text-gray-500 italic p-2">Nenhum item selecionado.</div>`;
     } else {
-        // Renderiza itens selecionados
         openOrderList.innerHTML = selectedItems.map(item => `
             <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg shadow-sm">
                 <span class="font-semibold">${item.name}</span>
@@ -90,19 +86,17 @@ export const renderOrderScreen = () => {
 
 // --- FUNÇÕES DE AÇÃO ---
 
-// Implementação da função openProductInfoModal (Item 2)
 export const openProductInfoModal = (productId) => {
     const product = getProducts().find(p => p.id === productId);
-    const productInfoModal = document.getElementById('productManagementModal'); // Placeholder
     
     if (!product) return;
 
     alert(`Detalhes do Produto:\nNome: ${product.name}\nPreço: ${formatCurrency(product.price)}\nSetor: ${product.sector}`);
 };
-window.openProductInfoModal = openProductInfoModal; // EXPÕE AO ESCOPO GLOBAL
+window.openProductInfoModal = openProductInfoModal; 
 
-// Implementação da função addItemToSelection (Item 1)
 export const addItemToSelection = (product) => {
+    // ESTE CHECK AGORA SERÁ PASSADO, POIS currentTableId é definido em loadTableOrder
     if (!currentTableId) {
         alert("Selecione ou abra uma mesa primeiro.");
         return;
@@ -118,13 +112,10 @@ export const addItemToSelection = (product) => {
     
     selectedItems.push(newItem); 
 
-    // Atualiza a UI e salva o estado no Firebase
     renderOrderScreen();
     saveSelectedItemsToFirebase(currentTableId, selectedItems);
-    
-    // Abrir modal de observações aqui (Função futura: window.openObsModalForGroup(product.id, ''));
 };
-window.addItemToSelection = addItemToSelection; // EXPÕE AO ESCOPO GLOBAL
+window.addItemToSelection = addItemToSelection; 
 
 
 export const handleSendSelectedItems = () => { alert('Função de Envio KDS (Marcha) em desenvolvimento.'); };
