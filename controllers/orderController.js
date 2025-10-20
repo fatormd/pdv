@@ -165,10 +165,13 @@ export const openObsModalForGroup = (itemId, noteKey) => {
     const obsInput = document.getElementById('obsInput');
     const esperaSwitch = document.getElementById('esperaSwitch');
     
-    if (!product || !obsModal || !obsItemName || !obsInput || !esperaSwitch) return; // Checagem completa de null
+    if (!product || !obsModal || !obsItemName || !obsInput || !esperaSwitch) {
+        console.error("Erro: Elementos do modal de observação não encontrados no DOM.");
+        return; 
+    }
 
     // 1. Configura o estado do modal
-    obsItemName.textContent = product.name; // CORREÇÃO: Isso resolve o "Cannot set properties of null"
+    obsItemName.textContent = product.name; // CORREÇÃO: Esta linha era o ponto de falha.
     
     const currentNoteCleaned = noteKey.replace(' [EM ESPERA]', '').trim(); 
     obsInput.value = currentNoteCleaned;
