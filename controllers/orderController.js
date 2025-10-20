@@ -3,6 +3,9 @@ import { getProducts, getCategories } from "../services/wooCommerceService.js";
 import { formatCurrency } from "../utils.js";
 import { saveSelectedItemsToFirebase } from "../services/firebaseService.js"; 
 import { currentTableId, selectedItems, userRole } from "../app.js";
+import { arrayUnion, serverTimestamp, doc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"; // Importa funções para o KDS
+import { getKdsCollectionRef, getTableDocRef } from "../services/firebaseService.js";
+import { openManagerAuthModal } from "./managerController.js";
 
 // --- ELEMENTOS DO MODAL ---
 const obsModal = document.getElementById('obsModal');
@@ -165,22 +168,20 @@ export const renderOrderScreen = () => {
 
 // Item 3: Abertura do Modal de Observações
 export const openObsModalForGroup = (itemId, noteKey) => {
-    const product = getProducts().find(p => p.id === itemId);
+    const products = getProducts();
+    const product = products.find(p => p.id == itemId);
     
     if (!product || !obsModal) return;
 
     // 1. Configura o estado do modal
     obsItemName.textContent = product.name;
     
-    // Remove a tag [EM ESPERA] para exibição limpa no textarea
     const currentNoteCleaned = noteKey.replace(' [EM ESPERA]', '').trim(); 
     obsInput.value = currentNoteCleaned;
     
-    // Define a chave do item no dataset do modal
     obsModal.dataset.itemId = itemId;
     obsModal.dataset.originalNoteKey = noteKey;
     
-    // Define o estado da chave 'Em Espera'
     esperaSwitch.checked = noteKey.toLowerCase().includes('espera');
 
     // 2. Exibe o modal
@@ -198,7 +199,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const isEsperaActive = esperaSwitch.checked;
             const esperaTag = ' [EM ESPERA]';
 
-            // 1. Limpa a tag existente no texto e aplica a nova regra
             let noteCleaned = newNote.replace(esperaTag, '').trim();
             noteCleaned = noteCleaned.replace(/,?\s*\[EM ESPERA\]/gi, '').trim();
 
@@ -208,7 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 newNote = noteCleaned;
             }
 
-            // 2. Atualiza TODOS os itens que pertencem a esse grupo de obs
+            // Atualiza TODOS os itens que pertencem a esse grupo de obs
             selectedItems = selectedItems.map(item => {
                 if (item.id == itemId && (item.note || '') === originalNoteKey) {
                     return { ...item, note: newNote };
@@ -216,7 +216,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 return item;
             });
 
-            // 3. Esconde, renderiza e salva
+            // Se o item for novo e o usuário cancelar/salvar sem obs, removemos do array (limpeza)
+            if (originalNoteKey === '' && newNote === '') {
+                 selectedItems = selectedItems.filter(item => item.id != itemId || item.note !== '');
+            }
+
             obsModal.style.display = 'none';
             renderOrderScreen();
             saveSelectedItemsToFirebase(currentTableId, selectedItems);
@@ -225,9 +229,47 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (cancelObsBtn) {
         cancelObsBtn.addEventListener('click', () => {
-            obsModal.style.display = 'none';
+             // Lógica de cancelamento: se o item foi adicionado e a observação cancelada, ele deve sumir (limpeza)
+             const itemId = obsModal.dataset.itemId;
+             const originalNoteKey = obsModal.dataset.originalNoteKey;
+             
+             if (originalNoteKey === '') {
+                 selectedItems = selectedItems.filter(item => item.id != itemId || item.note !== '');
+                 saveSelectedItemsToFirebase(currentTableId, selectedItems);
+             }
+             
+             obsModal.style.display = 'none';
+             renderOrderScreen(); // Re-renderiza para refletir a possível remoção
         });
     }
 });
 
-// ... (Outras funções de Produto e Envio KDS permanecem no orderController.js)
+
+// Item 1: Adicionar Produto à Lista (Expõe ao onclick do Cardápio)
+export const addItemToSelection = (product) => {
+    if (!currentTableId) {
+        alert("Selecione ou abra uma mesa primeiro.");
+        return;
+    }
+
+    const newItem = {
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        sector: product.sector, 
+        note: ''
+    };
+    
+    selectedItems.push(newItem); 
+
+    renderOrderScreen();
+    saveSelectedItemsToFirebase(currentTableId, selectedItems);
+    
+    // Abre o modal para iniciar o fluxo de observações
+    openObsModalForGroup(product.id, ''); 
+};
+window.addItemToSelection = addItemToSelection;
+
+
+// Funções Placeholder de Envio (Item 1)
+export const handleSendSelectedItems = () => { alert('Função de Envio KDS (Marcha) em desenvolvimento.'); };
