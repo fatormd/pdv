@@ -19,6 +19,7 @@ export const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
 const STAFF_CREDENTIALS = {
     'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' }, 
     'garcom@fator.com': { password: '1234', role: 'garcom', name: 'Mock Garçom' },
+    // Outros funcionários aqui
 };
 
 // Variáveis Mutáveis (Estado da Sessão)
@@ -38,12 +39,13 @@ const appContainer = document.getElementById('appContainer');
 const loginModal = document.getElementById('loginModal');
 const logoutBtnHeader = document.getElementById('logoutBtnHeader');
 const abrirMesaBtn = document.getElementById('abrirMesaBtn');
+const openManagerPanelBtn = document.getElementById('openManagerPanelBtn'); // Botão Gerencial
 
 // Elementos de Login
 const loginBtn = document.getElementById('loginBtn');
 const loginEmailInput = document.getElementById('loginEmail'); 
 const loginPasswordInput = document.getElementById('loginPassword');
-const searchTableBtn = document.getElementById('searchTableBtn');
+const searchTableBtn = document.getElementById('searchTableBtn'); // Botão de busca
 
 
 // --- FUNÇÕES CORE E ROTEAMENTO ---
@@ -95,7 +97,7 @@ window.goToScreen = goToScreen;
 window.openManagerAuthModal = openManagerAuthModal; 
 
 
-// --- LÓGICA DE LOGIN ---
+// --- LÓGICA DE AUTH/LOGIN ---
 
 const authenticateStaff = (email, password) => {
     const creds = STAFF_CREDENTIALS[email];
@@ -158,7 +160,7 @@ const handleLogout = () => {
     
     goToScreen('panelScreen');
     showLoginModal();
-    document.getElementById('user-id-display').textContent = 'Usuário ID: Deslogado...';
+    document.getElementById('user-id-display').textContent = 'Usuário ID: Carregando...';
 };
 
 window.handleLogout = handleLogout;
@@ -184,10 +186,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (loginBtn) {
         loginBtn.addEventListener('click', handleStaffLogin);
     }
-    if (openManagerPanelBtn) { // Item 1
+    
+    // NOVO: Item 1 - Listener para o Botão Gerencial
+    if (openManagerPanelBtn) { 
         openManagerPanelBtn.addEventListener('click', () => {
              openManagerAuthModal('goToManagerPanel'); 
         });
+    }
+    
+    // NOVO: Item 1 - Listener para o Botão de Logout
+    if (logoutBtnHeader) {
+        logoutBtnHeader.addEventListener('click', handleLogout); 
     }
 
     // 2. Event Listener para Abrir Mesa (Item 2)
@@ -200,7 +209,7 @@ document.addEventListener('DOMContentLoaded', () => {
         searchTableBtn.addEventListener('click', handleSearchTable);
     }
 
-    // 4. Carrega UI Inicial (Painel de Mesas e Filtros)
+    // 4. Carrega UI Inicial
     loadOpenTables();
     renderTableFilters(); 
 });
