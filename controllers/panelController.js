@@ -2,7 +2,8 @@
 import { getTablesCollectionRef, getTableDocRef, auth } from "../services/firebaseService.js";
 import { query, where, orderBy, onSnapshot, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { formatCurrency, formatElapsedTime } from "../utils.js";
-import { goToScreen, currentTableId, selectedItems, unsubscribeTable, currentOrderSnapshot } from "../app.js"; 
+// CRITICAL FIX: Adicionado setCurrentTable para controle de estado
+import { goToScreen, currentTableId, selectedItems, unsubscribeTable, currentOrderSnapshot, setCurrentTable } from "../app.js"; 
 import { fetchWooCommerceProducts } from "../services/wooCommerceService.js"; 
 import { renderMenu, renderOrderScreen } from "./orderController.js";
 
@@ -10,17 +11,17 @@ import { renderMenu, renderOrderScreen } from "./orderController.js";
 // --- ESTADO DO MÓDULO ---
 const SECTORS = ['Todos', 'Salão 1', 'Bar', 'Mezanino', 'Calçada'];
 let currentSectorFilter = 'Todos';
-let unsubscribeTables = null; // CRITICAL FIX: Declaração no escopo do módulo
+let unsubscribeTables = null; 
 
 
 // --- RENDERIZAÇÃO DE SETORES ---
 
 export const renderTableFilters = () => {
+//... (mantém a mesma)
     const sectorFiltersContainer = document.getElementById('sectorFilters');
     const sectorInput = document.getElementById('sectorInput');
     if (!sectorFiltersContainer || !sectorInput) return;
 
-    // 1. Renderiza os botões de filtro
     sectorFiltersContainer.innerHTML = '';
     SECTORS.forEach(sector => {
         const isActive = sector === currentSectorFilter ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border border-gray-300';
@@ -31,12 +32,10 @@ export const renderTableFilters = () => {
         `;
     });
     
-    // 2. Renderiza as opções do seletor (para Abrir Nova Mesa)
     sectorInput.innerHTML = '<option value="" disabled selected>Setor</option>' + 
                             SECTORS.filter(s => s !== 'Todos')
                                    .map(s => `<option value="${s}">${s}</option>`).join('');
 
-    // Adiciona listener para a seleção de filtro
     sectorFiltersContainer.addEventListener('click', (e) => {
         const btn = e.target.closest('.sector-btn');
         if (btn) {
@@ -59,6 +58,7 @@ export const renderTableFilters = () => {
 // --- RENDERIZAÇÃO E CARREGAMENTO DE MESAS ---
 
 const renderTables = (docs) => {
+//... (mantém a mesma)
     const openTablesList = document.getElementById('openTablesList');
     const openTablesCount = document.getElementById('openTablesCount');
     if (!openTablesList || !openTablesCount) return;
@@ -133,6 +133,7 @@ const renderTables = (docs) => {
 };
 
 export const loadOpenTables = () => {
+//... (mantém a mesma)
     if (unsubscribeTables) unsubscribeTables(); 
     
     const tablesCollection = getTablesCollectionRef();
@@ -157,6 +158,7 @@ export const loadOpenTables = () => {
 
 // Item 2: Abrir Mesa
 export const handleAbrirMesa = async () => {
+//... (mantém a mesma)
     const mesaInput = document.getElementById('mesaInput');
     const pessoasInput = document.getElementById('pessoasInput');
     const sectorInput = document.getElementById('sectorInput');
@@ -180,7 +182,6 @@ export const handleAbrirMesa = async () => {
             return;
         }
 
-        // Cria o documento da mesa
         await setDoc(tableRef, {
             tableNumber: tableNumber,
             diners: diners,
@@ -198,7 +199,7 @@ export const handleAbrirMesa = async () => {
         pessoasInput.value = '';
         sectorInput.value = '';
         
-        openTableForOrder(tableNumber.toString()); // Carrega a mesa recém-criada
+        openTableForOrder(tableNumber.toString()); 
         
     } catch (e) {
         console.error("Erro ao abrir mesa:", e);
@@ -208,6 +209,7 @@ export const handleAbrirMesa = async () => {
 
 // Item 3: Busca de Mesa
 export const handleSearchTable = async () => {
+//... (mantém a mesma)
     const searchTableInput = document.getElementById('searchTableInput');
     const tableNumber = searchTableInput.value.trim();
 
@@ -220,7 +222,7 @@ export const handleSearchTable = async () => {
     const docSnap = await getDoc(tableRef);
 
     if (docSnap.exists() && docSnap.data().status === 'open') {
-        openTableForOrder(tableNumber); // Abre a mesa existente
+        openTableForOrder(tableNumber); 
         searchTableInput.value = '';
     } else {
         alert(`A Mesa ${tableNumber} não está aberta.`);
@@ -237,7 +239,6 @@ export const openTableForOrder = async (tableId) => {
 };
 
 export const loadTableOrder = (tableId) => {
-    // Este código deve ser implementado no orderController na próxima fase
-    // Simplesmente renderiza o Painel 2
-    console.log(`Iniciando listener para Mesa ${tableId}...`);
+    // CRITICAL FIX: Chama a função central que define o estado global (currentTableId) e inicia o listener
+    setCurrentTable(tableId); 
 };
