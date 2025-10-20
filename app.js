@@ -222,7 +222,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!user) {
             showLoginModal();
         } 
-        // A lógica de autenticação do Staff/Cliente cuidará da navegação e esconder o modal
+        // Se a persistência do Firebase for ativada e o usuário voltar, 
+        // a lógica de login Staff/Cliente será necessária para definir o userRole novamente.
     });
 
 
