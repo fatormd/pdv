@@ -334,6 +334,27 @@ document.addEventListener('DOMContentLoaded', () => {
     saveObsBtn = document.getElementById('saveObsBtn');
     cancelObsBtn = document.getElementById('cancelObsBtn');
     esperaSwitch = document.getElementById('esperaSwitch');
+
+    // NOVO: Adiciona listener para os botões de observação rápida
+    const quickObsButtons = obsModal.querySelector('#quickObsButtons');
+    if (quickObsButtons) {
+        quickObsButtons.addEventListener('click', (e) => {
+            const btn = e.target.closest('.quick-obs-btn');
+            if (btn) {
+                const obsText = btn.dataset.obs;
+                let currentValue = obsInput.value.trim();
+                
+                // Lógica para adicionar vírgula e espaço se já houver texto
+                if (currentValue && !currentValue.endsWith(',')) {
+                    currentValue += ', ';
+                } else if (currentValue.endsWith(',')) {
+                    currentValue += ' ';
+                }
+                
+                obsInput.value = (currentValue + obsText).trim();
+            }
+        });
+    }
     
     if (saveObsBtn) {
         saveObsBtn.addEventListener('click', () => {
