@@ -4,13 +4,13 @@ import { query, where, orderBy, onSnapshot, getDoc, setDoc, serverTimestamp } fr
 import { formatCurrency, formatElapsedTime } from "../utils.js";
 import { goToScreen, currentTableId, selectedItems, unsubscribeTable } from "../app.js"; 
 import { fetchWooCommerceProducts } from "../services/wooCommerceService.js"; 
-import { renderMenu } from "./orderController.js";
+import { renderMenu, renderOrderScreen } from "./orderController.js"; // Importa renderOrderScreen
 
 
 // --- ESTADO DO MÓDULO ---
 const SECTORS = ['Todos', 'Salão 1', 'Bar', 'Mezanino', 'Calçada'];
 let currentSectorFilter = 'Todos';
-let unsubscribeTables = null; // CRITICAL FIX: Declaração no escopo do módulo
+let unsubscribeTables = null; 
 
 
 // --- RENDERIZAÇÃO DE SETORES ---
@@ -137,7 +137,7 @@ const renderTables = (docs) => {
 };
 
 export const loadOpenTables = () => {
-    if (unsubscribeTables) unsubscribeTables(); // Agora deve funcionar
+    if (unsubscribeTables) unsubscribeTables(); 
     
     const tablesCollection = getTablesCollectionRef();
     let q;
@@ -231,7 +231,6 @@ export const handleSearchTable = async () => {
     }
 };
 
-// CRITICAL FIX: Exportando a função para o app.js (Item 2)
 export const openTableForOrder = async (tableId) => {
     // Garante que o Menu esteja carregado (dependência para o Painel 2)
     await fetchWooCommerceProducts(renderMenu); 
@@ -241,12 +240,9 @@ export const openTableForOrder = async (tableId) => {
     goToScreen('orderScreen'); 
 };
 
-// CRITICAL FIX: Exportando a função que estava faltando no app.js (Item 2)
 export const loadTableOrder = (tableId) => {
-    // Implementação da lógica de listener da mesa (para o Painel 2)
-    // Este código será movido para o orderController na próxima fase
-    const tableRef = getTableDocRef(tableId);
-    
-    // Simplesmente renderiza o Painel 2
+    // CRITICAL FIX: Este é o listener da mesa que precisa ser configurado.
+    // Este código deve ser implementado no orderController na próxima fase.
     console.log(`Iniciando listener para Mesa ${tableId}...`);
+    // Aqui você iniciaria o onSnapshot e chamaria renderOrderScreen
 };
