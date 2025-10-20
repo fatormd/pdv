@@ -87,8 +87,8 @@ export const goToScreen = (screenId) => {
     }
 };
 
-window.goToScreen = goToScreen; // Exporta para o onclick do HTML
-window.openManagerAuthModal = openManagerAuthModal; // Exporta para o onclick do HTML
+window.goToScreen = goToScreen; 
+window.openManagerAuthModal = openManagerAuthModal; 
 
 
 // --- LÓGICA DE LOGIN ---
@@ -201,7 +201,6 @@ const handleLogout = () => {
     document.getElementById('user-id-display').textContent = 'Usuário ID: Deslogado...';
 };
 
-// CRITICAL FIX: Garante que a função de logout do cabeçalho esteja disponível imediatamente
 window.handleLogout = handleLogout;
 
 
@@ -215,14 +214,15 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initializeFirebase(dbInstance, authInstance, window.__app_id); 
 
+    // CHAVE DA CORREÇÃO: Garante que o modal de login apareça imediatamente no DOMContentLoaded
+    showLoginModal(); 
+
     onAuthStateChanged(authInstance, (user) => {
-        // Se não houver usuário (anônimo ou qualquer outro), mostra o login.
-        if (!user) {
-            showLoginModal();
-        } else {
-            // Se o usuário está logado anonimamente, mas ainda não escolheu o perfil, mostra o login.
-            if (userRole === 'anonymous') {
-                showLoginModal();
+        if (user) {
+            // Se já autenticado (persistência de sessão), garante que o estado seja carregado
+            if (userRole !== 'anonymous') {
+                hideLoginModal();
+                // A UI será carregada após a autenticação Staff/Cliente ser concluída
             }
         }
     });
@@ -241,10 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
         abrirMesaBtn.addEventListener('click', handleAbrirMesa);
     }
     
-    // O evento de Logout já está definido no window.handleLogout
-    // O evento de Gerente já está definido no window.openManagerAuthModal
-
-    // Carrega UI Inicial (Painel de Mesas e Filtros)
+    // 3. Carrega UI Inicial (Painel de Mesas e Filtros)
     loadOpenTables();
     renderTableFilters(); 
 });
