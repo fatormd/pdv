@@ -9,7 +9,7 @@ import { fetchWooCommerceProducts, fetchWooCommerceCategories } from './services
 import { loadOpenTables, renderTableFilters, handleAbrirMesa, loadTableOrder, handleSearchTable } from './controllers/panelController.js';
 import { renderMenu, renderOrderScreen } from './controllers/orderController.js';
 import { openManagerAuthModal } from './controllers/managerController.js';
-import { renderPaymentSummary } from './controllers/paymentController.js'; // Importa o resumo de pagamento
+import { renderPaymentSummary, handleAddSplitAccount } from './controllers/paymentController.js'; // Importa o resumo de pagamento
 
 
 // --- VARIÁVEIS DE ESTADO GLOBAL ---
@@ -96,18 +96,52 @@ export const goToScreen = (screenId) => {
 window.goToScreen = goToScreen; 
 window.openManagerAuthModal = openManagerAuthModal; 
 
+// NOVO: Função central para DEFINIR A MESA ATUAL, resolver o erro #2 e o erro #1 (Título)
+export const setCurrentTable = (tableId) => {
+    currentTableId = tableId; // Define o estado global
+    
+    // CORREÇÃO #1: Atualiza o título do Painel de Pedido
+    document.getElementById('current-table-number').textContent = `Mesa ${tableId}`; 
+    // CORREÇÃO #1: Atualiza o título do Painel de Pagamento
+    document.getElementById('payment-table-number').textContent = `Mesa ${tableId}`; 
+    
+    setTableListener(tableId); // Inicia o stream de dados
+};
+
+
+// NOVO: Função para o listener da mesa (MÓDULO DE FLUXO)
+export const setTableListener = (tableId) => {
+    if (unsubscribeTable) unsubscribeTable(); 
+
+    const tableRef = getTableDocRef(tableId);
+
+    // CRITICAL: Atualiza o estado global e chama os renderizadores de tela
+    unsubscribeTable = onSnapshot(tableRef, (docSnapshot) => {
+        if (docSnapshot.exists()) {
+            currentOrderSnapshot = docSnapshot.data();
+            selectedItems = currentOrderSnapshot.selectedItems || []; 
+            renderOrderScreen(currentOrderSnapshot);
+            renderPaymentSummary(currentTableId, currentOrderSnapshot);
+        }
+    }, (error) => {
+        console.error("Erro ao carregar dados da mesa:", error);
+    });
+};
+
 
 // --- LÓGICA DE AUTH/LOGIN ---
 
 const authenticateStaff = (email, password) => {
+//... (mantém a mesma)
     const creds = STAFF_CREDENTIALS[email];
     if (creds && creds.password === password) {
-        return creds; // Retorna credenciais, incluindo o role
+        return creds; 
     }
     return null;
 };
 
 const handleStaffLogin = async () => {
+//... (mantém a mesma)
     if (loginBtn) loginBtn.disabled = true; 
     
     const email = loginEmailInput.value.trim();
@@ -123,19 +157,16 @@ const handleStaffLogin = async () => {
             const userCredential = await signInAnonymously(authInstance); 
             userId = userCredential.user.uid; 
             
-            // Configura o display e esconde o modal
             document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)} | Função: ${userRole.toUpperCase()}`;
             
             hideLoginModal(); 
             hideStatus(); 
             
-            // Carrega dados iniciais da UI
             loadOpenTables();
             renderTableFilters(); 
             fetchWooCommerceProducts(renderMenu);
             fetchWooCommerceCategories(renderTableFilters); 
             
-            // Navega para o Painel de Mesas
             goToScreen('panelScreen');
             
         } catch (error) {
@@ -149,6 +180,7 @@ const handleStaffLogin = async () => {
 };
 
 const handleLogout = () => {
+//... (mantém a mesma)
     userId = null;
     currentTableId = null;
     selectedItems = [];
@@ -165,10 +197,13 @@ const handleLogout = () => {
 
 window.handleLogout = handleLogout;
 
+// NOVO: Expondo a função de divisão para o Event Listener no DOM
+window.handleAddSplitAccount = () => handleAddSplitAccount(currentTableId, currentOrderSnapshot);
+
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
-
+//... (mantém a mesma)
     const firebaseConfig = JSON.parse(window.__firebase_config);
     const app = initializeApp(firebaseConfig); 
     const dbInstance = getFirestore(app);
@@ -182,17 +217,14 @@ document.addEventListener('DOMContentLoaded', () => {
         } 
     });
 
-    // 1. Event Listeners de Login
     if (loginBtn) {
         loginBtn.addEventListener('click', handleStaffLogin);
     }
     
-    // 2. Event Listeners do Cabeçalho e Painel
     const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
     const logoutBtnHeader = document.getElementById('logoutBtnHeader');
     const abrirMesaBtn = document.getElementById('abrirMesaBtn');
     const searchTableBtn = document.getElementById('searchTableBtn');
-    const addSplitAccountBtn = document.getElementById('addSplitAccountBtn'); // Botão de divisão de conta
 
     if (openManagerPanelBtn) { 
         openManagerPanelBtn.addEventListener('click', () => {
@@ -209,7 +241,6 @@ document.addEventListener('DOMContentLoaded', () => {
         searchTableBtn.addEventListener('click', handleSearchTable);
     }
     
-    // 3. Carrega UI Inicial
     loadOpenTables();
     renderTableFilters(); 
 });
