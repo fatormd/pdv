@@ -96,7 +96,7 @@ window.goToScreen = goToScreen;
 window.openManagerAuthModal = openManagerAuthModal; 
 
 
-// --- LÓGICA DE LOGIN ---
+// --- LÓGICA DE AUTH/LOGIN ---
 
 const authenticateStaff = (email, password) => {
     const creds = STAFF_CREDENTIALS[email];
