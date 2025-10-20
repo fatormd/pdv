@@ -7,7 +7,7 @@ import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapsh
 import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, getCustomersCollectionRef, auth } from './services/firebaseService.js';
 import { fetchWooCommerceProducts, fetchWooCommerceCategories } from './services/wooCommerceService.js';
 import { loadOpenTables, renderTableFilters, handleAbrirMesa, loadTableOrder, handleSearchTable } from './controllers/panelController.js';
-import { renderMenu, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity, openProductInfoModal } from './controllers/orderController.js';
+import { renderMenu, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity } from './controllers/orderController.js';
 import { openManagerAuthModal } from './controllers/managerController.js';
 import { renderPaymentSummary } from './controllers/paymentController.js'; 
 
@@ -48,7 +48,7 @@ const loginPasswordInput = document.getElementById('loginPassword');
 const searchTableBtn = document.getElementById('searchTableBtn'); 
 
 
-// --- FUNÇÕES CORE E ROTEAMENTO ---
+// --- FUNÇÕES CORE E ROTIAMENTO ---
 
 export const hideStatus = () => {
     if (statusScreen && mainContent) {
