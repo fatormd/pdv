@@ -338,7 +338,25 @@
     </main>
     
     <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+            <h3 id="obsItemName" class="text-xl font-bold mb-4 text-indigo-700">Adicionar Observação</h3>
+            
+            <textarea id="obsInput" rows="3" placeholder="Ex: Sem cebola, Ponto da carne mal passada..." class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base"></textarea>
+            
+            <div class="flex items-center justify-between mt-3 mb-4">
+                 <span class="text-gray-700 font-semibold">Item em Espera?</span>
+                 <label class="switch-obs">
+                     <input type="checkbox" id="esperaSwitch">
+                     <span class="slider-obs"></span>
+                 </label>
+            </div>
+            
+            <div class="flex justify-end space-x-3 mt-4">
+                <button id="cancelObsBtn" class="px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition text-base">Cancelar</button>
+                <button id="saveObsBtn" class="px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition text-base">Salvar</button>
+            </div>
         </div>
+    </div>
 
     <div id="calculatorModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
          </div>
