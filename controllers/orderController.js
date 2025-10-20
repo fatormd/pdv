@@ -1,39 +1,84 @@
 // --- CONTROLLERS/ORDERCONTROLLER.JS (Painel 2) ---
 import { getProducts, getCategories } from "../services/wooCommerceService.js";
 import { formatCurrency } from "../utils.js";
-import { saveSelectedItemsToFirebase } from "../services/firebaseService.js"; 
-import { currentTableId, selectedItems, userRole, currentOrderSnapshot } from "../app.js";
+import { saveSelectedItemsToFirebase, getKdsCollectionRef, getTableDocRef } from "../services/firebaseService.js"; 
+import { currentTableId, selectedItems, userRole, currentOrderSnapshot, setTableListener } from "../app.js";
+import { writeBatch, doc, setDoc, serverTimestamp, arrayUnion, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+
+// --- FUNÇÕES CORE DE GESTÃO DE ITENS ---
+
+// Item 2: Ação para adicionar uma unidade (expõe ao onclick)
+export const increaseLocalItemQuantity = (itemId, noteKey) => {
+    const itemToCopy = selectedItems.find(item => 
+        item.id == itemId && (item.note || '') === noteKey
+    );
+
+    if (itemToCopy) {
+        selectedItems.push({ ...itemToCopy, note: noteKey });
+        renderOrderScreen();
+        saveSelectedItemsToFirebase(currentTableId, selectedItems);
+    }
+};
+window.increaseLocalItemQuantity = increaseLocalItemQuantity;
+
+
+// Item 2: Ação para remover uma unidade (expõe ao onclick)
+export const decreaseLocalItemQuantity = (itemId, noteKey) => {
+    const indexToRemove = selectedItems.findIndex(item => 
+        item.id == itemId && (item.note || '') === noteKey
+    );
+
+    if (indexToRemove > -1) {
+        selectedItems.splice(indexToRemove, 1);
+        renderOrderScreen();
+        saveSelectedItemsToFirebase(currentTableId, selectedItems);
+    }
+};
+window.decreaseLocalItemQuantity = decreaseLocalItemQuantity;
 
 
 // --- FUNÇÕES DE EXIBIÇÃO DE TELA ---
 
-// Função para renderizar o cardápio
-export const renderMenu = () => { 
+// Item 4: Função para renderizar o cardápio e a busca
+export const renderMenu = (filter = 'all', search = '') => { 
     const menuItemsGrid = document.getElementById('menuItemsGrid');
     const categoryFiltersContainer = document.getElementById('categoryFilters');
+    const searchProductInput = document.getElementById('searchProductInput');
     
     if (!menuItemsGrid || !categoryFiltersContainer) return;
     
     const products = getProducts();
     const categories = getCategories(); 
 
-    // 1. Renderiza Filtros de Categoria (se houver)
-    if (categories.length > 0) {
-        categoryFiltersContainer.innerHTML = categories.map(cat => `
-            <button class="category-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap bg-white text-gray-700 border border-gray-300" 
-                    data-category="${cat.slug || cat.id}">
-                ${cat.name}
-            </button>
-        `).join('');
+    // 1. Renderiza Filtros de Categoria (se houver) - (Lógica incompleta, mantendo apenas a estrutura)
+    categoryFiltersContainer.innerHTML = categories.map(cat => `
+        <button class="category-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap bg-white text-gray-700 border border-gray-300" 
+                data-category="${cat.slug || cat.id}">
+            ${cat.name}
+        </button>
+    `).join('');
+
+    // 2. Lógica de Busca e Filtro
+    let filteredProducts = products;
+    if (search) {
+        const normalizedSearch = search.toLowerCase();
+        filteredProducts = filteredProducts.filter(p => p.name.toLowerCase().includes(normalizedSearch));
+    }
+    
+    // Adiciona listener de busca no input
+    if (searchProductInput && !searchProductInput.hasAttribute('data-listener')) {
+        searchProductInput.addEventListener('input', (e) => renderMenu('all', e.target.value));
+        searchProductInput.setAttribute('data-listener', 'true');
     }
 
-    if (products.length === 0) {
-        menuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-red-500 italic">Erro ao carregar produtos. Verifique a API do WooCommerce.</div>`;
+    if (filteredProducts.length === 0) {
+        menuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-red-500 italic">Nenhum produto encontrado.</div>`;
         return;
     }
     
-    // 2. Renderiza Itens do Cardápio
-    menuItemsGrid.innerHTML = products.map(product => `
+    // 3. Renderiza Itens do Cardápio
+    menuItemsGrid.innerHTML = filteredProducts.map(product => `
         <div class="product-card bg-white p-4 rounded-xl shadow-md cursor-pointer hover:shadow-lg transition duration-150 border border-gray-200">
             <h4 class="font-bold text-base text-gray-800">${product.name}</h4>
             <p class="text-xs text-gray-500">${product.category} (${product.sector})</p>
@@ -62,6 +107,7 @@ export const renderOrderScreen = () => {
     const openItemsCountValue = selectedItems.length;
     openItemsCount.textContent = openItemsCountValue;
 
+    // Lógica de Ativação do Botão de Envio
     if (sendSelectedItemsBtn) {
         if (userRole === 'client') {
             sendSelectedItemsBtn.disabled = true;
@@ -75,28 +121,60 @@ export const renderOrderScreen = () => {
     if (openItemsCountValue === 0) {
         openOrderList.innerHTML = `<div class="text-base text-gray-500 italic p-2">Nenhum item selecionado.</div>`;
     } else {
-        openOrderList.innerHTML = selectedItems.map(item => `
+        // Agrupamento para exibição (necessário para controle de quantidade)
+        const groupedItems = selectedItems.reduce((acc, item, index) => {
+            const key = `${item.id}-${item.note || ''}`;
+            if (!acc[key]) {
+                acc[key] = { ...item, count: 0 };
+            }
+            acc[key].count++;
+            return acc;
+        }, {});
+
+        openOrderList.innerHTML = Object.values(groupedItems).map(group => `
             <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg shadow-sm">
-                <span class="font-semibold">${item.name}</span>
-                <span class="text-sm">(${formatCurrency(item.price)})</span>
+                <div class="flex flex-col flex-grow min-w-0 mr-2">
+                    <span class="font-semibold text-gray-800">${group.name} (${group.count}x)</span>
+                    <span class="text-sm cursor-pointer" onclick="window.openObsModalForGroup('${group.id}', '${group.note || ''}')">
+                        ${group.note ? `(${group.note})` : `(Adicionar Obs.)`}
+                    </span>
+                </div>
+
+                <div class="flex items-center space-x-2 flex-shrink-0">
+                    <button class="qty-btn bg-red-500 text-white rounded-full text-lg hover:bg-red-600 transition duration-150" 
+                            onclick="window.decreaseLocalItemQuantity('${group.id}', '${group.note || ''}')" title="Remover um">
+                        <i class="fas fa-minus"></i>
+                    </button>
+                    <button class="qty-btn bg-green-500 text-white rounded-full text-lg hover:bg-green-600 transition duration-150" 
+                            onclick="window.increaseLocalItemQuantity('${group.id}', '${group.note || ''}')" title="Adicionar um">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
             </div>
         `).join('');
     }
 };
 
-// --- FUNÇÕES DE AÇÃO ---
+// --- FUNÇÕES DE OBSERVAÇÃO E AÇÃO DE PRODUTO ---
 
 export const openProductInfoModal = (productId) => {
+    // Lógica para abrir o modal de informações (placeholder)
     const product = getProducts().find(p => p.id === productId);
-    
     if (!product) return;
-
     alert(`Detalhes do Produto:\nNome: ${product.name}\nPreço: ${formatCurrency(product.price)}\nSetor: ${product.sector}`);
 };
 window.openProductInfoModal = openProductInfoModal; 
 
+// Item 3: Abertura do Modal de Observações
+export const openObsModalForGroup = (itemId, noteKey) => {
+    // Lógica para abrir o modal de observações (placeholder)
+    alert(`Abrir modal de observações para Item ID: ${itemId} (Obs: ${noteKey})`);
+};
+window.openObsModalForGroup = openObsModalForGroup;
+
+
+// Item 1: Adicionar Produto à Lista (Expõe ao onclick do Cardápio)
 export const addItemToSelection = (product) => {
-    // ESTE CHECK AGORA SERÁ PASSADO, POIS currentTableId é definido em loadTableOrder
     if (!currentTableId) {
         alert("Selecione ou abra uma mesa primeiro.");
         return;
@@ -114,8 +192,72 @@ export const addItemToSelection = (product) => {
 
     renderOrderScreen();
     saveSelectedItemsToFirebase(currentTableId, selectedItems);
+    
+    // Abrir modal de observações automaticamente
+    // window.openObsModalForGroup(product.id, ''); 
 };
-window.addItemToSelection = addItemToSelection; 
+window.addItemToSelection = addItemToSelection;
 
 
-export const handleSendSelectedItems = () => { alert('Função de Envio KDS (Marcha) em desenvolvimento.'); };
+// Item 1: Envia Pedidos ao KDS e Resumo
+export const handleSendSelectedItems = async () => { 
+    if (!currentTableId || selectedItems.length === 0) return;
+    if (userRole === 'client') return; 
+
+    if (!confirm(`Confirmar o envio de ${selectedItems.length} item(s) para a produção?`)) return;
+
+    // Lógica para separar itens "Em Espera"
+    const itemsToSend = selectedItems.filter(item => !item.note || !item.note.toLowerCase().includes('espera'));
+    const itemsToHold = selectedItems.filter(item => item.note && item.note.toLowerCase().includes('espera'));
+
+    if (itemsToSend.length === 0) {
+        alert("Nenhum item pronto para envio.");
+        return;
+    }
+    
+    // 1. Preparação para KDS e Mesa
+    const itemsToSendValue = itemsToSend.reduce((sum, item) => sum + item.price, 0);
+    const kdsOrderRef = doc(getKdsCollectionRef());
+    
+    const itemsForUpdate = itemsToSend.map(item => ({
+        ...item,
+        sentAt: Date.now(),
+        orderId: kdsOrderRef.id,
+    }));
+
+    // 2. Atualização Transacional (Mesa e KDS)
+    try {
+        // Envio KDS
+        await setDoc(kdsOrderRef, {
+            orderId: kdsOrderRef.id,
+            tableNumber: parseInt(currentTableId),
+            sentAt: serverTimestamp(),
+            sectors: itemsToSend.reduce((acc, item) => { acc[item.sector] = acc[item.sector] || []; acc[item.sector].push(item); return acc; }, {}),
+            status: 'pending',
+        });
+        
+        // Atualização da Mesa
+        const tableRef = getTableDocRef(currentTableId);
+        await updateDoc(tableRef, {
+            sentItems: arrayUnion(...itemsForUpdate), 
+            selectedItems: itemsToHold, // Retém os itens 'Em Espera'
+            total: (currentOrderSnapshot?.total || 0) + itemsToSendValue, // Atualiza o total
+            lastKdsSentAt: serverTimestamp() 
+        });
+
+        // 3. Sucesso: Atualiza o estado local
+        selectedItems.length = 0; // Limpa localmente (será redefinido por onSnapshot com itensToHold)
+        selectedItems.push(...itemsToHold);
+        renderOrderScreen();
+        
+        alert(`Pedido enviado! Total atualizado. ${itemsToHold.length} itens retidos.`);
+
+    } catch (e) {
+        console.error("Erro ao enviar pedido:", e);
+        alert("Falha ao enviar pedido ao KDS/Firebase. Tente novamente.");
+    }
+};
+document.addEventListener('DOMContentLoaded', () => {
+    const sendBtn = document.getElementById('sendSelectedItemsBtn');
+    if (sendBtn) sendBtn.addEventListener('click', handleSendSelectedItems);
+});
