@@ -2,7 +2,9 @@
 import { getTablesCollectionRef, getTableDocRef } from "../services/firebaseService.js";
 import { query, where, orderBy, onSnapshot, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { formatCurrency } from "../utils.js";
-import { goToScreen } from "../app.js"; // Importa a função de navegação do App Core
+import { goToScreen, currentTableId, selectedItems } from "../app.js"; // Importa o estado do app
+import { fetchWooCommerceProducts } from "../services/wooCommerceService.js"; // Para garantir o carregamento do menu
+import { renderOrderScreen, renderMenu } from "./orderController.js"; // Importa a função de renderização do Painel 2
 
 
 // --- ESTADO DO MÓDULO ---
@@ -15,7 +17,7 @@ let unsubscribeTables = null; // Listener para mesas
 
 export const renderTableFilters = () => {
     const sectorFiltersContainer = document.getElementById('sectorFilters');
-    const sectorInput = document.getElementById('sectorInput'); // Campo de seleção no modal de abrir mesa
+    const sectorInput = document.getElementById('sectorInput');
     if (!sectorFiltersContainer || !sectorInput) return;
 
     // 1. Renderiza os botões de filtro
@@ -72,6 +74,8 @@ const renderTables = (docs) => {
             count++;
             const total = table.total || 0;
             const cardColor = total > 0 ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200';
+            
+            // Adicione aqui a lógica dos ícones (Atenção, Timer, Status KDS) no futuro
 
             const cardHtml = `
                 <div class="table-card-panel ${cardColor} shadow-md transition-colors duration-200" data-table-id="${tableId}">
@@ -85,6 +89,16 @@ const renderTables = (docs) => {
     });
 
     openTablesCount.textContent = count;
+    
+    // Listener para abrir a mesa ao clicar no card
+    document.querySelectorAll('.table-card-panel').forEach(card => {
+        card.addEventListener('click', (e) => {
+            const tableId = card.dataset.tableId;
+            if (tableId) {
+                openTableForOrder(tableId);
+            }
+        });
+    });
 };
 
 export const loadOpenTables = () => {
@@ -94,7 +108,6 @@ export const loadOpenTables = () => {
     let q;
     
     if (currentSectorFilter === 'Todos') {
-        // Consulta original: todas as mesas abertas, ordenadas por número da mesa
         q = query(tablesCollection, where('status', '==', 'open'), orderBy('tableNumber', 'asc'));
     } else {
         // Consulta filtrada por Setor (Requer índice composto: status + sector)
@@ -113,7 +126,29 @@ export const loadOpenTables = () => {
     });
 };
 
-// --- LÓGICA DE ABERTURA DE MESA (Refatorada do main.js) ---
+export const openTableForOrder = async (tableId) => {
+    // Implementação temporária: ir para a tela de pedido e iniciar o listener
+    currentTableId = tableId; // ATUALIZA O ESTADO GLOBAL no App Core
+    
+    // Garante que o menu está carregado antes de navegar
+    await fetchWooCommerceProducts(); 
+    renderMenu();
+
+    loadTableOrder(tableId);
+    goToScreen('orderScreen'); 
+};
+
+export const loadTableOrder = (tableId) => {
+    // Implementação da lógica de listener da mesa (para o Painel 2)
+    // Este código deve ser movido para o orderController na próxima fase
+    const tableRef = getTableDocRef(tableId);
+    
+    // Simplesmente renderiza o Painel 2
+    renderOrderScreen(null); 
+};
+
+
+// --- LÓGICA DE ABERTURA DE MESA ---
 
 export const handleAbrirMesa = async () => {
     const mesaInput = document.getElementById('mesaInput');
@@ -142,7 +177,7 @@ export const handleAbrirMesa = async () => {
         await setDoc(tableRef, {
             tableNumber: tableNumber,
             diners: diners,
-            sector: sector, // NOVO: Campo Setor
+            sector: sector, 
             status: 'open',
             createdAt: serverTimestamp(),
             total: 0,
@@ -154,14 +189,11 @@ export const handleAbrirMesa = async () => {
         
         alert(`Mesa ${tableNumber} aberta com sucesso no setor ${sector}!`);
         
-        // Zera os inputs e navega para o pedido
         mesaInput.value = '';
         pessoasInput.value = '';
         sectorInput.value = '';
         
-        // No sistema modular, o App Core lida com a navegação e o estado global da mesa
-        // openTableForOrder(tableNumber.toString()); 
-        goToScreen('orderScreen'); // A lógica de carregar a mesa será feita no controller de pedido
+        openTableForOrder(tableNumber.toString()); // Carrega a mesa recém-criada
         
     } catch (e) {
         console.error("Erro ao abrir mesa:", e);
