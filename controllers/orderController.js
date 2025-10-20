@@ -8,6 +8,15 @@ import { getKdsCollectionRef, getTableDocRef } from "../services/firebaseService
 import { openManagerAuthModal } from "./managerController.js";
 
 
+// --- Mapeamento dos Elementos do Modal (Para garantir escopo e estabilidade) ---
+const obsModal = document.getElementById('obsModal');
+const obsItemName = document.getElementById('obsItemName');
+const obsInput = document.getElementById('obsInput');
+const saveObsBtn = document.getElementById('saveObsBtn');
+const cancelObsBtn = document.getElementById('cancelObsBtn');
+const esperaSwitch = document.getElementById('esperaSwitch');
+
+
 // --- FUNÇÕES DE AÇÃO GERAL ---
 
 export const increaseLocalItemQuantity = (itemId, noteKey) => {
@@ -159,19 +168,20 @@ export const openObsModalForGroup = (itemId, noteKey) => {
     const products = getProducts();
     const product = products.find(p => p.id == itemId);
     
-    // Mapeamento dos elementos (CRITICAL FIX: Garante que os elementos são acessíveis)
+    // Mapeamento dos elementos
     const obsModal = document.getElementById('obsModal');
     const obsItemName = document.getElementById('obsItemName');
     const obsInput = document.getElementById('obsInput');
     const esperaSwitch = document.getElementById('esperaSwitch');
     
     if (!product || !obsModal || !obsItemName || !obsInput || !esperaSwitch) {
+        // Se a checagem falhar, exibe a mensagem de erro e retorna
         console.error("Erro: Elementos do modal de observação não encontrados no DOM.");
         return; 
     }
 
     // 1. Configura o estado do modal
-    obsItemName.textContent = product.name; // CORREÇÃO: Esta linha era o ponto de falha.
+    obsItemName.textContent = product.name; 
     
     const currentNoteCleaned = noteKey.replace(' [EM ESPERA]', '').trim(); 
     obsInput.value = currentNoteCleaned;
@@ -238,7 +248,6 @@ export const handleSendSelectedItems = async () => {
         return;
     }
     
-    // 1. Preparação para KDS e Mesa
     const itemsToSendValue = itemsToSend.reduce((sum, item) => sum + item.price, 0);
     const kdsOrderRef = doc(getKdsCollectionRef());
     
@@ -248,7 +257,6 @@ export const handleSendSelectedItems = async () => {
         orderId: kdsOrderRef.id,
     }));
 
-    // 2. Atualização Transacional (Mesa e KDS)
     try {
         // Envio KDS
         await setDoc(kdsOrderRef, {
