@@ -215,15 +215,15 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initializeFirebase(dbInstance, authInstance, window.__app_id); 
 
-    // CHAVE DA CORREÇÃO: Força a exibição do modal de login imediatamente no DOMContentLoaded
-    showLoginModal(); 
-
+    // O onAuthStateChanged tratará a navegação principal
     onAuthStateChanged(authInstance, (user) => {
         if (!user) {
+            // Se não houver usuário (novo ou deslogado), mostra o login.
             showLoginModal();
-        } 
-        // Se a persistência do Firebase for ativada e o usuário voltar, 
-        // a lógica de login Staff/Cliente será necessária para definir o userRole novamente.
+        } else {
+            // Se houver usuário, a lógica de login Staff/Cliente fará a navegação
+            // para o Painel 1 (Staff) ou Painel 2 (Cliente).
+        }
     });
 
 
