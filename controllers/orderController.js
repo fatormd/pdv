@@ -11,6 +11,10 @@ import { openManagerAuthModal } from "./managerController.js";
 // --- VARIÁVEIS DE ELEMENTOS (Serão definidas em DOMContentLoaded) ---
 let obsModal, obsItemName, obsInput, saveObsBtn, cancelObsBtn, esperaSwitch;
 
+// NOVO: Variável para manter o estado da busca e filtro
+let currentSearch = ''; 
+let currentCategoryFilter = 'all'; 
+
 
 // --- FUNÇÕES DE AÇÃO GERAL ---
 
@@ -44,7 +48,7 @@ window.decreaseLocalItemQuantity = decreaseLocalItemQuantity;
 
 // --- FUNÇÕES DE EXIBIÇÃO DE TELA E MODAL ---
 
-export const renderMenu = (filter = 'all', search = '') => { 
+export const renderMenu = (filter = currentCategoryFilter, search = currentSearch) => { 
     const menuItemsGrid = document.getElementById('menuItemsGrid');
     const categoryFiltersContainer = document.getElementById('categoryFilters');
     const searchProductInput = document.getElementById('searchProductInput');
@@ -53,27 +57,58 @@ export const renderMenu = (filter = 'all', search = '') => {
     
     const products = getProducts();
     const categories = getCategories(); 
-
-    // 1. Renderiza Filtros de Categoria
+    
+    // 1. Atualiza e Renderiza Filtros de Categoria
+    currentCategoryFilter = filter; // Atualiza estado
     if (categories.length > 0) {
-        categoryFiltersContainer.innerHTML = categories.map(cat => `
-            <button class="category-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap bg-white text-gray-700 border border-gray-300" 
-                    data-category="${cat.slug || cat.id}">
-                ${cat.name}
-            </button>
-        `).join('');
+        // CORRIGIDO: Adiciona classe de ativo e botão para filtro
+        categoryFiltersContainer.innerHTML = categories.map(cat => {
+            const isActive = cat.slug === currentCategoryFilter ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border border-gray-300';
+            return `
+                <button class="category-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap ${isActive}" 
+                        data-category="${cat.slug || cat.id}">
+                    ${cat.name}
+                </button>
+            `;
+        }).join('');
+        
+        // NOVO: Adiciona listener de filtro de categoria (só precisa ser adicionado uma vez)
+        if (!categoryFiltersContainer.hasAttribute('data-listener')) {
+            categoryFiltersContainer.addEventListener('click', (e) => {
+                const btn = e.target.closest('.category-btn');
+                if (btn) {
+                    const categorySlug = btn.dataset.category;
+                    renderMenu(categorySlug, currentSearch); // Filtra por categoria, mantendo a busca
+                }
+            });
+            categoryFiltersContainer.setAttribute('data-listener', 'true');
+        }
     }
 
+    // 2. Lógica de Busca e Filtro
+    currentSearch = search; // Persiste a busca
     let filteredProducts = products;
+    
     if (search) {
         const normalizedSearch = search.toLowerCase();
         filteredProducts = filteredProducts.filter(p => p.name.toLowerCase().includes(normalizedSearch));
     }
     
+    // NOVO: Filtro por Categoria (aplica no resultado da busca, se houver)
+    if (currentCategoryFilter !== 'all') {
+        filteredProducts = filteredProducts.filter(p => p.category === currentCategoryFilter);
+    }
+    
     // Adiciona listener de busca no input
-    if (searchProductInput && !searchProductInput.hasAttribute('data-listener')) {
-        searchProductInput.addEventListener('input', (e) => renderMenu('all', e.target.value));
-        searchProductInput.setAttribute('data-listener', 'true');
+    if (searchProductInput) {
+        if (!searchProductInput.hasAttribute('data-listener')) {
+            searchProductInput.addEventListener('input', (e) => renderMenu(currentCategoryFilter, e.target.value)); // Filtra por busca, mantendo a categoria
+            searchProductInput.setAttribute('data-listener', 'true');
+        }
+        // Garante que o input reflita o estado atual
+        if (searchProductInput.value !== currentSearch) {
+             searchProductInput.value = currentSearch;
+        }
     }
 
     if (filteredProducts.length === 0) {
@@ -293,11 +328,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sendBtn) sendBtn.addEventListener('click', handleSendSelectedItems);
     
     // Mapeamento defensivo dos elementos do modal DENTRO DO DOMContentLoaded
-    const obsInput = document.getElementById('obsInput');
-    const saveObsBtn = document.getElementById('saveObsBtn');
-    const cancelObsBtn = document.getElementById('cancelObsBtn');
-    const esperaSwitch = document.getElementById('esperaSwitch');
-    const obsModal = document.getElementById('obsModal');
+    obsModal = document.getElementById('obsModal'); // CORRIGIDO: Atribuição ao escopo do módulo
+    obsItemName = document.getElementById('obsItemName');
+    obsInput = document.getElementById('obsInput');
+    saveObsBtn = document.getElementById('saveObsBtn');
+    cancelObsBtn = document.getElementById('cancelObsBtn');
+    esperaSwitch = document.getElementById('esperaSwitch');
     
     if (saveObsBtn) {
         saveObsBtn.addEventListener('click', () => {
