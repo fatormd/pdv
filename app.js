@@ -52,9 +52,8 @@ export const hideStatus = () => {
     }
 };
 
-// CORREÇÃO: Função showLoginModal ajustada para lidar com o statusScreen
 const showLoginModal = () => {
-    if (statusScreen) statusScreen.style.display = 'none'; // Garante que a tela de status seja escondida
+    if (statusScreen) statusScreen.style.display = 'none'; 
     if (loginModal) {
         loginModal.style.display = 'flex';
         mainContent.style.display = 'none';
@@ -88,8 +87,8 @@ export const goToScreen = (screenId) => {
     }
 };
 
-window.goToScreen = goToScreen; 
-window.openManagerAuthModal = openManagerAuthModal; 
+window.goToScreen = goToScreen; // Exporta para o onclick do HTML
+window.openManagerAuthModal = openManagerAuthModal; // Exporta para o onclick do HTML
 
 
 // --- LÓGICA DE LOGIN ---
@@ -202,6 +201,9 @@ const handleLogout = () => {
     document.getElementById('user-id-display').textContent = 'Usuário ID: Deslogado...';
 };
 
+// CRITICAL FIX: Garante que a função de logout do cabeçalho esteja disponível imediatamente
+window.handleLogout = handleLogout;
+
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -214,9 +216,11 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeFirebase(dbInstance, authInstance, window.__app_id); 
 
     onAuthStateChanged(authInstance, (user) => {
+        // Se não houver usuário (anônimo ou qualquer outro), mostra o login.
         if (!user) {
             showLoginModal();
         } else {
+            // Se o usuário está logado anonimamente, mas ainda não escolheu o perfil, mostra o login.
             if (userRole === 'anonymous') {
                 showLoginModal();
             }
@@ -237,8 +241,10 @@ document.addEventListener('DOMContentLoaded', () => {
         abrirMesaBtn.addEventListener('click', handleAbrirMesa);
     }
     
-    // 3. Lógica de Logout
-    if (logoutBtnHeader) {
-        logoutBtnHeader.addEventListener('click', handleLogout);
-    }
+    // O evento de Logout já está definido no window.handleLogout
+    // O evento de Gerente já está definido no window.openManagerAuthModal
+
+    // Carrega UI Inicial (Painel de Mesas e Filtros)
+    loadOpenTables();
+    renderTableFilters(); 
 });
