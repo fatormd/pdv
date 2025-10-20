@@ -53,11 +53,11 @@ export const hideStatus = () => {
 };
 
 const showLoginModal = () => {
-    if (statusScreen) statusScreen.style.display = 'none'; // Garante que o status suma
-    if (mainContent) mainContent.style.display = 'none'; // Garante que o conteúdo principal suma
+    if (statusScreen) statusScreen.style.display = 'none'; 
+    if (mainContent) mainContent.style.display = 'none'; 
     
     if (loginModal) {
-        loginModal.style.display = 'flex'; // Força a exibição do modal
+        loginModal.style.display = 'flex'; 
     }
 };
 
@@ -219,14 +219,10 @@ document.addEventListener('DOMContentLoaded', () => {
     showLoginModal(); 
 
     onAuthStateChanged(authInstance, (user) => {
-        if (user) {
-            // Se já autenticado (persistência de sessão), garante que o estado seja carregado
-            if (userRole !== 'anonymous') {
-                hideLoginModal();
-            }
-        } else {
-            showLoginModal(); // Garante que o modal esteja na frente se não houver sessão
-        }
+        if (!user) {
+            showLoginModal();
+        } 
+        // A lógica de autenticação do Staff/Cliente cuidará da navegação e esconder o modal
     });
 
 
