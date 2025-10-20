@@ -2,19 +2,10 @@
 import { getProducts, getCategories } from "../services/wooCommerceService.js";
 import { formatCurrency } from "../utils.js";
 import { saveSelectedItemsToFirebase } from "../services/firebaseService.js"; 
-import { currentTableId, selectedItems, userRole } from "../app.js";
-import { arrayUnion, serverTimestamp, doc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"; // Importa funções para o KDS
+import { currentTableId, selectedItems, userRole, currentOrderSnapshot } from "../app.js";
+import { arrayUnion, serverTimestamp, doc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { getKdsCollectionRef, getTableDocRef } from "../services/firebaseService.js";
 import { openManagerAuthModal } from "./managerController.js";
-
-// --- ELEMENTOS DO MODAL ---
-const obsModal = document.getElementById('obsModal');
-const obsItemName = document.getElementById('obsItemName');
-const obsInput = document.getElementById('obsInput');
-const saveObsBtn = document.getElementById('saveObsBtn');
-const cancelObsBtn = document.getElementById('cancelObsBtn');
-const esperaSwitch = document.getElementById('esperaSwitch');
-const quickObsButtons = document.getElementById('quickObsButtons');
 
 
 // --- FUNÇÕES DE AÇÃO GERAL ---
@@ -171,6 +162,12 @@ export const openObsModalForGroup = (itemId, noteKey) => {
     const products = getProducts();
     const product = products.find(p => p.id == itemId);
     
+    // Mapeamento dos elementos (CRITICAL FIX: Garante que os elementos são acessíveis)
+    const obsModal = document.getElementById('obsModal');
+    const obsItemName = document.getElementById('obsItemName');
+    const obsInput = document.getElementById('obsInput');
+    const esperaSwitch = document.getElementById('esperaSwitch');
+    
     if (!product || !obsModal) return;
 
     // 1. Configura o estado do modal
@@ -188,61 +185,6 @@ export const openObsModalForGroup = (itemId, noteKey) => {
     obsModal.style.display = 'flex';
 };
 window.openObsModalForGroup = openObsModalForGroup;
-
-// Item 3: Lógica de Salvar Observações
-document.addEventListener('DOMContentLoaded', () => {
-    if (saveObsBtn) {
-        saveObsBtn.addEventListener('click', () => {
-            const itemId = obsModal.dataset.itemId;
-            const originalNoteKey = obsModal.dataset.originalNoteKey; 
-            let newNote = obsInput.value.trim();
-            const isEsperaActive = esperaSwitch.checked;
-            const esperaTag = ' [EM ESPERA]';
-
-            let noteCleaned = newNote.replace(esperaTag, '').trim();
-            noteCleaned = noteCleaned.replace(/,?\s*\[EM ESPERA\]/gi, '').trim();
-
-            if (isEsperaActive) {
-                newNote = (noteCleaned + esperaTag).trim();
-            } else {
-                newNote = noteCleaned;
-            }
-
-            // Atualiza TODOS os itens que pertencem a esse grupo de obs
-            selectedItems = selectedItems.map(item => {
-                if (item.id == itemId && (item.note || '') === originalNoteKey) {
-                    return { ...item, note: newNote };
-                }
-                return item;
-            });
-
-            // Se o item for novo e o usuário cancelar/salvar sem obs, removemos do array (limpeza)
-            if (originalNoteKey === '' && newNote === '') {
-                 selectedItems = selectedItems.filter(item => item.id != itemId || item.note !== '');
-            }
-
-            obsModal.style.display = 'none';
-            renderOrderScreen();
-            saveSelectedItemsToFirebase(currentTableId, selectedItems);
-        });
-    }
-
-    if (cancelObsBtn) {
-        cancelObsBtn.addEventListener('click', () => {
-             // Lógica de cancelamento: se o item foi adicionado e a observação cancelada, ele deve sumir (limpeza)
-             const itemId = obsModal.dataset.itemId;
-             const originalNoteKey = obsModal.dataset.originalNoteKey;
-             
-             if (originalNoteKey === '') {
-                 selectedItems = selectedItems.filter(item => item.id != itemId || item.note !== '');
-                 saveSelectedItemsToFirebase(currentTableId, selectedItems);
-             }
-             
-             obsModal.style.display = 'none';
-             renderOrderScreen(); // Re-renderiza para refletir a possível remoção
-        });
-    }
-});
 
 
 // Item 1: Adicionar Produto à Lista (Expõe ao onclick do Cardápio)
@@ -271,5 +213,74 @@ export const addItemToSelection = (product) => {
 window.addItemToSelection = addItemToSelection;
 
 
-// Funções Placeholder de Envio (Item 1)
-export const handleSendSelectedItems = () => { alert('Função de Envio KDS (Marcha) em desenvolvimento.'); };
+// Item 1: Envia Pedidos ao KDS e Resumo
+export const handleSendSelectedItems = async () => { 
+    if (!currentTableId || selectedItems.length === 0) return;
+    if (userRole === 'client') return; 
+
+    if (!confirm(`Confirmar o envio de ${selectedItems.length} item(s) para a produção?`)) return;
+
+    // Lógica para separar itens "Em Espera"
+    const itemsToSend = selectedItems.filter(item => !item.note || !item.note.toLowerCase().includes('espera'));
+    const itemsToHold = selectedItems.filter(item => item.note && item.note.toLowerCase().includes('espera'));
+
+    if (itemsToSend.length === 0) {
+        alert("Nenhum item pronto para envio.");
+        return;
+    }
+    
+    // 1. Preparação para KDS e Mesa
+    const itemsToSendValue = itemsToSend.reduce((sum, item) => sum + item.price, 0);
+    const kdsOrderRef = doc(getKdsCollectionRef());
+    
+    const itemsForUpdate = itemsToSend.map(item => ({
+        ...item,
+        sentAt: Date.now(),
+        orderId: kdsOrderRef.id,
+    }));
+
+    // 2. Atualização Transacional (Mesa e KDS)
+    try {
+        // Envio KDS
+        await setDoc(kdsOrderRef, {
+            orderId: kdsOrderRef.id,
+            tableNumber: parseInt(currentTableId),
+            sentAt: serverTimestamp(),
+            // Agrupa por setor, usando apenas os campos necessários para o KDS
+            sectors: itemsToSend.reduce((acc, item) => { 
+                acc[item.sector] = acc[item.sector] || []; 
+                acc[item.sector].push({
+                    name: item.name,
+                    note: item.note || '',
+                    price: item.price
+                }); 
+                return acc; 
+            }, {}),
+            status: 'pending',
+        });
+        
+        // Atualização da Mesa
+        const tableRef = getTableDocRef(currentTableId);
+        await updateDoc(tableRef, {
+            sentItems: arrayUnion(...itemsForUpdate), 
+            selectedItems: itemsToHold, // Retém os itens 'Em Espera'
+            total: (currentOrderSnapshot?.total || 0) + itemsToSendValue, // Atualiza o total
+            lastKdsSentAt: serverTimestamp() 
+        });
+
+        // 3. Sucesso: Atualiza o estado local
+        selectedItems.length = 0; // Limpa localmente
+        selectedItems.push(...itemsToHold);
+        renderOrderScreen();
+        
+        alert(`Pedido enviado! Total atualizado. ${itemsToHold.length} itens retidos.`);
+
+    } catch (e) {
+        console.error("Erro ao enviar pedido:", e);
+        alert("Falha ao enviar pedido ao KDS/Firebase. Tente novamente.");
+    }
+};
+document.addEventListener('DOMContentLoaded', () => {
+    const sendBtn = document.getElementById('sendSelectedItemsBtn');
+    if (sendBtn) sendBtn.addEventListener('click', handleSendSelectedItems);
+});
