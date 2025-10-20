@@ -373,20 +373,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 newNote = noteCleaned;
             }
 
-            // CORREÇÃO CRÍTICA DO TYPERROR (LINHA 377): Evita reatribuir a variável importada (selectedItems)
+            // CORREÇÃO: Removida a lógica de "limpeza" condicional.
+            // O item permanece na lista mesmo com newNote === ''
             
             // 2. Atualiza TODOS os itens que pertencem a esse grupo de obs
-            let updatedItems = selectedItems.map(item => { // Usa variável temporária
+            let updatedItems = selectedItems.map(item => { 
                 if (item.id == itemId && (item.note || '') === originalNoteKey) {
                     return { ...item, note: newNote };
                 }
                 return item;
             });
-
-            // 3. Limpeza: Se o item for novo e o usuário cancelar/salvar sem obs, removemos
-            if (originalNoteKey === '' && newNote === '') {
-                 updatedItems = updatedItems.filter(item => item.id != itemId || item.note !== ''); // Filtra a variável temporária
-            }
             
             // Reatribui o conteúdo da lista global (selectedItems)
             selectedItems.length = 0; 
@@ -400,19 +396,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (cancelObsBtn) {
         cancelObsBtn.addEventListener('click', () => {
-             const itemId = obsModal.dataset.itemId;
-             const originalNoteKey = obsModal.dataset.originalNoteKey;
-             
-             // CORREÇÃO CRÍTICA DO TYPERROR (LINHA 401): Evita reatribuir a variável importada (selectedItems)
-             if (originalNoteKey === '') {
-                 const filteredItems = selectedItems.filter(item => item.id != itemId || item.note !== '');
-                 
-                 // Reatribui o conteúdo da lista global (selectedItems)
-                 selectedItems.length = 0; 
-                 selectedItems.push(...filteredItems);
-                 
-                 saveSelectedItemsToFirebase(currentTableId, selectedItems);
-             }
+             // CORREÇÃO: Removida a lógica de remoção de itens adicionados na hora (originalNoteKey === '')
+             // O item recém-adicionado permanece na lista, pois foi adicionado em addItemToSelection.
              
              obsModal.style.display = 'none';
              renderOrderScreen(); 
