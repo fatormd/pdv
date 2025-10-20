@@ -2,19 +2,10 @@
 import { getProducts, getCategories } from "../services/wooCommerceService.js";
 import { formatCurrency } from "../utils.js";
 import { saveSelectedItemsToFirebase } from "../services/firebaseService.js"; 
-import { currentTableId, selectedItems, userRole } from "../app.js";
+import { currentTableId, selectedItems, userRole, currentOrderSnapshot } from "../app.js";
 import { arrayUnion, serverTimestamp, doc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { getKdsCollectionRef, getTableDocRef } from "../services/firebaseService.js";
 import { openManagerAuthModal } from "./managerController.js";
-
-// --- MAPEAMENTO DOS ELEMENTOS DO MODAL ---
-const obsModal = document.getElementById('obsModal');
-const obsItemName = document.getElementById('obsItemName');
-const obsInput = document.getElementById('obsInput');
-const saveObsBtn = document.getElementById('saveObsBtn');
-const cancelObsBtn = document.getElementById('cancelObsBtn');
-const esperaSwitch = document.getElementById('esperaSwitch');
-const quickObsButtons = document.getElementById('quickObsButtons');
 
 
 // --- FUNÇÕES DE AÇÃO GERAL ---
@@ -49,7 +40,6 @@ window.decreaseLocalItemQuantity = decreaseLocalItemQuantity;
 
 // --- FUNÇÕES DE EXIBIÇÃO DE TELA E MODAL ---
 
-// Função para renderizar o cardápio e a busca
 export const renderMenu = (filter = 'all', search = '') => { 
     const menuItemsGrid = document.getElementById('menuItemsGrid');
     const categoryFiltersContainer = document.getElementById('categoryFilters');
@@ -60,7 +50,7 @@ export const renderMenu = (filter = 'all', search = '') => {
     const products = getProducts();
     const categories = getCategories(); 
 
-    // 1. Renderiza Filtros de Categoria (se houver)
+    // 1. Renderiza Filtros de Categoria
     if (categories.length > 0) {
         categoryFiltersContainer.innerHTML = categories.map(cat => `
             <button class="category-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap bg-white text-gray-700 border border-gray-300" 
@@ -169,15 +159,15 @@ export const openObsModalForGroup = (itemId, noteKey) => {
     const products = getProducts();
     const product = products.find(p => p.id == itemId);
     
-    // 1. Mapeamento dos elementos (movido para fora do DOMContentLoaded)
+    // Mapeamento dos elementos (CRITICAL FIX: Garante que os elementos são acessíveis)
     const obsModal = document.getElementById('obsModal');
     const obsItemName = document.getElementById('obsItemName');
     const obsInput = document.getElementById('obsInput');
     const esperaSwitch = document.getElementById('esperaSwitch');
     
-    if (!product || !obsModal) return;
+    if (!product || !obsModal || !obsItemName || !obsInput || !esperaSwitch) return; // Checagem completa de null
 
-    // 2. Configura o estado do modal
+    // 1. Configura o estado do modal
     obsItemName.textContent = product.name; // CORREÇÃO: Isso resolve o "Cannot set properties of null"
     
     const currentNoteCleaned = noteKey.replace(' [EM ESPERA]', '').trim(); 
@@ -188,10 +178,20 @@ export const openObsModalForGroup = (itemId, noteKey) => {
     
     esperaSwitch.checked = noteKey.toLowerCase().includes('espera');
 
-    // 3. Exibe o modal
+    // 2. Exibe o modal
     obsModal.style.display = 'flex';
 };
 window.openObsModalForGroup = openObsModalForGroup; // EXPÕE AO ESCOPO GLOBAL
+
+// Funções de Detalhe (CRITICAL FIX: Expõe a função globalmente)
+export const openProductInfoModal = (productId) => {
+    const product = getProducts().find(p => p.id === productId);
+    
+    if (!product) return;
+
+    alert(`Detalhes do Produto:\nNome: ${product.name}\nPreço: ${formatCurrency(product.price)}\nSetor: ${product.sector}`);
+};
+window.openProductInfoModal = openProductInfoModal; // EXPÕE AO ESCOPO GLOBAL
 
 
 // Item 1: Adicionar Produto à Lista (Expõe ao onclick do Cardápio)
@@ -219,6 +219,7 @@ export const addItemToSelection = (product) => {
 };
 window.addItemToSelection = addItemToSelection;
 
+
 // Item 1: Envia Pedidos ao KDS e Resumo
 export const handleSendSelectedItems = async () => { 
     if (!currentTableId || selectedItems.length === 0) return;
@@ -234,6 +235,7 @@ export const handleSendSelectedItems = async () => {
         return;
     }
     
+    // 1. Preparação para KDS e Mesa
     const itemsToSendValue = itemsToSend.reduce((sum, item) => sum + item.price, 0);
     const kdsOrderRef = doc(getKdsCollectionRef());
     
@@ -243,6 +245,7 @@ export const handleSendSelectedItems = async () => {
         orderId: kdsOrderRef.id,
     }));
 
+    // 2. Atualização Transacional (Mesa e KDS)
     try {
         // Envio KDS
         await setDoc(kdsOrderRef, {
@@ -282,11 +285,18 @@ export const handleSendSelectedItems = async () => {
         alert("Falha ao enviar pedido ao KDS/Firebase. Tente novamente.");
     }
 };
+
 document.addEventListener('DOMContentLoaded', () => {
     const sendBtn = document.getElementById('sendSelectedItemsBtn');
     if (sendBtn) sendBtn.addEventListener('click', handleSendSelectedItems);
     
-    // Implementação da lógica de salvar observações
+    // Lógica de salvar observações
+    const obsInput = document.getElementById('obsInput');
+    const saveObsBtn = document.getElementById('saveObsBtn');
+    const cancelObsBtn = document.getElementById('cancelObsBtn');
+    const esperaSwitch = document.getElementById('esperaSwitch');
+    const obsModal = document.getElementById('obsModal');
+    
     if (saveObsBtn) {
         saveObsBtn.addEventListener('click', () => {
             const itemId = obsModal.dataset.itemId;
