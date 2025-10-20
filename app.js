@@ -7,7 +7,7 @@ import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapsh
 import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, getCustomersCollectionRef, auth } from './services/firebaseService.js';
 import { fetchWooCommerceProducts, fetchWooCommerceCategories } from './services/wooCommerceService.js';
 import { loadOpenTables, renderTableFilters, handleAbrirMesa, loadTableOrder, handleSearchTable } from './controllers/panelController.js';
-import { renderMenu, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity } from './controllers/orderController.js';
+import { renderMenu, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity, openProductInfoModal, openObsModalForGroup } from './controllers/orderController.js';
 import { openManagerAuthModal } from './controllers/managerController.js';
 import { renderPaymentSummary } from './controllers/paymentController.js'; 
 
@@ -18,7 +18,7 @@ export const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
 
 // Credenciais Staff Centralizadas (para login unificado)
 const STAFF_CREDENTIALS = {
-    'fmd': { password: '1', role: 'gerente', name: 'Fmd' }, 
+    'agencia@fatormd.com': { password: '1', role: 'gerente', name: 'Fmd' }, // Senha atualizada para 1
     'garcom@fator.com': { password: '1234', role: 'garcom', name: 'Mock Garçom' },
 };
 
@@ -95,7 +95,6 @@ export const goToScreen = (screenId) => {
 
 window.goToScreen = goToScreen; 
 window.openManagerAuthModal = openManagerAuthModal; 
-
 
 // NOVO: Função para o listener da mesa (MÓDULO DE FLUXO)
 export const setTableListener = (tableId) => {
