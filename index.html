@@ -319,6 +319,7 @@
     <div id="calculatorModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
          </div>
 
+
     <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         </div>
     
@@ -333,8 +334,7 @@
 
     <div id="selectiveTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         </div>
-
-
+    
     <div id="loginModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
         <div class="content-card bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h2 class="text-2xl font-bold mb-4 text-indigo-700 text-center">Acesso Rápido</h2>
@@ -342,7 +342,6 @@
             <div id="loginTabs" class="flex border-b border-gray-200 mb-6">
                 <button class="tab-btn flex-1 py-2 text-sm font-semibold text-gray-500 border-b-2 border-transparent hover:text-indigo-600" data-tab="visitante" data-active="true">VISITANTE</button>
                 <button class="tab-btn flex-1 py-2 text-sm font-semibold text-gray-500 border-b-2 border-transparent hover:text-indigo-600" data-tab="cliente">CLIENTE DA CASA</button>
-                <button class="tab-btn flex-1 py-2 text-sm font-semibold text-gray-500 border-b-2 border-transparent hover:text-indigo-600" data-tab="staff">STAFF</button>
             </div>
 
             <div id="loginContentContainer">
@@ -350,13 +349,15 @@
                 <div data-content="visitante" class="space-y-4" data-active="true">
                     <p class="text-sm text-gray-500">Acesso rápido sem cadastro para visualizar o cardápio.</p>
                     <input type="email" id="visitanteEmail" placeholder="E-mail (Visitante)" class="w-full p-3 border border-gray-300 rounded-lg text-base" value="visitante@fator.com.br" readonly>
-                    <input type="password" id="visitanteSenha" placeholder="Senha (WhatsApp da Loja)" class="w-full p-3 border border-gray-300 rounded-lg text-base" value="11999999999" readonly>
-                    <input type="number" id="visitanteMesa" placeholder="Nº da Mesa" class="w-full p-3 border border-indigo-500 rounded-lg text-base" min="1" required>
+                    <input type="password" id="visitanteSenha" placeholder="Senha (WhatsApp da Loja)" class="w-full p-3 border border-gray-300 rounded-lg text-base" value="98763543210" readonly>
+                    <input type="number" id="visitanteMesa" placeholder="Nº da Mesa (ou Comanda)" class="w-full p-3 border border-indigo-500 rounded-lg text-base" min="0" required>
+                    <input type="number" id="visitantePessoas" placeholder="Nº de Pessoas na Mesa" class="w-full p-3 border border-gray-300 rounded-lg text-base" min="1" required>
+
                     <button id="visitanteLoginBtn" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition">ENTRAR</button>
                 </div>
 
                 <div data-content="cliente" class="space-y-4 hidden">
-                    <p class="text-sm text-gray-500">Acesse para acumular pontos e receber benefícios exclusivos.</p>
+                    <p class="text-sm text-gray-500">Acesse para acumular pontos e receber benefícios.</p>
                     
                     <button id="googleLoginBtn" class="w-full py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition flex items-center justify-center space-x-2">
                         <i class="fab fa-google text-lg"></i>
@@ -367,19 +368,15 @@
                         <span class="text-gray-400">ou</span>
                     </div>
 
-                    <input type="email" id="clienteEmail" placeholder="Seu E-mail" class="w-full p-3 border border-gray-300 rounded-lg text-base">
+                    <input type="email" id="clienteEmail" placeholder="Seu E-mail / E-mail Funcional" class="w-full p-3 border border-gray-300 rounded-lg text-base">
                     <input type="password" id="clienteSenha" placeholder="Senha (Seu WhatsApp)" class="w-full p-3 border border-gray-300 rounded-lg text-base">
-                    <input type="number" id="clienteMesa" placeholder="Nº da Mesa" class="w-full p-3 border border-indigo-500 rounded-lg text-base" min="1" required>
+                    
+                    <input type="number" id="clienteMesa" placeholder="Nº da Mesa (ou Comanda)" class="w-full p-3 border border-indigo-500 rounded-lg text-base" min="0" required>
+                    <input type="number" id="clientePessoas" placeholder="Nº de Pessoas na Mesa" class="w-full p-3 border border-gray-300 rounded-lg text-base" min="1" required>
 
                     <button id="clienteLoginBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition">ENTRAR / CADASTRAR</button>
+                    
                     <p id="forgotPassword" class="text-xs text-indigo-500 hover:underline cursor-pointer text-center">Esqueceu a senha? (Use seu WhatsApp)</p>
-                </div>
-                
-                <div data-content="staff" class="space-y-4 hidden">
-                    <p class="text-sm text-red-500">Acesso restrito. Sua função será determinada pelo seu login.</p>
-                    <input type="text" id="staffUsername" placeholder="Usuário Staff" class="w-full p-3 border border-gray-300 rounded-lg text-base">
-                    <input type="password" id="staffPassword" placeholder="Senha" class="w-full p-3 border border-gray-300 rounded-lg text-base">
-                    <button id="staffLoginBtn" class="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition">LOGIN STAFF</button>
                 </div>
             </div>
         </div>
@@ -389,7 +386,7 @@
     
 
     <script>
-        // Lógica de toggle no DOM (sem depender do app.js para a UI inicial)
+        // Lógica de toggle para o cadastro de cliente (MANTIDO)
         document.addEventListener('DOMContentLoaded', () => {
              const toggleRegisterLink = document.getElementById('toggleRegisterLink');
              if (toggleRegisterLink) {
@@ -425,7 +422,6 @@
                     // Atualiza conteúdo
                     contents.forEach(content => {
                         content.classList.add('hidden');
-                        content.removeAttribute('data-active');
                         if (content.dataset.content === targetTab) {
                             content.classList.remove('hidden');
                             content.setAttribute('data-active', true);
@@ -433,8 +429,11 @@
                     });
                 });
              }
-             // Ativa a primeira guia por padrão
-             document.querySelector('.tab-btn[data-tab="visitante"]').click();
+             // Ativa a primeira guia (Visitante) ao carregar
+             const defaultTabBtn = document.querySelector('.tab-btn[data-tab="visitante"]');
+             const defaultContent = document.querySelector('[data-content="visitante"]');
+             if (defaultTabBtn) defaultTabBtn.setAttribute('data-active', true);
+             if (defaultContent) defaultContent.classList.remove('hidden');
         });
 
 
