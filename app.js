@@ -15,7 +15,7 @@ import { openManagerAuthModal } from './controllers/managerController.js';
 export const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2, 'managerScreen': 3 };
 export const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
 
-// NOVO: Credenciais Staff Centralizadas (para login unificado)
+// Credenciais Staff Centralizadas (para login unificado)
 const STAFF_CREDENTIALS = {
     'agencia@fatormd.com': { password: '98763543210', role: 'gerente', name: 'Fmd' }, 
     'garcom@fator.com': { password: '1234', role: 'garcom', name: 'Mock Garçom' },
@@ -95,7 +95,7 @@ window.goToScreen = goToScreen;
 window.openManagerAuthModal = openManagerAuthModal; 
 
 
-// --- LÓGICA DE LOGIN ---
+// --- LÓGICA DE AUTH/LOGIN ---
 
 const authenticateStaff = (email, password) => {
     const creds = STAFF_CREDENTIALS[email];
@@ -106,6 +106,8 @@ const authenticateStaff = (email, password) => {
 };
 
 const handleStaffLogin = async () => {
+    if (loginBtn) loginBtn.disabled = true; // Previne double-click
+    
     const email = loginEmailInput.value.trim();
     const password = loginPasswordInput.value.trim();
     
@@ -116,10 +118,11 @@ const handleStaffLogin = async () => {
         
         try {
             const authInstance = auth;
+            // 1. Loga anonimamente no Firebase
             const userCredential = await signInAnonymously(authInstance); 
             userId = userCredential.user.uid; 
             
-            // Configura o display e esconde o modal
+            // 2. Configura e navega
             document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)} | Função: ${userRole.toUpperCase()}`;
             
             hideLoginModal(); 
@@ -131,16 +134,16 @@ const handleStaffLogin = async () => {
             fetchWooCommerceProducts(renderMenu);
             fetchWooCommerceCategories(renderTableFilters); 
             
-            // Navega para o Painel de Mesas
             goToScreen('panelScreen');
             
         } catch (error) {
              console.error("Erro ao autenticar Staff (Firebase/Anônimo):", error);
-             alert("Autenticação local OK, mas falha no Firebase. Tente novamente.");
-             showLoginModal();
+             alert("Autenticação local OK, mas falha no Firebase. Verifique a conexão.");
+             if (loginBtn) loginBtn.disabled = false;
         }
     } else {
         alert('Credenciais inválidas. Verifique seu e-mail e senha.');
+        if (loginBtn) loginBtn.disabled = false;
     }
 };
 
@@ -172,12 +175,12 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initializeFirebase(dbInstance, authInstance, window.__app_id); 
 
-    // CHAVE DA CORREÇÃO: Garante que o modal de login apareça e esconde a tela de status
     onAuthStateChanged(authInstance, (user) => {
         if (!user) {
             showLoginModal();
         } 
-        // Se houver persistência de sessão, a lógica de login Staff cuidará da navegação.
+        // Se a persistência do Firebase for ativada e o usuário voltar, 
+        // a lógica de login Staff cuidará da navegação.
     });
 
     // 1. Event Listeners de Login
