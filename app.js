@@ -4,22 +4,21 @@ import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gsta
 import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // Importações dos Módulos Refatorados
-// CRITICAL FIX: Importando auth e db do service
-import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, getCustomersCollectionRef, auth, db } from './services/firebaseService.js';
+import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, getCustomersCollectionRef, auth } from './services/firebaseService.js';
 import { fetchWooCommerceProducts, fetchWooCommerceCategories } from './services/wooCommerceService.js';
-import { loadOpenTables, renderTableFilters, handleAbrirMesa, loadTableOrder } from './controllers/panelController.js';
+import { loadOpenTables, renderTableFilters, handleAbrirMesa, loadTableOrder, handleSearchTable } from './controllers/panelController.js';
 import { renderMenu } from './controllers/orderController.js';
 import { openManagerAuthModal } from './controllers/managerController.js';
 
 
 // --- VARIÁVEIS DE ESTADO GLOBAL ---
 export const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2, 'managerScreen': 3 };
+export const mockUsers = { 'gerente': '1234', 'garcom': '1234' }; // Manter mock para compatibilidade
 
 // Credenciais Staff Centralizadas (para login unificado)
 const STAFF_CREDENTIALS = {
     'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' }, 
     'garcom@fator.com': { password: '1234', role: 'garcom', name: 'Mock Garçom' },
-    // Outros funcionários aqui
 };
 
 // Variáveis Mutáveis (Estado da Sessão)
@@ -39,11 +38,13 @@ const appContainer = document.getElementById('appContainer');
 const loginModal = document.getElementById('loginModal');
 const logoutBtnHeader = document.getElementById('logoutBtnHeader');
 const abrirMesaBtn = document.getElementById('abrirMesaBtn');
+const openManagerPanelBtn = document.getElementById('openManagerPanelBtn'); // Botão Gerencial
 
 // Elementos de Login
 const loginBtn = document.getElementById('loginBtn');
 const loginEmailInput = document.getElementById('loginEmail'); 
 const loginPasswordInput = document.getElementById('loginPassword');
+const searchTableBtn = document.getElementById('searchTableBtn'); // Botão de busca
 
 
 // --- FUNÇÕES CORE E ROTEAMENTO ---
@@ -92,7 +93,7 @@ export const goToScreen = (screenId) => {
 };
 
 window.goToScreen = goToScreen; 
-window.openManagerAuthModal = openManagerAuthModal; 
+window.openManagerAuthModal = openManagerAuthModal; // Item 1
 
 
 // --- LÓGICA DE AUTH/LOGIN ---
@@ -120,7 +121,7 @@ const handleStaffLogin = async () => {
             const authInstance = auth;
             const userCredential = await signInAnonymously(authInstance); 
             userId = userCredential.user.uid; 
-
+            
             // Configura o display e esconde o modal
             document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)} | Função: ${userRole.toUpperCase()}`;
             
@@ -130,9 +131,7 @@ const handleStaffLogin = async () => {
             // Carrega dados iniciais da UI
             loadOpenTables();
             renderTableFilters(); 
-            // Estes devem ser chamados para que a navegação para Painel 1 funcione
-            // corretamente e a tela não pareça quebrada.
-            fetchWooCommerceProducts(renderMenu); 
+            fetchWooCommerceProducts(renderMenu);
             fetchWooCommerceCategories(renderTableFilters); 
             
             // Navega para o Painel de Mesas
@@ -176,6 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initializeFirebase(dbInstance, authInstance, window.__app_id || 'pdv_default_app'); 
 
+    // CRITICAL FIX: Garante que o modal de login apareça
     onAuthStateChanged(authInstance, (user) => {
         if (!user) {
             showLoginModal();
@@ -186,13 +186,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if (loginBtn) {
         loginBtn.addEventListener('click', handleStaffLogin);
     }
+    if (openManagerPanelBtn) { // Item 1
+        openManagerPanelBtn.addEventListener('click', () => {
+             // O modal já cuida da senha do gerente
+             openManagerAuthModal('goToManagerPanel'); 
+        });
+    }
 
-    // 2. Event Listener para Abrir Mesa
+    // 2. Event Listener para Abrir Mesa (Item 2)
     if (abrirMesaBtn) {
         abrirMesaBtn.addEventListener('click', handleAbrirMesa);
     }
     
-    // 3. Carrega UI Inicial (Painel de Mesas e Filtros)
+    // 3. Event Listener para Busca de Mesa (Item 3)
+    if (searchTableBtn) {
+        searchTableBtn.addEventListener('click', handleSearchTable);
+    }
+
+    // 4. Carrega UI Inicial
     loadOpenTables();
     renderTableFilters(); 
 });
