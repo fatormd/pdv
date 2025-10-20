@@ -209,7 +209,7 @@
                     </div>
                 </div>
 
-                <div class="p-4 pt-0 content-card bg-white mt-6">
+                <div id="chargeInputs" class="p-4 pt-0 content-card bg-white mt-6">
                     <h4 class="text-lg font-semibold text-gray-700 mb-3">Registrar Pagamento</h4>
                     
                     <div class="flex items-center space-x-2 mb-3">
@@ -312,13 +312,12 @@
             
         </div>
     </main>
-
+    
     <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         </div>
 
     <div id="calculatorModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
          </div>
-
 
     <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         </div>
@@ -334,69 +333,124 @@
 
     <div id="selectiveTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         </div>
-    
+
+
     <div id="loginModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
-        <div class="content-card bg-white p-6 rounded-xl shadow-2xl w-full max-w-md text-center">
-            <h2 class="text-2xl font-bold mb-4 text-indigo-700">Acesso PDV | Comanda Digital</h2>
-            
-            <div class="space-y-4 mb-6 p-4 border border-indigo-200 bg-indigo-50 rounded-lg">
-                <h3 class="text-lg font-semibold text-indigo-800">Sou Cliente: Comanda Digital</h3>
-                <input type="text" id="clientNameInput" placeholder="Seu Nome / Comanda (Opcional)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
-                <input type="number" id="clientTableInput" placeholder="Nº da Mesa / Comanda" class="w-full p-3 border border-indigo-500 rounded-lg focus:ring-indigo-700 focus:border-indigo-700 text-base" min="1">
+        <div class="content-card bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+            <h2 class="text-2xl font-bold mb-4 text-indigo-700 text-center">Acesso Rápido</h2>
+
+            <div id="loginTabs" class="flex border-b border-gray-200 mb-6">
+                <button class="tab-btn flex-1 py-2 text-sm font-semibold text-gray-500 border-b-2 border-transparent hover:text-indigo-600" data-tab="visitante" data-active="true">VISITANTE</button>
+                <button class="tab-btn flex-1 py-2 text-sm font-semibold text-gray-500 border-b-2 border-transparent hover:text-indigo-600" data-tab="cliente">CLIENTE DA CASA</button>
+                <button class="tab-btn flex-1 py-2 text-sm font-semibold text-gray-500 border-b-2 border-transparent hover:text-indigo-600" data-tab="staff">STAFF</button>
+            </div>
+
+            <div id="loginContentContainer">
                 
-                <div id="clientRegistrationFields" class="space-y-3 mt-4 border-t pt-4 hidden">
-                    <h4 class="text-md font-semibold text-indigo-800">Novo Cadastro Rápido</h4>
-                    <input type="tel" id="clientPhoneInput" placeholder="Telefone (Opcional, Ex: 11999999999)" class="w-full p-3 border border-gray-300 rounded-lg text-base">
+                <div data-content="visitante" class="space-y-4" data-active="true">
+                    <p class="text-sm text-gray-500">Acesso rápido sem cadastro para visualizar o cardápio.</p>
+                    <input type="email" id="visitanteEmail" placeholder="E-mail (Visitante)" class="w-full p-3 border border-gray-300 rounded-lg text-base" value="visitante@fator.com.br" readonly>
+                    <input type="password" id="visitanteSenha" placeholder="Senha (WhatsApp da Loja)" class="w-full p-3 border border-gray-300 rounded-lg text-base" value="11999999999" readonly>
+                    <input type="number" id="visitanteMesa" placeholder="Nº da Mesa" class="w-full p-3 border border-indigo-500 rounded-lg text-base" min="1" required>
+                    <button id="visitanteLoginBtn" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition">ENTRAR</button>
+                </div>
+
+                <div data-content="cliente" class="space-y-4 hidden">
+                    <p class="text-sm text-gray-500">Acesse para acumular pontos e receber benefícios exclusivos.</p>
+                    
+                    <button id="googleLoginBtn" class="w-full py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition flex items-center justify-center space-x-2">
+                        <i class="fab fa-google text-lg"></i>
+                        <span class="font-semibold text-gray-700">Entrar com Google</span>
+                    </button>
+                    
+                    <div class="flex items-center justify-center">
+                        <span class="text-gray-400">ou</span>
+                    </div>
+
+                    <input type="email" id="clienteEmail" placeholder="Seu E-mail" class="w-full p-3 border border-gray-300 rounded-lg text-base">
+                    <input type="password" id="clienteSenha" placeholder="Senha (Seu WhatsApp)" class="w-full p-3 border border-gray-300 rounded-lg text-base">
+                    <input type="number" id="clienteMesa" placeholder="Nº da Mesa" class="w-full p-3 border border-indigo-500 rounded-lg text-base" min="1" required>
+
+                    <button id="clienteLoginBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition">ENTRAR / CADASTRAR</button>
+                    <p id="forgotPassword" class="text-xs text-indigo-500 hover:underline cursor-pointer text-center">Esqueceu a senha? (Use seu WhatsApp)</p>
                 </div>
                 
-                <div class="flex justify-between items-center mt-3">
-                    <span id="toggleRegisterLink" class="text-sm text-indigo-600 hover:text-indigo-800 cursor-pointer">
-                        <i class="fas fa-user-plus"></i> Novo por aqui? Clique para se cadastrar.
-                    </span>
+                <div data-content="staff" class="space-y-4 hidden">
+                    <p class="text-sm text-red-500">Acesso restrito. Sua função será determinada pelo seu login.</p>
+                    <input type="text" id="staffUsername" placeholder="Usuário Staff" class="w-full p-3 border border-gray-300 rounded-lg text-base">
+                    <input type="password" id="staffPassword" placeholder="Senha" class="w-full p-3 border border-gray-300 rounded-lg text-base">
+                    <button id="staffLoginBtn" class="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition">LOGIN STAFF</button>
                 </div>
-
-                <button id="clientLoginBtn" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition duration-150 text-base">
-                    ABRIR CARDÁPIO
-                </button>
             </div>
-
-            <div id="staffLoginToggle" class="cursor-pointer text-sm text-indigo-600 hover:text-indigo-800 mb-4">
-                <i class="fas fa-user-lock"></i> Acesso para Garçons/Gerentes
-            </div>
-
-            <div id="staffLoginForm" class="space-y-4 hidden border-t border-gray-200 pt-4">
-                <input type="text" id="loginUsername" placeholder="Usuário (Ex: garcom)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
-                <input type="password" id="loginPassword" placeholder="Senha (Ex: 1234)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base" maxlength="4">
-                <button id="staffLoginBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition duration-150 text-base">
-                    LOGIN STAFF
-                </button>
-            </div>
-
-            <p class="mt-4 text-xs text-gray-400">Credenciais Staff: Gerente/1234. Garçom/1234.</p>
         </div>
     </div>
     
+    <p class="mt-8 text-center text-xs text-gray-400" id="user-id-display">Usuário ID: Carregando...</p>
+    
+
     <script>
         // Lógica de toggle no DOM (sem depender do app.js para a UI inicial)
-        document.getElementById('staffLoginToggle').addEventListener('click', () => {
-            const form = document.getElementById('staffLoginForm');
-            form.classList.toggle('hidden');
-        });
-        document.getElementById('toggleRegisterLink').addEventListener('click', () => {
-            const fields = document.getElementById('clientRegistrationFields');
-            const link = document.getElementById('toggleRegisterLink');
-            fields.classList.toggle('hidden');
-            if (fields.classList.contains('hidden')) {
-                link.innerHTML = '<i class="fas fa-user-plus"></i> Novo por aqui? Clique para se cadastrar.';
-            } else {
-                link.innerHTML = '<i class="fas fa-minus-circle"></i> Ocultar Cadastro';
-            }
+        document.addEventListener('DOMContentLoaded', () => {
+             const toggleRegisterLink = document.getElementById('toggleRegisterLink');
+             if (toggleRegisterLink) {
+                 toggleRegisterLink.addEventListener('click', () => {
+                     const fields = document.getElementById('clientRegistrationFields');
+                     const link = document.getElementById('toggleRegisterLink');
+                     fields.classList.toggle('hidden');
+                     if (fields.classList.contains('hidden')) {
+                         link.innerHTML = '<i class="fas fa-user-plus"></i> Novo por aqui? Clique para se cadastrar.';
+                     } else {
+                         link.innerHTML = '<i class="fas fa-minus-circle"></i> Ocultar Cadastro';
+                     }
+                 });
+             }
+             
+             // Lógica de Tabs
+             const tabsContainer = document.getElementById('loginTabs');
+             const contents = document.querySelectorAll('[data-content]');
+
+             if (tabsContainer) {
+                tabsContainer.addEventListener('click', (e) => {
+                    const btn = e.target.closest('.tab-btn');
+                    if (!btn) return;
+                    
+                    const targetTab = btn.dataset.tab;
+
+                    // Atualiza botões
+                    document.querySelectorAll('.tab-btn').forEach(b => {
+                        b.removeAttribute('data-active');
+                    });
+                    btn.setAttribute('data-active', true);
+
+                    // Atualiza conteúdo
+                    contents.forEach(content => {
+                        content.classList.add('hidden');
+                        content.removeAttribute('data-active');
+                        if (content.dataset.content === targetTab) {
+                            content.classList.remove('hidden');
+                            content.setAttribute('data-active', true);
+                        }
+                    });
+                });
+             }
+             // Ativa a primeira guia por padrão
+             document.querySelector('.tab-btn[data-tab="visitante"]').click();
         });
 
-        // Configurações do Firebase (mantidas)
-        window.openManagerAuthModal = (action, payload) => { /* Placeholder */ };
-        window.goToScreen = (screenId) => { /* Placeholder */ };
-        // ... (outras configurações de window)
+
+        // Configurações do Firebase (passadas para app.js via window)
+        window.__app_id = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        window.__firebase_config = typeof __firebase_config !== 'undefined' ? window.__firebase_config : '{"apiKey": "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY", "authDomain": "fator-pdv.firebaseapp.com", "projectId": "fator-pdv", "storageBucket": "fator-pdv.appspot.com", "messagingSenderId": "1097659747429", "appId": "1:1097659747429:web:8ec0a7c3978c311dbe0a8c", "measurementId": "G-02QWNRXRCV"}';
+        
+        // Funções globais de placeholder (manter para o onclick)
+        window.openManagerAuthModal = () => {};
+        window.goToScreen = () => {};
+        window.openKdsStatusModal = () => {};
+        window.addItemToSelection = () => {};
+        window.appendObs = () => {};
+        window.decreaseLocalItemQuantity = () => {};
+        window.increaseLocalItemQuantity = () => {};
+        window.openObsModalForGroup = () => {};
     </script>
     
     <script type="module" src="app.js"></script>
