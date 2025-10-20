@@ -13,7 +13,7 @@ import { openManagerAuthModal } from './controllers/managerController.js';
 
 // --- VARIÁVEIS DE ESTADO GLOBAL ---
 export const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2, 'managerScreen': 3 };
-export const mockUsers = { 'gerente': '1234', 'garcom': '1234' }; // Manter mock para compatibilidade
+export const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
 
 // Credenciais Staff Centralizadas (para login unificado)
 const STAFF_CREDENTIALS = {
@@ -93,7 +93,7 @@ export const goToScreen = (screenId) => {
 };
 
 window.goToScreen = goToScreen; 
-window.openManagerAuthModal = openManagerAuthModal; // Item 1
+window.openManagerAuthModal = openManagerAuthModal; 
 
 
 // --- LÓGICA DE AUTH/LOGIN ---
@@ -175,7 +175,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initializeFirebase(dbInstance, authInstance, window.__app_id || 'pdv_default_app'); 
 
-    // CRITICAL FIX: Garante que o modal de login apareça
     onAuthStateChanged(authInstance, (user) => {
         if (!user) {
             showLoginModal();
@@ -188,7 +187,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (openManagerPanelBtn) { // Item 1
         openManagerPanelBtn.addEventListener('click', () => {
-             // O modal já cuida da senha do gerente
              openManagerAuthModal('goToManagerPanel'); 
         });
     }
@@ -203,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
         searchTableBtn.addEventListener('click', handleSearchTable);
     }
 
-    // 4. Carrega UI Inicial
+    // 4. Carrega UI Inicial (Painel de Mesas e Filtros)
     loadOpenTables();
     renderTableFilters(); 
 });
