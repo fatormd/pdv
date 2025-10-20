@@ -95,7 +95,7 @@ window.goToScreen = goToScreen;
 window.openManagerAuthModal = openManagerAuthModal; 
 
 
-// --- LÓGICA DE AUTH/LOGIN ---
+// --- LÓGICA DE LOGIN ---
 
 const authenticateStaff = (email, password) => {
     const creds = STAFF_CREDENTIALS[email];
@@ -113,14 +113,12 @@ const handleStaffLogin = async () => {
 
     if (staffData) {
         userRole = staffData.role;
-        // CRITICAL FIX: Usamos o ID do Firebase Auth (mesmo anônimo) para o DB
-        // Mas se a sessão anônima falhar, usamos um ID de mock.
         
         try {
             const authInstance = auth;
             const userCredential = await signInAnonymously(authInstance); 
             userId = userCredential.user.uid; 
-
+            
             // Configura o display e esconde o modal
             document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)} | Função: ${userRole.toUpperCase()}`;
             
@@ -139,7 +137,6 @@ const handleStaffLogin = async () => {
         } catch (error) {
              console.error("Erro ao autenticar Staff (Firebase/Anônimo):", error);
              alert("Autenticação local OK, mas falha no Firebase. Tente novamente.");
-             // Em caso de falha do Firebase, não logamos.
              showLoginModal();
         }
     } else {
@@ -175,14 +172,12 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initializeFirebase(dbInstance, authInstance, window.__app_id); 
 
-    // Garante que o modal de login apareça e esconde a tela de status
+    // CHAVE DA CORREÇÃO: Garante que o modal de login apareça e esconde a tela de status
     onAuthStateChanged(authInstance, (user) => {
         if (!user) {
             showLoginModal();
-        } else if (userRole === 'anonymous') {
-             // Se houver uma sessão persistente, mas o role não foi setado, mostra o login.
-             showLoginModal(); 
-        }
+        } 
+        // Se houver persistência de sessão, a lógica de login Staff cuidará da navegação.
     });
 
     // 1. Event Listeners de Login
