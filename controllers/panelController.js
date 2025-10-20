@@ -1,19 +1,18 @@
 // --- CONTROLLERS/PANELCONTROLLER.JS ---
-import { getTablesCollectionRef, getTableDocRef } from "../services/firebaseService.js";
+import { getTablesCollectionRef, getTableDocRef, auth } from "../services/firebaseService.js";
 import { query, where, orderBy, onSnapshot, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { formatCurrency } from "../utils.js";
-import { goToScreen, currentTableId, selectedItems } from "../app.js"; // Importa o estado do app
-import { fetchWooCommerceProducts } from "../services/wooCommerceService.js"; // Para garantir o carregamento do menu
-import { renderOrderScreen, renderMenu } from "./orderController.js"; // Importa a função de renderização do Painel 2
+import { formatCurrency, formatElapsedTime } from "../utils.js";
+import { goToScreen, currentTableId, selectedItems, unsubscribeTable, loadTableOrder } from "../app.js"; 
+import { fetchWooCommerceProducts } from "../services/wooCommerceService.js"; 
+import { renderMenu } from "./orderController.js";
 
 
 // --- ESTADO DO MÓDULO ---
 const SECTORS = ['Todos', 'Salão 1', 'Bar', 'Mezanino', 'Calçada'];
 let currentSectorFilter = 'Todos';
-let unsubscribeTables = null; // Listener para mesas
 
 
-// --- RENDERIZAÇÃO DE SETORES (Item 0.2) ---
+// --- RENDERIZAÇÃO DE SETORES ---
 
 export const renderTableFilters = () => {
     const sectorFiltersContainer = document.getElementById('sectorFilters');
@@ -56,7 +55,7 @@ export const renderTableFilters = () => {
 };
 
 
-// --- RENDERIZAÇÃO E CARREGAMENTO DE MESAS ---
+// --- RENDERIZAÇÃO E CARREGAMENTO DE MESAS (Item 4) ---
 
 const renderTables = (docs) => {
     const openTablesList = document.getElementById('openTablesList');
@@ -75,13 +74,46 @@ const renderTables = (docs) => {
             const total = table.total || 0;
             const cardColor = total > 0 ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200';
             
-            // Adicione aqui a lógica dos ícones (Atenção, Timer, Status KDS) no futuro
+            // 4c. Ícone de Atenção ("Em Espera")
+            const hasAguardandoItem = (table.selectedItems || []).some(item => 
+                item.note && item.note.toLowerCase().includes('espera')
+            );
+            const attentionIconHtml = hasAguardandoItem 
+                ? `<i class="fas fa-exclamation-triangle attention-icon" title="Itens em Espera"></i>` 
+                : '';
+
+            // 4a. Timer de Último Pedido
+            const lastSentAt = table.lastKdsSentAt?.toMillis() || null;
+            const elapsedTime = lastSentAt ? formatElapsedTime(lastSentAt) : null;
+            
+            const timerHtml = elapsedTime ? `
+                <div class="table-timer">
+                    <i class="fas fa-clock"></i> 
+                    <span>${elapsedTime}</span>
+                </div>
+            ` : '';
+
+            // 4b. Botão KDS Status
+            const statusIconHtml = lastSentAt ? `
+                <button class="kds-status-icon-btn" 
+                        title="Status do Último Pedido"
+                        onclick="window.openKdsStatusModal(${tableId})">
+                    <i class="fas fa-tasks"></i>
+                </button>
+            ` : '';
+            
+            // 4d. Nome do Cliente
+            const clientInfo = table.clientName ? `<p class="text-xs font-semibold text-gray-800">Cliente: ${table.clientName}</p>` : '';
 
             const cardHtml = `
-                <div class="table-card-panel ${cardColor} shadow-md transition-colors duration-200" data-table-id="${tableId}">
+                <div class="table-card-panel ${cardColor} shadow-md transition-colors duration-200 relative" data-table-id="${tableId}">
+                    ${attentionIconHtml}
+                    ${statusIconHtml} 
                     <h3 class="font-bold text-2xl">Mesa ${table.tableNumber}</h3>
+                    ${clientInfo}
                     <p class="text-xs font-light">Setor: ${table.sector || 'N/A'}</p>
                     <span class="font-bold text-lg mt-2">${formatCurrency(total)}</span>
+                    ${timerHtml}
                 </div>
             `;
             openTablesList.innerHTML += cardHtml;
@@ -93,6 +125,8 @@ const renderTables = (docs) => {
     // Listener para abrir a mesa ao clicar no card
     document.querySelectorAll('.table-card-panel').forEach(card => {
         card.addEventListener('click', (e) => {
+            if (e.target.closest('.kds-status-icon-btn')) return; 
+            
             const tableId = card.dataset.tableId;
             if (tableId) {
                 openTableForOrder(tableId);
@@ -102,54 +136,32 @@ const renderTables = (docs) => {
 };
 
 export const loadOpenTables = () => {
-    if (unsubscribeTables) unsubscribeTables(); // Cancela o listener anterior
+    if (unsubscribeTables) unsubscribeTables(); 
     
     const tablesCollection = getTablesCollectionRef();
     let q;
     
     if (currentSectorFilter === 'Todos') {
+        // Requer índice composto: status + tableNumber
         q = query(tablesCollection, where('status', '==', 'open'), orderBy('tableNumber', 'asc'));
     } else {
-        // Consulta filtrada por Setor (Requer índice composto: status + sector)
+        // Requer índice composto: status + sector + tableNumber
         q = query(tablesCollection, 
                   where('status', '==', 'open'), 
                   where('sector', '==', currentSectorFilter),
                   orderBy('tableNumber', 'asc'));
     }
 
+    // O unsubscribeTables está na variável do módulo, mas será gerenciado pelo app.js
     unsubscribeTables = onSnapshot(q, (snapshot) => {
         const docs = snapshot.docs;
         renderTables(docs);
     }, (error) => {
         console.error("Erro ao carregar mesas (onSnapshot):", error);
-        // Em um sistema real, aqui você mostraria uma mensagem de erro na UI.
     });
 };
 
-export const openTableForOrder = async (tableId) => {
-    // Implementação temporária: ir para a tela de pedido e iniciar o listener
-    currentTableId = tableId; // ATUALIZA O ESTADO GLOBAL no App Core
-    
-    // Garante que o menu está carregado antes de navegar
-    await fetchWooCommerceProducts(); 
-    renderMenu();
-
-    loadTableOrder(tableId);
-    goToScreen('orderScreen'); 
-};
-
-export const loadTableOrder = (tableId) => {
-    // Implementação da lógica de listener da mesa (para o Painel 2)
-    // Este código deve ser movido para o orderController na próxima fase
-    const tableRef = getTableDocRef(tableId);
-    
-    // Simplesmente renderiza o Painel 2
-    renderOrderScreen(null); 
-};
-
-
-// --- LÓGICA DE ABERTURA DE MESA ---
-
+// Item 2: Abrir Mesa
 export const handleAbrirMesa = async () => {
     const mesaInput = document.getElementById('mesaInput');
     const pessoasInput = document.getElementById('pessoasInput');
@@ -174,6 +186,7 @@ export const handleAbrirMesa = async () => {
             return;
         }
 
+        // Cria o documento da mesa
         await setDoc(tableRef, {
             tableNumber: tableNumber,
             diners: diners,
@@ -187,8 +200,6 @@ export const handleAbrirMesa = async () => {
             selectedItems: [] 
         });
         
-        alert(`Mesa ${tableNumber} aberta com sucesso no setor ${sector}!`);
-        
         mesaInput.value = '';
         pessoasInput.value = '';
         sectorInput.value = '';
@@ -199,4 +210,34 @@ export const handleAbrirMesa = async () => {
         console.error("Erro ao abrir mesa:", e);
         alert("Erro ao tentar abrir a mesa.");
     }
+};
+
+// Item 3: Busca de Mesa
+export const handleSearchTable = async () => {
+    const searchTableInput = document.getElementById('searchTableInput');
+    const tableNumber = searchTableInput.value.trim();
+
+    if (!tableNumber || parseInt(tableNumber) <= 0) {
+        alert("Insira um número de mesa válido para buscar.");
+        return;
+    }
+
+    const tableRef = getTableDocRef(tableNumber);
+    const docSnap = await getDoc(tableRef);
+
+    if (docSnap.exists() && docSnap.data().status === 'open') {
+        openTableForOrder(tableNumber); // Abre a mesa existente
+        searchTableInput.value = '';
+    } else {
+        alert(`A Mesa ${tableNumber} não está aberta.`);
+    }
+};
+
+export const openTableForOrder = async (tableId) => {
+    // 1. Garante que o Menu esteja carregado (dependência para o Painel 2)
+    await fetchWooCommerceProducts(renderMenu); 
+    
+    // 2. Navegação e Carregamento (Item 2)
+    loadTableOrder(tableId); // Inicia o listener e atualiza o estado
+    goToScreen('orderScreen'); 
 };
