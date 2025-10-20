@@ -10,6 +10,7 @@ import { renderMenu } from "./orderController.js";
 // --- ESTADO DO MÓDULO ---
 const SECTORS = ['Todos', 'Salão 1', 'Bar', 'Mezanino', 'Calçada'];
 let currentSectorFilter = 'Todos';
+let unsubscribeTables = null; // CRITICAL FIX: Variável de escopo do módulo
 
 
 // --- RENDERIZAÇÃO DE SETORES ---
@@ -136,7 +137,7 @@ const renderTables = (docs) => {
 };
 
 export const loadOpenTables = () => {
-    if (unsubscribeTables) unsubscribeTables(); 
+    if (unsubscribeTables) unsubscribeTables(); // Agora deve funcionar
     
     const tablesCollection = getTablesCollectionRef();
     let q;
@@ -237,15 +238,4 @@ export const openTableForOrder = async (tableId) => {
     // Navegação e Carregamento (Item 2)
     loadTableOrder(tableId); // Inicia o listener e atualiza o estado
     goToScreen('orderScreen'); 
-};
-
-// Função temporária (será migrada para o OrderController)
-export const loadTableOrder = (tableId) => {
-    // Implementação da lógica de listener da mesa (para o Painel 2)
-    // Este código será movido para o orderController na próxima fase
-    const tableRef = getTableDocRef(tableId);
-    
-    // Simplesmente renderiza o Painel 2
-    // Aqui você iniciaria o onSnapshot e chamaria renderOrderScreen
-    console.log(`Iniciando listener para Mesa ${tableId}...`);
 };
