@@ -1,23 +1,25 @@
-
 // --- CONTROLLERS/PANELCONTROLLER.JS ---
 import { getTablesCollectionRef, getTableDocRef } from "../services/firebaseService.js";
-import { query, where, orderBy, onSnapshot, doc, setDoc, serverTimestamp, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { formatCurrency, formatElapsedTime } from "../utils.js";
-import { currentTableId, unsubscribeTable, goToScreen, selectedItems } from "../app.js"; // Importa o estado do app
+import { query, where, orderBy, onSnapshot, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { formatCurrency } from "../utils.js";
+import { goToScreen } from "../app.js"; // Importa a função de navegação do App Core
 
-// Variáveis Mock para os Setores
+
+// --- ESTADO DO MÓDULO ---
 const SECTORS = ['Todos', 'Salão 1', 'Bar', 'Mezanino', 'Calçada'];
 let currentSectorFilter = 'Todos';
+let unsubscribeTables = null; // Listener para mesas
 
 
-// --- MÓDULO DE SETORES (Item 0.2) ---
+// --- RENDERIZAÇÃO DE SETORES (Item 0.2) ---
 
 export const renderTableFilters = () => {
     const sectorFiltersContainer = document.getElementById('sectorFilters');
-    if (!sectorFiltersContainer) return;
+    const sectorInput = document.getElementById('sectorInput'); // Campo de seleção no modal de abrir mesa
+    if (!sectorFiltersContainer || !sectorInput) return;
 
+    // 1. Renderiza os botões de filtro
     sectorFiltersContainer.innerHTML = '';
-
     SECTORS.forEach(sector => {
         const isActive = sector === currentSectorFilter ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border border-gray-300';
         sectorFiltersContainer.innerHTML += `
@@ -26,7 +28,13 @@ export const renderTableFilters = () => {
             </button>
         `;
     });
+    
+    // 2. Renderiza as opções do seletor (para Abrir Nova Mesa)
+    sectorInput.innerHTML = '<option value="" disabled selected>Setor</option>' + 
+                            SECTORS.filter(s => s !== 'Todos')
+                                   .map(s => `<option value="${s}">${s}</option>`).join('');
 
+    // Adiciona listener para a seleção de filtro
     sectorFiltersContainer.addEventListener('click', (e) => {
         const btn = e.target.closest('.sector-btn');
         if (btn) {
@@ -40,13 +48,13 @@ export const renderTableFilters = () => {
             btn.classList.remove('bg-white', 'text-gray-700', 'border', 'border-gray-300');
             btn.classList.add('bg-indigo-600', 'text-white');
             
-            loadOpenTables(); // Recarrega as mesas com o novo filtro
+            loadOpenTables(); 
         }
     });
 };
 
 
-// --- FUNÇÕES DE MESA (Painel 1) ---
+// --- RENDERIZAÇÃO E CARREGAMENTO DE MESAS ---
 
 const renderTables = (docs) => {
     const openTablesList = document.getElementById('openTablesList');
@@ -80,6 +88,8 @@ const renderTables = (docs) => {
 };
 
 export const loadOpenTables = () => {
+    if (unsubscribeTables) unsubscribeTables(); // Cancela o listener anterior
+    
     const tablesCollection = getTablesCollectionRef();
     let q;
     
@@ -87,33 +97,74 @@ export const loadOpenTables = () => {
         // Consulta original: todas as mesas abertas, ordenadas por número da mesa
         q = query(tablesCollection, where('status', '==', 'open'), orderBy('tableNumber', 'asc'));
     } else {
-        // NOVO: Consulta filtrada por Setor
-        // OBS: Isso pode exigir um novo índice composto no Firebase (status + sector)
+        // Consulta filtrada por Setor (Requer índice composto: status + sector)
         q = query(tablesCollection, 
                   where('status', '==', 'open'), 
                   where('sector', '==', currentSectorFilter),
                   orderBy('tableNumber', 'asc'));
     }
 
-
-    onSnapshot(q, (snapshot) => {
+    unsubscribeTables = onSnapshot(q, (snapshot) => {
         const docs = snapshot.docs;
         renderTables(docs);
     }, (error) => {
         console.error("Erro ao carregar mesas (onSnapshot):", error);
-        // Exibe erro na UI se houver problema de indexação
+        // Em um sistema real, aqui você mostraria uma mensagem de erro na UI.
     });
 };
 
-export const openTableForOrder = async (tableId) => {
-    // ... (Lógica para carregar a mesa e ir para o Painel 2)
-    // Importa o loadTableOrder de outro lugar ou usa a lógica aqui
-    const tableRef = getTableDocRef(tableId);
-    const docSnap = await getDoc(tableRef);
-    if (docSnap.exists()) {
-        // Atualiza estado global e navega
-        // currentTableId = tableId; 
-        // goToScreen('orderScreen');
-        // loadTableOrder(tableId);
+// --- LÓGICA DE ABERTURA DE MESA (Refatorada do main.js) ---
+
+export const handleAbrirMesa = async () => {
+    const mesaInput = document.getElementById('mesaInput');
+    const pessoasInput = document.getElementById('pessoasInput');
+    const sectorInput = document.getElementById('sectorInput');
+
+    const tableNumber = parseInt(mesaInput.value);
+    const diners = parseInt(pessoasInput.value);
+    const sector = sectorInput.value;
+
+    if (!tableNumber || !diners || tableNumber <= 0 || diners <= 0 || !sector) {
+        alert('Preencha o número da mesa, a quantidade de pessoas e o setor corretamente.');
+        return;
+    }
+
+    const tableRef = getTableDocRef(tableNumber);
+
+    try {
+        const docSnap = await getDoc(tableRef);
+
+        if (docSnap.exists() && docSnap.data().status === 'open') {
+            alert(`A Mesa ${tableNumber} já está aberta!`);
+            return;
+        }
+
+        await setDoc(tableRef, {
+            tableNumber: tableNumber,
+            diners: diners,
+            sector: sector, // NOVO: Campo Setor
+            status: 'open',
+            createdAt: serverTimestamp(),
+            total: 0,
+            sentItems: [], 
+            payments: [],
+            serviceTaxApplied: true, 
+            selectedItems: [] 
+        });
+        
+        alert(`Mesa ${tableNumber} aberta com sucesso no setor ${sector}!`);
+        
+        // Zera os inputs e navega para o pedido
+        mesaInput.value = '';
+        pessoasInput.value = '';
+        sectorInput.value = '';
+        
+        // No sistema modular, o App Core lida com a navegação e o estado global da mesa
+        // openTableForOrder(tableNumber.toString()); 
+        goToScreen('orderScreen'); // A lógica de carregar a mesa será feita no controller de pedido
+        
+    } catch (e) {
+        console.error("Erro ao abrir mesa:", e);
+        alert("Erro ao tentar abrir a mesa.");
     }
 };
