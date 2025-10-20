@@ -1,11 +1,14 @@
 // --- SERVICES/FIREBASESERVICE.JS ---
+// Importa funções do Firebase Firestore e as exporta para uso nos Controllers
 import { collection, doc, updateDoc, arrayUnion, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // Variáveis globais (exportadas para que o app.js possa defini-las)
 export let db = null;
 export let auth = null;
 export let appId = null;
-export { arrayUnion, serverTimestamp }; // Exporta funções do Firebase Firestore
+
+// Exporta funções críticas do Firestore para uso no orderController.js (KDS)
+export { arrayUnion, serverTimestamp }; 
 
 export const initializeFirebase = (database, authentication, appIdentifier) => {
     db = database;
