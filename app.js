@@ -9,7 +9,8 @@ import { fetchWooCommerceProducts, fetchWooCommerceCategories } from './services
 import { loadOpenTables, renderTableFilters, handleAbrirMesa, loadTableOrder, handleSearchTable } from './controllers/panelController.js';
 import { renderMenu, renderOrderScreen } from './controllers/orderController.js';
 import { openManagerAuthModal } from './controllers/managerController.js';
-import { renderPaymentSummary, handleAddSplitAccount } from './controllers/paymentController.js'; // Importa a função de divisão
+import { renderPaymentSummary } from './controllers/paymentController.js'; // Importa o resumo de pagamento
+
 
 // --- VARIÁVEIS DE ESTADO GLOBAL ---
 export const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2, 'managerScreen': 3 };
@@ -95,25 +96,6 @@ export const goToScreen = (screenId) => {
 window.goToScreen = goToScreen; 
 window.openManagerAuthModal = openManagerAuthModal; 
 
-// NOVO: Função para o listener da mesa (MÓDULO DE FLUXO)
-export const setTableListener = (tableId) => {
-    if (unsubscribeTable) unsubscribeTable(); 
-
-    const tableRef = getTableDocRef(tableId);
-
-    // CRITICAL: Atualiza o estado global e chama os renderizadores de tela
-    unsubscribeTable = onSnapshot(tableRef, (docSnapshot) => {
-        if (docSnapshot.exists()) {
-            currentOrderSnapshot = docSnapshot.data();
-            selectedItems = currentOrderSnapshot.selectedItems || []; 
-            renderOrderScreen(currentOrderSnapshot);
-            renderPaymentSummary(currentTableId, currentOrderSnapshot);
-        }
-    }, (error) => {
-        console.error("Erro ao carregar dados da mesa:", error);
-    });
-};
-
 
 // --- LÓGICA DE AUTH/LOGIN ---
 
@@ -183,9 +165,6 @@ const handleLogout = () => {
 
 window.handleLogout = handleLogout;
 
-// NOVO: Expondo a função de divisão para o Event Listener no DOM
-window.handleAddSplitAccount = () => handleAddSplitAccount(currentTableId, currentOrderSnapshot);
-
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -213,6 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const logoutBtnHeader = document.getElementById('logoutBtnHeader');
     const abrirMesaBtn = document.getElementById('abrirMesaBtn');
     const searchTableBtn = document.getElementById('searchTableBtn');
+    const addSplitAccountBtn = document.getElementById('addSplitAccountBtn'); // Botão de divisão de conta
 
     if (openManagerPanelBtn) { 
         openManagerPanelBtn.addEventListener('click', () => {
@@ -228,7 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (searchTableBtn) {
         searchTableBtn.addEventListener('click', handleSearchTable);
     }
-
+    
     // 3. Carrega UI Inicial
     loadOpenTables();
     renderTableFilters(); 
