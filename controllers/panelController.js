@@ -2,15 +2,15 @@
 import { getTablesCollectionRef, getTableDocRef, auth } from "../services/firebaseService.js";
 import { query, where, orderBy, onSnapshot, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { formatCurrency, formatElapsedTime } from "../utils.js";
-import { goToScreen, currentTableId, selectedItems, unsubscribeTable } from "../app.js"; 
+import { goToScreen, currentTableId, selectedItems, unsubscribeTable, currentOrderSnapshot } from "../app.js"; 
 import { fetchWooCommerceProducts } from "../services/wooCommerceService.js"; 
-import { renderMenu, renderOrderScreen } from "./orderController.js"; // Importa renderOrderScreen
+import { renderMenu, renderOrderScreen } from "./orderController.js";
 
 
 // --- ESTADO DO MÓDULO ---
 const SECTORS = ['Todos', 'Salão 1', 'Bar', 'Mezanino', 'Calçada'];
 let currentSectorFilter = 'Todos';
-let unsubscribeTables = null; 
+let unsubscribeTables = null; // CRITICAL FIX: Declaração no escopo do módulo
 
 
 // --- RENDERIZAÇÃO DE SETORES ---
@@ -56,7 +56,7 @@ export const renderTableFilters = () => {
 };
 
 
-// --- RENDERIZAÇÃO E CARREGAMENTO DE MESAS (Item 4) ---
+// --- RENDERIZAÇÃO E CARREGAMENTO DE MESAS ---
 
 const renderTables = (docs) => {
     const openTablesList = document.getElementById('openTablesList');
@@ -75,7 +75,6 @@ const renderTables = (docs) => {
             const total = table.total || 0;
             const cardColor = total > 0 ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200';
             
-            // 4c. Ícone de Atenção ("Em Espera")
             const hasAguardandoItem = (table.selectedItems || []).some(item => 
                 item.note && item.note.toLowerCase().includes('espera')
             );
@@ -83,7 +82,6 @@ const renderTables = (docs) => {
                 ? `<i class="fas fa-exclamation-triangle attention-icon" title="Itens em Espera"></i>` 
                 : '';
 
-            // 4a. Timer de Último Pedido
             const lastSentAt = table.lastKdsSentAt?.toMillis() || null;
             const elapsedTime = lastSentAt ? formatElapsedTime(lastSentAt) : null;
             
@@ -94,7 +92,6 @@ const renderTables = (docs) => {
                 </div>
             ` : '';
 
-            // 4b. Botão KDS Status
             const statusIconHtml = lastSentAt ? `
                 <button class="kds-status-icon-btn" 
                         title="Status do Último Pedido"
@@ -103,7 +100,6 @@ const renderTables = (docs) => {
                 </button>
             ` : '';
             
-            // 4d. Nome do Cliente
             const clientInfo = table.clientName ? `<p class="text-xs font-semibold text-gray-800">Cliente: ${table.clientName}</p>` : '';
 
             const cardHtml = `
@@ -241,8 +237,7 @@ export const openTableForOrder = async (tableId) => {
 };
 
 export const loadTableOrder = (tableId) => {
-    // CRITICAL FIX: Este é o listener da mesa que precisa ser configurado.
-    // Este código deve ser implementado no orderController na próxima fase.
+    // Este código deve ser implementado no orderController na próxima fase
+    // Simplesmente renderiza o Painel 2
     console.log(`Iniciando listener para Mesa ${tableId}...`);
-    // Aqui você iniciaria o onSnapshot e chamaria renderOrderScreen
 };
