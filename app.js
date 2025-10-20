@@ -95,7 +95,7 @@ window.goToScreen = goToScreen;
 window.openManagerAuthModal = openManagerAuthModal; 
 
 
-// --- LÓGICA DE AUTH/LOGIN ---
+// --- LÓGICA DE LOGIN ---
 
 const authenticateStaff = (email, password) => {
     const creds = STAFF_CREDENTIALS[email];
@@ -106,7 +106,7 @@ const authenticateStaff = (email, password) => {
 };
 
 const handleStaffLogin = async () => {
-    if (loginBtn) loginBtn.disabled = true; // Previne double-click
+    if (loginBtn) loginBtn.disabled = true; 
     
     const email = loginEmailInput.value.trim();
     const password = loginPasswordInput.value.trim();
@@ -118,11 +118,10 @@ const handleStaffLogin = async () => {
         
         try {
             const authInstance = auth;
-            // 1. Loga anonimamente no Firebase
             const userCredential = await signInAnonymously(authInstance); 
             userId = userCredential.user.uid; 
             
-            // 2. Configura e navega
+            // Configura o display e esconde o modal
             document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)} | Função: ${userRole.toUpperCase()}`;
             
             hideLoginModal(); 
@@ -134,6 +133,7 @@ const handleStaffLogin = async () => {
             fetchWooCommerceProducts(renderMenu);
             fetchWooCommerceCategories(renderTableFilters); 
             
+            // Navega para o Painel de Mesas
             goToScreen('panelScreen');
             
         } catch (error) {
@@ -168,19 +168,30 @@ window.handleLogout = handleLogout;
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
 
-    const firebaseConfig = JSON.parse(window.__firebase_config);
+    // CORREÇÃO CRÍTICA DO ERRO JSON.PARSE: Usa um fallback seguro e trata a leitura.
+    const configString = window.__firebase_config && typeof window.__firebase_config === 'string' 
+                         ? window.__firebase_config 
+                         : '{}';
+    
+    let firebaseConfig;
+    try {
+        firebaseConfig = JSON.parse(configString);
+    } catch(e) {
+        // Se a configuração estiver incorreta no HTML, o sistema não pode prosseguir.
+        document.getElementById('statusContent').innerHTML = `<h2 class="text-xl font-bold mb-2 text-red-600">Erro Fatal de Configuração</h2><p>Verifique o bloco de variáveis do Firebase no seu index.html. O JSON está inválido.</p>`;
+        return; 
+    }
+
     const app = initializeApp(firebaseConfig); 
     const dbInstance = getFirestore(app);
     const authInstance = getAuth(app);
     
-    initializeFirebase(dbInstance, authInstance, window.__app_id); 
+    initializeFirebase(dbInstance, authInstance, window.__app_id || 'pdv_default_app'); 
 
     onAuthStateChanged(authInstance, (user) => {
         if (!user) {
             showLoginModal();
         } 
-        // Se a persistência do Firebase for ativada e o usuário voltar, 
-        // a lógica de login Staff cuidará da navegação.
     });
 
     // 1. Event Listeners de Login
