@@ -341,6 +341,13 @@
         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 id="obsItemName" class="text-xl font-bold mb-4 text-indigo-700">Adicionar Observação</h3>
             
+            <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-4">
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Sem Gelo">Sem Gelo</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Bem Passado">Bem Passado</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Molho à Parte">Molho à Parte</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Duas Camadas">Duas Camadas</button>
+            </div>
+
             <textarea id="obsInput" rows="3" placeholder="Ex: Sem cebola, Ponto da carne mal passada..." class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base"></textarea>
             
             <div class="flex items-center justify-between mt-3 mb-4">
@@ -417,7 +424,7 @@
             projectId: "fator-pdv", // Chave de projeto corrigida
             storageBucket: "fator-pdv.appspot.com",
             messagingSenderId: "1097659747429",
-            appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c"
+            appId: "1:1097659747429:web:8ec0a7c39778c311dbe0a8c"
         });
     </script>
     
