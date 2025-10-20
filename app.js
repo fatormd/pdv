@@ -1,15 +1,14 @@
-// --- APP.JS (NOVO CORE) ---
+// --- APP.JS ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-// Importações dos Módulos Essenciais
+// Importação dos Módulos Refatorados
 import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, getCustomersCollectionRef } from './services/firebaseService.js';
 import { fetchWooCommerceProducts, fetchWooCommerceCategories } from './services/wooCommerceService.js';
 import { loadOpenTables, renderTableFilters, handleAbrirMesa, loadTableOrder } from './controllers/panelController.js';
 import { renderMenu } from './controllers/orderController.js';
 import { openManagerAuthModal } from './controllers/managerController.js';
-import { doc, setDoc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 
 // --- VARIÁVEIS DE ESTADO GLOBAL ---
@@ -20,7 +19,7 @@ export const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
 export let currentTableId = null;
 export let selectedItems = []; 
 export let currentOrderSnapshot = null;
-export let userRole = 'anonymous'; // 'anonymous', 'client', 'garcom', 'gerente'
+export let userRole = 'anonymous'; 
 export let userId = null;
 export let unsubscribeTable = null;
 
@@ -73,13 +72,12 @@ export const goToScreen = (screenId) => {
     }
 };
 
-window.goToScreen = goToScreen; // Exporta para o onclick do HTML
-window.openManagerAuthModal = openManagerAuthModal; // Exporta para o onclick do HTML
+window.goToScreen = goToScreen; 
+window.openManagerAuthModal = openManagerAuthModal; 
 
 
 // --- LÓGICA DE LOGIN ---
 
-// MOCK: Função para autenticar um cliente (Comanda Digital)
 const handleClientLogin = async () => {
     const tableNumber = clientTableInput.value.trim();
     const clientName = clientNameInput.value.trim() || 'Cliente';
@@ -105,7 +103,6 @@ const handleClientLogin = async () => {
         userId = userCredential.user.uid;
         userRole = 'client';
 
-        // 1. Tenta registrar/atualizar o cliente no CRM (customers)
         const customerRef = doc(getCustomersCollectionRef(), userId);
         const customerData = {
             id: userId,
@@ -119,7 +116,6 @@ const handleClientLogin = async () => {
              await setDoc(customerRef, customerData, { merge: true }); 
         }
 
-        // 2. Atualiza a mesa (vinculando cliente)
         currentTableId = tableNumber;
         await updateDoc(tableRef, { 
             clientId: userId, 
@@ -127,13 +123,11 @@ const handleClientLogin = async () => {
             lastClientLogin: serverTimestamp() 
         });
         
-        // 3. Redireciona
         document.getElementById('current-table-number').textContent = `Mesa ${currentTableId} (${clientName})`;
         document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)} | Função: Cliente`;
         loginModal.style.display = 'none';
         hideStatus();
         
-        // Carrega o estado da mesa e navega
         loadTableOrder(currentTableId);
         goToScreen('orderScreen');
 
@@ -162,7 +156,6 @@ const handleStaffLogin = async () => {
             
             document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)} | Função: ${userRole}`;
             
-            // Carrega dados e UI
             loadOpenTables();
             renderTableFilters(); 
             fetchWooCommerceProducts(renderMenu);
@@ -178,6 +171,22 @@ const handleStaffLogin = async () => {
     }
 };
 
+const handleLogout = () => {
+    // Limpa estado e retorna ao login
+    userId = null;
+    currentTableId = null;
+    selectedItems = [];
+    userRole = 'anonymous'; 
+    
+    if (auth.currentUser) {
+        auth.signOut().catch(e => console.error("Erro no sign out:", e)); 
+    }
+    
+    goToScreen('panelScreen');
+    showLoginModal();
+    document.getElementById('user-id-display').textContent = 'Usuário ID: Deslogado...';
+};
+
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -189,6 +198,15 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Inicializa o serviço Firebase globalmente
     initializeFirebase(dbInstance, authInstance, window.__app_id); 
+
+    // CRITICAL FIX: Este listener garante que o modal de login apareça quando o usuário não estiver autenticado
+    onAuthStateChanged(authInstance, (user) => {
+        if (!user) {
+            showLoginModal();
+        }
+        // Se houver usuário (mesmo anônimo), o aplicativo espera o clique nos botões Staff ou Cliente
+    });
+
 
     // 1. Event Listeners de Login
     if (staffLoginBtn) {
@@ -202,12 +220,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (abrirMesaBtn) {
         abrirMesaBtn.addEventListener('click', handleAbrirMesa);
     }
+    
+    // 3. Lógica de Logout
+    if (logoutBtnHeader) {
+        logoutBtnHeader.addEventListener('click', handleLogout);
+    }
 
-    // 3. Carrega UI Inicial (Painel de Mesas e Filtros)
+    // 4. Inicia a visualização da UI (o listener onAuthStateChanged cuidará de mostrar o modal)
     loadOpenTables();
     renderTableFilters(); 
-    
-    // 4. Abertura inicial da tela de status (Aguardando login)
-    statusScreen.style.display = 'flex';
-    mainContent.style.display = 'none';
 });
