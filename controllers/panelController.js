@@ -2,7 +2,7 @@
 import { getTablesCollectionRef, getTableDocRef, auth } from "../services/firebaseService.js";
 import { query, where, orderBy, onSnapshot, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { formatCurrency, formatElapsedTime } from "../utils.js";
-import { goToScreen, currentTableId, selectedItems, unsubscribeTable, loadTableOrder } from "../app.js"; 
+import { goToScreen, currentTableId, selectedItems, unsubscribeTable } from "../app.js"; 
 import { fetchWooCommerceProducts } from "../services/wooCommerceService.js"; 
 import { renderMenu } from "./orderController.js";
 
@@ -142,17 +142,14 @@ export const loadOpenTables = () => {
     let q;
     
     if (currentSectorFilter === 'Todos') {
-        // Requer índice composto: status + tableNumber
         q = query(tablesCollection, where('status', '==', 'open'), orderBy('tableNumber', 'asc'));
     } else {
-        // Requer índice composto: status + sector + tableNumber
         q = query(tablesCollection, 
                   where('status', '==', 'open'), 
                   where('sector', '==', currentSectorFilter),
                   orderBy('tableNumber', 'asc'));
     }
 
-    // O unsubscribeTables está na variável do módulo, mas será gerenciado pelo app.js
     unsubscribeTables = onSnapshot(q, (snapshot) => {
         const docs = snapshot.docs;
         renderTables(docs);
@@ -234,10 +231,21 @@ export const handleSearchTable = async () => {
 };
 
 export const openTableForOrder = async (tableId) => {
-    // 1. Garante que o Menu esteja carregado (dependência para o Painel 2)
+    // Garante que o Menu esteja carregado (dependência para o Painel 2)
     await fetchWooCommerceProducts(renderMenu); 
     
-    // 2. Navegação e Carregamento (Item 2)
+    // Navegação e Carregamento (Item 2)
     loadTableOrder(tableId); // Inicia o listener e atualiza o estado
     goToScreen('orderScreen'); 
+};
+
+// Função temporária (será migrada para o OrderController)
+export const loadTableOrder = (tableId) => {
+    // Implementação da lógica de listener da mesa (para o Painel 2)
+    // Este código será movido para o orderController na próxima fase
+    const tableRef = getTableDocRef(tableId);
+    
+    // Simplesmente renderiza o Painel 2
+    // Aqui você iniciaria o onSnapshot e chamaria renderOrderScreen
+    console.log(`Iniciando listener para Mesa ${tableId}...`);
 };
