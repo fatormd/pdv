@@ -1,19 +1,37 @@
 // --- CONTROLLERS/ORDERCONTROLLER.JS (Painel 2) ---
-import { getProducts } from "../services/wooCommerceService.js";
+import { getProducts, getCategories } from "../services/wooCommerceService.js";
 import { formatCurrency } from "../utils.js";
-import { currentTableId } from "../app.js";
+import { currentTableId, selectedItems, userRole, goToScreen, saveSelectedItemsToFirebase, currentOrderSnapshot } from "../app.js";
+
+
+// --- FUNÇÕES DE EXIBIÇÃO DE TELA ---
 
 // Função para renderizar o cardápio
 export const renderMenu = () => { 
     const menuItemsGrid = document.getElementById('menuItemsGrid');
-    if (!menuItemsGrid) return;
+    const categoryFiltersContainer = document.getElementById('categoryFilters');
+    
+    if (!menuItemsGrid || !categoryFiltersContainer) return;
     
     const products = getProducts();
+    const categories = getCategories(); // Assumindo que getCategories retorna [{id, name}]
+
+    // 1. Renderiza Filtros de Categoria (se houver)
+    if (categories.length > 0) {
+        categoryFiltersContainer.innerHTML = categories.map(cat => `
+            <button class="category-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap bg-white text-gray-700 border border-gray-300" 
+                    data-category="${cat.slug || cat.id}">
+                ${cat.name}
+            </button>
+        `).join('');
+    }
+
     if (products.length === 0) {
         menuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-red-500 italic">Erro ao carregar produtos. Verifique a API do WooCommerce.</div>`;
         return;
     }
     
+    // 2. Renderiza Itens do Cardápio
     menuItemsGrid.innerHTML = products.map(product => `
         <div class="product-card bg-white p-4 rounded-xl shadow-md cursor-pointer hover:shadow-lg transition duration-150 border border-gray-200">
             <h4 class="font-bold text-base text-gray-800">${product.name}</h4>
@@ -33,6 +51,75 @@ export const renderMenu = () => {
     `).join('');
 };
 
-// Função para renderizar a lista de itens selecionados (Painel 2)
-export const renderOrderScreen = () => { console.log('OrderController: Renderizando Itens Selecionados...'); };
+export const renderOrderScreen = () => {
+    const openOrderList = document.getElementById('openOrderList');
+    const openItemsCount = document.getElementById('openItemsCount');
+    const sendSelectedItemsBtn = document.getElementById('sendSelectedItemsBtn');
+
+    if (!openOrderList) return;
+
+    const openItemsCountValue = selectedItems.length;
+    openItemsCount.textContent = openItemsCountValue;
+
+    if (sendSelectedItemsBtn) {
+        // Lógica de desabilitação: Cliente não pode enviar, Garçom/Gerente precisa de itens.
+        if (userRole === 'client') {
+            sendSelectedItemsBtn.disabled = true;
+            sendSelectedItemsBtn.textContent = 'Aguardando Staff';
+        } else {
+            sendSelectedItemsBtn.disabled = openItemsCountValue === 0;
+            sendSelectedItemsBtn.textContent = 'Enviar Itens';
+        }
+    }
+
+    if (openItemsCountValue === 0) {
+        openOrderList.innerHTML = `<div class="text-base text-gray-500 italic p-2">Nenhum item selecionado.</div>`;
+    } else {
+        // Lógica de agrupamento para exibição (simples placeholder)
+        openOrderList.innerHTML = selectedItems.map(item => `
+            <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg shadow-sm">
+                <span>${item.name} (${formatCurrency(item.price)})</span>
+                <button onclick="alert('Abrir observação para ${item.name}')">Obs</button>
+            </div>
+        `).join('');
+    }
+};
+
+// --- FUNÇÕES DE AÇÃO ---
+
+// Implementação da função openProductInfoModal (Item 2)
+export const openProductInfoModal = (productId) => {
+    const product = getProducts().find(p => p.id === productId);
+    const productInfoModal = document.getElementById('productManagementModal'); // Reutilizando o modal de gestão como placeholder
+    
+    if (!product || !productInfoModal) return;
+
+    alert(`Detalhes do Produto:\nNome: ${product.name}\nPreço: ${formatCurrency(product.price)}\nSetor: ${product.sector}`);
+};
+window.openProductInfoModal = openProductInfoModal; // EXPÕE AO ESCOPO GLOBAL
+
+// Implementação da função addItemToSelection (Item 1)
+export const addItemToSelection = (product) => {
+    if (!currentTableId) {
+        alert("Selecione ou abra uma mesa primeiro.");
+        return;
+    }
+
+    const newItem = {
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        sector: product.sector, 
+        note: ''
+    };
+    
+    selectedItems.push(newItem); 
+
+    // Atualiza a UI e salva o estado
+    renderOrderScreen();
+    // Você chamará o modal de observação aqui no futuro: window.openObsModalForGroup(product.id, '');
+};
+window.addItemToSelection = addItemToSelection; // EXPÕE AO ESCOPO GLOBAL
+
+
 export const handleSendSelectedItems = () => { alert('Função de Envio KDS (Marcha) em desenvolvimento.'); };
