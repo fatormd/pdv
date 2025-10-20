@@ -96,6 +96,7 @@ export const goToScreen = (screenId) => {
 window.goToScreen = goToScreen; 
 window.openManagerAuthModal = openManagerAuthModal; 
 
+
 // NOVO: Função para o listener da mesa (MÓDULO DE FLUXO)
 export const setTableListener = (tableId) => {
     if (unsubscribeTable) unsubscribeTable(); 
