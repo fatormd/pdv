@@ -13,12 +13,13 @@ import { openManagerAuthModal } from './controllers/managerController.js';
 
 // --- VARIÁVEIS DE ESTADO GLOBAL ---
 export const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2, 'managerScreen': 3 };
+export const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
 
 // NOVO: Credenciais Staff Centralizadas (para login unificado)
 const STAFF_CREDENTIALS = {
     'agencia@fatormd.com': { password: '98763543210', role: 'gerente', name: 'Fmd' }, 
     'garcom@fator.com': { password: '1234', role: 'garcom', name: 'Mock Garçom' },
-    // Adicione outros funcionários aqui com seu respectivo role: 'kds-cozinha', 'kds-bar', etc.
+    // Outros funcionários aqui
 };
 
 // Variáveis Mutáveis (Estado da Sessão)
@@ -41,7 +42,7 @@ const abrirMesaBtn = document.getElementById('abrirMesaBtn');
 
 // Elementos de Login
 const loginBtn = document.getElementById('loginBtn');
-const loginEmailInput = document.getElementById('loginEmail'); // E-mail agora é o principal
+const loginEmailInput = document.getElementById('loginEmail'); 
 const loginPasswordInput = document.getElementById('loginPassword');
 
 
@@ -96,10 +97,10 @@ window.openManagerAuthModal = openManagerAuthModal;
 
 // --- LÓGICA DE AUTH/LOGIN ---
 
-const authenticateStaff = async (email, password) => {
+const authenticateStaff = (email, password) => {
     const creds = STAFF_CREDENTIALS[email];
     if (creds && creds.password === password) {
-        return creds.role;
+        return creds; // Retorna credenciais, incluindo o role
     }
     return null;
 };
@@ -108,34 +109,38 @@ const handleStaffLogin = async () => {
     const email = loginEmailInput.value.trim();
     const password = loginPasswordInput.value.trim();
     
-    const role = await authenticateStaff(email, password);
+    const staffData = authenticateStaff(email, password);
 
-    if (role) {
-        userRole = role;
+    if (staffData) {
+        userRole = staffData.role;
+        // CRITICAL FIX: Usamos o ID do Firebase Auth (mesmo anônimo) para o DB
+        // Mas se a sessão anônima falhar, usamos um ID de mock.
         
         try {
             const authInstance = auth;
-            // Usa login anônimo para obter userId (se não quiser usar email/senha real do Firebase Auth)
             const userCredential = await signInAnonymously(authInstance); 
             userId = userCredential.user.uid; 
+
+            // Configura o display e esconde o modal
+            document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)} | Função: ${userRole.toUpperCase()}`;
             
-            // Sucesso
             hideLoginModal(); 
             hideStatus(); 
             
-            document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)} | Função: ${userRole.toUpperCase()}`;
-            
-            // Carrega UI e vai para o Painel de Mesas
+            // Carrega dados iniciais da UI
             loadOpenTables();
             renderTableFilters(); 
             fetchWooCommerceProducts(renderMenu);
             fetchWooCommerceCategories(renderTableFilters); 
             
+            // Navega para o Painel de Mesas
             goToScreen('panelScreen');
             
         } catch (error) {
-             console.error("Erro ao autenticar Staff (Firebase):", error);
-             alert("Falha na conexão com o Firebase.");
+             console.error("Erro ao autenticar Staff (Firebase/Anônimo):", error);
+             alert("Autenticação local OK, mas falha no Firebase. Tente novamente.");
+             // Em caso de falha do Firebase, não logamos.
+             showLoginModal();
         }
     } else {
         alert('Credenciais inválidas. Verifique seu e-mail e senha.');
@@ -175,12 +180,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!user) {
             showLoginModal();
         } else if (userRole === 'anonymous') {
-             // Se houver uma sessão persistente, mas o role não foi setado, força o login novamente.
+             // Se houver uma sessão persistente, mas o role não foi setado, mostra o login.
              showLoginModal(); 
         }
     });
 
-    // 1. Event Listener de Login
+    // 1. Event Listeners de Login
     if (loginBtn) {
         loginBtn.addEventListener('click', handleStaffLogin);
     }
