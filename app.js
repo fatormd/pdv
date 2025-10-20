@@ -4,7 +4,8 @@ import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gsta
 import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // Importações dos Módulos Refatorados
-import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, getCustomersCollectionRef } from './services/firebaseService.js';
+// CRITICAL FIX: Importando auth e db do service
+import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, getCustomersCollectionRef, auth, db } from './services/firebaseService.js';
 import { fetchWooCommerceProducts, fetchWooCommerceCategories } from './services/wooCommerceService.js';
 import { loadOpenTables, renderTableFilters, handleAbrirMesa, loadTableOrder } from './controllers/panelController.js';
 import { renderMenu } from './controllers/orderController.js';
@@ -13,11 +14,10 @@ import { openManagerAuthModal } from './controllers/managerController.js';
 
 // --- VARIÁVEIS DE ESTADO GLOBAL ---
 export const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2, 'managerScreen': 3 };
-export const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
 
 // Credenciais Staff Centralizadas (para login unificado)
 const STAFF_CREDENTIALS = {
-    'agencia@fatormd.com': { password: '98763543210', role: 'gerente', name: 'Fmd' }, 
+    'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' }, 
     'garcom@fator.com': { password: '1234', role: 'garcom', name: 'Mock Garçom' },
     // Outros funcionários aqui
 };
@@ -95,7 +95,7 @@ window.goToScreen = goToScreen;
 window.openManagerAuthModal = openManagerAuthModal; 
 
 
-// --- LÓGICA DE LOGIN ---
+// --- LÓGICA DE AUTH/LOGIN ---
 
 const authenticateStaff = (email, password) => {
     const creds = STAFF_CREDENTIALS[email];
@@ -120,7 +120,7 @@ const handleStaffLogin = async () => {
             const authInstance = auth;
             const userCredential = await signInAnonymously(authInstance); 
             userId = userCredential.user.uid; 
-            
+
             // Configura o display e esconde o modal
             document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)} | Função: ${userRole.toUpperCase()}`;
             
@@ -130,7 +130,9 @@ const handleStaffLogin = async () => {
             // Carrega dados iniciais da UI
             loadOpenTables();
             renderTableFilters(); 
-            fetchWooCommerceProducts(renderMenu);
+            // Estes devem ser chamados para que a navegação para Painel 1 funcione
+            // corretamente e a tela não pareça quebrada.
+            fetchWooCommerceProducts(renderMenu); 
             fetchWooCommerceCategories(renderTableFilters); 
             
             // Navega para o Painel de Mesas
@@ -139,12 +141,11 @@ const handleStaffLogin = async () => {
         } catch (error) {
              console.error("Erro ao autenticar Staff (Firebase/Anônimo):", error);
              alert("Autenticação local OK, mas falha no Firebase. Verifique a conexão.");
-             if (loginBtn) loginBtn.disabled = false;
         }
     } else {
         alert('Credenciais inválidas. Verifique seu e-mail e senha.');
-        if (loginBtn) loginBtn.disabled = false;
     }
+    if (loginBtn) loginBtn.disabled = false;
 };
 
 const handleLogout = () => {
@@ -153,7 +154,7 @@ const handleLogout = () => {
     selectedItems = [];
     userRole = 'anonymous'; 
     
-    if (auth.currentUser) {
+    if (auth && auth.currentUser) {
         auth.signOut().catch(e => console.error("Erro no sign out:", e)); 
     }
     
@@ -168,20 +169,7 @@ window.handleLogout = handleLogout;
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
 
-    // CORREÇÃO CRÍTICA DO ERRO JSON.PARSE: Usa um fallback seguro e trata a leitura.
-    const configString = window.__firebase_config && typeof window.__firebase_config === 'string' 
-                         ? window.__firebase_config 
-                         : '{}';
-    
-    let firebaseConfig;
-    try {
-        firebaseConfig = JSON.parse(configString);
-    } catch(e) {
-        // Se a configuração estiver incorreta no HTML, o sistema não pode prosseguir.
-        document.getElementById('statusContent').innerHTML = `<h2 class="text-xl font-bold mb-2 text-red-600">Erro Fatal de Configuração</h2><p>Verifique o bloco de variáveis do Firebase no seu index.html. O JSON está inválido.</p>`;
-        return; 
-    }
-
+    const firebaseConfig = JSON.parse(window.__firebase_config);
     const app = initializeApp(firebaseConfig); 
     const dbInstance = getFirestore(app);
     const authInstance = getAuth(app);
