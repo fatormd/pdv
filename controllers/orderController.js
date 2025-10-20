@@ -373,8 +373,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 newNote = noteCleaned;
             }
 
+            // CORREÇÃO CRÍTICA DO TYPERROR (LINHA 377): Evita reatribuir a variável importada (selectedItems)
+            
             // 2. Atualiza TODOS os itens que pertencem a esse grupo de obs
-            selectedItems = selectedItems.map(item => {
+            let updatedItems = selectedItems.map(item => { // Usa variável temporária
                 if (item.id == itemId && (item.note || '') === originalNoteKey) {
                     return { ...item, note: newNote };
                 }
@@ -383,8 +385,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 3. Limpeza: Se o item for novo e o usuário cancelar/salvar sem obs, removemos
             if (originalNoteKey === '' && newNote === '') {
-                 selectedItems = selectedItems.filter(item => item.id != itemId || item.note !== '');
+                 updatedItems = updatedItems.filter(item => item.id != itemId || item.note !== ''); // Filtra a variável temporária
             }
+            
+            // Reatribui o conteúdo da lista global (selectedItems)
+            selectedItems.length = 0; 
+            selectedItems.push(...updatedItems);
 
             obsModal.style.display = 'none';
             renderOrderScreen();
@@ -397,8 +403,14 @@ document.addEventListener('DOMContentLoaded', () => {
              const itemId = obsModal.dataset.itemId;
              const originalNoteKey = obsModal.dataset.originalNoteKey;
              
+             // CORREÇÃO CRÍTICA DO TYPERROR (LINHA 401): Evita reatribuir a variável importada (selectedItems)
              if (originalNoteKey === '') {
-                 selectedItems = selectedItems.filter(item => item.id != itemId || item.note !== '');
+                 const filteredItems = selectedItems.filter(item => item.id != itemId || item.note !== '');
+                 
+                 // Reatribui o conteúdo da lista global (selectedItems)
+                 selectedItems.length = 0; 
+                 selectedItems.push(...filteredItems);
+                 
                  saveSelectedItemsToFirebase(currentTableId, selectedItems);
              }
              
