@@ -25,10 +25,10 @@ const fetchWooCommerceData = async (endpoint) => {
 };
 
 let WOOCOMMERCE_PRODUCTS = [];
-let WOOCOMMERCE_CATEGORIES = [];
+let WOOCOMMERCE_CATEGORIES = []; // Variável Correta
 
 export const getProducts = () => WOOCOMMERCE_PRODUCTS;
-export const getCategories = () => WOOCOMMERCE_CATEGES;
+export const getCategories = () => WOOCOMMERCE_CATEGORIES; // CORRIGIDO: Era WOOCOMMERCE_CATEGES
 
 
 export const fetchWooCommerceProducts = async (renderMenuCallback) => {
@@ -45,6 +45,6 @@ export const fetchWooCommerceProducts = async (renderMenuCallback) => {
 
 export const fetchWooCommerceCategories = async (renderCategoryFiltersCallback) => {
     const categories = await fetchWooCommerceData('products/categories');
-    WOOCOMMERCE_CATEGORIES = [{ id: 'all', name: 'Todos', slug: 'all' }, ...categories];
+    WOOCOMMERCE_CATEGORIES = [{ id: 'all', name: 'Todos', slug: 'all' }, ...categories.map(c => ({ id: c.id, name: c.name, slug: c.slug }))];
     if (renderCategoryFiltersCallback) renderCategoryFiltersCallback();
 };
