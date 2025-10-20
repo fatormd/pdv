@@ -53,10 +53,11 @@ export const hideStatus = () => {
 };
 
 const showLoginModal = () => {
-    if (statusScreen) statusScreen.style.display = 'none'; 
+    if (statusScreen) statusScreen.style.display = 'none'; // Garante que o status suma
+    if (mainContent) mainContent.style.display = 'none'; // Garante que o conteúdo principal (por baixo) suma
+    
     if (loginModal) {
-        loginModal.style.display = 'flex';
-        mainContent.style.display = 'none';
+        loginModal.style.display = 'flex'; // Força a exibição do modal
     }
 };
 
@@ -214,16 +215,13 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initializeFirebase(dbInstance, authInstance, window.__app_id); 
 
-    // CHAVE DA CORREÇÃO: Garante que o modal de login apareça imediatamente no DOMContentLoaded
+    // CHAVE DA CORREÇÃO: Força a exibição do modal de login imediatamente no DOMContentLoaded
     showLoginModal(); 
 
     onAuthStateChanged(authInstance, (user) => {
         if (user) {
             // Se já autenticado (persistência de sessão), garante que o estado seja carregado
-            if (userRole !== 'anonymous') {
-                hideLoginModal();
-                // A UI será carregada após a autenticação Staff/Cliente ser concluída
-            }
+            // A lógica de login do Staff/Cliente cuidará da navegação
         }
     });
 
