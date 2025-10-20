@@ -19,7 +19,6 @@ export const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
 const STAFF_CREDENTIALS = {
     'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' }, 
     'garcom@fator.com': { password: '1234', role: 'garcom', name: 'Mock Garçom' },
-    // Outros funcionários aqui
 };
 
 // Variáveis Mutáveis (Estado da Sessão)
