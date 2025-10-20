@@ -1,10 +1,11 @@
 // --- SERVICES/FIREBASESERVICE.JS ---
-import { collection, doc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { collection, doc, updateDoc, arrayUnion, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // Variáveis globais (exportadas para que o app.js possa defini-las)
 export let db = null;
 export let auth = null;
 export let appId = null;
+export { arrayUnion, serverTimestamp }; // Exporta funções do Firebase Firestore
 
 export const initializeFirebase = (database, authentication, appIdentifier) => {
     db = database;
