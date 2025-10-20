@@ -1,7 +1,10 @@
 // --- CONTROLLERS/ORDERCONTROLLER.JS (Painel 2) ---
 import { getProducts, getCategories } from "../services/wooCommerceService.js";
 import { formatCurrency } from "../utils.js";
-import { currentTableId, selectedItems, userRole, goToScreen, saveSelectedItemsToFirebase, currentOrderSnapshot } from "../app.js";
+// CRITICAL FIX: Importando saveSelectedItemsToFirebase do serviço, não do app.js
+import { saveSelectedItemsToFirebase } from "../services/firebaseService.js"; 
+import { currentTableId, selectedItems, userRole, currentOrderSnapshot } from "../app.js";
+import { openManagerAuthModal } from "./managerController.js";
 
 
 // --- FUNÇÕES DE EXIBIÇÃO DE TELA ---
@@ -14,7 +17,7 @@ export const renderMenu = () => {
     if (!menuItemsGrid || !categoryFiltersContainer) return;
     
     const products = getProducts();
-    const categories = getCategories(); // Assumindo que getCategories retorna [{id, name}]
+    const categories = getCategories(); 
 
     // 1. Renderiza Filtros de Categoria (se houver)
     if (categories.length > 0) {
@@ -75,11 +78,11 @@ export const renderOrderScreen = () => {
     if (openItemsCountValue === 0) {
         openOrderList.innerHTML = `<div class="text-base text-gray-500 italic p-2">Nenhum item selecionado.</div>`;
     } else {
-        // Lógica de agrupamento para exibição (simples placeholder)
+        // Renderiza itens selecionados
         openOrderList.innerHTML = selectedItems.map(item => `
             <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg shadow-sm">
-                <span>${item.name} (${formatCurrency(item.price)})</span>
-                <button onclick="alert('Abrir observação para ${item.name}')">Obs</button>
+                <span class="font-semibold">${item.name}</span>
+                <span class="text-sm">(${formatCurrency(item.price)})</span>
             </div>
         `).join('');
     }
@@ -90,9 +93,9 @@ export const renderOrderScreen = () => {
 // Implementação da função openProductInfoModal (Item 2)
 export const openProductInfoModal = (productId) => {
     const product = getProducts().find(p => p.id === productId);
-    const productInfoModal = document.getElementById('productManagementModal'); // Reutilizando o modal de gestão como placeholder
+    const productInfoModal = document.getElementById('productManagementModal'); // Placeholder
     
-    if (!product || !productInfoModal) return;
+    if (!product) return;
 
     alert(`Detalhes do Produto:\nNome: ${product.name}\nPreço: ${formatCurrency(product.price)}\nSetor: ${product.sector}`);
 };
@@ -115,9 +118,11 @@ export const addItemToSelection = (product) => {
     
     selectedItems.push(newItem); 
 
-    // Atualiza a UI e salva o estado
+    // Atualiza a UI e salva o estado no Firebase
     renderOrderScreen();
-    // Você chamará o modal de observação aqui no futuro: window.openObsModalForGroup(product.id, '');
+    saveSelectedItemsToFirebase(currentTableId, selectedItems);
+    
+    // Abrir modal de observações aqui (Função futura: window.openObsModalForGroup(product.id, ''));
 };
 window.addItemToSelection = addItemToSelection; // EXPÕE AO ESCOPO GLOBAL
 
