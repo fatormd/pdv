@@ -1,15 +1,15 @@
 // --- APP.JS ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // Importações dos Módulos Refatorados
 import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, getCustomersCollectionRef, auth } from './services/firebaseService.js';
 import { fetchWooCommerceProducts, fetchWooCommerceCategories } from './services/wooCommerceService.js';
 import { loadOpenTables, renderTableFilters, handleAbrirMesa, loadTableOrder, handleSearchTable } from './controllers/panelController.js';
-import { renderMenu } from './controllers/orderController.js';
+import { renderMenu, renderOrderScreen } from './controllers/orderController.js';
 import { openManagerAuthModal } from './controllers/managerController.js';
-
+import { renderPaymentSummary, handleAddSplitAccount } from './controllers/paymentController.js'; // Importa a função de divisão
 
 // --- VARIÁVEIS DE ESTADO GLOBAL ---
 export const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2, 'managerScreen': 3 };
@@ -95,6 +95,25 @@ export const goToScreen = (screenId) => {
 window.goToScreen = goToScreen; 
 window.openManagerAuthModal = openManagerAuthModal; 
 
+// NOVO: Função para o listener da mesa (MÓDULO DE FLUXO)
+export const setTableListener = (tableId) => {
+    if (unsubscribeTable) unsubscribeTable(); 
+
+    const tableRef = getTableDocRef(tableId);
+
+    // CRITICAL: Atualiza o estado global e chama os renderizadores de tela
+    unsubscribeTable = onSnapshot(tableRef, (docSnapshot) => {
+        if (docSnapshot.exists()) {
+            currentOrderSnapshot = docSnapshot.data();
+            selectedItems = currentOrderSnapshot.selectedItems || []; 
+            renderOrderScreen(currentOrderSnapshot);
+            renderPaymentSummary(currentTableId, currentOrderSnapshot);
+        }
+    }, (error) => {
+        console.error("Erro ao carregar dados da mesa:", error);
+    });
+};
+
 
 // --- LÓGICA DE AUTH/LOGIN ---
 
@@ -164,6 +183,9 @@ const handleLogout = () => {
 
 window.handleLogout = handleLogout;
 
+// NOVO: Expondo a função de divisão para o Event Listener no DOM
+window.handleAddSplitAccount = () => handleAddSplitAccount(currentTableId, currentOrderSnapshot);
+
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -186,29 +208,28 @@ document.addEventListener('DOMContentLoaded', () => {
         loginBtn.addEventListener('click', handleStaffLogin);
     }
     
-    // NOVO: Item 1 - Listener para o Botão Gerencial
+    // 2. Event Listeners do Cabeçalho e Painel
+    const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
+    const logoutBtnHeader = document.getElementById('logoutBtnHeader');
+    const abrirMesaBtn = document.getElementById('abrirMesaBtn');
+    const searchTableBtn = document.getElementById('searchTableBtn');
+
     if (openManagerPanelBtn) { 
         openManagerPanelBtn.addEventListener('click', () => {
              openManagerAuthModal('goToManagerPanel'); 
         });
     }
-    
-    // NOVO: Item 1 - Listener para o Botão de Logout
     if (logoutBtnHeader) {
         logoutBtnHeader.addEventListener('click', handleLogout); 
     }
-
-    // 2. Event Listener para Abrir Mesa (Item 2)
     if (abrirMesaBtn) {
         abrirMesaBtn.addEventListener('click', handleAbrirMesa);
     }
-    
-    // 3. Event Listener para Busca de Mesa (Item 3)
     if (searchTableBtn) {
         searchTableBtn.addEventListener('click', handleSearchTable);
     }
 
-    // 4. Carrega UI Inicial (Painel de Mesas e Filtros)
+    // 3. Carrega UI Inicial
     loadOpenTables();
     renderTableFilters(); 
 });
