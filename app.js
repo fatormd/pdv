@@ -19,7 +19,6 @@ export const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
 const STAFF_CREDENTIALS = {
     'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' }, 
     'garcom@fator.com': { password: '1234', role: 'garcom', name: 'Mock Garçom' },
-    // Outros funcionários aqui
 };
 
 // Variáveis Mutáveis (Estado da Sessão)
@@ -97,7 +96,7 @@ window.goToScreen = goToScreen;
 window.openManagerAuthModal = openManagerAuthModal; 
 
 
-// --- LÓGICA DE AUTH/LOGIN ---
+// --- LÓGICA DE LOGIN ---
 
 const authenticateStaff = (email, password) => {
     const creds = STAFF_CREDENTIALS[email];
@@ -209,7 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
         searchTableBtn.addEventListener('click', handleSearchTable);
     }
 
-    // 4. Carrega UI Inicial
+    // 4. Carrega UI Inicial (Painel de Mesas e Filtros)
     loadOpenTables();
     renderTableFilters(); 
 });
