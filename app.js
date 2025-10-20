@@ -19,6 +19,7 @@ export const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
 const STAFF_CREDENTIALS = {
     'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' }, 
     'garcom@fator.com': { password: '1234', role: 'garcom', name: 'Mock Garçom' },
+    // Outros funcionários aqui
 };
 
 // Variáveis Mutáveis (Estado da Sessão)
@@ -38,13 +39,12 @@ const appContainer = document.getElementById('appContainer');
 const loginModal = document.getElementById('loginModal');
 const logoutBtnHeader = document.getElementById('logoutBtnHeader');
 const abrirMesaBtn = document.getElementById('abrirMesaBtn');
-const openManagerPanelBtn = document.getElementById('openManagerPanelBtn'); // Botão Gerencial
 
 // Elementos de Login
 const loginBtn = document.getElementById('loginBtn');
 const loginEmailInput = document.getElementById('loginEmail'); 
 const loginPasswordInput = document.getElementById('loginPassword');
-const searchTableBtn = document.getElementById('searchTableBtn'); // Botão de busca
+const searchTableBtn = document.getElementById('searchTableBtn');
 
 
 // --- FUNÇÕES CORE E ROTEAMENTO ---
@@ -96,7 +96,7 @@ window.goToScreen = goToScreen;
 window.openManagerAuthModal = openManagerAuthModal; 
 
 
-// --- LÓGICA DE AUTH/LOGIN ---
+// --- LÓGICA DE LOGIN ---
 
 const authenticateStaff = (email, password) => {
     const creds = STAFF_CREDENTIALS[email];
