@@ -3,7 +3,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebas
 import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-// Importação dos Módulos Refatorados
+// Importações dos Módulos Refatorados
 import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, getCustomersCollectionRef } from './services/firebaseService.js';
 import { fetchWooCommerceProducts, fetchWooCommerceCategories } from './services/wooCommerceService.js';
 import { loadOpenTables, renderTableFilters, handleAbrirMesa, loadTableOrder } from './controllers/panelController.js';
@@ -19,7 +19,7 @@ export const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
 export let currentTableId = null;
 export let selectedItems = []; 
 export let currentOrderSnapshot = null;
-export let userRole = 'anonymous'; 
+export let userRole = 'anonymous'; // 'anonymous', 'client', 'garcom', 'gerente'
 export let userId = null;
 export let unsubscribeTable = null;
 
@@ -28,7 +28,6 @@ export let unsubscribeTable = null;
 const statusScreen = document.getElementById('statusScreen');
 const mainContent = document.getElementById('mainContent');
 const appContainer = document.getElementById('appContainer');
-
 const loginModal = document.getElementById('loginModal');
 const logoutBtnHeader = document.getElementById('logoutBtnHeader');
 const abrirMesaBtn = document.getElementById('abrirMesaBtn');
@@ -48,6 +47,22 @@ const loginPasswordInput = document.getElementById('loginPassword');
 export const hideStatus = () => {
     if (statusScreen && mainContent) {
         statusScreen.style.display = 'none';
+        mainContent.style.display = 'block';
+    }
+};
+
+// CORREÇÃO DE ESCOPO: Funções de controle de UI movidas para o escopo principal do módulo
+const showLoginModal = () => {
+    if (loginModal) {
+        loginModal.style.display = 'flex';
+        mainContent.style.display = 'none';
+        // if (openManagerPanelBtn) openManagerPanelBtn.classList.add('hidden'); // openManagerPanelBtn não está mapeado aqui
+    }
+};
+
+const hideLoginModal = () => {
+    if (loginModal) {
+        loginModal.style.display = 'none';
         mainContent.style.display = 'block';
     }
 };
@@ -125,7 +140,7 @@ const handleClientLogin = async () => {
         
         document.getElementById('current-table-number').textContent = `Mesa ${currentTableId} (${clientName})`;
         document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)} | Função: Cliente`;
-        loginModal.style.display = 'none';
+        hideLoginModal();
         hideStatus();
         
         loadTableOrder(currentTableId);
@@ -151,7 +166,7 @@ const handleStaffLogin = async () => {
             const userCredential = await signInAnonymously(authInstance); 
             userId = userCredential.user.uid; 
             
-            loginModal.style.display = 'none'; 
+            hideLoginModal(); 
             hideStatus(); 
             
             document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)} | Função: ${userRole}`;
@@ -199,12 +214,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // Inicializa o serviço Firebase globalmente
     initializeFirebase(dbInstance, authInstance, window.__app_id); 
 
-    // CRITICAL FIX: Este listener garante que o modal de login apareça quando o usuário não estiver autenticado
+    // CRITICAL FIX: Garante que o modal de login apareça quando o usuário não estiver autenticado
     onAuthStateChanged(authInstance, (user) => {
         if (!user) {
             showLoginModal();
+        } else {
+            // Se o usuário estiver logado anonimamente, mas o role não estiver setado, ele precisa completar o login
+            if (userRole === 'anonymous') {
+                showLoginModal();
+            }
         }
-        // Se houver usuário (mesmo anônimo), o aplicativo espera o clique nos botões Staff ou Cliente
     });
 
 
@@ -226,7 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
         logoutBtnHeader.addEventListener('click', handleLogout);
     }
 
-    // 4. Inicia a visualização da UI (o listener onAuthStateChanged cuidará de mostrar o modal)
-    loadOpenTables();
-    renderTableFilters(); 
+    // 4. Carrega UI Inicial (Painel de Mesas e Filtros)
+    // As chamadas para loadOpenTables e renderTableFilters foram movidas para dentro do handler de login Staff
+    // para garantir que sejam executadas apenas após a autenticação.
 });
