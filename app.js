@@ -19,7 +19,7 @@ export const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
 export let currentTableId = null;
 export let selectedItems = []; 
 export let currentOrderSnapshot = null;
-export let userRole = 'anonymous'; // 'anonymous', 'client', 'garcom', 'gerente'
+export let userRole = 'anonymous'; 
 export let userId = null;
 export let unsubscribeTable = null;
 
@@ -28,6 +28,7 @@ export let unsubscribeTable = null;
 const statusScreen = document.getElementById('statusScreen');
 const mainContent = document.getElementById('mainContent');
 const appContainer = document.getElementById('appContainer');
+
 const loginModal = document.getElementById('loginModal');
 const logoutBtnHeader = document.getElementById('logoutBtnHeader');
 const abrirMesaBtn = document.getElementById('abrirMesaBtn');
@@ -51,12 +52,12 @@ export const hideStatus = () => {
     }
 };
 
-// CORREÇÃO DE ESCOPO: Funções de controle de UI movidas para o escopo principal do módulo
+// CORREÇÃO: Função showLoginModal ajustada para lidar com o statusScreen
 const showLoginModal = () => {
+    if (statusScreen) statusScreen.style.display = 'none'; // Garante que a tela de status seja escondida
     if (loginModal) {
         loginModal.style.display = 'flex';
         mainContent.style.display = 'none';
-        // if (openManagerPanelBtn) openManagerPanelBtn.classList.add('hidden'); // openManagerPanelBtn não está mapeado aqui
     }
 };
 
@@ -187,7 +188,6 @@ const handleStaffLogin = async () => {
 };
 
 const handleLogout = () => {
-    // Limpa estado e retorna ao login
     userId = null;
     currentTableId = null;
     selectedItems = [];
@@ -211,15 +211,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const dbInstance = getFirestore(app);
     const authInstance = getAuth(app);
     
-    // Inicializa o serviço Firebase globalmente
     initializeFirebase(dbInstance, authInstance, window.__app_id); 
 
-    // CRITICAL FIX: Garante que o modal de login apareça quando o usuário não estiver autenticado
     onAuthStateChanged(authInstance, (user) => {
         if (!user) {
             showLoginModal();
         } else {
-            // Se o usuário estiver logado anonimamente, mas o role não estiver setado, ele precisa completar o login
             if (userRole === 'anonymous') {
                 showLoginModal();
             }
@@ -244,8 +241,4 @@ document.addEventListener('DOMContentLoaded', () => {
     if (logoutBtnHeader) {
         logoutBtnHeader.addEventListener('click', handleLogout);
     }
-
-    // 4. Carrega UI Inicial (Painel de Mesas e Filtros)
-    // As chamadas para loadOpenTables e renderTableFilters foram movidas para dentro do handler de login Staff
-    // para garantir que sejam executadas apenas após a autenticação.
 });
