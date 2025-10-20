@@ -9,11 +9,11 @@ export const calculateItemsValue = (items) => {
 
 export const formatElapsedTime = (timestamp) => {
     if (!timestamp) return null; 
+    
     const timeMs = typeof timestamp.toMillis === 'function' ? timestamp.toMillis() : timestamp;
     const now = Date.now();
     const diffMs = now - timeMs;
-    const seconds = Math.floor(diffMs / 1000);
-    const minutes = Math.floor(seconds / 60);
+    const minutes = Math.floor((diffMs / 1000) / 60);
 
     if (minutes >= 60) {
          const hours = Math.floor(minutes / 60);
