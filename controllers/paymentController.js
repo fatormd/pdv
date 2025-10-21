@@ -469,10 +469,6 @@ export const renderPaymentSplits = (currentTableId, currentOrderSnapshot) => {
 };
 
 
-// Exportada para uso no app.js
-export { renderPaymentSummary, renderPaymentSplits };
-
-
 // Event listener para inicialização
 document.addEventListener('DOMContentLoaded', () => {
     const addSplitAccountBtn = document.getElementById('addSplitAccountBtn');
@@ -496,5 +492,36 @@ document.addEventListener('DOMContentLoaded', () => {
     const finalizeOrderBtn = document.getElementById('finalizeOrderBtn');
     if (finalizeOrderBtn) {
         finalizeOrderBtn.addEventListener('click', handleFinalizeOrder);
+    }
+    
+    const confirmTransferBtn = document.getElementById('confirmTableTransferBtn');
+    if (confirmTransferBtn) {
+        confirmTransferBtn.addEventListener('click', handleConfirmTableTransfer);
+    }
+
+    const targetTableInput = document.getElementById('targetTableInput');
+    const newTableDinersInput = document.getElementById('newTableDinersInput');
+
+    if (targetTableInput) {
+        targetTableInput.addEventListener('input', async (e) => {
+             const tableNumber = e.target.value.trim();
+             const confirmBtn = document.getElementById('confirmTableTransferBtn');
+             newTableDinersInput.classList.add('hidden'); // Esconde por padrão
+             confirmBtn.textContent = 'Prosseguir';
+             
+             if (tableNumber) {
+                 const tableRef = getTableDocRef(tableNumber);
+                 const docSnap = await getDoc(tableRef);
+                 
+                 if (docSnap.exists() && docSnap.data().status === 'open') {
+                     // Mesa aberta: só transfere
+                     confirmBtn.textContent = `Transferir para Mesa ${tableNumber}`;
+                 } else {
+                     // Mesa fechada/inexistente: precisa abrir
+                     newTableDinersInput.classList.remove('hidden');
+                     confirmBtn.textContent = `Abrir Mesa ${tableNumber} e Transferir`;
+                 }
+             }
+        });
     }
 });
