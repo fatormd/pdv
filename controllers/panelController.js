@@ -3,7 +3,7 @@ import { getTablesCollectionRef, getTableDocRef, auth } from "../services/fireba
 import { query, where, orderBy, onSnapshot, getDoc, setDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { formatCurrency, formatElapsedTime } from "../utils.js";
 // CRITICAL FIX: Adicionado setCurrentTable para controle de estado
-import { goToScreen, currentTableId, selectedItems, unsubscribeTable, currentOrderSnapshot, setCurrentTable } from "../app.js"; 
+import { goToScreen, currentTableId, selectedItems, unsubscribeTable, currentOrderSnapshot, setCurrentTable, userRole } from "../app.js"; 
 import { fetchWooCommerceProducts } from "../services/wooCommerceService.js"; 
 import { renderMenu, renderOrderScreen } from "./orderController.js";
 
@@ -215,8 +215,8 @@ export const handleAbrirMesa = async () => {
     }
 };
 
-// Item 3: Busca de Mesa
-export const handleSearchTable = async () => {
+// Item 3: Busca de Mesa (Ajustada para o fluxo de Cliente)
+export const handleSearchTable = async (isClientFlow = false) => {
 //... (mantém a mesma)
     const searchTableInput = document.getElementById('searchTableInput');
     const tableNumber = searchTableInput.value.trim();
@@ -230,20 +230,25 @@ export const handleSearchTable = async () => {
     const docSnap = await getDoc(tableRef);
 
     if (docSnap.exists() && docSnap.data().status === 'open') {
-        openTableForOrder(tableNumber); 
+        openTableForOrder(tableNumber, isClientFlow); // Passa a flag para o próximo passo
         searchTableInput.value = '';
     } else {
         alert(`A Mesa ${tableNumber} não está aberta.`);
     }
 };
 
-export const openTableForOrder = async (tableId) => {
+export const openTableForOrder = async (tableId, isClientFlow = false) => {
     // Garante que o Menu esteja carregado (dependência para o Painel 2)
     await fetchWooCommerceProducts(renderMenu); 
     
     // Navegação e Carregamento (Item 2)
     loadTableOrder(tableId); // Inicia o listener e atualiza o estado
-    goToScreen('orderScreen'); 
+    
+    if (isClientFlow) {
+        goToScreen('clientOrderScreen'); // Cliente vai para sua tela dedicada
+    } else {
+        goToScreen('orderScreen'); // Staff vai para a tela de pedidos normal
+    }
 };
 
 export const loadTableOrder = (tableId) => {
