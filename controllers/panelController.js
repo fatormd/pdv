@@ -1,6 +1,6 @@
 // --- CONTROLLERS/PANELCONTROLLER.JS ---
 import { getTablesCollectionRef, getTableDocRef, auth } from "../services/firebaseService.js";
-import { query, where, orderBy, onSnapshot, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { query, where, orderBy, onSnapshot, getDoc, setDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { formatCurrency, formatElapsedTime } from "../utils.js";
 // CRITICAL FIX: Adicionado setCurrentTable para controle de estado
 import { goToScreen, currentTableId, selectedItems, unsubscribeTable, currentOrderSnapshot, setCurrentTable } from "../app.js"; 
@@ -35,7 +35,15 @@ export const renderTableFilters = () => {
     sectorInput.innerHTML = '<option value="" disabled selected>Setor</option>' + 
                             SECTORS.filter(s => s !== 'Todos')
                                    .map(s => `<option value="${s}">${s}</option>`).join('');
-
+    
+    // Adiciona as opções de setor ao modal de Transferência (index.html)
+    const newTableSectorInput = document.getElementById('newTableSector');
+    if (newTableSectorInput) {
+        newTableSectorInput.innerHTML = '<option value="" disabled selected>Setor</option>' + 
+                                SECTORS.filter(s => s !== 'Todos')
+                                       .map(s => `<option value="${s}">${s}</option>`).join('');
+    }
+    
     sectorFiltersContainer.addEventListener('click', (e) => {
         const btn = e.target.closest('.sector-btn');
         if (btn) {
@@ -242,3 +250,74 @@ export const loadTableOrder = (tableId) => {
     // CRITICAL FIX: Chama a função central que define o estado global (currentTableId) e inicia o listener
     setCurrentTable(tableId); 
 };
+
+
+// NOVO: Lógica Central para Transferência de Itens para Outra Mesa
+export const handleTableTransferConfirmed = async (originTableId, targetTableId, itemsToTransfer, newDiners = 0, newSector = '') => {
+    if (!originTableId || !targetTableId || itemsToTransfer.length === 0) {
+        alert("Erro: Dados de transferência incompletos.");
+        return;
+    }
+
+    const originTableRef = getTableDocRef(originTableId);
+    const targetTableRef = getTableDocRef(targetTableId);
+
+    try {
+        const targetSnap = await getDoc(targetTableRef);
+        const targetTableIsOpen = targetSnap.exists() && targetSnap.data().status === 'open';
+
+        // 1. Abertura da Mesa de Destino (se necessário)
+        if (!targetTableIsOpen) {
+            if (!newDiners || !newSector) {
+                alert("Erro: A mesa de destino está fechada. A quantidade de pessoas e o setor são obrigatórios para abri-la.");
+                return;
+            }
+
+            await setDoc(targetTableRef, {
+                tableNumber: parseInt(targetTableId),
+                diners: newDiners,
+                sector: newSector,
+                status: 'open',
+                createdAt: serverTimestamp(),
+                total: 0,
+                sentItems: [],
+                payments: [],
+                serviceTaxApplied: true,
+                selectedItems: []
+            });
+        }
+
+        // 2. Transferência dos Itens
+        const transferValue = itemsToTransfer.reduce((sum, item) => sum + item.price, 0);
+
+        // a) Remove os itens da mesa de origem
+        const originItemsAfterTransfer = currentOrderSnapshot.sentItems.filter(item => {
+            const itemKey = item.orderId + item.sentAt;
+            const isItemToTransfer = itemsToTransfer.some(tItem => (tItem.orderId + tItem.sentAt) === itemKey);
+            return !isItemToTransfer;
+        });
+
+        await updateDoc(originTableRef, {
+            sentItems: originItemsAfterTransfer,
+            total: (currentOrderSnapshot.total || 0) - transferValue,
+        });
+
+        // b) Adiciona os itens à mesa de destino
+        const targetData = targetTableIsOpen ? targetSnap.data() : { sentItems: [], total: 0 };
+        
+        await updateDoc(targetTableRef, {
+            sentItems: [...(targetData.sentItems || []), ...itemsToTransfer],
+            total: targetData.total + transferValue,
+        });
+
+        alert(`Sucesso! ${itemsToTransfer.length} item(s) transferidos da Mesa ${originTableId} para a Mesa ${targetTableId}.`);
+
+        // Volta para o painel de mesas após a operação
+        goToScreen('panelScreen');
+
+    } catch (e) {
+        console.error("Erro na transferência de mesa:", e);
+        alert("Falha na transferência dos itens.");
+    }
+};
+window.handleTableTransferConfirmed = handleTableTransferConfirmed;
