@@ -256,8 +256,11 @@ window.handleAddSplitAccount = handleAddSplitAccount; // Exposto ao escopo globa
 
 // Implementar no futuro: Lógica para mover itens para as subcontas.
 const openSplitTransferModal = (targetKey, mode, itemsToTransfer = null) => {
-    if (itemsToTransfer) {
-        alert(`Transferência de ${itemsToTransfer.length} itens para ${targetKey} em desenvolvimento.`);
+    const itemCount = itemsToTransfer ? itemsToTransfer.length : 0;
+    
+    if (itemsToTransfer && mode === 'move_out') {
+        // CORREÇÃO DO ALERTA: Mensagem mais clara sobre o próximo passo
+        alert(`Pronto para transferir ${itemCount} item(s). Agora deve abrir o modal de seleção de Contas de Divisão (Split) ou criação de nova conta. (Em desenvolvimento)`);
     } else {
         alert(`Gerenciamento da conta ${targetKey} no modo ${mode} (Em desenvolvimento).`);
     }
