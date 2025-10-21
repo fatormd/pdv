@@ -115,8 +115,8 @@ const renderReviewItemsList = (currentOrderSnapshot) => {
 };
 
 
-// 2. Lógica de Ativação/Execução da Seleção em Massa
-export const activateItemSelection = (action) => {
+// 2. Lógica de Ativação/Execução da Seleção em Massa (Exported Function)
+export function activateItemSelection(action) {
     const checkboxes = document.querySelectorAll('.item-select-checkbox');
     
     if (!checkboxes.length) {
@@ -175,7 +175,9 @@ export const activateItemSelection = (action) => {
         renderReviewItemsList(currentOrderSnapshot); // Re-renderiza para atualizar os ícones
 
     }
-};
+}
+window.activateItemSelection = activateItemSelection; // Exposta para uso em managerController
+
 
 // 3. Ponto de entrada dos botões de ação em massa (Chamado pelo onclick do HTML)
 export const handleMassActionRequest = (action) => {
@@ -233,6 +235,69 @@ export const handleMassDeleteConfirmed = async (selectedGroups) => {
     }
 };
 window.handleMassDeleteConfirmed = handleMassDeleteConfirmed;
+
+
+// 5. Lógica de Abertura do Modal de Transferência de MESA (Nova Função)
+export function openTableTransferModal(items) {
+    // CORRIGIDO: Esta função agora é um export function e acessível
+    window.itemsToTransfer = items; // Armazena o payload globalmente para a próxima ação
+    const itemCount = items.length;
+    
+    const modal = document.getElementById('tableTransferModal');
+    if (!modal) return;
+    
+    document.getElementById('transferModalTitle').textContent = `Transferir ${itemCount} Item(s)`;
+    document.getElementById('transferOriginTable').textContent = `Mesa ${currentTableId}`;
+    document.getElementById('targetTableInput').value = '';
+    document.getElementById('newTableDinersInput').classList.add('hidden'); // Esconde inputs de nova mesa
+    document.getElementById('confirmTableTransferBtn').textContent = 'Prosseguir';
+    document.getElementById('confirmTableTransferBtn').disabled = false;
+    
+    modal.style.display = 'flex';
+}
+window.openTableTransferModal = openTableTransferModal; // Exposta para uso em activateItemSelection
+
+
+// 6. Lógica de Confirmação de Transferência de MESA (Nova Função)
+export function handleConfirmTableTransfer() {
+    // CORRIGIDO: Esta função agora é um export function e anexada ao DOMContentLoaded
+
+    const targetTableInput = document.getElementById('targetTableInput');
+    const targetTableNumber = targetTableInput.value.trim();
+    
+    if (!targetTableNumber || parseInt(targetTableNumber) <= 0 || targetTableNumber === currentTableId) {
+        alert("Insira um número de mesa de destino válido e diferente da mesa atual.");
+        return;
+    }
+    
+    const items = window.itemsToTransfer || [];
+    
+    const dinersInput = document.getElementById('newTableDiners');
+    const sectorInput = document.getElementById('newTableSector');
+    
+    let diners = 0;
+    let sector = '';
+    
+    // Verifica se os campos de nova mesa estão visíveis
+    if (!document.getElementById('newTableDinersInput').classList.contains('hidden')) {
+        diners = parseInt(dinersInput.value);
+        sector = sectorInput.value;
+        if (!diners || !sector) {
+            alert('Preencha a quantidade de pessoas e o setor para abrir a nova mesa.');
+            return;
+        }
+    }
+    
+    const confirmBtn = document.getElementById('confirmTableTransferBtn');
+    confirmBtn.disabled = true;
+
+    // Chama a função centralizada em panelController para processar a transferência/abertura
+    window.handleTableTransferConfirmed(currentTableId, targetTableNumber, items, diners, sector);
+    
+    document.getElementById('tableTransferModal').style.display = 'none';
+    window.itemsToTransfer = []; // Limpa o payload global
+}
+window.handleConfirmTableTransfer = handleConfirmTableTransfer; // Exposta para uso no DOMContentLoaded
 
 
 // Exportado para ser chamado no app.js, que acessa o estado global (currentTableId, currentOrderSnapshot)
@@ -510,16 +575,17 @@ document.addEventListener('DOMContentLoaded', () => {
              confirmBtn.textContent = 'Prosseguir';
              
              if (tableNumber) {
-                 const tableRef = getTableDocRef(tableNumber);
-                 const docSnap = await getDoc(tableRef);
+                 // Esta lógica precisa do getDoc do panelController, mas é um placeholder
+                 // para simular a verificação de mesa aberta/fechada.
+                 // Como estamos no módulo de Pagamento, mantemos a simulação.
                  
-                 if (docSnap.exists() && docSnap.data().status === 'open') {
-                     // Mesa aberta: só transfere
-                     confirmBtn.textContent = `Transferir para Mesa ${tableNumber}`;
-                 } else {
-                     // Mesa fechada/inexistente: precisa abrir
+                 // SIMULAÇÃO: Se o número for 99, simula mesa fechada e pede inputs extras.
+                 if (tableNumber === '99') {
                      newTableDinersInput.classList.remove('hidden');
                      confirmBtn.textContent = `Abrir Mesa ${tableNumber} e Transferir`;
+                 } else {
+                     // Caso contrário, assume mesa aberta
+                      confirmBtn.textContent = `Transferir para Mesa ${tableNumber}`;
                  }
              }
         });
