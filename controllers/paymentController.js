@@ -6,8 +6,9 @@ import { updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1
 import { openManagerAuthModal } from "./managerController.js"; // Importado para proteção de exclusão
 
 
-// Variável para manter o item selecionado para ação
-let selectedItemForAction = null; 
+// Variáveis de estado do módulo
+let currentPaymentMethod = 'Dinheiro'; // Padrão
+let isMassSelectionActive = false; // NOVO: Estado para controle do modo de seleção
 
 // Função para calcular o total geral (subtotal + serviço)
 const calculateTotal = (subtotal, applyServiceTax) => {
@@ -23,7 +24,7 @@ const updateText = (id, value) => {
     if (el) el.textContent = value;
 };
 
-// Lógica de Agrupamento de Itens (Reutilizada e aprimorada)
+// Lógica de Agrupamento de Itens (agrupa itens idênticos para exibição)
 const groupMainAccountItems = (currentOrderSnapshot) => {
     const sentItems = currentOrderSnapshot.sentItems || [];
     
@@ -37,6 +38,7 @@ const groupMainAccountItems = (currentOrderSnapshot) => {
 
     // Agrupamento
     return mainAccountItems.reduce((acc, item) => {
+        // Chave baseada em Nome e Observação (para agrupar 5x X-Bacon c/ Sem Cebola)
         const groupKey = `${item.name}-${item.note || ''}`;
 
         if (!acc[groupKey]) {
@@ -50,94 +52,7 @@ const groupMainAccountItems = (currentOrderSnapshot) => {
 };
 
 
-// Implementação das Ações do Item (Item 2)
-// Função para abrir o modal de ações do item (view, delete, transfer)
-export const openItemActionModal = (groupKey) => {
-    if (!currentOrderSnapshot) return;
-
-    const groupedItems = groupMainAccountItems(currentOrderSnapshot);
-    selectedItemForAction = groupedItems[groupKey];
-    
-    if (!selectedItemForAction) {
-        alert('Grupo de item não encontrado.');
-        return;
-    }
-    
-    const modal = document.getElementById('itemActionModal');
-    if (modal) {
-        document.getElementById('itemActionName').textContent = selectedItemForAction.items[0].name;
-        document.getElementById('itemActionGroupNote').textContent = selectedItemForAction.items[0].note || 'Sem observação';
-        document.getElementById('itemActionQuantity').textContent = `${selectedItemForAction.totalCount}x`;
-        document.getElementById('itemActionTotal').textContent = formatCurrency(selectedItemForAction.totalValue);
-        
-        modal.dataset.groupKey = groupKey;
-        modal.style.display = 'flex';
-    }
-};
-window.openItemActionModal = openItemActionModal;
-
-
-// Ação de Exclusão: Solicitação de Gerente
-export const handleItemDeleteRequest = () => {
-    const groupKey = document.getElementById('itemActionModal').dataset.groupKey;
-    if (groupKey && selectedItemForAction) {
-        // Envia a ação para autenticação do gerente
-        openManagerAuthModal('deleteReviewItem', groupKey);
-    }
-};
-window.handleItemDeleteRequest = handleItemDeleteRequest;
-
-
-// Ação de Exclusão: Confirmação e Execução
-export const handleItemDeleteConfirmed = async (groupKey) => {
-    // Chamado após a autenticação do gerente
-    const modal = document.getElementById('itemActionModal');
-    if (modal) modal.style.display = 'none';
-
-    if (!groupKey || !currentTableId || !currentOrderSnapshot || !selectedItemForAction) return;
-    
-    try {
-        const tableRef = getTableDocRef(currentTableId);
-        
-        const valueRemoved = selectedItemForAction.totalValue;
-
-        // 1. Cria a nova lista de sentItems, excluindo os itens selecionados (melhor abordagem do que arrayRemove)
-        const sentItemsAfterRemoval = currentOrderSnapshot.sentItems.filter(item => {
-             const itemGroupKey = `${item.name}-${item.note || ''}`;
-             return itemGroupKey !== groupKey;
-        });
-
-        // 2. Atualiza o Firebase
-        await updateDoc(tableRef, {
-            sentItems: sentItemsAfterRemoval,
-            total: (currentOrderSnapshot.total || 0) - valueRemoved
-        });
-        
-        alert(`Grupo de itens (${selectedItemForAction.items[0].name} - ${selectedItemForAction.totalCount}x) removido da conta.`);
-        
-        // Limpa o estado
-        selectedItemForAction = null;
-        
-    } catch (e) {
-        console.error("Erro ao remover item da conta:", e);
-        alert("Falha ao remover item da conta.");
-    }
-};
-window.handleItemDeleteConfirmed = handleItemDeleteConfirmed;
-
-
-// Ação de Transferência: Placeholder
-export const handleItemTransferRequest = () => {
-    const groupKey = document.getElementById('itemActionModal').dataset.groupKey;
-    if (groupKey && selectedItemForAction) {
-        // Usa o placeholder da função de transferência (openSplitTransferModal)
-        openSplitTransferModal('main', 'move_out', selectedItemForAction.items);
-    }
-};
-window.handleItemTransferRequest = handleItemTransferRequest;
-
-
-// 5. Renderiza a lista de itens da conta (Item 1, 2)
+// 1. Renderiza a lista de itens da conta (Com Checkboxes desabilitadas por padrão)
 const renderReviewItemsList = (currentOrderSnapshot) => {
     const listEl = document.getElementById('reviewItemsList');
     if (!listEl) return;
@@ -146,6 +61,13 @@ const renderReviewItemsList = (currentOrderSnapshot) => {
 
     const mainAccountItemsCount = Object.values(groupedItems).reduce((sum, group) => sum + group.totalCount, 0);
 
+    // Atualiza os ícones para refletir o estado de seleção
+    document.getElementById('itemMassTransferBtn').classList.toggle('text-yellow-600', isMassSelectionActive);
+    document.getElementById('itemMassDeleteBtn').classList.toggle('text-red-600', isMassSelectionActive);
+    document.getElementById('itemMassTransferBtn').classList.toggle('text-gray-500', !isMassSelectionActive);
+    document.getElementById('itemMassDeleteBtn').classList.toggle('text-gray-500', !isMassSelectionActive);
+
+
     if (mainAccountItemsCount === 0) {
         listEl.innerHTML = `<div class="text-sm text-gray-500 italic p-2">Nenhum item restante na conta principal.</div>`;
         return;
@@ -153,24 +75,31 @@ const renderReviewItemsList = (currentOrderSnapshot) => {
 
     const listHtml = Object.values(groupedItems).map(group => {
         const firstItem = group.items[0];
-        const groupKey = group.groupKey; 
+        const groupKey = group.groupKey;
+        // Chave de identificação única do grupo para a ação em massa (contém as chaves dos itens)
+        const massItemKeys = group.items.map(item => `${item.orderId}_${item.sentAt}`).join(','); 
         
+        // Determina se a checkbox deve estar habilitada
+        const disabledAttr = isMassSelectionActive ? '' : 'disabled';
+        
+        // Mantém o estado visual da checkbox (importante ao re-renderizar no modo de seleção)
+        const checkedAttr = document.querySelector(`.item-select-checkbox[data-group-key="${groupKey}"]:checked`) ? 'checked' : '';
+
+
         return `
             <div class="flex items-start justify-between py-1 border-b border-gray-100 hover:bg-gray-50 transition">
+                
+                <input type="checkbox" class="item-select-checkbox mt-1.5 ml-1 mr-2" 
+                       data-group-key="${groupKey}" 
+                       data-item-keys="${massItemKeys}"
+                       ${disabledAttr} ${checkedAttr}>
                 
                 <div class="flex flex-col flex-grow min-w-0 pr-2">
                     <span class="text-sm font-semibold text-gray-800">${firstItem.name} (${group.totalCount}x)</span>
                     ${firstItem.note ? `<span class="text-xs text-gray-500 truncate">(${firstItem.note})</span>` : ''}
                 </div>
                 
-                <div class="flex items-center space-x-2">
-                    <span class="text-sm font-bold text-gray-700">${formatCurrency(group.totalValue)}</span>
-                    <button class="item-action-btn text-gray-500 hover:text-indigo-600 transition p-1" 
-                            onclick="window.openItemActionModal('${groupKey}')"
-                            title="Ações do Item">
-                        <i class="fas fa-ellipsis-v text-sm"></i>
-                    </button>
-                </div>
+                <span class="text-sm font-bold text-gray-700">${formatCurrency(group.totalValue)}</span>
             </div>
         `;
     }).join('');
@@ -179,145 +108,124 @@ const renderReviewItemsList = (currentOrderSnapshot) => {
         <div class="border p-2 rounded-lg bg-gray-50 max-h-48 overflow-y-auto">
             ${listHtml}
         </div>
-        <p class="text-sm text-gray-500 italic p-2 mt-2">Total de ${mainAccountItemsCount} itens na conta principal. Clique nos pontos (...) para ações.</p>
+        <p class="text-sm text-gray-500 italic p-2 mt-2">Total de ${mainAccountItemsCount} itens na conta principal. </p>
     `;
 };
 
 
-// NOVO: Renderiza os botões/cards de divisão de conta (Painel 3)
-export const renderPaymentSplits = (currentTableId, currentOrderSnapshot) => {
-    const paymentSplitsContainer = document.getElementById('paymentSplitsContainer');
-    const addSplitAccountBtn = document.getElementById('addSplitAccountBtn');
-    if (!paymentSplitsContainer || !currentOrderSnapshot) return;
-
-    const sentItems = currentOrderSnapshot.sentItems || [];
-    const splits = currentOrderSnapshot.splits || {};
+// 2. Lógica de Ativação/Execução da Seleção em Massa
+export const activateItemSelection = (action) => {
+    const checkboxes = document.querySelectorAll('.item-select-checkbox');
     
-    let totalItemsInSplits = 0;
-    Object.values(splits).forEach(split => totalItemsInSplits += split.items.reduce((sum, item) => sum + item.price, 0));
-
-    const totalSentItems = sentItems.reduce((sum, item) => sum + item.price, 0);
-    const totalInMainAccount = Math.max(0, totalSentItems - totalItemsInSplits);
-    const itemsRemaining = sentItems.length - Object.values(splits).reduce((c, s) => c + (s.items || []).length, 0);
-    
-    if (addSplitAccountBtn) {
-        addSplitAccountBtn.disabled = userRole === 'client' || itemsRemaining === 0;
+    if (!checkboxes.length) {
+        alert("Não há itens para selecionar na conta.");
+        return;
     }
 
-    paymentSplitsContainer.innerHTML = '';
-    let accountCounter = 0;
-    
-    // 1. Renderiza a Conta Principal (Restante)
-    paymentSplitsContainer.innerHTML += `
-        <div class="bg-gray-200 p-3 rounded-lg border border-indigo-400">
-            <h4 class="font-bold text-lg flex justify-between items-center text-indigo-800">
-                <span>Conta Principal (Restante)</span>
-                <span class="text-xl">${formatCurrency(totalInMainAccount)}</span>
-            </h4>
-            <p class="text-sm text-gray-700 mt-1">
-                Itens restantes a pagar: ${itemsRemaining}
-            </p>
-            <button class="text-xs mt-2 px-3 py-1 bg-yellow-500 text-white rounded-full hover:bg-yellow-600 transition disabled:opacity-50" 
-                    onclick="window.openSplitTransferModal('main', 'move_out')" ${userRole === 'client' || totalInMainAccount === 0 ? 'disabled' : ''}>
-                <i class="fas fa-cut"></i> Mover Itens
-            </button>
-        </div>
-    `;
-
-    // 2. Renderiza as Contas de Divisão
-    Object.keys(splits).forEach(splitKey => {
-        const split = splits[splitKey];
-        accountCounter++;
-        const splitTotal = split.total || 0;
-        const splitPaymentsTotal = split.payments ? split.payments.reduce((sum, p) => sum + p.value, 0) : 0;
-        const isPaid = splitTotal <= splitPaymentsTotal;
+    if (!isMassSelectionActive) {
+        // --- MODO DE ATIVAÇÃO ---
+        isMassSelectionActive = true;
         
-        paymentSplitsContainer.innerHTML += `
-            <div class="bg-white p-3 rounded-lg border ${isPaid ? 'border-green-500' : 'border-red-500'} shadow">
-                <h4 class="font-bold text-lg flex justify-between items-center text-gray-800">
-                    <span>Conta ${accountCounter}</span>
-                    <span class="text-xl ${isPaid ? 'text-green-600' : 'text-red-600'}">${formatCurrency(splitTotal)}</span>
-                </h4>
-                <p class="text-sm text-gray-700 mt-1">
-                    Itens: ${split.items.length}. Pagamentos: ${formatCurrency(splitPaymentsTotal)}
-                </p>
-                <div class="flex space-x-2 mt-2">
-                    <button class="text-xs px-3 py-1 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition" 
-                            onclick="window.openPaymentModalForSplit('${splitKey}')" ${userRole === 'client' ? 'disabled' : ''}>
-                        <i class="fas fa-credit-card"></i> Pagar
-                    </button>
-                    <button class="text-xs px-3 py-1 bg-gray-500 text-white rounded-full hover:bg-gray-600 transition" 
-                            onclick="window.moveItemsToMainAccount('${splitKey}')" ${userRole === 'client' ? 'disabled' : ''}>
-                        <i class="fas fa-arrow-left"></i> Desfazer
-                    </button>
-                </div>
-            </div>
-        `;
-    });
-};
+        checkboxes.forEach(cb => { 
+            cb.disabled = false; 
+            cb.checked = false; 
+        });
+        
+        alert(`Modo de SELEÇÃO ATIVO para ${action.toUpperCase()}. Clique no ícone ${action.toUpperCase()} novamente para executar.`);
+        renderReviewItemsList(currentOrderSnapshot); // Re-renderiza para habilitar as checkboxes
 
+    } else {
+        // --- MODO DE EXECUÇÃO (2º Clique) ---
+        isMassSelectionActive = false;
+        
+        const selectedItemsGroups = Array.from(checkboxes)
+            .filter(cb => cb.checked)
+            .map(cb => ({ 
+                groupKey: cb.dataset.groupKey, 
+                itemKeys: cb.dataset.itemKeys.split(',') 
+            }));
 
-// Recalcula e renderiza o resumo de pagamento
-export const renderPaymentSummary = (currentTableId, currentOrderSnapshot) => {
-    if (!currentOrderSnapshot) return;
-
-    const tableData = currentOrderSnapshot;
-    const subtotal = tableData.total || 0; 
-    const payments = tableData.payments || [];
-    const currentPaymentsTotal = payments.reduce((sum, p) => sum + p.value, 0);
-
-    const serviceTaxApplied = tableData.serviceTaxApplied || false;
-
-    const { total: generalTotal, serviceValue } = calculateTotal(subtotal, serviceTaxApplied);
-    
-    const diners = parseInt(document.getElementById('dinersSplitInput')?.value) || 1;
-    const valuePerDiner = generalTotal / diners;
-
-    const remainingBalance = generalTotal - currentPaymentsTotal;
-    
-    // Atualiza UI
-    updateText('payment-table-number', `Mesa ${currentTableId}`);
-    updateText('orderSubtotalDisplayPayment', formatCurrency(subtotal));
-    updateText('orderServiceTaxDisplayPayment', formatCurrency(serviceValue));
-    updateText('orderTotalDisplayPayment', formatCurrency(generalTotal));
-    updateText('valuePerDinerDisplay', formatCurrency(valuePerDiner));
-    
-    // Valor Restante
-    const remainingBalanceDisplay = document.getElementById('remainingBalanceDisplay');
-    if (remainingBalanceDisplay) {
-        remainingBalanceDisplay.textContent = formatCurrency(Math.abs(remainingBalance));
-        remainingBalanceDisplay.classList.remove('text-red-600', 'text-green-600', 'text-gray-800');
-        if (remainingBalance > 0.01) {
-            remainingBalanceDisplay.classList.add('text-red-600'); 
-        } else if (remainingBalance < -0.01) {
-            remainingBalanceDisplay.classList.add('text-green-600'); 
-            remainingBalanceDisplay.textContent = `TROCO: ${formatCurrency(Math.abs(remainingBalance))}`;
-        } else {
-            remainingBalanceDisplay.classList.add('text-gray-800'); 
+        // Desativa o modo de seleção e limpa visualmente
+        checkboxes.forEach(cb => { cb.disabled = true; cb.checked = false; });
+        
+        if (selectedItemsGroups.length === 0) {
+            alert("Nenhum item selecionado. Modo de seleção desativado.");
+            renderReviewItemsList(currentOrderSnapshot); // Re-renderiza para atualizar os ícones
+            return;
         }
+
+        if (action === 'transfer') {
+             // Lógica de Transferência de Itens
+             const allItemKeys = selectedItemsGroups.flatMap(group => group.itemKeys);
+             openSplitTransferModal('new_split', 'move_out', allItemKeys); 
+        } else if (action === 'delete') {
+             // Lógica de Exclusão de Itens
+             handleMassDeleteConfirmed(selectedItemsGroups);
+        }
+        renderReviewItemsList(currentOrderSnapshot); // Re-renderiza para atualizar os ícones
+
     }
-    
-    // Toggle do botão de serviço
-    const toggleServiceTaxBtn = document.getElementById('toggleServiceTaxBtn');
-    if (toggleServiceTaxBtn) {
-        toggleServiceTaxBtn.textContent = serviceTaxApplied ? 'Remover' : 'Aplicar';
-        toggleServiceTaxBtn.classList.toggle('bg-green-600', serviceTaxApplied);
-        toggleServiceTaxBtn.classList.toggle('bg-red-600', !serviceTaxApplied);
-    }
-    
-    // Habilita/Desabilita Finalizar
-    const finalizeOrderBtn = document.getElementById('finalizeOrderBtn');
-    if (finalizeOrderBtn) {
-        const canFinalize = remainingBalance <= 0.01 && currentPaymentsTotal > 0;
-        finalizeOrderBtn.disabled = !canFinalize;
-    }
-    
-    // Item 1: NOVO: Renderiza a lista de itens da conta (agora no topo)
-    renderReviewItemsList(currentOrderSnapshot);
-    
-    // NOVO: Renderiza os botões/cards de divisão
-    renderPaymentSplits(currentTableId, currentOrderSnapshot);
 };
+
+// 3. Ponto de entrada dos botões de ação em massa (Chamado pelo onclick do HTML)
+export const handleMassActionRequest = (action) => {
+    // Se a seleção estiver ativa, executa a ação imediatamente (sem senha, o gerente já inseriu a senha ou o usuário está no 2º clique)
+    if (isMassSelectionActive) {
+        activateItemSelection(action);
+        return;
+    }
+
+    // Se o modo estiver inativo, requer senha para ATIVAR o modo de seleção
+    if (action === 'delete') {
+        openManagerAuthModal('openMassDelete', action);
+    } else if (action === 'transfer') {
+        openManagerAuthModal('openMassTransfer', action);
+    }
+};
+window.handleMassActionRequest = handleMassActionRequest;
+
+
+// 4. Exclusão em Massa (Execução após a senha)
+export const handleMassDeleteConfirmed = async (selectedGroups) => {
+    if (!currentTableId || !currentOrderSnapshot || selectedGroups.length === 0) return;
+    
+    try {
+        const tableRef = getTableDocRef(currentTableId);
+        
+        let valueRemoved = 0;
+        const groupKeysToRemove = selectedGroups.map(g => g.groupKey);
+        
+        // Encontra o valor total a ser removido (usando a função de agrupamento para obter os valores)
+        const groupedItems = groupMainAccountItems(currentOrderSnapshot);
+        groupKeysToRemove.forEach(key => {
+            if (groupedItems[key]) {
+                valueRemoved += groupedItems[key].totalValue;
+            }
+        });
+
+        // Cria a nova lista de sentItems, excluindo os itens dos grupos selecionados
+        const sentItemsAfterRemoval = currentOrderSnapshot.sentItems.filter(item => {
+             const itemGroupKey = `${item.name}-${item.note || ''}`;
+             return !groupKeysToRemove.includes(itemGroupKey);
+        });
+
+        // Atualiza o Firebase
+        await updateDoc(tableRef, {
+            sentItems: sentItemsAfterRemoval,
+            total: (currentOrderSnapshot.total || 0) - valueRemoved
+        });
+        
+        alert(`Total de ${selectedGroups.length} grupos (${selectedGroups.flatMap(g => g.itemKeys).length} itens) removidos da conta. Valor: ${formatCurrency(valueRemoved)}.`);
+        
+    } catch (e) {
+        console.error("Erro ao remover itens em massa:", e);
+        alert("Falha ao remover itens em massa da conta.");
+    }
+};
+window.handleMassDeleteConfirmed = handleMassDeleteConfirmed;
+
+
+// ... (Funções de Split e Summary permanecem)
 
 
 // Exportado para ser chamado no app.js, que acessa o estado global (currentTableId, currentOrderSnapshot)
@@ -402,18 +310,4 @@ document.addEventListener('DOMContentLoaded', () => {
     if (finalizeOrderBtn) {
         finalizeOrderBtn.addEventListener('click', handleFinalizeOrder);
     }
-    
-    // Listeners do Modal de Ação do Item
-    const itemActionDeleteBtn = document.getElementById('itemActionDeleteBtn');
-    if (itemActionDeleteBtn) itemActionDeleteBtn.addEventListener('click', handleItemDeleteRequest);
-
-    const itemActionTransferBtn = document.getElementById('itemActionTransferBtn');
-    if (itemActionTransferBtn) itemActionTransferBtn.addEventListener('click', handleItemTransferRequest);
-    
-    const itemActionCloseBtn = document.getElementById('itemActionCloseBtn');
-    if (itemActionCloseBtn) itemActionCloseBtn.addEventListener('click', () => {
-        document.getElementById('itemActionModal').style.display = 'none';
-        selectedItemForAction = null;
-    });
-
 });
