@@ -81,14 +81,33 @@ const renderTables = (docs) => {
         if (table.status === 'open') {
             count++;
             const total = table.total || 0;
-            const cardColor = total > 0 ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200';
+            
+            // NOVO: Lógica de Notificação do Cliente
+            const isClientPending = table.clientOrderPending || false; 
+            
+            let cardColor = total > 0 ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200';
+            let bellIconHtml = '';
+            let attentionIconHtml = '';
+            
+            if (isClientPending) {
+                // Modo Noturno/Escuro e Sino (usando indigo-900 e amarelo)
+                cardColor = 'bg-indigo-900 text-white hover:bg-indigo-800 border-2 border-yellow-400'; 
+                bellIconHtml = `<i class="fas fa-bell attention-icon text-yellow-400" title="Pedido Novo de Cliente"></i>`;
+            }
             
             const hasAguardandoItem = (table.selectedItems || []).some(item => 
                 item.note && item.note.toLowerCase().includes('espera')
             );
-            const attentionIconHtml = hasAguardandoItem 
-                ? `<i class="fas fa-exclamation-triangle attention-icon" title="Itens em Espera"></i>` 
-                : '';
+            
+            // A prioridade de ícone é: Sino > Atenção Normal
+            if (!isClientPending) {
+                attentionIconHtml = hasAguardandoItem 
+                    ? `<i class="fas fa-exclamation-triangle attention-icon" title="Itens em Espera"></i>` 
+                    : '';
+            } else {
+                 attentionIconHtml = bellIconHtml;
+            }
+
 
             const lastSentAt = table.lastKdsSentAt?.toMillis() || null;
             const elapsedTime = lastSentAt ? formatElapsedTime(lastSentAt) : null;
@@ -112,7 +131,7 @@ const renderTables = (docs) => {
 
             const cardHtml = `
                 <div class="table-card-panel ${cardColor} shadow-md transition-colors duration-200 relative" data-table-id="${tableId}">
-                    ${attentionIconHtml}
+                    ${attentionIconHtml} 
                     ${statusIconHtml} 
                     <h3 class="font-bold text-2xl">Mesa ${table.tableNumber}</h3>
                     ${clientInfo}
@@ -232,6 +251,11 @@ export const handleSearchTable = async (isClientFlow = false) => {
     if (docSnap.exists() && docSnap.data().status === 'open') {
         openTableForOrder(tableNumber, isClientFlow); // Passa a flag para o próximo passo
         searchTableInput.value = '';
+        // Após o sucesso, remove o input de busca para evitar nova digitação
+        if (isClientFlow) {
+            searchTableInput.style.display = 'none';
+            document.getElementById('searchTableBtn').style.display = 'none';
+        }
     } else {
         alert(`A Mesa ${tableNumber} não está aberta.`);
     }
