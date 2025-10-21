@@ -9,8 +9,7 @@ import { fetchWooCommerceProducts, fetchWooCommerceCategories } from './services
 import { loadOpenTables, renderTableFilters, handleAbrirMesa, loadTableOrder, handleSearchTable } from './controllers/panelController.js';
 import { renderMenu, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity } from './controllers/orderController.js';
 import { openManagerAuthModal } from './controllers/managerController.js';
-import { renderPaymentSummary } from './controllers/paymentController.js'; 
-
+import { renderPaymentSummary } from './controllers/paymentController.js'; // CORRIGIDO: Agora a função está exportada
 
 // --- VARIÁVEIS DE ESTADO GLOBAL ---
 export const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2, 'managerScreen': 3 };
