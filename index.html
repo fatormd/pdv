@@ -398,32 +398,6 @@
     
     <div id="customerRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         </div>
-        
-    <div id="tableTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
-             <h3 class="text-xl font-bold mb-4 text-indigo-700" id="transferModalTitle">Transferir 1 Item(s)</h3>
-             <p class="text-sm text-gray-600 mb-4">Mesa de Origem: <span id="transferOriginTable" class="font-semibold">Mesa N/A</span></p>
-
-             <input type="number" id="targetTableInput" placeholder="Nº da Mesa de Destino" class="w-full p-3 mb-3 input-pdv border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
-             
-             <div id="newTableDinersInput" class="flex space-x-3 mb-4 hidden">
-                 <input type="number" id="newTableDiners" placeholder="Pessoas" class="w-1/2 input-pdv border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" min="1" required>
-                 <select id="newTableSector" class="w-1/2 p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base" required>
-                     <option value="" disabled selected>Setor</option>
-                     </select>
-             </div>
-             
-             <button id="confirmTableTransferBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition duration-150 text-base disabled:opacity-50">
-                 Prosseguir
-             </button>
-             
-             <div class="flex justify-end mt-4">
-                 <button class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-base" 
-                         onclick="document.getElementById('tableTransferModal').style.display='none'">Cancelar</button>
-             </div>
-         </div>
-    </div>
-
 
     <div id="reportsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         </div>
