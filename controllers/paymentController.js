@@ -364,7 +364,7 @@ export const handleSearchCustomer = async () => {
 window.handleSearchCustomer = handleSearchCustomer;
 
 
-// Implementar no futuro: Lógica para mover itens para as subcontas.
+// Implementar no futuro: Lógica para mover itens para as subcontas. (CORRIGIDO: Removida a declaração duplicada)
 const openSplitTransferModal = (targetKey, mode, selectedItemsKeys = null) => {
     if (selectedItemsKeys) {
         alert(`Transferência de ${selectedItemsKeys.length} itens do grupo para ${targetKey} em desenvolvimento.`);
