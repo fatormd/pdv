@@ -14,7 +14,7 @@ body { overflow-x: hidden; }
 /* Contêiner principal para transição de telas */
 #appContainer {
     display: flex;
-    /* CORREÇÃO: 5 TELAS (Client Order, Panel, Order, Payment, Manager) */
+    /* CORREÇÃO FINAL: 5 TELAS */
     width: 500vw; 
     transition: transform 0.3s ease-out; 
     min-height: calc(100vh - 56px); /* Altura total - altura do header */
