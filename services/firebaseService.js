@@ -2,7 +2,7 @@
 // Importa funções do Firebase Firestore e as exporta para uso nos Controllers
 import { collection, doc, updateDoc, arrayUnion, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-// Variáveis globais (exportadas para que o app.js possa defini-las)
+// Variáveis globais (exportadas para que o app.js possa definilas)
 export let db = null;
 export let auth = null;
 export let appId = null;
