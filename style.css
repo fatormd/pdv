@@ -14,14 +14,14 @@ body { overflow-x: hidden; }
 /* Contêiner principal para transição de telas */
 #appContainer {
     display: flex;
-    /* CORREÇÃO PARA 4 TELAS (Painel, Pedido, Pagamento, Gerente) */
-    width: 400vw; 
+    /* CORREÇÃO PARA 5 TELAS (Painel, Pedido, Pagamento, Gerente, Cliente) */
+    width: 500vw; 
     transition: transform 0.3s ease-out; 
     min-height: calc(100vh - 56px); /* Altura total - altura do header */
 }
 
 /* Cada tela ocupa 100vw */
-#panelScreen, #orderScreen, #paymentScreen, #managerScreen {
+#panelScreen, #orderScreen, #paymentScreen, #managerScreen, #clientOrderScreen {
     width: 100vw;
     max-width: 100%;
     flex-shrink: 0;
@@ -134,10 +134,24 @@ input:checked + .slider-obs {
 input:checked + .slider-obs:before {
   transform: translateX(22px);
 }
-/* Item 6: Ajuste de padding nos botões de pagamento */
-#paymentMethodButtons .payment-method-btn {
-    padding-top: 0.75rem; /* Aumenta o espaço vertical */
-    padding-bottom: 0.75rem;
+
+/* NOVO: REGRAS DE RESTRIÇÃO PARA CLIENTE (.client-mode) */
+
+/* 1. Ocultar Ações Gerenciais (Engrenagem) */
+body.client-mode #openManagerPanelBtn {
+    display: none !important;
+}
+
+/* 2. Ocultar botão Voltar na tela de pedidos do cliente */
+body.client-mode #backToPanelFromClientOrderBtn {
+    display: none !important;
+}
+
+/* 3. Ocultar UI de Staff no Painel de Mesas */
+body.client-mode #panelScreen .content-card:first-child, /* Abrir Nova Mesa */
+body.client-mode #sectorFilters, /* Filtros de Setor */
+body.client-mode #openTablesList /* Lista de Mesas */ {
+    display: none !important;
 }
 
 
