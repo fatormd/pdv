@@ -2,7 +2,7 @@
 import { goToScreen } from "../app.js";
 import { getProducts } from "../services/wooCommerceService.js";
 import { formatCurrency } from "../utils.js";
-import { handleItemDeleteConfirmed } from "./paymentController.js"; // Importado para confirmar a exclusão
+import { activateItemSelection, handleMassDeleteConfirmed } from "./paymentController.js"; // Importado
 
 
 // Credenciais Staff Centralizadas (copiadas do app.js)
@@ -63,8 +63,12 @@ const handleGerencialAction = (action, payload) => {
         case 'goToManagerPanel':
             goToScreen('managerScreen'); 
             break;
-        case 'deleteReviewItem': // NOVO: Ação para exclusão de item da conta
-            handleItemDeleteConfirmed(payload); 
+        case 'openMassDelete': // NOVO: Ativa o modo de seleção para exclusão
+        case 'openMassTransfer': // NOVO: Ativa o modo de seleção para transferência
+            activateItemSelection(payload); 
+            break;
+        case 'deleteReviewItem': // Mantido: Se a ação de exclusão individual for usada no futuro
+            handleMassDeleteConfirmed(payload); 
             break;
         case 'openProductManagement':
         case 'openCategoryManagement':
