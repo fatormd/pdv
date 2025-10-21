@@ -18,7 +18,7 @@ export const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
 
 // Credenciais Staff Centralizadas (para login unificado)
 const STAFF_CREDENTIALS = {
-    'agencia@fatormd.com': { password: '1', role: 'gerente', name: 'Fmd' }, 
+    'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' }, // CORRIGIDO: Senha atualizada para 1234 (conforme hint)
     'garcom@fator.com': { password: '1234', role: 'garcom', name: 'Mock Garçom' },
 };
 
@@ -46,7 +46,7 @@ const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
 let loginBtn = null; 
 let loginEmailInput = null; 
 let loginPasswordInput = null;
-let searchTableBtn = null; 
+let searchTableInput = null; // Renomeado para input
 
 
 // --- FUNÇÕES CORE E ROTIAMENTO ---
@@ -141,6 +141,7 @@ const handleStaffLogin = async () => {
     // Garante que os elementos foram carregados (fix para o erro de login)
     if (!loginBtn || !loginEmailInput || !loginPasswordInput) {
          console.error("Erro: Elementos de login não encontrados.");
+         alert("Erro interno: Elementos de login não carregados.");
          return;
     }
     
@@ -156,6 +157,7 @@ const handleStaffLogin = async () => {
         
         try {
             const authInstance = auth;
+            // Assinatura anônima para obter um user.uid do Firebase
             const userCredential = await signInAnonymously(authInstance); 
             userId = userCredential.user.uid; 
             
@@ -173,7 +175,7 @@ const handleStaffLogin = async () => {
             
         } catch (error) {
              console.error("Erro ao autenticar Staff (Firebase/Anônimo):", error);
-             alert("Autenticação local OK, mas falha no Firebase. Verifique a conexão.");
+             alert("Autenticação local OK, mas falha no Firebase. Verifique a configuração ou conexão.");
         }
     } else {
         alert('Credenciais inválidas. Verifique seu e-mail e senha.');
@@ -206,8 +208,8 @@ document.addEventListener('DOMContentLoaded', () => {
     loginBtn = document.getElementById('loginBtn');
     loginEmailInput = document.getElementById('loginEmail'); 
     loginPasswordInput = document.getElementById('loginPassword');
-    searchTableBtn = document.getElementById('searchTableBtn'); 
-
+    searchTableInput = document.getElementById('searchTableInput'); 
+    
     const firebaseConfig = JSON.parse(window.__firebase_config);
     const app = initializeApp(firebaseConfig); 
     const dbInstance = getFirestore(app);
@@ -216,6 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeFirebase(dbInstance, authInstance, window.__app_id || 'pdv_default_app'); 
 
     onAuthStateChanged(authInstance, (user) => {
+        // Se o Firebase não autenticar anonimamente (geralmente acontece no início ou após o logout), mostra o modal
         if (!user) {
             showLoginModal();
         } 
@@ -230,7 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
     const logoutBtnHeader = document.getElementById('logoutBtnHeader');
     const abrirMesaBtn = document.getElementById('abrirMesaBtn');
-    const searchTableBtn = document.getElementById('searchTableBtn');
+    const searchTableBtnTrigger = document.getElementById('searchTableBtn'); // O botão de busca
 
     if (openManagerPanelBtn) { 
         openManagerPanelBtn.addEventListener('click', () => {
@@ -243,8 +246,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (abrirMesaBtn) {
         abrirMesaBtn.addEventListener('click', handleAbrirMesa);
     }
-    if (searchTableBtn) {
-        searchTableBtn.addEventListener('click', handleSearchTable);
+    if (searchTableBtnTrigger) {
+        searchTableBtnTrigger.addEventListener('click', handleSearchTable);
     }
 
     // 3. Carrega UI Inicial
