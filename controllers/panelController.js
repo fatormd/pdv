@@ -20,7 +20,23 @@ export const renderTableFilters = () => {
 //... (mantém a mesma)
     const sectorFiltersContainer = document.getElementById('sectorFilters');
     const sectorInput = document.getElementById('sectorInput');
+    
+    // Elementos do Cliente (Restrição)
+    const abrirMesaCard = document.querySelector('#panelScreen .content-card:first-child');
+    const tableListTitle = document.querySelector('#panelScreen .space-y-3 h3');
+    
     if (!sectorFiltersContainer || !sectorInput) return;
+
+    // NOVO: Esconde elementos de Staff para o Cliente
+    if (userRole === 'client') {
+        if (abrirMesaCard) abrirMesaCard.style.display = 'none';
+        if (tableListTitle) tableListTitle.textContent = 'Minha Mesa (Busca Abaixo)';
+        // O restante dos filtros e lista de mesas é escondido via CSS (client-mode)
+    } else {
+        if (abrirMesaCard) abrirMesaCard.style.display = 'block';
+        if (tableListTitle) tableListTitle.textContent = 'Mesas Abertas';
+    }
+
 
     sectorFiltersContainer.innerHTML = '';
     SECTORS.forEach(sector => {
@@ -92,6 +108,7 @@ const renderTables = (docs) => {
             if (isClientPending) {
                 // Modo Noturno/Escuro e Sino (usando indigo-900 e amarelo)
                 cardColor = 'bg-indigo-900 text-white hover:bg-indigo-800 border-2 border-yellow-400'; 
+                // Ícone do sino
                 bellIconHtml = `<i class="fas fa-bell attention-icon text-yellow-400" title="Pedido Novo de Cliente"></i>`;
             }
             
@@ -100,12 +117,12 @@ const renderTables = (docs) => {
             );
             
             // A prioridade de ícone é: Sino > Atenção Normal
-            if (!isClientPending) {
-                attentionIconHtml = hasAguardandoItem 
+            if (isClientPending) {
+                 attentionIconHtml = bellIconHtml;
+            } else {
+                 attentionIconHtml = hasAguardandoItem 
                     ? `<i class="fas fa-exclamation-triangle attention-icon" title="Itens em Espera"></i>` 
                     : '';
-            } else {
-                 attentionIconHtml = bellIconHtml;
             }
 
 
@@ -238,6 +255,7 @@ export const handleAbrirMesa = async () => {
 export const handleSearchTable = async (isClientFlow = false) => {
 //... (mantém a mesma)
     const searchTableInput = document.getElementById('searchTableInput');
+    const searchTableBtn = document.getElementById('searchTableBtn');
     const tableNumber = searchTableInput.value.trim();
 
     if (!tableNumber || parseInt(tableNumber) <= 0) {
@@ -251,10 +269,12 @@ export const handleSearchTable = async (isClientFlow = false) => {
     if (docSnap.exists() && docSnap.data().status === 'open') {
         openTableForOrder(tableNumber, isClientFlow); // Passa a flag para o próximo passo
         searchTableInput.value = '';
-        // Após o sucesso, remove o input de busca para evitar nova digitação
+        
+        // NOVO: Restringe o cliente após a vinculação da mesa
         if (isClientFlow) {
-            searchTableInput.style.display = 'none';
-            document.getElementById('searchTableBtn').style.display = 'none';
+            searchTableInput.readOnly = true;
+            searchTableInput.placeholder = `Mesa ${tableNumber} vinculada.`;
+            searchTableBtn.style.display = 'none';
         }
     } else {
         alert(`A Mesa ${tableNumber} não está aberta.`);
