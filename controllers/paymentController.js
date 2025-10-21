@@ -1,9 +1,13 @@
 // --- CONTROLLERS/PAYMENTCONTROLLER.JS (Painel 3) ---
-import { goToScreen, userRole } from "../app.js";
+import { goToScreen, userRole, currentTableId, currentOrderSnapshot } from "../app.js";
 import { formatCurrency, calculateItemsValue, getNumericValueFromCurrency } from "../utils.js";
 import { getTableDocRef } from "../services/firebaseService.js";
 import { updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { openManagerAuthModal } from "./managerController.js"; // Importado para proteção de exclusão
 
+
+// Variável para manter o item selecionado para ação
+let selectedItemForAction = null; 
 
 // Função para calcular o total geral (subtotal + serviço)
 const calculateTotal = (subtotal, applyServiceTax) => {
@@ -19,6 +23,166 @@ const updateText = (id, value) => {
     if (el) el.textContent = value;
 };
 
+// Lógica de Agrupamento de Itens (Reutilizada e aprimorada)
+const groupMainAccountItems = (currentOrderSnapshot) => {
+    const sentItems = currentOrderSnapshot.sentItems || [];
+    
+    const itemsInSplits = Object.values(currentOrderSnapshot.splits || {})
+                                .flatMap(split => split.items.map(item => item.orderId + item.sentAt)); 
+    
+    const mainAccountItems = sentItems.filter(item => {
+        const key = item.orderId + item.sentAt;
+        return !itemsInSplits.includes(key);
+    });
+
+    // Agrupamento
+    return mainAccountItems.reduce((acc, item) => {
+        const groupKey = `${item.name}-${item.note || ''}`;
+
+        if (!acc[groupKey]) {
+            acc[groupKey] = { items: [], totalCount: 0, totalValue: 0, groupKey: groupKey };
+        }
+        acc[groupKey].items.push(item);
+        acc[groupKey].totalCount++;
+        acc[groupKey].totalValue += item.price;
+        return acc;
+    }, {});
+};
+
+
+// Implementação das Ações do Item (Item 2)
+// Função para abrir o modal de ações do item (view, delete, transfer)
+export const openItemActionModal = (groupKey) => {
+    if (!currentOrderSnapshot) return;
+
+    const groupedItems = groupMainAccountItems(currentOrderSnapshot);
+    selectedItemForAction = groupedItems[groupKey];
+    
+    if (!selectedItemForAction) {
+        alert('Grupo de item não encontrado.');
+        return;
+    }
+    
+    const modal = document.getElementById('itemActionModal');
+    if (modal) {
+        document.getElementById('itemActionName').textContent = selectedItemForAction.items[0].name;
+        document.getElementById('itemActionGroupNote').textContent = selectedItemForAction.items[0].note || 'Sem observação';
+        document.getElementById('itemActionQuantity').textContent = `${selectedItemForAction.totalCount}x`;
+        document.getElementById('itemActionTotal').textContent = formatCurrency(selectedItemForAction.totalValue);
+        
+        modal.dataset.groupKey = groupKey;
+        modal.style.display = 'flex';
+    }
+};
+window.openItemActionModal = openItemActionModal;
+
+
+// Ação de Exclusão: Solicitação de Gerente
+export const handleItemDeleteRequest = () => {
+    const groupKey = document.getElementById('itemActionModal').dataset.groupKey;
+    if (groupKey && selectedItemForAction) {
+        // Envia a ação para autenticação do gerente
+        openManagerAuthModal('deleteReviewItem', groupKey);
+    }
+};
+window.handleItemDeleteRequest = handleItemDeleteRequest;
+
+
+// Ação de Exclusão: Confirmação e Execução
+export const handleItemDeleteConfirmed = async (groupKey) => {
+    // Chamado após a autenticação do gerente
+    const modal = document.getElementById('itemActionModal');
+    if (modal) modal.style.display = 'none';
+
+    if (!groupKey || !currentTableId || !currentOrderSnapshot || !selectedItemForAction) return;
+    
+    try {
+        const tableRef = getTableDocRef(currentTableId);
+        
+        const valueRemoved = selectedItemForAction.totalValue;
+
+        // 1. Cria a nova lista de sentItems, excluindo os itens selecionados (melhor abordagem do que arrayRemove)
+        const sentItemsAfterRemoval = currentOrderSnapshot.sentItems.filter(item => {
+             const itemGroupKey = `${item.name}-${item.note || ''}`;
+             return itemGroupKey !== groupKey;
+        });
+
+        // 2. Atualiza o Firebase
+        await updateDoc(tableRef, {
+            sentItems: sentItemsAfterRemoval,
+            total: (currentOrderSnapshot.total || 0) - valueRemoved
+        });
+        
+        alert(`Grupo de itens (${selectedItemForAction.items[0].name} - ${selectedItemForAction.totalCount}x) removido da conta.`);
+        
+        // Limpa o estado
+        selectedItemForAction = null;
+        
+    } catch (e) {
+        console.error("Erro ao remover item da conta:", e);
+        alert("Falha ao remover item da conta.");
+    }
+};
+window.handleItemDeleteConfirmed = handleItemDeleteConfirmed;
+
+
+// Ação de Transferência: Placeholder
+export const handleItemTransferRequest = () => {
+    const groupKey = document.getElementById('itemActionModal').dataset.groupKey;
+    if (groupKey && selectedItemForAction) {
+        // Usa o placeholder da função de transferência (openSplitTransferModal)
+        openSplitTransferModal('main', 'move_out', selectedItemForAction.items);
+    }
+};
+window.handleItemTransferRequest = handleItemTransferRequest;
+
+
+// 5. Renderiza a lista de itens da conta (Item 1, 2)
+const renderReviewItemsList = (currentOrderSnapshot) => {
+    const listEl = document.getElementById('reviewItemsList');
+    if (!listEl) return;
+    
+    const groupedItems = groupMainAccountItems(currentOrderSnapshot);
+
+    const mainAccountItemsCount = Object.values(groupedItems).reduce((sum, group) => sum + group.totalCount, 0);
+
+    if (mainAccountItemsCount === 0) {
+        listEl.innerHTML = `<div class="text-sm text-gray-500 italic p-2">Nenhum item restante na conta principal.</div>`;
+        return;
+    } 
+
+    const listHtml = Object.values(groupedItems).map(group => {
+        const firstItem = group.items[0];
+        const groupKey = group.groupKey; 
+        
+        return `
+            <div class="flex items-start justify-between py-1 border-b border-gray-100 hover:bg-gray-50 transition">
+                
+                <div class="flex flex-col flex-grow min-w-0 pr-2">
+                    <span class="text-sm font-semibold text-gray-800">${firstItem.name} (${group.totalCount}x)</span>
+                    ${firstItem.note ? `<span class="text-xs text-gray-500 truncate">(${firstItem.note})</span>` : ''}
+                </div>
+                
+                <div class="flex items-center space-x-2">
+                    <span class="text-sm font-bold text-gray-700">${formatCurrency(group.totalValue)}</span>
+                    <button class="item-action-btn text-gray-500 hover:text-indigo-600 transition p-1" 
+                            onclick="window.openItemActionModal('${groupKey}')"
+                            title="Ações do Item">
+                        <i class="fas fa-ellipsis-v text-sm"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    listEl.innerHTML = `
+        <div class="border p-2 rounded-lg bg-gray-50 max-h-48 overflow-y-auto">
+            ${listHtml}
+        </div>
+        <p class="text-sm text-gray-500 italic p-2 mt-2">Total de ${mainAccountItemsCount} itens na conta principal. Clique nos pontos (...) para ações.</p>
+    `;
+};
+
 
 // NOVO: Renderiza os botões/cards de divisão de conta (Painel 3)
 export const renderPaymentSplits = (currentTableId, currentOrderSnapshot) => {
@@ -27,10 +191,8 @@ export const renderPaymentSplits = (currentTableId, currentOrderSnapshot) => {
     if (!paymentSplitsContainer || !currentOrderSnapshot) return;
 
     const sentItems = currentOrderSnapshot.sentItems || [];
-    // Inicializa splits se não existir
     const splits = currentOrderSnapshot.splits || {};
     
-    // Calcula o total dos itens que JÁ FORAM MOVIMENTADOS para as subcontas
     let totalItemsInSplits = 0;
     Object.values(splits).forEach(split => totalItemsInSplits += split.items.reduce((sum, item) => sum + item.price, 0));
 
@@ -38,7 +200,6 @@ export const renderPaymentSplits = (currentTableId, currentOrderSnapshot) => {
     const totalInMainAccount = Math.max(0, totalSentItems - totalItemsInSplits);
     const itemsRemaining = sentItems.length - Object.values(splits).reduce((c, s) => c + (s.items || []).length, 0);
     
-    // Apenas o Garçom/Gerente pode adicionar divisões, e se houver itens para dividir
     if (addSplitAccountBtn) {
         addSplitAccountBtn.disabled = userRole === 'client' || itemsRemaining === 0;
     }
@@ -189,9 +350,12 @@ window.handleAddSplitAccount = handleAddSplitAccount; // Exposto ao escopo globa
 
 
 // Implementar no futuro: Lógica para mover itens para as subcontas.
-const openSplitTransferModal = (targetKey, mode) => {
-    // Implementação de um modal para seleção de itens será feita em uma próxima fase
-    alert(`Gerenciamento da conta ${targetKey} no modo ${mode} (Em desenvolvimento).`);
+const openSplitTransferModal = (targetKey, mode, itemsToTransfer = null) => {
+    if (itemsToTransfer) {
+        alert(`Transferência de ${itemsToTransfer.length} itens para ${targetKey} em desenvolvimento.`);
+    } else {
+        alert(`Gerenciamento da conta ${targetKey} no modo ${mode} (Em desenvolvimento).`);
+    }
 };
 window.openSplitTransferModal = openSplitTransferModal;
 
@@ -199,21 +363,6 @@ window.openSplitTransferModal = openSplitTransferModal;
 // Implementar no futuro: Lógica para fechar a conta (WooCommerce)
 export const handleFinalizeOrder = () => {
     alert("Função de Fechamento de Conta (WooCommerce Sync) em desenvolvimento.");
-};
-
-
-// Implementar no futuro: Lógica para renderizar itens de revisão (Painel 3)
-const renderReviewItemsList = (currentOrderSnapshot) => {
-    const listEl = document.getElementById('reviewItemsList');
-    if (!listEl) return;
-    
-    const sentItems = currentOrderSnapshot.sentItems || [];
-    listEl.innerHTML = `
-        <div class="border p-2 rounded-lg bg-gray-50 max-h-32 overflow-y-auto">
-            <div class="text-sm text-gray-500 italic p-2">Total de ${sentItems.length} itens na conta.</div>
-            <p class="text-xs text-gray-400">Funcionalidades de visualização detalhada, exclusão e transferência em desenvolvimento.</p>
-        </div>
-    `;
 };
 
 
@@ -229,12 +378,12 @@ const moveItemsToMainAccount = (splitKey) => {
 window.moveItemsToMainAccount = moveItemsToMainAccount;
 
 
-// Event listener para adicionar conta de divisão
+// Event listener para inicialização
 document.addEventListener('DOMContentLoaded', () => {
     const addSplitAccountBtn = document.getElementById('addSplitAccountBtn');
     if (addSplitAccountBtn) {
         addSplitAccountBtn.addEventListener('click', () => {
-            // Chama a função globalmente acessível, passando os estados globais como argumentos
+            // A função é chamada no módulo App.js para acessar o estado global
             window.handleAddSplitAccount(window.currentTableId, window.currentOrderSnapshot); 
         });
     }
@@ -253,4 +402,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (finalizeOrderBtn) {
         finalizeOrderBtn.addEventListener('click', handleFinalizeOrder);
     }
+    
+    // Listeners do Modal de Ação do Item
+    const itemActionDeleteBtn = document.getElementById('itemActionDeleteBtn');
+    if (itemActionDeleteBtn) itemActionDeleteBtn.addEventListener('click', handleItemDeleteRequest);
+
+    const itemActionTransferBtn = document.getElementById('itemActionTransferBtn');
+    if (itemActionTransferBtn) itemActionTransferBtn.addEventListener('click', handleItemTransferRequest);
+    
+    const itemActionCloseBtn = document.getElementById('itemActionCloseBtn');
+    if (itemActionCloseBtn) itemActionCloseBtn.addEventListener('click', () => {
+        document.getElementById('itemActionModal').style.display = 'none';
+        selectedItemForAction = null;
+    });
+
 });
