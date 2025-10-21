@@ -123,6 +123,10 @@ export const renderOrderScreen = () => {
     
     // Renderiza Tela do Cliente
     _renderOrderList('openOrderListClient', 'openItemsCountClient', 'sendClientOrderBtn', true);
+    
+    // Renderiza o menu nas duas telas
+    renderMenu(currentCategoryFilter, currentSearch, 'staff');
+    renderMenu(currentCategoryFilter, currentSearch, 'client');
 };
 
 const _renderOrderList = (listId, countId, btnId, isClient) => {
@@ -139,7 +143,7 @@ const _renderOrderList = (listId, countId, btnId, isClient) => {
         // Lógica de desativação e texto para o botão de envio
         sendBtn.disabled = openItemsCountValue === 0;
         if (isClient) {
-             sendBtn.textContent = ''; // Usando ícone no HTML
+             sendBtn.innerHTML = '<i class="fas fa-check-circle"></i>';
         } else {
              sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i>';
         }
@@ -182,7 +186,7 @@ const _renderOrderList = (listId, countId, btnId, isClient) => {
     }
 };
 
-// Item 3: Abertura do Modal de Observações (CRITICAL FIX)
+// Item 3: Abertura do Modal de Observações (Restrito para Cliente)
 export const openObsModalForGroup = (itemId, noteKey) => {
     const products = getProducts();
     const product = products.find(p => p.id == itemId);
@@ -205,6 +209,16 @@ export const openObsModalForGroup = (itemId, noteKey) => {
     obsModal.dataset.originalNoteKey = noteKey;
     
     esperaSwitch.checked = noteKey.toLowerCase().includes('espera');
+
+    // NOVO: Restrição para Cliente (sem caixa de texto livre)
+    if (userRole === 'client') {
+        obsInput.readOnly = true;
+        // Permite apenas botões rápidos e o switch de espera
+        obsInput.placeholder = "Apenas observações rápidas e botões abaixo permitidos.";
+    } else {
+        obsInput.readOnly = false;
+        obsInput.placeholder = "Ex: Sem cebola, Ponto da carne mal passada...";
+    }
 
     // 2. Exibe o modal
     obsModal.style.display = 'flex';
@@ -272,11 +286,10 @@ export const handleClientSendOrder = async () => {
         
         // Limpa a lista local e salva, notificando o garçom no Firebase
         await updateDoc(tableRef, {
-            // Adiciona o pedido à coleção de pedidos pendentes do cliente
             requestedOrders: arrayUnion(requestedOrder), 
-            // Limpa a lista de itens selecionados (o carrinho do cliente)
             selectedItems: [],
-            // Adiciona um campo de notificação simples para o painel de mesas/staff
+            // NOVO: Flag de Notificação para o Staff
+            clientOrderPending: true, 
             waiterNotification: { type: 'client_request', timestamp: serverTimestamp() } 
         });
 
@@ -291,7 +304,6 @@ export const handleClientSendOrder = async () => {
         alert("Falha ao enviar pedido para o Garçom/Firebase.");
     }
 };
-
 
 // Item 1: Envia Pedidos ao KDS e Resumo (Função de Staff)
 export const handleSendSelectedItems = async () => { 
