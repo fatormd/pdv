@@ -8,8 +8,8 @@ import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, getCus
 import { fetchWooCommerceProducts, fetchWooCommerceCategories } from './services/wooCommerceService.js';
 import { loadOpenTables, renderTableFilters, handleAbrirMesa, loadTableOrder, handleSearchTable } from './controllers/panelController.js';
 import { renderMenu, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity } from './controllers/orderController.js';
+import { renderPaymentSummary } from './controllers/paymentController.js'; 
 import { openManagerAuthModal } from './controllers/managerController.js';
-import { renderPaymentSummary } from './controllers/paymentController.js'; // CORRIGIDO: Agora a função está exportada
 
 // --- VARIÁVEIS DE ESTADO GLOBAL ---
 export const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2, 'managerScreen': 3 };
@@ -102,7 +102,12 @@ export const setTableListener = (tableId) => {
     unsubscribeTable = onSnapshot(tableRef, (docSnapshot) => {
         if (docSnapshot.exists()) {
             currentOrderSnapshot = docSnapshot.data();
-            selectedItems = currentOrderSnapshot.selectedItems || []; 
+            
+            // CORREÇÃO DE LÓGICA: Limpa o array e repopula (evita vazamento de referência)
+            const newSelectedItems = currentOrderSnapshot.selectedItems || [];
+            selectedItems.length = 0; 
+            selectedItems.push(...newSelectedItems);
+            
             renderOrderScreen(currentOrderSnapshot);
             renderPaymentSummary(currentTableId, currentOrderSnapshot);
         }
