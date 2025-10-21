@@ -13,7 +13,7 @@ let isMassSelectionActive = false; // NOVO: Estado para controle do modo de sele
 // Função para calcular o total geral (subtotal + serviço)
 const calculateTotal = (subtotal, applyServiceTax) => {
     const taxRate = applyServiceTax ? 0.10 : 0;
-    const serviceValue = subtotal * taxTaxa;
+    const serviceValue = subtotal * taxRate;
     const total = subtotal + serviceValue;
     return { total, serviceValue };
 };
@@ -384,7 +384,7 @@ export const renderPaymentSummary = (currentTableId, currentOrderSnapshot) => {
     // NOVO: Renderiza os botões/cards de divisão
     renderPaymentSplits(currentTableId, currentOrderSnapshot);
 };
-// CORREÇÃO FINAL: A função deve ser exportada no ponto de declaração, não duplamente.
+// Exportada para uso no app.js
 export { renderPaymentSummary };
 
 
