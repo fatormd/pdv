@@ -280,7 +280,7 @@ export const handleClientSendOrder = async () => {
         const requestedOrder = {
             orderId: `req_${Date.now()}`,
             items: selectedItems.map(item => ({...item, requestedAt: Date.now()})),
-            requestedAt: serverTimestamp(),
+            requestedAt: Date.now(), // CORRIGIDO: Usando Date.now() para evitar FirebaseError
             status: 'pending_waiter' // Novo status para o Garçom
         };
         
