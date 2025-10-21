@@ -1,9 +1,12 @@
 // --- CONTROLLERS/PAYMENTCONTROLLER.JS (Painel 3) ---
-import { goToScreen, userRole } from "../app.js";
+import { goToScreen, userRole, currentTableId, currentOrderSnapshot } from "../app.js";
 import { formatCurrency, calculateItemsValue, getNumericValueFromCurrency } from "../utils.js";
 import { getTableDocRef } from "../services/firebaseService.js";
 import { updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+
+// Variáveis de estado do módulo
+let currentPaymentMethod = 'Dinheiro'; // Padrão
 
 // Função para calcular o total geral (subtotal + serviço)
 const calculateTotal = (subtotal, applyServiceTax) => {
@@ -17,6 +20,116 @@ const calculateTotal = (subtotal, applyServiceTax) => {
 const updateText = (id, value) => {
     const el = document.getElementById(id);
     if (el) el.textContent = value;
+};
+
+
+// 1. Implementa a lógica para alternar a taxa de serviço (NOVO)
+export const handleToggleServiceTax = async () => {
+    if (!currentTableId || userRole === 'client') return;
+
+    try {
+        const tableRef = getTableDocRef(currentTableId);
+        // Toggle baseado no estado atual do snapshot
+        const newServiceTaxApplied = !(currentOrderSnapshot?.serviceTaxApplied || false);
+        
+        await updateDoc(tableRef, {
+            serviceTaxApplied: newServiceTaxApplied
+        });
+
+        alert(`Taxa de serviço ${newServiceTaxApplied ? 'Aplicada' : 'Removida'} com sucesso.`);
+    } catch (e) {
+        console.error("Erro ao alternar taxa de serviço:", e);
+        alert("Falha ao atualizar a taxa de serviço.");
+    }
+};
+window.handleToggleServiceTax = handleToggleServiceTax;
+
+
+// 2. Implementa a função de registro de pagamento (NOVO)
+export const handleAddPayment = async () => {
+    if (!currentTableId || userRole === 'client') return;
+    
+    const paymentValueInput = document.getElementById('paymentValueInput');
+    const paymentMethod = currentPaymentMethod; 
+
+    const rawValue = getNumericValueFromCurrency(paymentValueInput.value);
+
+    if (rawValue <= 0 || !paymentMethod) {
+        alert("Selecione um método e insira um valor válido.");
+        return;
+    }
+
+    const newPayment = {
+        method: paymentMethod,
+        value: rawValue,
+        paidAt: Date.now()
+    };
+    
+    try {
+        const tableRef = getTableDocRef(currentTableId);
+        
+        await updateDoc(tableRef, {
+            payments: arrayUnion(newPayment)
+        });
+        
+        alert(`Pagamento de ${formatCurrency(rawValue)} via ${paymentMethod} registrado.`);
+        
+        // Limpa o input após o sucesso
+        paymentValueInput.value = formatCurrency(0); 
+        
+    } catch (e) {
+        console.error("Erro ao adicionar pagamento:", e);
+        alert("Erro ao registrar pagamento. Tente novamente.");
+    }
+};
+window.handleAddPayment = handleAddPayment;
+
+
+// NOVO: Renderiza a lista de itens da conta (para exclusão/transferência em massa)
+const renderReviewItemsList = (currentOrderSnapshot) => {
+    const listEl = document.getElementById('reviewItemsList');
+    if (!listEl) return;
+    
+    const sentItems = currentOrderSnapshot.sentItems || [];
+    
+    // Calcula itens já movidos para splits (para não listá-los na conta principal)
+    // Usa orderId e sentAt como chave de identificação única do item
+    const itemsInSplits = Object.values(currentOrderSnapshot.splits || {})
+                                .flatMap(split => split.items.map(item => item.orderId + item.sentAt)); 
+    
+    const mainAccountItems = sentItems.filter(item => {
+        const key = item.orderId + item.sentAt;
+        return !itemsInSplits.includes(key);
+    });
+
+    if (mainAccountItems.length === 0) {
+        listEl.innerHTML = `<div class="text-sm text-gray-500 italic p-2">Nenhum item restante na conta principal.</div>`;
+    } else {
+        // Agrupamento para exibição
+        const groupedItems = mainAccountItems.reduce((acc, item) => {
+            const key = `${item.name}-${item.note || ''}`;
+            if (!acc[key]) {
+                acc[key] = { ...item, count: 0, price: 0 };
+            }
+            acc[key].count++;
+            acc[key].price += item.price;
+            return acc;
+        }, {});
+
+        const listHtml = Object.values(groupedItems).map(group => `
+            <div class="flex justify-between items-center py-1 border-b border-gray-100">
+                <span class="text-sm text-gray-700">${group.name} (${group.count}x)</span>
+                <span class="text-sm font-semibold">${formatCurrency(group.price)}</span>
+            </div>
+        `).join('');
+        
+        listEl.innerHTML = `
+            <div class="max-h-40 overflow-y-auto">
+                ${listHtml}
+            </div>
+            <p class="text-sm text-gray-500 italic p-2 mt-2">Total de ${mainAccountItems.length} itens na conta principal. </p>
+        `;
+    }
 };
 
 
@@ -109,7 +222,9 @@ export const renderPaymentSummary = (currentTableId, currentOrderSnapshot) => {
 
     const { total: generalTotal, serviceValue } = calculateTotal(subtotal, serviceTaxApplied);
     
-    const diners = parseInt(document.getElementById('dinersSplitInput')?.value) || 1;
+    // Pega o input de valor por pessoa
+    const dinersSplitInput = document.getElementById('dinersSplitInput');
+    const diners = parseInt(dinersSplitInput?.value) || 1;
     const valuePerDiner = generalTotal / diners;
 
     const remainingBalance = generalTotal - currentPaymentsTotal;
@@ -142,6 +257,12 @@ export const renderPaymentSummary = (currentTableId, currentOrderSnapshot) => {
         toggleServiceTaxBtn.textContent = serviceTaxApplied ? 'Remover' : 'Aplicar';
         toggleServiceTaxBtn.classList.toggle('bg-green-600', serviceTaxApplied);
         toggleServiceTaxBtn.classList.toggle('bg-red-600', !serviceTaxApplied);
+        
+        // Adiciona o listener aqui (caso não exista, para evitar duplicação)
+        if (!toggleServiceTaxBtn.hasAttribute('data-listener')) {
+            toggleServiceTaxBtn.addEventListener('click', handleToggleServiceTax);
+            toggleServiceTaxBtn.setAttribute('data-listener', 'true');
+        }
     }
     
     // Habilita/Desabilita Finalizar
@@ -151,8 +272,13 @@ export const renderPaymentSummary = (currentTableId, currentOrderSnapshot) => {
         finalizeOrderBtn.disabled = !canFinalize;
     }
     
+    // Listener para o input de Pessoas (Divisão)
+    if (dinersSplitInput && !dinersSplitInput.hasAttribute('data-listener')) {
+        dinersSplitInput.addEventListener('input', () => renderPaymentSummary(currentTableId, currentOrderSnapshot));
+        dinersSplitInput.setAttribute('data-listener', 'true');
+    }
+    
     // NOVO: Renderiza a lista de itens da conta (para exclusão/transferência em massa)
-    // NOTE: Esta lista só deve mostrar itens que AINDA NÃO estão em subcontas de split.
     renderReviewItemsList(currentOrderSnapshot);
     
     // NOVO: Renderiza os botões/cards de divisão
@@ -161,7 +287,7 @@ export const renderPaymentSummary = (currentTableId, currentOrderSnapshot) => {
 
 
 // NOVO: Adiciona a funcionalidade de adicionar conta de divisão
-export const handleAddSplitAccount = async (currentTableId, currentOrderSnapshot) => {
+export const handleAddSplitAccount = async () => {
     if (!currentTableId || userRole === 'client') return;
     
     const splitKey = `split_${Date.now()}`;
@@ -186,39 +312,117 @@ export const handleAddSplitAccount = async (currentTableId, currentOrderSnapshot
         alert("Erro ao tentar adicionar a conta de divisão.");
     }
 };
+window.handleAddSplitAccount = handleAddSplitAccount;
+
 
 // Implementar no futuro: Lógica para mover itens para as subcontas.
 const openSplitTransferModal = (targetKey, mode) => {
     // Implementação de um modal para seleção de itens será feita em uma próxima fase
     alert(`Gerenciamento da conta ${targetKey} no modo ${mode} (Em desenvolvimento).`);
 };
-
 window.openSplitTransferModal = openSplitTransferModal;
 
 
 // Implementar no futuro: Lógica para fechar a conta (WooCommerce)
 export const handleFinalizeOrder = () => {
-    alert("Função de Fechamento de Conta (WooCommerce Sync) em desenvolvimento.");
-};
-
-
-// Implementar no futuro: Lógica para renderizar itens de revisão (Painel 3)
-const renderReviewItemsList = (currentOrderSnapshot) => {
-    const listEl = document.getElementById('reviewItemsList');
-    if (!listEl) return;
+    if (!currentTableId || userRole === 'client') return;
     
-    const sentItems = currentOrderSnapshot.sentItems || [];
-    listEl.innerHTML = `<div class="text-sm text-gray-500 italic p-2">Total de ${sentItems.length} itens na conta (Funcionalidades de exclusão/transferência em desenvolvimento).</div>`;
+    // Etapas Pendentes:
+    // 1. Criar função no wooCommerceService para registrar o pedido final.
+    // 2. Coletar todos os items (sentItems + items de todos os splits).
+    // 3. Coletar todos os pagamentos (payments da conta principal + payments de todos os splits).
+    // 4. Se o envio ao WooCommerce for bem-sucedido, atualizar o status da mesa no Firebase para 'closed'.
+    
+    alert("Função de Fechamento de Conta (WooCommerce Sync e Fechamento de Mesa) em desenvolvimento.");
 };
+window.handleFinalizeOrder = handleFinalizeOrder;
 
 
-// Event listener para adicionar conta de divisão
+// Implementar no futuro: Lógica para pagar splits (Placeholder)
+const openPaymentModalForSplit = (splitKey) => {
+    alert(`Pagar Conta de Divisão (${splitKey}) em desenvolvimento.`);
+};
+window.openPaymentModalForSplit = openPaymentModalForSplit;
+
+// Implementar no futuro: Lógica para desfazer split (Placeholder)
+const moveItemsToMainAccount = (splitKey) => {
+    alert(`Desfazer itens da conta (${splitKey}) para a conta principal em desenvolvimento.`);
+};
+window.moveItemsToMainAccount = moveItemsToMainAccount;
+
+
+// Event listener para inicialização
 document.addEventListener('DOMContentLoaded', () => {
     const addSplitAccountBtn = document.getElementById('addSplitAccountBtn');
+    const paymentMethodButtons = document.getElementById('paymentMethodButtons');
+    const paymentValueInput = document.getElementById('paymentValueInput');
+    const addPaymentBtn = document.getElementById('addPaymentBtn');
+    const finalizeOrderBtn = document.getElementById('finalizeOrderBtn');
+    
+    // 1. Adicionar Conta de Divisão
     if (addSplitAccountBtn) {
-        addSplitAccountBtn.addEventListener('click', () => {
-            // A função é chamada no módulo App.js para acessar o estado global
-            window.handleAddSplitAccount(); 
+        addSplitAccountBtn.addEventListener('click', handleAddSplitAccount); 
+    }
+
+    // 2. Botões de Método de Pagamento (Seleção)
+    if (paymentMethodButtons) {
+        // Inicializa o primeiro como ativo
+        const firstButton = paymentMethodButtons.querySelector('.payment-method-btn');
+        if (firstButton) {
+            firstButton.classList.add('active');
+            currentPaymentMethod = firstButton.dataset.method;
+        }
+
+        paymentMethodButtons.addEventListener('click', (e) => {
+            const btn = e.target.closest('.payment-method-btn');
+            if (btn) {
+                // Remove 'active' de todos
+                document.querySelectorAll('.payment-method-btn').forEach(b => b.classList.remove('active'));
+                // Adiciona 'active' ao clicado
+                btn.classList.add('active');
+                currentPaymentMethod = btn.dataset.method;
+                
+                // Opcional: pré-preenche o valor total para Dinheiro/Pix
+                if (currentOrderSnapshot) {
+                     const { total: generalTotal } = calculateTotal(currentOrderSnapshot.total || 0, currentOrderSnapshot.serviceTaxApplied || false);
+                     document.getElementById('paymentValueInput').value = formatCurrency(generalTotal);
+                }
+            }
         });
+    }
+
+    // 3. Input de Valor Pago (Máscara de Moeda)
+    if (paymentValueInput) {
+        // Inicializa o valor
+        paymentValueInput.value = formatCurrency(0); 
+        
+        paymentValueInput.addEventListener('input', (e) => {
+             // Simplesmente remove tudo que não for número e coloca a máscara (manualmente para evitar libs)
+             let value = e.target.value.replace(/\D/g, ''); 
+             if (value.length > 2) {
+                 // Converte para centavos
+                 value = (parseFloat(value) / 100).toFixed(2).replace('.', ',');
+                 // Adiciona R$
+                 e.target.value = `R$ ${value}`;
+             }
+        });
+        
+        // Seleciona o valor total ao focar (facilita o pagamento completo)
+        paymentValueInput.addEventListener('focus', (e) => {
+            if (currentOrderSnapshot) {
+                 const { total: generalTotal } = calculateTotal(currentOrderSnapshot.total || 0, currentOrderSnapshot.serviceTaxApplied || false);
+                 document.getElementById('paymentValueInput').value = formatCurrency(generalTotal);
+            }
+        });
+    }
+
+    // 4. Adicionar Pagamento
+    if (addPaymentBtn) {
+        addPaymentBtn.addEventListener('click', handleAddPayment);
+    }
+    
+    // 5. Finalizar Conta
+    if (finalizeOrderBtn) {
+        finalizeOrderBtn.addEventListener('click', handleFinalizeOrder);
     }
 });
