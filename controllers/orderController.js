@@ -286,7 +286,9 @@ export const handleClientSendOrder = async () => {
         
         // Limpa a lista local e salva, notificando o garçom no Firebase
         await updateDoc(tableRef, {
+            // Inicializa ou adiciona o pedido à coleção de pedidos pendentes do cliente
             requestedOrders: arrayUnion(requestedOrder), 
+            // Limpa a lista de itens selecionados (o carrinho do cliente)
             selectedItems: [],
             // NOVO: Flag de Notificação para o Staff
             clientOrderPending: true, 
