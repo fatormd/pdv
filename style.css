@@ -154,7 +154,6 @@ body.client-mode #openTablesList /* Lista de Mesas */ {
     display: none !important;
 }
 
-
 /* Animação de Loading */
 @keyframes spin { to { transform: rotate(360deg); } }
 .loading-spinner {
