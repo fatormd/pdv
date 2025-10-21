@@ -303,4 +303,4 @@ document.addEventListener('DOMContentLoaded', () => {
     // 3. Carrega UI Inicial
     loadOpenTables();
     renderTableFilters(); 
-});
+}); 
