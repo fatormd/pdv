@@ -345,6 +345,52 @@
                 </div>
             </div>
             
+            <div id="clientOrderScreen" class="flex-shrink-0">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center text-indigo-700">
+                        <button id="backToPanelFromClientOrderBtn" class="mr-2 text-3xl p-2 hover:text-indigo-900 transition duration-150" title="Voltar para o Painel" onclick="window.goToScreen('panelScreen')">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <span class="text-2xl font-semibold mr-3 text-green-600" id="client-table-number">Mesa Cliente</span>
+                    </div>
+                    
+                    <button id="goToPaymentBtnClient" class="rounded-full bg-green-600 p-3 text-white shadow-lg hover:bg-green-700 transition duration-150 w-12 h-12 flex items-center justify-center" title="Ver Conta" onclick="window.goToScreen('paymentScreen')">
+                        <i class="fas fa-receipt text-xl"></i>
+                    </button>
+                </div>
+
+                <div id="orderingInputsClient" class="space-y-4">
+                    <div class="p-4 content-card bg-white">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-semibold text-gray-700 mr-2">Seu Pedido (<span id="openItemsCountClient">0</span>)</h2>
+                            <button id="sendClientOrderBtn" class="bg-green-600 text-white p-3 rounded-full shadow-lg hover:bg-green-700 transition duration-150 w-12 h-12 flex items-center justify-center text-xl disabled:opacity-50" title="Enviar Pedido para Confirmação">
+                                <i class="fas fa-check-circle"></i>
+                            </button>
+                        </div>
+                        
+                        <div id="openOrderListClient" class="space-y-3 mb-4">
+                            <div class="text-base text-gray-500 italic p-2">Nenhum item selecionado.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="menuContainerClient" class="mt-6">
+                    <div class="flex justify-between items-center mb-4 px-4">
+                        <h2 class="text-xl font-bold text-gray-800">Cardápio</h2>
+                        <div class="relative">
+                            <input type="text" id="searchProductInputClient" placeholder="Buscar produtos..." class="pr-8 input-pdv border border-gray-300 rounded-lg text-sm" style="width: 150px;">
+                            <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                        </div>
+                    </div>
+                    
+                    <div id="categoryFiltersClient" class="flex space-x-2 overflow-x-auto pb-2 mb-4 px-4">
+                        </div>
+                    
+                    <div id="menuItemsGridClient" class="px-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                         </div>
+                </div>
+            </div>
+            
         </div>
     </main>
     
