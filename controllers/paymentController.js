@@ -225,9 +225,6 @@ export const handleMassDeleteConfirmed = async (selectedGroups) => {
 window.handleMassDeleteConfirmed = handleMassDeleteConfirmed;
 
 
-// ... (Funções de Split e Summary permanecem)
-
-
 // Exportado para ser chamado no app.js, que acessa o estado global (currentTableId, currentOrderSnapshot)
 export const handleAddSplitAccount = async (currentTableId, currentOrderSnapshot) => {
     if (!currentTableId || userRole === 'client') return;
@@ -284,6 +281,69 @@ const moveItemsToMainAccount = (splitKey) => {
     alert(`Desfazer itens da conta (${splitKey}) para a conta principal em desenvolvimento.`);
 };
 window.moveItemsToMainAccount = moveItemsToMainAccount;
+
+
+// Recalcula e renderiza o resumo de pagamento
+export const renderPaymentSummary = (currentTableId, currentOrderSnapshot) => {
+    if (!currentOrderSnapshot) return;
+
+    const tableData = currentOrderSnapshot;
+    const subtotal = tableData.total || 0; 
+    const payments = tableData.payments || [];
+    const currentPaymentsTotal = payments.reduce((sum, p) => sum + p.value, 0);
+
+    const serviceTaxApplied = tableData.serviceTaxApplied || false;
+
+    const { total: generalTotal, serviceValue } = calculateTotal(subtotal, serviceTaxApplied);
+    
+    const diners = parseInt(document.getElementById('dinersSplitInput')?.value) || 1;
+    const valuePerDiner = generalTotal / diners;
+
+    const remainingBalance = generalTotal - currentPaymentsTotal;
+    
+    // Atualiza UI
+    updateText('payment-table-number', `Mesa ${currentTableId}`);
+    updateText('orderSubtotalDisplayPayment', formatCurrency(subtotal));
+    updateText('orderServiceTaxDisplayPayment', formatCurrency(serviceValue));
+    updateText('orderTotalDisplayPayment', formatCurrency(generalTotal));
+    updateText('valuePerDinerDisplay', formatCurrency(valuePerDiner));
+    
+    // Valor Restante
+    const remainingBalanceDisplay = document.getElementById('remainingBalanceDisplay');
+    if (remainingBalanceDisplay) {
+        remainingBalanceDisplay.textContent = formatCurrency(Math.abs(remainingBalance));
+        remainingBalanceDisplay.classList.remove('text-red-600', 'text-green-600', 'text-gray-800');
+        if (remainingBalance > 0.01) {
+            remainingBalanceDisplay.classList.add('text-red-600'); 
+        } else if (remainingBalance < -0.01) {
+            remainingBalanceDisplay.classList.add('text-green-600'); 
+            remainingBalanceDisplay.textContent = `TROCO: ${formatCurrency(Math.abs(remainingBalance))}`;
+        } else {
+            remainingBalanceDisplay.classList.add('text-gray-800'); 
+        }
+    }
+    
+    // Toggle do botão de serviço
+    const toggleServiceTaxBtn = document.getElementById('toggleServiceTaxBtn');
+    if (toggleServiceTaxBtn) {
+        toggleServiceTaxBtn.textContent = serviceTaxApplied ? 'Remover' : 'Aplicar';
+        toggleServiceTaxBtn.classList.toggle('bg-green-600', serviceTaxApplied);
+        toggleServiceTaxBtn.classList.toggle('bg-red-600', !serviceTaxApplied);
+    }
+    
+    // Habilita/Desabilita Finalizar
+    const finalizeOrderBtn = document.getElementById('finalizeOrderBtn');
+    if (finalizeOrderBtn) {
+        const canFinalize = remainingBalance <= 0.01 && currentPaymentsTotal > 0;
+        finalizeOrderBtn.disabled = !canFinalize;
+    }
+    
+    // Item 1: NOVO: Renderiza a lista de itens da conta (agora no topo com checkboxes)
+    renderReviewItemsList(currentOrderSnapshot);
+    
+    // NOVO: Renderiza os botões/cards de divisão
+    renderPaymentSplits(currentTableId, currentOrderSnapshot);
+};
 
 
 // Event listener para inicialização
