@@ -1,6 +1,6 @@
 // --- APP.JS ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, onAuthStateChanged, signInAnonymously, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // Importações dos Módulos Refatorados
@@ -71,10 +71,21 @@ const hideLoginModal = () => {
 };
 
 export const goToScreen = (screenId) => {
-    if (screenId === 'panelScreen' && currentTableId) {
+    // 1. Lógica de Restrição de Navegação para o Cliente
+    if (userRole === 'client' && screenId !== 'clientOrderScreen' && currentTableId) {
+        // Se o cliente tentar sair da tela de pedidos após se vincular à mesa, ele é impedido.
+        if (screenId === 'panelScreen') {
+             alert("Acesso restrito. Você só pode visualizar a sua mesa.");
+             return; 
+        }
+    }
+    
+    // Salva o estado ao sair da tela de pedidos
+    if (currentTableId) {
         saveSelectedItemsToFirebase(currentTableId, selectedItems);
     }
-
+    
+    // Se o cliente fizer logout ou tentar sair da mesa, desvincula o currentTableId.
     if (screenId === 'panelScreen' && currentTableId && unsubscribeTable) {
         unsubscribeTable(); 
         unsubscribeTable = null; 
@@ -83,7 +94,6 @@ export const goToScreen = (screenId) => {
     const screenIndex = screens[screenId];
     if (screenIndex !== undefined) {
         if (appContainer) {
-            // Transform ajustado para 5 telas
             appContainer.style.transform = `translateX(-${screenIndex * 100}vw)`;
         }
         document.body.classList.toggle('bg-gray-900', screenId === 'managerScreen');
@@ -161,10 +171,12 @@ const handleStaffLogin = async () => {
         userRole = staffData.role;
         
         try {
-            const authInstance = getAuth(firebaseConfig); // A instância precisa ser obtida aqui se usada no try-catch
-            // Faz o login com a senha correta (método padrão do Firebase com e-mail/senha)
-            // Se você não tiver o Firebase Authentication ativado, pode usar signInAnonymously como fallback
-            const userCredential = await auth.signInWithEmailAndPassword(authInstance, email, password); 
+            // Obter a instância auth para usar com métodos Firebase
+            const app = initializeApp(JSON.parse(window.__firebase_config));
+            const authInstance = getAuth(app);
+            
+            // Tenta o login com e-mail/senha
+            const userCredential = await signInWithEmailAndPassword(authInstance, email, password); 
             userId = userCredential.user.uid; 
             
             document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)} | Função: ${userRole.toUpperCase()}`;
@@ -177,21 +189,22 @@ const handleStaffLogin = async () => {
             fetchWooCommerceProducts(renderMenu);
             fetchWooCommerceCategories(renderTableFilters); 
             
-            // NOVO FLUXO: Roteamento baseado na função
+            // ROTEAMENTO INICIAL: Cliente deve ser forçado ao Painel de Mesas
+            // mas o Painel de Mesas terá sua UI restrita pelo CSS e JS.
             if (userRole === 'client') {
-                 // CLIENTE: Adiciona classe de restrição e instrução
+                 // CLIENTE: Adiciona classe de restrição. A busca de mesa fará o resto.
                  document.body.classList.add('client-mode');
-                 goToScreen('panelScreen'); 
+                 alert("Bem-vindo Cliente! Insira o número da sua mesa no campo de busca para começar a pedir.");
             } else {
                  // STAFF: Remove classe de restrição (se existir)
                  document.body.classList.remove('client-mode');
-                 goToScreen('panelScreen');
             }
+            goToScreen('panelScreen');
             
         } catch (error) {
              console.error("Erro ao autenticar Staff (Firebase):", error);
              // Tenta login anônimo se o e-mail/senha falhar, para manter o ambiente
-             getAuth(firebaseConfig).signInAnonymously();
+             getAuth(initializeApp(JSON.parse(window.__firebase_config))).signInAnonymously();
              alert("Autenticação falhou. Verifique as credenciais ou a configuração do Firebase.");
         }
     } else {
@@ -209,7 +222,7 @@ const handleLogout = () => {
     // Obtém a instância correta do auth para logout
     const authInstance = getAuth(initializeApp(JSON.parse(window.__firebase_config)));
     if (authInstance && authInstance.currentUser) {
-        auth.signOut(authInstance).catch(e => console.error("Erro no sign out:", e)); 
+        signOut(authInstance).catch(e => console.error("Erro no sign out:", e)); 
     }
     
     goToScreen('panelScreen');
