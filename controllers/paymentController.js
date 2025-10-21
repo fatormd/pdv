@@ -261,7 +261,6 @@ const openSplitTransferModal = (targetKey, mode, itemsToTransfer = null) => {
     const itemCount = itemsToTransfer ? itemsToTransfer.length : 0;
     
     if (itemsToTransfer && mode === 'move_out') {
-        // CORREÇÃO: Implementação do modal de seleção de destino
         
         const modal = document.getElementById('selectiveTransferModal');
         const splits = currentOrderSnapshot.splits || {};
@@ -384,8 +383,6 @@ export const renderPaymentSummary = (currentTableId, currentOrderSnapshot) => {
     // NOVO: Renderiza os botões/cards de divisão
     renderPaymentSplits(currentTableId, currentOrderSnapshot);
 };
-// Exportada para uso no app.js
-export { renderPaymentSummary };
 
 
 // Event listener para inicialização
