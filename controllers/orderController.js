@@ -48,20 +48,21 @@ window.decreaseLocalItemQuantity = decreaseLocalItemQuantity;
 
 // --- FUNÇÕES DE EXIBIÇÃO DE TELA E MODAL ---
 
-export const renderMenu = (filter = currentCategoryFilter, search = currentSearch) => { 
-    const menuItemsGrid = document.getElementById('menuItemsGrid');
-    const categoryFiltersContainer = document.getElementById('categoryFilters');
-    const searchProductInput = document.getElementById('searchProductInput');
+export const renderMenu = (filter = currentCategoryFilter, search = '', screen = 'staff') => { 
+    const isClient = screen === 'client';
+    const suffix = isClient ? 'Client' : '';
+    
+    const menuItemsGrid = document.getElementById(`menuItemsGrid${suffix}`);
+    const categoryFiltersContainer = document.getElementById(`categoryFilters${suffix}`);
+    const searchProductInput = document.getElementById(`searchProductInput${suffix}`);
     
     if (!menuItemsGrid || !categoryFiltersContainer) return;
     
     const products = getProducts();
     const categories = getCategories(); 
-    
-    // 1. Atualiza e Renderiza Filtros de Categoria
-    currentCategoryFilter = filter; // Atualiza estado
+
+    // 1. Renderiza Filtros de Categoria
     if (categories.length > 0) {
-        // CORRIGIDO: Adiciona classe de ativo e botão para filtro
         categoryFiltersContainer.innerHTML = categories.map(cat => {
             const isActive = cat.slug === currentCategoryFilter ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border border-gray-300';
             return `
@@ -71,44 +72,23 @@ export const renderMenu = (filter = currentCategoryFilter, search = currentSearc
                 </button>
             `;
         }).join('');
-        
-        // NOVO: Adiciona listener de filtro de categoria (só precisa ser adicionado uma vez)
-        if (!categoryFiltersContainer.hasAttribute('data-listener')) {
-            categoryFiltersContainer.addEventListener('click', (e) => {
-                const btn = e.target.closest('.category-btn');
-                if (btn) {
-                    const categorySlug = btn.dataset.category;
-                    renderMenu(categorySlug, currentSearch); // Filtra por categoria, mantendo a busca
-                }
-            });
-            categoryFiltersContainer.setAttribute('data-listener', 'true');
-        }
     }
-
-    // 2. Lógica de Busca e Filtro
-    currentSearch = search; // Persiste a busca
-    let filteredProducts = products;
     
+    // ... (Lógica de Filtro e Busca) ...
+
+    let filteredProducts = products;
     if (search) {
         const normalizedSearch = search.toLowerCase();
         filteredProducts = filteredProducts.filter(p => p.name.toLowerCase().includes(normalizedSearch));
     }
     
-    // NOVO: Filtro por Categoria (aplica no resultado da busca, se houver)
     if (currentCategoryFilter !== 'all') {
         filteredProducts = filteredProducts.filter(p => p.category === currentCategoryFilter);
     }
-    
-    // Adiciona listener de busca no input
-    if (searchProductInput) {
-        if (!searchProductInput.hasAttribute('data-listener')) {
-            searchProductInput.addEventListener('input', (e) => renderMenu(currentCategoryFilter, e.target.value)); // Filtra por busca, mantendo a categoria
-            searchProductInput.setAttribute('data-listener', 'true');
-        }
-        // Garante que o input reflita o estado atual
-        if (searchProductInput.value !== currentSearch) {
-             searchProductInput.value = currentSearch;
-        }
+
+    if (searchProductInput && !searchProductInput.hasAttribute('data-listener')) {
+        searchProductInput.addEventListener('input', (e) => renderMenu(currentCategoryFilter, e.target.value, screen));
+        searchProductInput.setAttribute('data-listener', 'true');
     }
 
     if (filteredProducts.length === 0) {
@@ -136,23 +116,32 @@ export const renderMenu = (filter = currentCategoryFilter, search = currentSearc
     `).join('');
 };
 
+// Ajustada para renderizar ambas as telas
 export const renderOrderScreen = () => {
-    const openOrderList = document.getElementById('openOrderList');
-    const openItemsCount = document.getElementById('openItemsCount');
-    const sendSelectedItemsBtn = document.getElementById('sendSelectedItemsBtn');
+    // Renderiza Tela do Staff
+    _renderOrderList('openOrderList', 'openItemsCount', 'sendSelectedItemsBtn', false);
+    
+    // Renderiza Tela do Cliente
+    _renderOrderList('openOrderListClient', 'openItemsCountClient', 'sendClientOrderBtn', true);
+};
 
+const _renderOrderList = (listId, countId, btnId, isClient) => {
+    const openOrderList = document.getElementById(listId);
+    const openItemsCount = document.getElementById(countId);
+    const sendBtn = document.getElementById(btnId);
+    
     if (!openOrderList) return;
-
+    
     const openItemsCountValue = selectedItems.length;
     openItemsCount.textContent = openItemsCountValue;
 
-    if (sendSelectedItemsBtn) {
-        if (userRole === 'client') {
-            sendSelectedItemsBtn.disabled = true;
-            sendSelectedItemsBtn.textContent = 'Aguardando Staff';
+    if (sendBtn) {
+        // Lógica de desativação e texto para o botão de envio
+        sendBtn.disabled = openItemsCountValue === 0;
+        if (isClient) {
+             sendBtn.textContent = ''; // Usando ícone no HTML
         } else {
-            sendSelectedItemsBtn.disabled = openItemsCountValue === 0;
-            sendSelectedItemsBtn.textContent = 'Enviar Itens';
+             sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i>';
         }
     }
 
@@ -259,7 +248,52 @@ export const addItemToSelection = (product) => {
 window.addItemToSelection = addItemToSelection;
 
 
-// Item 1: Envia Pedidos ao KDS e Resumo
+// NOVO MÓDULO: Envio de Pedido pelo Cliente (Aguardando Garçom)
+export const handleClientSendOrder = async () => {
+    if (!currentTableId || selectedItems.length === 0) return;
+    
+    if (userRole !== 'client') {
+        alert("Apenas clientes podem usar esta função. Use o botão de envio normal.");
+        return;
+    }
+
+    if (!confirm(`Confirmar o envio de ${selectedItems.length} item(s) para o Garçom?`)) return;
+
+    try {
+        const tableRef = getTableDocRef(currentTableId);
+        
+        // Marca e adiciona o pedido à lista de "requestedOrders" (nova estrutura)
+        const requestedOrder = {
+            orderId: `req_${Date.now()}`,
+            items: selectedItems.map(item => ({...item, requestedAt: Date.now()})),
+            requestedAt: serverTimestamp(),
+            status: 'pending_waiter' // Novo status para o Garçom
+        };
+        
+        // Limpa a lista local e salva, notificando o garçom no Firebase
+        await updateDoc(tableRef, {
+            // Adiciona o pedido à coleção de pedidos pendentes do cliente
+            requestedOrders: arrayUnion(requestedOrder), 
+            // Limpa a lista de itens selecionados (o carrinho do cliente)
+            selectedItems: [],
+            // Adiciona um campo de notificação simples para o painel de mesas/staff
+            waiterNotification: { type: 'client_request', timestamp: serverTimestamp() } 
+        });
+
+        // Limpa o estado local para refletir o envio
+        selectedItems.length = 0; 
+        renderOrderScreen();
+        
+        alert(`Pedido enviado! Aguarde a confirmação do seu Garçom.`);
+
+    } catch (e) {
+        console.error("Erro ao enviar pedido do cliente:", e);
+        alert("Falha ao enviar pedido para o Garçom/Firebase.");
+    }
+};
+
+
+// Item 1: Envia Pedidos ao KDS e Resumo (Função de Staff)
 export const handleSendSelectedItems = async () => { 
     if (!currentTableId || selectedItems.length === 0) return;
     if (userRole === 'client') return; 
@@ -327,34 +361,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const sendBtn = document.getElementById('sendSelectedItemsBtn');
     if (sendBtn) sendBtn.addEventListener('click', handleSendSelectedItems);
     
+    const sendClientBtn = document.getElementById('sendClientOrderBtn');
+    if (sendClientBtn) sendClientBtn.addEventListener('click', handleClientSendOrder);
+    
     // Mapeamento defensivo dos elementos do modal DENTRO DO DOMContentLoaded
-    obsModal = document.getElementById('obsModal'); // CORRIGIDO: Atribuição ao escopo do módulo
+    obsModal = document.getElementById('obsModal'); 
     obsItemName = document.getElementById('obsItemName');
     obsInput = document.getElementById('obsInput');
     saveObsBtn = document.getElementById('saveObsBtn');
     cancelObsBtn = document.getElementById('cancelObsBtn');
     esperaSwitch = document.getElementById('esperaSwitch');
-
-    // NOVO: Adiciona listener para os botões de observação rápida
-    const quickObsButtons = obsModal.querySelector('#quickObsButtons');
-    if (quickObsButtons) {
-        quickObsButtons.addEventListener('click', (e) => {
-            const btn = e.target.closest('.quick-obs-btn');
-            if (btn) {
-                const obsText = btn.dataset.obs;
-                let currentValue = obsInput.value.trim();
-                
-                // Lógica para adicionar vírgula e espaço se já houver texto
-                if (currentValue && !currentValue.endsWith(',')) {
-                    currentValue += ', ';
-                } else if (currentValue.endsWith(',')) {
-                    currentValue += ' ';
-                }
-                
-                obsInput.value = (currentValue + obsText).trim();
-            }
-        });
-    }
     
     if (saveObsBtn) {
         saveObsBtn.addEventListener('click', () => {
@@ -373,9 +389,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 newNote = noteCleaned;
             }
 
-            // CORREÇÃO: Removida a lógica de "limpeza" condicional.
-            // O item permanece na lista mesmo com newNote === ''
-            
             // 2. Atualiza TODOS os itens que pertencem a esse grupo de obs
             let updatedItems = selectedItems.map(item => { 
                 if (item.id == itemId && (item.note || '') === originalNoteKey) {
@@ -396,9 +409,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (cancelObsBtn) {
         cancelObsBtn.addEventListener('click', () => {
-             // CORREÇÃO: Removida a lógica de remoção de itens adicionados na hora (originalNoteKey === '')
-             // O item recém-adicionado permanece na lista, pois foi adicionado em addItemToSelection.
-             
+             // O item permanece na lista se foi recém-adicionado
              obsModal.style.display = 'none';
              renderOrderScreen(); 
         });
