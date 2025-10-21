@@ -14,6 +14,37 @@ let currentSectorFilter = 'Todos';
 let unsubscribeTables = null; 
 
 
+// --- FUNÇÃO DE ALERTA CUSTOMIZADO ---
+const showCustomAlert = (title, message) => {
+    const modal = document.getElementById('customAlertModal');
+    const titleEl = document.getElementById('customAlertTitle');
+    const messageEl = document.getElementById('customAlertMessage');
+    const okBtn = document.getElementById('customAlertOkBtn');
+
+    if (!modal || !titleEl || !messageEl || !okBtn) {
+        // Fallback para o alert nativo se o modal não for encontrado
+        alert(`${title}: ${message}`);
+        return;
+    }
+    
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    
+    // Configura o comportamento do botão para fechar o modal
+    okBtn.onclick = () => {
+        modal.style.display = 'none';
+        // Limpa o input de busca para que o cliente possa tentar de novo
+        const searchTableInput = document.getElementById('searchTableInput');
+        if (searchTableInput) {
+            searchTableInput.value = '';
+            searchTableInput.focus();
+        }
+    };
+    
+    modal.style.display = 'flex';
+};
+
+
 // --- RENDERIZAÇÃO DE SETORES ---
 
 export const renderTableFilters = () => {
@@ -267,17 +298,58 @@ export const handleSearchTable = async (isClientFlow = false) => {
     const docSnap = await getDoc(tableRef);
 
     if (docSnap.exists() && docSnap.data().status === 'open') {
-        openTableForOrder(tableNumber, isClientFlow); // Passa a flag para o próximo passo
-        searchTableInput.value = '';
         
-        // NOVO: Restringe o cliente após a vinculação da mesa
         if (isClientFlow) {
-            searchTableInput.readOnly = true;
-            searchTableInput.placeholder = `Mesa ${tableNumber} vinculada.`;
-            searchTableBtn.style.display = 'none';
+            // LÓGICA CLIENTE 1: MESA OCUPADA/ABERTA (CLIENTE NÃO PODE USAR)
+            showCustomAlert("Mesa Ocupada", "A mesa já está em uso. Informe o garçom para se vincular.");
+            // A função showCustomAlert já limpa o input e retorna o foco
+            return; 
+        } else {
+            // LÓGICA STAFF: Abre a mesa para pedido
+            openTableForOrder(tableNumber, isClientFlow); 
+            searchTableInput.value = '';
         }
+
     } else {
-        alert(`A Mesa ${tableNumber} não está aberta.`);
+        
+        if (isClientFlow) {
+            // LÓGICA CLIENTE 2: MESA FECHADA (ABRE AUTOMATICAMENTE PARA O CLIENTE)
+            const defaultDiners = 1;
+            const defaultSector = 'Salão 1'; 
+            const targetTableId = tableNumber;
+
+            try {
+                await setDoc(tableRef, {
+                    tableNumber: parseInt(targetTableId),
+                    diners: defaultDiners,
+                    sector: defaultSector, 
+                    status: 'open',
+                    createdAt: serverTimestamp(),
+                    total: 0,
+                    sentItems: [], 
+                    payments: [],
+                    serviceTaxApplied: true, 
+                    selectedItems: [],
+                    linkedClient: true
+                });
+
+                // Lógica de sucesso (abrir a tela do cliente)
+                openTableForOrder(targetTableId, isClientFlow); 
+                searchTableInput.value = '';
+                searchTableInput.readOnly = true;
+                searchTableInput.placeholder = `Mesa ${tableNumber} vinculada.`;
+                searchTableBtn.style.display = 'none';
+                
+                alert("Mesa aberta com sucesso! Você já pode fazer pedidos.");
+            } catch (e) {
+                 console.error("Erro ao abrir mesa pelo cliente:", e);
+                 alert("Erro ao tentar abrir a mesa. Tente novamente.");
+            }
+            
+        } else {
+            // LÓGICA STAFF: Mesa não existe/fechada, alerta simples.
+            alert(`A Mesa ${tableNumber} não está aberta.`);
+        }
     }
 };
 
