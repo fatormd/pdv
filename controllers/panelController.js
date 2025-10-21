@@ -227,7 +227,8 @@ export const loadOpenTables = () => {
         const docs = snapshot.docs;
         renderTables(docs);
     }, (error) => {
-        console.error("Erro ao carregar mesas (onSnapshot):", error);
+        // CORREÇÃO: Tratamento de erro melhorado para diagnosticar o Firebase
+        console.error("Erro ao carregar mesas (onSnapshot): Verifique permissões do Firebase (regras de segurança) ou índices.", error);
     });
 };
 
@@ -328,7 +329,7 @@ export const handleSearchTable = async (isClientFlow = false) => {
                     total: 0,
                     sentItems: [], 
                     payments: [],
-                    serviceTaxApplied: true, 
+                    serviceTaxApplied: true,
                     selectedItems: [],
                     linkedClient: true
                 });
