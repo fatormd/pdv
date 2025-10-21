@@ -62,10 +62,12 @@ const renderReviewItemsList = (currentOrderSnapshot) => {
     const mainAccountItemsCount = Object.values(groupedItems).reduce((sum, group) => sum + group.totalCount, 0);
 
     // Atualiza os ícones para refletir o estado de seleção
-    document.getElementById('itemMassTransferBtn').classList.toggle('text-yellow-600', isMassSelectionActive);
-    document.getElementById('itemMassDeleteBtn').classList.toggle('text-red-600', isMassSelectionActive);
-    document.getElementById('itemMassTransferBtn').classList.toggle('text-gray-500', !isMassSelectionActive);
-    document.getElementById('itemMassDeleteBtn').classList.toggle('text-gray-500', !isMassSelectionActive);
+    const transferBtn = document.getElementById('itemMassTransferBtn');
+    const deleteBtn = document.getElementById('itemMassDeleteBtn');
+    if (transferBtn) transferBtn.classList.toggle('text-yellow-600', isMassSelectionActive);
+    if (deleteBtn) deleteBtn.classList.toggle('text-red-600', isMassSelectionActive);
+    if (transferBtn) transferBtn.classList.toggle('text-gray-500', !isMassSelectionActive);
+    if (deleteBtn) deleteBtn.classList.toggle('text-gray-500', !isMassSelectionActive);
 
 
     if (mainAccountItemsCount === 0) {
@@ -259,8 +261,43 @@ const openSplitTransferModal = (targetKey, mode, itemsToTransfer = null) => {
     const itemCount = itemsToTransfer ? itemsToTransfer.length : 0;
     
     if (itemsToTransfer && mode === 'move_out') {
-        // CORREÇÃO DO ALERTA: Mensagem mais clara sobre o próximo passo
-        alert(`Pronto para transferir ${itemCount} item(s). Agora deve abrir o modal de seleção de Contas de Divisão (Split) ou criação de nova conta. (Em desenvolvimento)`);
+        // CORREÇÃO: Implementação do modal de seleção de destino
+        
+        const modal = document.getElementById('selectiveTransferModal');
+        const splits = currentOrderSnapshot.splits || {};
+        const splitKeys = Object.keys(splits);
+
+        let splitOptionsHtml = splitKeys.map(key => `
+            <button class="w-full px-4 py-3 bg-blue-100 text-blue-700 font-bold rounded-lg hover:bg-blue-200 transition text-base" 
+                    onclick="alert('Transferindo ${itemCount} item(s) para a conta ${key}')">
+                Conta de Divisão ${key.slice(6)} (${splits[key].items.length} itens)
+            </button>
+        `).join('');
+        
+        if (splitKeys.length === 0) {
+            splitOptionsHtml = `<p class="text-sm text-gray-500 italic mb-4">Nenhuma conta de divisão ativa. Crie uma nova abaixo.</p>`;
+        }
+
+        modal.innerHTML = `
+            <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+                <h3 class="text-xl font-bold mb-4 text-indigo-700">Transferir ${itemCount} Item(s)</h3>
+                
+                <h4 class="text-lg font-semibold text-gray-700 mb-3">Contas Existentes:</h4>
+                <div class="space-y-2 mb-4 max-h-48 overflow-y-auto">${splitOptionsHtml}</div>
+                
+                <h4 class="text-lg font-semibold text-gray-700 mb-3">Nova Conta:</h4>
+                <button class="w-full px-4 py-3 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600 transition text-base"
+                        onclick="window.handleAddSplitAccount(window.currentTableId, window.currentOrderSnapshot); document.getElementById('selectiveTransferModal').style.display='none';">
+                    + Criar Nova Conta de Divisão
+                </button>
+                
+                <div class="flex justify-end mt-4">
+                    <button class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-base" 
+                            onclick="document.getElementById('selectiveTransferModal').style.display='none'">Cancelar</button>
+                </div>
+            </div>
+        `;
+        modal.style.display = 'flex';
     } else {
         alert(`Gerenciamento da conta ${targetKey} no modo ${mode} (Em desenvolvimento).`);
     }
@@ -347,6 +384,8 @@ export const renderPaymentSummary = (currentTableId, currentOrderSnapshot) => {
     // NOVO: Renderiza os botões/cards de divisão
     renderPaymentSplits(currentTableId, currentOrderSnapshot);
 };
+// CORREÇÃO: A função deve ser explicitamente exportada para ser importada por app.js
+export { renderPaymentSummary };
 
 
 // Event listener para inicialização
