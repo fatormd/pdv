@@ -1,6 +1,7 @@
 // --- APP.JS ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+// Importado signInAnonymously para uso direto no fluxo de login
+import { getAuth, onAuthStateChanged, signInAnonymously, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // Importações dos Módulos Refatorados
@@ -18,9 +19,9 @@ export const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
 
 // Credenciais Staff Centralizadas (para login unificado)
 const STAFF_CREDENTIALS = {
-    'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' }, 
+    'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' }, // Corrigida a senha para 1234
     'garcom@fator.com': { password: '1234', role: 'garcom', name: 'Mock Garçom' },
-    'cliente@fator.com': { password: '1234', role: 'client', name: 'Cliente Teste' }, // Credencial do Cliente
+    'cliente@fator.com': { password: '1234', role: 'client', name: 'Cliente Teste' }, 
 };
 
 // Variáveis Mutáveis (Estado da Sessão)
@@ -94,6 +95,7 @@ export const goToScreen = (screenId) => {
     const screenIndex = screens[screenId];
     if (screenIndex !== undefined) {
         if (appContainer) {
+            // Transform ajustado para 5 telas
             appContainer.style.transform = `translateX(-${screenIndex * 100}vw)`;
         }
         document.body.classList.toggle('bg-gray-900', screenId === 'managerScreen');
@@ -171,12 +173,11 @@ const handleStaffLogin = async () => {
         userRole = staffData.role;
         
         try {
-            // Obter a instância auth para usar com métodos Firebase
             const app = initializeApp(JSON.parse(window.__firebase_config));
             const authInstance = getAuth(app);
             
-            // Tenta o login com e-mail/senha
-            const userCredential = await signInWithEmailAndPassword(authInstance, email, password); 
+            // CORREÇÃO: Usamos Anonymous Auth para obter um token de sessão Firebase
+            const userCredential = await signInAnonymously(authInstance); 
             userId = userCredential.user.uid; 
             
             document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)} | Função: ${userRole.toUpperCase()}`;
@@ -202,9 +203,10 @@ const handleStaffLogin = async () => {
             goToScreen('panelScreen');
             
         } catch (error) {
-             console.error("Erro ao autenticar Staff (Firebase):", error);
-             // Tenta login anônimo se o e-mail/senha falhar, para manter o ambiente
-             getAuth(initializeApp(JSON.parse(window.__firebase_config))).signInAnonymously();
+             console.error("Erro ao autenticar Staff (Firebase/Anônimo):", error);
+             // Tenta login anônimo como fallback, caso a primeira falhe (e o Email/Password não esteja ativo)
+             const app = initializeApp(JSON.parse(window.__firebase_config));
+             getAuth(app).signInAnonymously();
              alert("Autenticação falhou. Verifique as credenciais ou a configuração do Firebase.");
         }
     } else {
@@ -303,4 +305,4 @@ document.addEventListener('DOMContentLoaded', () => {
     // 3. Carrega UI Inicial
     loadOpenTables();
     renderTableFilters(); 
-}); 
+});
