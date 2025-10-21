@@ -18,7 +18,7 @@ export const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
 
 // Credenciais Staff Centralizadas (para login unificado)
 const STAFF_CREDENTIALS = {
-    'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' }, // Senha Corrigida para 1234
+    'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' }, 
     'garcom@fator.com': { password: '1234', role: 'garcom', name: 'Mock Garçom' },
     'cliente@fator.com': { password: '1234', role: 'client', name: 'Cliente Teste' }, // Credencial do Cliente
 };
@@ -83,8 +83,7 @@ export const goToScreen = (screenId) => {
     const screenIndex = screens[screenId];
     if (screenIndex !== undefined) {
         if (appContainer) {
-            // Ajuste o CSS se width: 400vw estiver inline no HTML, para 500vw
-            // Ou use transform corretamente:
+            // Transform ajustado para 5 telas
             appContainer.style.transform = `translateX(-${screenIndex * 100}vw)`;
         }
         document.body.classList.toggle('bg-gray-900', screenId === 'managerScreen');
@@ -162,9 +161,10 @@ const handleStaffLogin = async () => {
         userRole = staffData.role;
         
         try {
-            const authInstance = auth;
-            // Assinatura anônima para obter um user.uid do Firebase
-            const userCredential = await auth.signInWithEmailAndPassword(auth, email, password); 
+            const authInstance = getAuth(firebaseConfig); // A instância precisa ser obtida aqui se usada no try-catch
+            // Faz o login com a senha correta (método padrão do Firebase com e-mail/senha)
+            // Se você não tiver o Firebase Authentication ativado, pode usar signInAnonymously como fallback
+            const userCredential = await auth.signInWithEmailAndPassword(authInstance, email, password); 
             userId = userCredential.user.uid; 
             
             document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)} | Função: ${userRole.toUpperCase()}`;
@@ -179,20 +179,20 @@ const handleStaffLogin = async () => {
             
             // NOVO FLUXO: Roteamento baseado na função
             if (userRole === 'client') {
-                 // Cliente precisa informar a mesa para começar
-                 // Implementação futura: modal para inserir número da mesa
-                 alert("Bem-vindo Cliente! Insira o número da sua mesa no campo de busca para começar a pedir.");
-                 goToScreen('panelScreen');
+                 // CLIENTE: Adiciona classe de restrição e instrução
+                 document.body.classList.add('client-mode');
+                 goToScreen('panelScreen'); 
             } else {
-                 // Staff vai direto para o painel de mesas
+                 // STAFF: Remove classe de restrição (se existir)
+                 document.body.classList.remove('client-mode');
                  goToScreen('panelScreen');
             }
             
         } catch (error) {
-             console.error("Erro ao autenticar Staff (Firebase/Anônimo):", error);
+             console.error("Erro ao autenticar Staff (Firebase):", error);
              // Tenta login anônimo se o e-mail/senha falhar, para manter o ambiente
-             auth.signInAnonymously(authInstance);
-             alert("Autenticação local OK, mas falha no Firebase. Verifique a configuração ou conexão.");
+             getAuth(firebaseConfig).signInAnonymously();
+             alert("Autenticação falhou. Verifique as credenciais ou a configuração do Firebase.");
         }
     } else {
         alert('Credenciais inválidas. Verifique seu e-mail e senha.');
@@ -206,8 +206,10 @@ const handleLogout = () => {
     selectedItems = [];
     userRole = 'anonymous'; 
     
-    if (auth && auth.currentUser) {
-        auth.signOut().catch(e => console.error("Erro no sign out:", e)); 
+    // Obtém a instância correta do auth para logout
+    const authInstance = getAuth(initializeApp(JSON.parse(window.__firebase_config)));
+    if (authInstance && authInstance.currentUser) {
+        auth.signOut(authInstance).catch(e => console.error("Erro no sign out:", e)); 
     }
     
     goToScreen('panelScreen');
@@ -219,9 +221,13 @@ window.handleLogout = handleLogout;
 
 
 // --- INITIALIZATION ---
+let firebaseConfig;
 document.addEventListener('DOMContentLoaded', () => {
+    
+    // CRIAÇÃO DO OBJETO FIREBASE CONF.
+    firebaseConfig = JSON.parse(window.__firebase_config);
 
-    // CORREÇÃO DO LOGIN: Captura dos elementos dentro do DOMContentLoaded
+    // Captura dos elementos dentro do DOMContentLoaded
     const loginBtnElement = document.getElementById('loginBtn');
     const loginEmailInputElement = document.getElementById('loginEmail'); 
     const loginPasswordInputElement = document.getElementById('loginPassword');
@@ -233,7 +239,6 @@ document.addEventListener('DOMContentLoaded', () => {
     loginPasswordInput = loginPasswordInputElement;
     searchTableInput = searchTableInputElement;
     
-    const firebaseConfig = JSON.parse(window.__firebase_config);
     const app = initializeApp(firebaseConfig); 
     const dbInstance = getFirestore(app);
     const authInstance = getAuth(app);
@@ -243,7 +248,10 @@ document.addEventListener('DOMContentLoaded', () => {
     onAuthStateChanged(authInstance, (user) => {
         if (!user) {
             showLoginModal();
-        } 
+        } else if (userRole === 'client') {
+            // Se o cliente já estiver logado (reload)
+            document.body.classList.add('client-mode');
+        }
     });
 
     // 1. Event Listeners de Login
@@ -270,6 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (searchTableBtnTrigger) {
         searchTableBtnTrigger.addEventListener('click', () => {
+            // A busca de mesa é o método que o cliente usa para se vincular
             if (userRole === 'client') {
                  handleSearchTable(true); // Passa flag para ir para a tela de cliente
             } else {
