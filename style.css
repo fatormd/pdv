@@ -134,6 +134,12 @@ input:checked + .slider-obs {
 input:checked + .slider-obs:before {
   transform: translateX(22px);
 }
+/* Item 6: Ajuste de padding nos botões de pagamento */
+#paymentMethodButtons .payment-method-btn {
+    padding-top: 0.75rem; /* Aumenta o espaço vertical */
+    padding-bottom: 0.75rem;
+}
+
 
 /* Animação de Loading */
 @keyframes spin { to { transform: rotate(360deg); } }
