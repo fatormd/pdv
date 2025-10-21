@@ -190,9 +190,15 @@ const handleStaffLogin = async () => {
             // CORREÇÃO CRÍTICA: REEXIBIR O CONTEÚDO PRINCIPAL (MainContent)
             if (mainContent) mainContent.style.display = 'block'; 
 
+            // NOVO: Chamadas de inicialização do Staff
             loadOpenTables();
             renderTableFilters(); 
-            fetchWooCommerceProducts(renderMenu);
+            
+            // GARANTE PRODUTOS: Chama fetchWooCommerceProducts com callback para renderizar TUDO
+            fetchWooCommerceProducts(() => {
+                // Roda o renderMenu para o Staff e Cliente APÓS o fetch
+                renderOrderScreen(); 
+            });
             fetchWooCommerceCategories(renderTableFilters); 
             
             // NOVO FLUXO DE ROTEAMENTO
