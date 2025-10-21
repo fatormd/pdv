@@ -18,7 +18,7 @@ export const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
 
 // Credenciais Staff Centralizadas (para login unificado)
 const STAFF_CREDENTIALS = {
-    'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' }, // CORRIGIDO: Senha ajustada para 1234
+    'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' }, 
     'garcom@fator.com': { password: '1234', role: 'garcom', name: 'Mock Garçom' },
 };
 
