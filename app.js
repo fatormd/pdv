@@ -186,7 +186,9 @@ const handleStaffLogin = async () => {
             document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)} | Função: ${userRole.toUpperCase()}`;
             
             hideLoginModal(); 
-            // hideStatus(); // Não é mais necessário, pois o CSS/modal de login controla
+            
+            // CORREÇÃO CRÍTICA: REEXIBIR O CONTEÚDO PRINCIPAL (MainContent)
+            if (mainContent) mainContent.style.display = 'block'; 
 
             loadOpenTables();
             renderTableFilters(); 
@@ -197,6 +199,7 @@ const handleStaffLogin = async () => {
             if (userRole === 'client') {
                  // CLIENTE: Adiciona classe de restrição e vai para a tela de pedidos (Index 0)
                  document.body.classList.add('client-mode');
+                 alert("Bem-vindo Cliente! Insira o número da sua mesa no campo de busca para começar a pedir.");
                  goToScreen('clientOrderScreen'); 
             } else {
                  // STAFF: Remove classe de restrição e vai para o painel de mesas (Index 1)
@@ -206,6 +209,9 @@ const handleStaffLogin = async () => {
             
         } catch (error) {
              console.error("Erro ao autenticar Staff (Firebase/Anônimo):", error);
+             // Tenta login anônimo como fallback, caso a primeira falhe (e o Email/Password não esteja ativo)
+             const app = initializeApp(JSON.parse(window.__firebase_config));
+             getAuth(app).signInAnonymously();
              alert("Autenticação falhou. Verifique as credenciais ou a configuração do Firebase.");
         }
     } else {
