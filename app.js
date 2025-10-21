@@ -1,7 +1,6 @@
 // --- APP.JS ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-// Importado signInAnonymously para uso direto no fluxo de login
-import { getAuth, onAuthStateChanged, signInAnonymously, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // Importações dos Módulos Refatorados
@@ -13,13 +12,19 @@ import { renderPaymentSummary } from './controllers/paymentController.js';
 import { openManagerAuthModal } from './controllers/managerController.js';
 
 // --- VARIÁVEIS DE ESTADO GLOBAL ---
-// Index 4 para o novo painel do cliente
-export const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2, 'managerScreen': 3, 'clientOrderScreen': 4 };
+// CORRIGIDO: NOVO ORDENAMENTO (Cliente -> Mapa de Mesas -> Pedido Staff)
+export const screens = { 
+    'clientOrderScreen': 0,
+    'panelScreen': 1,
+    'orderScreen': 2,
+    'paymentScreen': 3,
+    'managerScreen': 4
+};
 export const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
 
 // Credenciais Staff Centralizadas (para login unificado)
 const STAFF_CREDENTIALS = {
-    'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' }, // Corrigida a senha para 1234
+    'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' }, 
     'garcom@fator.com': { password: '1234', role: 'garcom', name: 'Mock Garçom' },
     'cliente@fator.com': { password: '1234', role: 'client', name: 'Cliente Teste' }, 
 };
@@ -51,7 +56,7 @@ let searchTableInput = null;
 export const hideStatus = () => {
     if (statusScreen && mainContent) {
         statusScreen.style.display = 'none';
-        mainContent.style.display = 'block';
+        // Removido display: block aqui, pois o CSS já faz o trabalho quando o modal de login some
     }
 };
 
@@ -67,7 +72,6 @@ const showLoginModal = () => {
 const hideLoginModal = () => {
     if (loginModal) {
         loginModal.style.display = 'none';
-        mainContent.style.display = 'block';
     }
 };
 
@@ -95,7 +99,6 @@ export const goToScreen = (screenId) => {
     const screenIndex = screens[screenId];
     if (screenIndex !== undefined) {
         if (appContainer) {
-            // Transform ajustado para 5 telas
             appContainer.style.transform = `translateX(-${screenIndex * 100}vw)`;
         }
         document.body.classList.toggle('bg-gray-900', screenId === 'managerScreen');
@@ -176,37 +179,33 @@ const handleStaffLogin = async () => {
             const app = initializeApp(JSON.parse(window.__firebase_config));
             const authInstance = getAuth(app);
             
-            // CORREÇÃO: Usamos Anonymous Auth para obter um token de sessão Firebase
+            // Usamos Anonymous Auth para obter um user.uid e confiar no mapeamento local
             const userCredential = await signInAnonymously(authInstance); 
             userId = userCredential.user.uid; 
             
             document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)} | Função: ${userRole.toUpperCase()}`;
             
             hideLoginModal(); 
-            hideStatus(); 
-            
+            // hideStatus(); // Não é mais necessário, pois o CSS/modal de login controla
+
             loadOpenTables();
             renderTableFilters(); 
             fetchWooCommerceProducts(renderMenu);
             fetchWooCommerceCategories(renderTableFilters); 
             
-            // ROTEAMENTO INICIAL: Cliente deve ser forçado ao Painel de Mesas
-            // mas o Painel de Mesas terá sua UI restrita pelo CSS e JS.
+            // NOVO FLUXO DE ROTEAMENTO
             if (userRole === 'client') {
-                 // CLIENTE: Adiciona classe de restrição. A busca de mesa fará o resto.
+                 // CLIENTE: Adiciona classe de restrição e vai para a tela de pedidos (Index 0)
                  document.body.classList.add('client-mode');
-                 alert("Bem-vindo Cliente! Insira o número da sua mesa no campo de busca para começar a pedir.");
+                 goToScreen('clientOrderScreen'); 
             } else {
-                 // STAFF: Remove classe de restrição (se existir)
+                 // STAFF: Remove classe de restrição e vai para o painel de mesas (Index 1)
                  document.body.classList.remove('client-mode');
+                 goToScreen('panelScreen'); 
             }
-            goToScreen('panelScreen');
             
         } catch (error) {
              console.error("Erro ao autenticar Staff (Firebase/Anônimo):", error);
-             // Tenta login anônimo como fallback, caso a primeira falhe (e o Email/Password não esteja ativo)
-             const app = initializeApp(JSON.parse(window.__firebase_config));
-             getAuth(app).signInAnonymously();
              alert("Autenticação falhou. Verifique as credenciais ou a configuração do Firebase.");
         }
     } else {
