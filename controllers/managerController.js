@@ -56,7 +56,7 @@ const renderProductManagement = () => {
 
 // --- CONTROLE DE ACESSO E AÇÕES ---
 
-const handleGerencialAction = (action, payload) => {
+const handleGerencialAction = (action) => {
     switch (action) {
         case 'goToManagerPanel':
             goToScreen('managerScreen'); 
@@ -64,18 +64,6 @@ const handleGerencialAction = (action, payload) => {
         case 'openProductManagement':
         case 'openCategoryManagement':
             renderProductManagement(); // Usa o mesmo modal para visualização
-            break;
-        case 'openItemTransfer':
-             window.activateItemSelection(payload); // Ativa modo de seleção (transfer)
-            break;
-        case 'openItemDelete':
-            window.activateItemSelection(payload); // Ativa modo de seleção (delete)
-            break;
-        case 'disableServiceTax':
-            window.handleServiceTaxToggleConfirmed(); // Chama a função no paymentController.js
-            break;
-        case 'deletePayment':
-            window.handleDeletePaymentConfirmed(payload); // Chama a função no paymentController.js com o ID do pagamento
             break;
         case 'openInventoryManagement':
             alert("Módulo de ESTOQUE/INVENTÁRIO (Fase 2) em desenvolvimento. Requer Ficha Técnica e entrada por NF-e.");
@@ -109,7 +97,7 @@ const handleGerencialAction = (action, payload) => {
     }
 };
 
-export const openManagerAuthModal = (action, payload = null) => {
+export const openManagerAuthModal = (action, payload) => {
     const managerModal = document.getElementById('managerModal');
     if (!managerModal) return; 
 
@@ -134,6 +122,7 @@ export const openManagerAuthModal = (action, payload = null) => {
         
         if (input && input.value === MANAGER_PASSWORD) {
             managerModal.style.display = 'none';
+            
             handleGerencialAction(action, payload);
             
         } else {
@@ -142,4 +131,3 @@ export const openManagerAuthModal = (action, payload = null) => {
         }
     };
 };
-window.openManagerAuthModal = openManagerAuthModal;
