@@ -1,6 +1,6 @@
 // --- APP.JS ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signInAnonymously, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // Importações dos Módulos Refatorados
@@ -31,21 +31,22 @@ export let userId = null;
 export let unsubscribeTable = null;
 
 
-// --- ELEMENTOS UI ---
+// --- ELEMENTOS UI (Definidos aqui para escopo, mas buscados no DOMContentLoaded) ---
 const statusScreen = document.getElementById('statusScreen');
 const mainContent = document.getElementById('mainContent');
 const appContainer = document.getElementById('appContainer');
 
+// Elementos de Login (Mantidos como const por enquanto, re-anexados no DOMContentLoaded)
 const loginModal = document.getElementById('loginModal');
 const logoutBtnHeader = document.getElementById('logoutBtnHeader');
 const abrirMesaBtn = document.getElementById('abrirMesaBtn');
 const openManagerPanelBtn = document.getElementById('openManagerPanelBtn'); 
 
-// Elementos de Login
-const loginBtn = document.getElementById('loginBtn');
-const loginEmailInput = document.getElementById('loginEmail'); 
-const loginPasswordInput = document.getElementById('loginPassword');
-const searchTableBtn = document.getElementById('searchTableBtn'); 
+// Variáveis para inputs de Login (inicialmente null, preenchidas no DOMContentLoaded)
+let loginBtn = null; 
+let loginEmailInput = null; 
+let loginPasswordInput = null;
+let searchTableBtn = null; 
 
 
 // --- FUNÇÕES CORE E ROTIAMENTO ---
@@ -137,6 +138,12 @@ const authenticateStaff = (email, password) => {
 };
 
 const handleStaffLogin = async () => {
+    // Garante que os elementos foram carregados (fix para o erro de login)
+    if (!loginBtn || !loginEmailInput || !loginPasswordInput) {
+         console.error("Erro: Elementos de login não encontrados.");
+         return;
+    }
+    
     if (loginBtn) loginBtn.disabled = true; 
     
     const email = loginEmailInput.value.trim();
@@ -181,7 +188,7 @@ const handleLogout = () => {
     userRole = 'anonymous'; 
     
     if (auth && auth.currentUser) {
-        auth.signOut().catch(e => console.error("Erro no sign out:", e)); 
+        signOut(auth).catch(e => console.error("Erro no sign out:", e)); 
     }
     
     goToScreen('panelScreen');
@@ -194,6 +201,12 @@ window.handleLogout = handleLogout;
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
+
+    // CORREÇÃO DO LOGIN: Captura dos elementos dentro do DOMContentLoaded
+    loginBtn = document.getElementById('loginBtn');
+    loginEmailInput = document.getElementById('loginEmail'); 
+    loginPasswordInput = document.getElementById('loginPassword');
+    searchTableBtn = document.getElementById('searchTableBtn'); 
 
     const firebaseConfig = JSON.parse(window.__firebase_config);
     const app = initializeApp(firebaseConfig); 
