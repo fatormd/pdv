@@ -4,7 +4,6 @@ import { getProducts } from "../services/wooCommerceService.js";
 import { formatCurrency } from "../utils.js";
 import { activateItemSelection, handleMassDeleteConfirmed } from "./paymentController.js"; // Importado
 
-
 // Credenciais Staff Centralizadas (copiadas do app.js)
 const STAFF_CREDENTIALS = {
     'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' }, 
@@ -67,7 +66,7 @@ const handleGerencialAction = (action, payload) => {
         case 'openMassTransfer': // NOVO: Ativa o modo de seleção para transferência
             activateItemSelection(payload); 
             break;
-        case 'deleteReviewItem': // Mantido: Se a ação de exclusão individual for usada no futuro
+        case 'deleteReviewItem':
             handleMassDeleteConfirmed(payload); 
             break;
         case 'openProductManagement':
