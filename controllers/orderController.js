@@ -6,6 +6,7 @@ import { currentTableId, selectedItems, userRole, currentOrderSnapshot } from ".
 import { arrayUnion, serverTimestamp, doc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { getKdsCollectionRef, getTableDocRef } from "../services/firebaseService.js";
 import { openManagerAuthModal } from "./managerController.js";
+import { renderClientOrderScreen, openClientObsModalForGroup } from "./clientOrderController.js"; // Importa do novo módulo
 
 
 // --- VARIÁVEIS DE ELEMENTOS (Serão definidas em DOMContentLoaded) ---
@@ -49,9 +50,11 @@ window.decreaseLocalItemQuantity = decreaseLocalItemQuantity;
 // --- FUNÇÕES DE EXIBIÇÃO DE TELA E MODAL ---
 
 export const renderMenu = (filter = currentCategoryFilter, search = '', screen = 'staff') => { 
+    // Adaptação para o novo fluxo:
     const isClient = screen === 'client';
     const suffix = isClient ? 'Client' : '';
     
+    // ... (Restante da lógica do renderMenu é a mesma, focando nos sufixos) ...
     const menuItemsGrid = document.getElementById(`menuItemsGrid${suffix}`);
     const categoryFiltersContainer = document.getElementById(`categoryFilters${suffix}`);
     const searchProductInput = document.getElementById(`searchProductInput${suffix}`);
@@ -121,8 +124,8 @@ export const renderOrderScreen = () => {
     // Renderiza Tela do Staff
     _renderOrderList('openOrderList', 'openItemsCount', 'sendSelectedItemsBtn', false);
     
-    // Renderiza Tela do Cliente
-    _renderOrderList('openOrderListClient', 'openItemsCountClient', 'sendClientOrderBtn', true);
+    // Renderiza Tela do Cliente (Delegada ao novo controller)
+    renderClientOrderScreen();
     
     // Renderiza o menu nas duas telas
     renderMenu(currentCategoryFilter, currentSearch, 'staff');
@@ -188,6 +191,12 @@ const _renderOrderList = (listId, countId, btnId, isClient) => {
 
 // Item 3: Abertura do Modal de Observações (Restrito para Cliente)
 export const openObsModalForGroup = (itemId, noteKey) => {
+    // Se o cliente estiver ativo, delega para a função restrita do cliente
+    if (userRole === 'client') {
+        openClientObsModalForGroup(itemId, noteKey);
+        return;
+    }
+    
     const products = getProducts();
     const product = products.find(p => p.id == itemId);
     
@@ -199,7 +208,7 @@ export const openObsModalForGroup = (itemId, noteKey) => {
 
     if (!product) return;
 
-    // 1. Configura o estado do modal
+    // 1. Configura o estado do modal (Staff Flow)
     obsItemName.textContent = product.name; 
     
     const currentNoteCleaned = noteKey.replace(' [EM ESPERA]', '').trim(); 
@@ -210,15 +219,9 @@ export const openObsModalForGroup = (itemId, noteKey) => {
     
     esperaSwitch.checked = noteKey.toLowerCase().includes('espera');
 
-    // NOVO: Restrição para Cliente (sem caixa de texto livre)
-    if (userRole === 'client') {
-        obsInput.readOnly = true;
-        // Permite apenas botões rápidos e o switch de espera
-        obsInput.placeholder = "Apenas observações rápidas e botões abaixo permitidos.";
-    } else {
-        obsInput.readOnly = false;
-        obsInput.placeholder = "Ex: Sem cebola, Ponto da carne mal passada...";
-    }
+    // Staff tem acesso total
+    obsInput.readOnly = false;
+    obsInput.placeholder = "Ex: Sem cebola, Ponto da carne mal passada...";
 
     // 2. Exibe o modal
     obsModal.style.display = 'flex';
@@ -261,51 +264,6 @@ export const addItemToSelection = (product) => {
 };
 window.addItemToSelection = addItemToSelection;
 
-
-// NOVO MÓDULO: Envio de Pedido pelo Cliente (Aguardando Garçom)
-export const handleClientSendOrder = async () => {
-    if (!currentTableId || selectedItems.length === 0) return;
-    
-    if (userRole !== 'client') {
-        alert("Apenas clientes podem usar esta função. Use o botão de envio normal.");
-        return;
-    }
-
-    if (!confirm(`Confirmar o envio de ${selectedItems.length} item(s) para o Garçom?`)) return;
-
-    try {
-        const tableRef = getTableDocRef(currentTableId);
-        
-        // Marca e adiciona o pedido à lista de "requestedOrders" (nova estrutura)
-        const requestedOrder = {
-            orderId: `req_${Date.now()}`,
-            items: selectedItems.map(item => ({...item, requestedAt: Date.now()})),
-            requestedAt: Date.now(), // CORRIGIDO: Usando Date.now() para evitar FirebaseError
-            status: 'pending_waiter' // Novo status para o Garçom
-        };
-        
-        // Limpa a lista local e salva, notificando o garçom no Firebase
-        await updateDoc(tableRef, {
-            // Inicializa ou adiciona o pedido à coleção de pedidos pendentes do cliente
-            requestedOrders: arrayUnion(requestedOrder), 
-            // Limpa a lista de itens selecionados (o carrinho do cliente)
-            selectedItems: [],
-            // NOVO: Flag de Notificação para o Staff
-            clientOrderPending: true, 
-            waiterNotification: { type: 'client_request', timestamp: serverTimestamp() } 
-        });
-
-        // Limpa o estado local para refletir o envio
-        selectedItems.length = 0; 
-        renderOrderScreen();
-        
-        alert(`Pedido enviado! Aguarde a confirmação do seu Garçom.`);
-
-    } catch (e) {
-        console.error("Erro ao enviar pedido do cliente:", e);
-        alert("Falha ao enviar pedido para o Garçom/Firebase.");
-    }
-};
 
 // Item 1: Envia Pedidos ao KDS e Resumo (Função de Staff)
 export const handleSendSelectedItems = async () => { 
@@ -374,9 +332,6 @@ export const handleSendSelectedItems = async () => {
 document.addEventListener('DOMContentLoaded', () => {
     const sendBtn = document.getElementById('sendSelectedItemsBtn');
     if (sendBtn) sendBtn.addEventListener('click', handleSendSelectedItems);
-    
-    const sendClientBtn = document.getElementById('sendClientOrderBtn');
-    if (sendClientBtn) sendClientBtn.addEventListener('click', handleClientSendOrder);
     
     // Mapeamento defensivo dos elementos do modal DENTRO DO DOMContentLoaded
     obsModal = document.getElementById('obsModal'); 
