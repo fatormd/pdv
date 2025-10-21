@@ -56,11 +56,26 @@ const renderProductManagement = () => {
 
 // --- CONTROLE DE ACESSO E AÇÕES ---
 
-const handleGerencialAction = (action) => {
+const handleGerencialAction = (action, payload) => {
     switch (action) {
+        case 'goToManagerPanel':
+            goToScreen('managerScreen'); 
+            break;
         case 'openProductManagement':
         case 'openCategoryManagement':
             renderProductManagement(); // Usa o mesmo modal para visualização
+            break;
+        case 'openItemTransfer':
+             window.activateItemSelection(payload); // Ativa modo de seleção (transfer)
+            break;
+        case 'openItemDelete':
+            window.activateItemSelection(payload); // Ativa modo de seleção (delete)
+            break;
+        case 'disableServiceTax':
+            window.handleServiceTaxToggleConfirmed(); // Chama a função no paymentController.js
+            break;
+        case 'deletePayment':
+            window.handleDeletePaymentConfirmed(payload); // Chama a função no paymentController.js com o ID do pagamento
             break;
         case 'openInventoryManagement':
             alert("Módulo de ESTOQUE/INVENTÁRIO (Fase 2) em desenvolvimento. Requer Ficha Técnica e entrada por NF-e.");
@@ -94,7 +109,7 @@ const handleGerencialAction = (action) => {
     }
 };
 
-export const openManagerAuthModal = (action, payload) => {
+export const openManagerAuthModal = (action, payload = null) => {
     const managerModal = document.getElementById('managerModal');
     if (!managerModal) return; 
 
@@ -119,13 +134,7 @@ export const openManagerAuthModal = (action, payload) => {
         
         if (input && input.value === MANAGER_PASSWORD) {
             managerModal.style.display = 'none';
-            
-            if (action === 'goToManagerPanel') {
-                alert("Acesso de Gerente liberado!");
-                goToScreen('managerScreen'); 
-            } else {
-                handleGerencialAction(action);
-            }
+            handleGerencialAction(action, payload);
             
         } else {
             alert("Senha incorreta.");
@@ -133,3 +142,4 @@ export const openManagerAuthModal = (action, payload) => {
         }
     };
 };
+window.openManagerAuthModal = openManagerAuthModal;
