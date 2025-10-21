@@ -1,12 +1,9 @@
 // --- CONTROLLERS/PAYMENTCONTROLLER.JS (Painel 3) ---
-import { goToScreen, userRole, currentTableId, currentOrderSnapshot } from "../app.js";
+import { goToScreen, userRole } from "../app.js";
 import { formatCurrency, calculateItemsValue, getNumericValueFromCurrency } from "../utils.js";
 import { getTableDocRef } from "../services/firebaseService.js";
 import { updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-
-// Variáveis de estado do módulo
-let currentPaymentMethod = 'Dinheiro'; // Padrão
 
 // Função para calcular o total geral (subtotal + serviço)
 const calculateTotal = (subtotal, applyServiceTax) => {
@@ -154,8 +151,7 @@ export const renderPaymentSummary = (currentTableId, currentOrderSnapshot) => {
         finalizeOrderBtn.disabled = !canFinalize;
     }
     
-    // NOVO: Renderiza a lista de itens da conta (para exclusão/transferência em massa)
-    // Usando a versão simples, pois a complexa foi revertida.
+    // Item 1: NOVO: Renderiza a lista de itens da conta (agora no topo)
     renderReviewItemsList(currentOrderSnapshot);
     
     // NOVO: Renderiza os botões/cards de divisão
@@ -163,7 +159,7 @@ export const renderPaymentSummary = (currentTableId, currentOrderSnapshot) => {
 };
 
 
-// NOVO: Adiciona a funcionalidade de adicionar conta de divisão
+// Exportado para ser chamado no app.js, que acessa o estado global (currentTableId, currentOrderSnapshot)
 export const handleAddSplitAccount = async (currentTableId, currentOrderSnapshot) => {
     if (!currentTableId || userRole === 'client') return;
     
@@ -189,7 +185,8 @@ export const handleAddSplitAccount = async (currentTableId, currentOrderSnapshot
         alert("Erro ao tentar adicionar a conta de divisão.");
     }
 };
-window.handleAddSplitAccount = handleAddSplitAccount;
+window.handleAddSplitAccount = handleAddSplitAccount; // Exposto ao escopo global
+
 
 // Implementar no futuro: Lógica para mover itens para as subcontas.
 const openSplitTransferModal = (targetKey, mode) => {
@@ -211,7 +208,12 @@ const renderReviewItemsList = (currentOrderSnapshot) => {
     if (!listEl) return;
     
     const sentItems = currentOrderSnapshot.sentItems || [];
-    listEl.innerHTML = `<div class="text-sm text-gray-500 italic p-2">Total de ${sentItems.length} itens na conta (Funcionalidades de exclusão/transferência em desenvolvimento).</div>`;
+    listEl.innerHTML = `
+        <div class="border p-2 rounded-lg bg-gray-50 max-h-32 overflow-y-auto">
+            <div class="text-sm text-gray-500 italic p-2">Total de ${sentItems.length} itens na conta.</div>
+            <p class="text-xs text-gray-400">Funcionalidades de visualização detalhada, exclusão e transferência em desenvolvimento.</p>
+        </div>
+    `;
 };
 
 
@@ -227,13 +229,13 @@ const moveItemsToMainAccount = (splitKey) => {
 window.moveItemsToMainAccount = moveItemsToMainAccount;
 
 
-// Event listener para adicionar conta de divisão e outros
+// Event listener para adicionar conta de divisão
 document.addEventListener('DOMContentLoaded', () => {
     const addSplitAccountBtn = document.getElementById('addSplitAccountBtn');
     if (addSplitAccountBtn) {
-        // Usa a função do módulo paymentController, que acessa os dados globais
         addSplitAccountBtn.addEventListener('click', () => {
-             handleAddSplitAccount(window.currentTableId, window.currentOrderSnapshot);
+            // Chama a função globalmente acessível, passando os estados globais como argumentos
+            window.handleAddSplitAccount(window.currentTableId, window.currentOrderSnapshot); 
         });
     }
     
