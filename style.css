@@ -14,7 +14,7 @@ body { overflow-x: hidden; }
 /* Contêiner principal para transição de telas */
 #appContainer {
     display: flex;
-    /* CORRIGIDO: 5 TELAS (Painel, Order, Payment, Manager, Client) */
+    /* CORREÇÃO: 5 TELAS */
     width: 500vw; 
     transition: transform 0.3s ease-out; 
     min-height: calc(100vh - 56px); /* Altura total - altura do header */
@@ -153,6 +153,7 @@ body.client-mode #sectorFilters, /* Filtros de Setor */
 body.client-mode #openTablesList /* Lista de Mesas */ {
     display: none !important;
 }
+
 
 /* Animação de Loading */
 @keyframes spin { to { transform: rotate(360deg); } }
