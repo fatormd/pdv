@@ -152,21 +152,23 @@
                         <span class="text-2xl font-semibold mr-3" id="payment-table-number">Mesa Selecionada</span>
                     </div>
                 </div>
-                
+
                 <div class="content-card bg-white p-4 mb-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-xl font-semibold text-green-700">Resumo da Conta</h2>
-                        <div class="flex space-x-2">
-                             <button id="itemTransferBtn" class="text-gray-500 hover:text-indigo-600 transition" title="Transferir Itens (Gerente)">
-                                <i class="fas fa-exchange-alt text-lg"></i>
-                            </button>
-                             <button id="itemDeleteBtn" class="text-gray-500 hover:text-red-600 transition" title="Excluir Itens (Gerente)">
-                                <i class="fas fa-trash-alt text-lg"></i>
+                    <h2 class="text-xl font-semibold text-green-700 mb-4">Resumo da Conta</h2>
+                    
+                    <div class="content-card bg-white p-4 mb-6 mt-6">
+                        <h2 class="text-xl font-semibold text-indigo-700 mb-4">Contas de Pagamento (Pessoas)</h2>
+                        <div id="paymentSplitsContainer" class="space-y-3">
+                            <div class="text-sm text-gray-500 italic p-2">Nenhuma conta de divisão criada.</div>
+                        </div>
+                        <div class="flex justify-end mt-4">
+                            <button id="addSplitAccountBtn" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition text-base font-bold disabled:opacity-50" disabled>
+                                + Adicionar Conta para Divisão
                             </button>
                         </div>
                     </div>
-                    
-                    <div id="reviewItemsList" class="space-y-3 border-b border-gray-200 mb-4 pb-2">
+
+                    <div id="reviewItemsList" class="space-y-3 pt-2">
                          <div class="text-sm text-gray-500 italic p-2">Nenhum item na conta para revisão.</div>
                     </div>
                     
@@ -206,18 +208,6 @@
                         <span class="text-3xl font-extrabold text-indigo-700" id="orderTotalDisplayPayment">R$ 0,00</span>
                     </div>
                 </div>
-                
-                <div class="content-card bg-white p-4 mb-6 mt-6">
-                    <h2 class="text-xl font-semibold text-indigo-700 mb-4">Contas de Pagamento (Pessoas)</h2>
-                    <div id="paymentSplitsContainer" class="space-y-3">
-                        <div class="text-sm text-gray-500 italic p-2">Nenhuma conta de divisão criada.</div>
-                    </div>
-                    <div class="flex justify-end mt-4">
-                        <button id="addSplitAccountBtn" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition text-base font-bold disabled:opacity-50" disabled>
-                            + Adicionar Conta para Divisão
-                        </button>
-                    </div>
-                </div>
 
                 <div id="chargeInputs" class="p-4 pt-0 content-card bg-white mt-6">
                     <h4 class="text-lg font-semibold text-gray-700 mb-3">Registrar Pagamento</h4>
@@ -226,16 +216,10 @@
                         <button id="openCustomerRegBtn" class="bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 transition duration-150 disabled:opacity-50" title="Cadastrar Cliente">
                             <i class="fas fa-plus"></i>
                         </button>
-                        <div class="relative w-full">
-                            <input type="text" id="customerSearchInput" placeholder="Buscar Cliente (Nome/WhatsApp)" class="w-full p-3 pr-10 input-pdv border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
-                            <button id="searchCustomerBtn" class="absolute right-0 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-indigo-600 transition" title="Buscar Cliente">
-                                <i class="fas fa-search"></i>
-                            </button>
-                        </div>
+                        <input type="text" id="customerSearchInput" placeholder="Buscar Cliente (Nome/WhatsApp)" class="w-full p-3 input-pdv border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
                     </div>
-                    
                     <div class="space-y-3">
-                        <div id="paymentMethodButtons" class="grid grid-cols-3 md:grid-cols-3 gap-2 py-2">
+                        <div id="paymentMethodButtons" class="grid grid-cols-3 md:grid-cols-3 gap-2">
                             <button class="payment-method-btn" data-method="Dinheiro">Dinheiro</button>
                             <button class="payment-method-btn" data-method="Pix">Pix</button>
                             <button class="payment-method-btn" data-method="Credito">Crédito</button>
@@ -243,22 +227,15 @@
                             <button class="payment-method-btn" data-method="Ticket">Ticket</button>
                             <button class="payment-method-btn" data-method="Voucher">Voucher</button>
                         </div>
-                        
                         <div class="flex space-x-2">
                             <input type="text" id="paymentValueInput" placeholder="Valor Pago (R$ 0,00)" class="w-full p-3 input-pdv border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base text-right" value="R$ 0,00">
-                            <button id="openCalculatorBtn" class="bg-gray-200 text-gray-700 font-bold py-3 px-4 rounded-lg hover:bg-gray-300 transition text-base disabled:opacity-50" title="Abrir Calculadora (Em desenvolvimento)">
+                            <button class="bg-gray-200 text-gray-700 font-bold py-3 px-4 rounded-lg hover:bg-gray-300 transition text-base disabled:opacity-50" id="openCalculatorBtn" title="Abrir Calculadora">
                                 <i class="fas fa-calculator"></i>
                             </button>
                         </div>
-                        
                         <button id="addPaymentBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition duration-150 text-base disabled:opacity-50">
                             Adicionar Pagamento
                         </button>
-                    </div>
-                    
-                    <h5 class="text-md font-semibold text-gray-600 mt-4 mb-2 border-t pt-2">Pagamentos Registrados</h5>
-                    <div id="registeredPaymentsList" class="max-h-32 overflow-y-auto border p-2 rounded-lg">
-                         <div class="text-sm text-gray-500 italic p-2">Nenhum pagamento registrado.</div>
                     </div>
                 </div>
                 
@@ -405,51 +382,11 @@
     <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         </div>
     
-    <div id="customerRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
-            <h3 class="text-xl font-bold mb-4 text-indigo-700">Cadastrar Novo Cliente</h3>
-            <input type="text" id="customerNameInput" placeholder="Nome Completo" class="w-full p-3 mb-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
-            <input type="text" id="customerWhatsAppInput" placeholder="WhatsApp (DDD+Número)" class="w-full p-3 mb-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
-            <input type="email" id="customerEmailInput" placeholder="E-mail (Opcional)" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
-            
-            <div class="flex justify-end space-x-3">
-                <button class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-base" onclick="document.getElementById('customerRegModal').style.display='none'">Cancelar</button>
-                <button class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base" onclick="window.handleCustomerRegistration()">Cadastrar</button>
-            </div>
+    <div id="waiterRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         </div>
-    </div>
     
-    <div id="finalizeOrderModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg">
-            <h3 class="text-2xl font-bold mb-4 text-green-700">Finalizar Conta</h3>
-            <p class="text-lg mb-4">Selecione as opções de fechamento:</p>
-            
-            <div class="space-y-4">
-                <input type="text" id="nfeCpfCnpjInput" placeholder="CPF/CNPJ para NF-e (Opcional)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-base">
-            </div>
-            
-            <div class="grid grid-cols-2 gap-4 mt-6">
-                 <button class="px-4 py-4 bg-blue-500 text-white font-bold rounded-lg hover:bg-blue-600 transition disabled:opacity-50">
-                    <i class="fas fa-print"></i> Imprimir Recibo
-                 </button>
-                 <button class="px-4 py-4 bg-yellow-500 text-white font-bold rounded-lg hover:bg-yellow-600 transition disabled:opacity-50">
-                    <i class="fas fa-envelope"></i> Enviar NF-e (E-mail/WhatsApp)
-                 </button>
-                 <button class="px-4 py-4 bg-gray-500 text-white font-bold rounded-lg hover:bg-gray-600 transition disabled:opacity-50">
-                    <i class="fas fa-credit-card"></i> Imprimir Maquininha
-                 </button>
-                 <button class="px-4 py-4 bg-red-500 text-white font-bold rounded-lg hover:bg-red-600 transition disabled:opacity-50">
-                    <i class="fas fa-times-circle"></i> Fechar Mesa e Sair
-                 </button>
-            </div>
-            
-            <div class="flex justify-end space-x-3 mt-6 border-t pt-4">
-                <button class="px-4 py-3 bg-gray-400 text-gray-800 rounded-lg hover:bg-gray-500 transition text-base" onclick="document.getElementById('finalizeOrderModal').style.display='none'">Cancelar / Voltar</button>
-                <button class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base" onclick="alert('Lógica de fechamento de mesa e envio ao WooCommerce em desenvolvimento.')">Fechar Mesa (WooCommerce)</button>
-            </div>
+    <div id="customerRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         </div>
-    </div>
-
 
     <div id="reportsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         </div>
@@ -488,8 +425,6 @@
         window.decreaseLocalItemQuantity = () => {};
         window.increaseLocalItemQuantity = () => {};
         window.openObsModalForGroup = () => {};
-        window.handleCustomerRegistration = () => {}; // Adicionado
-        window.handleSearchCustomer = () => {}; // Adicionado
         
         // CORREÇÃO CRÍTICA DO ERRO JSON.PARSE: Garante que o JSON esteja completo e válido
         window.__app_id = "pdv_fator_instance_001"; // ID da instância do PDV
