@@ -3,12 +3,18 @@ import { goToScreen, userRole, currentTableId, currentOrderSnapshot } from "../a
 import { formatCurrency, calculateItemsValue, getNumericValueFromCurrency } from "../utils.js";
 import { getTableDocRef } from "../services/firebaseService.js";
 import { updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { openManagerAuthModal } from "./managerController.js"; // Importado para proteção de exclusão
+import { openManagerAuthModal } from "./managerController.js"; 
+import { handleTableTransferConfirmed } from "./panelController.js"; // Importado para concluir a transferência
 
 
 // Variáveis de estado do módulo
 let currentPaymentMethod = 'Dinheiro'; // Padrão
 let isMassSelectionActive = false; // NOVO: Estado para controle do modo de seleção
+
+
+// --- Variáveis de estado para a Transferência de Mesa ---
+let itemsToTransfer = [];
+
 
 // Função para calcular o total geral (subtotal + serviço)
 const calculateTotal = (subtotal, applyServiceTax) => {
@@ -157,9 +163,17 @@ export const activateItemSelection = (action) => {
         }
 
         if (action === 'transfer') {
-             // Lógica de Transferência de Itens
-             const allItemKeys = selectedItemsGroups.flatMap(group => group.itemKeys);
-             openSplitTransferModal('new_split', 'move_out', allItemKeys); 
+             // Lógica de Transferência de Mesa
+             itemsToTransfer = selectedItemsGroups.flatMap(group => 
+                group.itemKeys.map(key => {
+                    const [orderId, sentAt] = key.split('_');
+                    // Retorna o item completo do sentItems para facilitar a transferência
+                    return currentOrderSnapshot.sentItems.find(item => item.orderId === orderId && item.sentAt == sentAt);
+                }).filter(Boolean)
+             );
+             
+             openTableTransferModal(itemsToTransfer);
+             
         } else if (action === 'delete') {
              // Lógica de Exclusão de Itens
              handleMassDeleteConfirmed(selectedItemsGroups);
@@ -227,6 +241,64 @@ export const handleMassDeleteConfirmed = async (selectedGroups) => {
 window.handleMassDeleteConfirmed = handleMassDeleteConfirmed;
 
 
+// 5. Lógica de Abertura do Modal de Transferência de MESA (Novo)
+export const openTableTransferModal = (items) => {
+    itemsToTransfer = items; // Armazena o payload globalmente
+    const itemCount = itemsToTransfer.length;
+    
+    const modal = document.getElementById('tableTransferModal');
+    if (!modal) return;
+    
+    document.getElementById('transferModalTitle').textContent = `Transferir ${itemCount} Item(s)`;
+    document.getElementById('transferOriginTable').textContent = `Mesa ${currentTableId}`;
+    document.getElementById('targetTableInput').value = '';
+    document.getElementById('newTableDinersInput').classList.add('hidden'); // Esconde inputs de nova mesa
+    document.getElementById('confirmTableTransferBtn').textContent = 'Prosseguir';
+    document.getElementById('confirmTableTransferBtn').disabled = false;
+    
+    modal.style.display = 'flex';
+};
+
+
+// 6. Lógica de Confirmação de Transferência de MESA (Chamado do botão do modal)
+export const handleConfirmTableTransfer = async () => {
+    const targetTableInput = document.getElementById('targetTableInput');
+    const targetTableNumber = targetTableInput.value.trim();
+    
+    if (!targetTableNumber || parseInt(targetTableNumber) <= 0 || targetTableNumber === currentTableId) {
+        alert("Insira um número de mesa de destino válido e diferente da mesa atual.");
+        return;
+    }
+    
+    const dinersInput = document.getElementById('newTableDiners');
+    const sectorInput = document.getElementById('newTableSector');
+    
+    let diners = 0;
+    let sector = '';
+    
+    // Verifica se os campos de nova mesa estão visíveis
+    if (!document.getElementById('newTableDinersInput').classList.contains('hidden')) {
+        diners = parseInt(dinersInput.value);
+        sector = sectorInput.value;
+        if (!diners || !sector) {
+            alert('Preencha a quantidade de pessoas e o setor para abrir a nova mesa.');
+            return;
+        }
+    }
+    
+    const confirmBtn = document.getElementById('confirmTableTransferBtn');
+    confirmBtn.disabled = true;
+
+    // Chama a função centralizada em panelController para processar a transferência/abertura
+    // NOTE: Esta função é importada no escopo do módulo e exposta no window pelo panelController
+    window.handleTableTransferConfirmed(currentTableId, targetTableNumber, itemsToTransfer, diners, sector);
+    
+    document.getElementById('tableTransferModal').style.display = 'none';
+    itemsToTransfer = []; // Limpa o payload global
+};
+window.handleConfirmTableTransfer = handleConfirmTableTransfer;
+
+
 // Exportado para ser chamado no app.js, que acessa o estado global (currentTableId, currentOrderSnapshot)
 export const handleAddSplitAccount = async (currentTableId, currentOrderSnapshot) => {
     if (!currentTableId || userRole === 'client') return;
@@ -258,10 +330,10 @@ window.handleAddSplitAccount = handleAddSplitAccount; // Exposto ao escopo globa
 
 // Implementar no futuro: Lógica para mover itens para as subcontas.
 const openSplitTransferModal = (targetKey, mode, itemsToTransfer = null) => {
+    // Mantido o modal de splits para ser usado nos botões de split
     const itemCount = itemsToTransfer ? itemsToTransfer.length : 0;
     
     if (itemsToTransfer && mode === 'move_out') {
-        
         const modal = document.getElementById('selectiveTransferModal');
         const splits = currentOrderSnapshot.splits || {};
         const splitKeys = Object.keys(splits);
@@ -384,6 +456,9 @@ export const renderPaymentSummary = (currentTableId, currentOrderSnapshot) => {
     renderPaymentSplits(currentTableId, currentOrderSnapshot);
 };
 
+// Exportada para uso no app.js
+export { renderPaymentSummary, renderPaymentSplits };
+
 
 // Event listener para inicialização
 document.addEventListener('DOMContentLoaded', () => {
@@ -408,5 +483,36 @@ document.addEventListener('DOMContentLoaded', () => {
     const finalizeOrderBtn = document.getElementById('finalizeOrderBtn');
     if (finalizeOrderBtn) {
         finalizeOrderBtn.addEventListener('click', handleFinalizeOrder);
+    }
+    
+    const confirmTransferBtn = document.getElementById('confirmTableTransferBtn');
+    if (confirmTransferBtn) {
+        confirmTransferBtn.addEventListener('click', handleConfirmTableTransfer);
+    }
+
+    const targetTableInput = document.getElementById('targetTableInput');
+    const newTableDinersInput = document.getElementById('newTableDinersInput');
+
+    if (targetTableInput) {
+        targetTableInput.addEventListener('input', async (e) => {
+             const tableNumber = e.target.value.trim();
+             const confirmBtn = document.getElementById('confirmTableTransferBtn');
+             newTableDinersInput.classList.add('hidden'); // Esconde por padrão
+             confirmBtn.textContent = 'Prosseguir';
+             
+             if (tableNumber) {
+                 const tableRef = getTableDocRef(tableNumber);
+                 const docSnap = await getDoc(tableRef);
+                 
+                 if (docSnap.exists() && docSnap.data().status === 'open') {
+                     // Mesa aberta: só transfere
+                     confirmBtn.textContent = `Transferir para Mesa ${tableNumber}`;
+                 } else {
+                     // Mesa fechada/inexistente: precisa abrir
+                     newTableDinersInput.classList.remove('hidden');
+                     confirmBtn.textContent = `Abrir Mesa ${tableNumber} e Transferir`;
+                 }
+             }
+        });
     }
 });
