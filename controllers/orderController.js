@@ -426,6 +426,6 @@ document.addEventListener('DOMContentLoaded', () => {
              // O item permanece na lista se foi recém-adicionado
              obsModal.style.display = 'none';
              renderOrderScreen(); 
-        });
+        }); 
     }
 });
