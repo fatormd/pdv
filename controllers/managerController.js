@@ -2,6 +2,8 @@
 import { goToScreen } from "../app.js";
 import { getProducts } from "../services/wooCommerceService.js";
 import { formatCurrency } from "../utils.js";
+import { handleItemDeleteConfirmed } from "./paymentController.js"; // Importado para confirmar a exclusão
+
 
 // Credenciais Staff Centralizadas (copiadas do app.js)
 const STAFF_CREDENTIALS = {
@@ -56,10 +58,13 @@ const renderProductManagement = () => {
 
 // --- CONTROLE DE ACESSO E AÇÕES ---
 
-const handleGerencialAction = (action) => {
+const handleGerencialAction = (action, payload) => {
     switch (action) {
         case 'goToManagerPanel':
             goToScreen('managerScreen'); 
+            break;
+        case 'deleteReviewItem': // NOVO: Ação para exclusão de item da conta
+            handleItemDeleteConfirmed(payload); 
             break;
         case 'openProductManagement':
         case 'openCategoryManagement':
