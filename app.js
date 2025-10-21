@@ -18,7 +18,7 @@ export const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
 
 // Credenciais Staff Centralizadas (para login unificado)
 const STAFF_CREDENTIALS = {
-    'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' }, // CORRIGIDO: Senha atualizada para 1234 (conforme hint)
+    'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' }, // CORRIGIDO: Senha ajustada para 1234
     'garcom@fator.com': { password: '1234', role: 'garcom', name: 'Mock Garçom' },
 };
 
@@ -31,22 +31,17 @@ export let userId = null;
 export let unsubscribeTable = null;
 
 
-// --- ELEMENTOS UI (Definidos aqui para escopo, mas buscados no DOMContentLoaded) ---
+// --- ELEMENTOS UI (Definidos no escopo superior para referências, mas buscados no DOMContentLoaded) ---
 const statusScreen = document.getElementById('statusScreen');
 const mainContent = document.getElementById('mainContent');
 const appContainer = document.getElementById('appContainer');
-
-// Elementos de Login (Mantidos como const por enquanto, re-anexados no DOMContentLoaded)
 const loginModal = document.getElementById('loginModal');
-const logoutBtnHeader = document.getElementById('logoutBtnHeader');
-const abrirMesaBtn = document.getElementById('abrirMesaBtn');
-const openManagerPanelBtn = document.getElementById('openManagerPanelBtn'); 
 
 // Variáveis para inputs de Login (inicialmente null, preenchidas no DOMContentLoaded)
 let loginBtn = null; 
 let loginEmailInput = null; 
 let loginPasswordInput = null;
-let searchTableInput = null; // Renomeado para input
+let searchTableInput = null; 
 
 
 // --- FUNÇÕES CORE E ROTIAMENTO ---
@@ -218,7 +213,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeFirebase(dbInstance, authInstance, window.__app_id || 'pdv_default_app'); 
 
     onAuthStateChanged(authInstance, (user) => {
-        // Se o Firebase não autenticar anonimamente (geralmente acontece no início ou após o logout), mostra o modal
         if (!user) {
             showLoginModal();
         } 
@@ -233,7 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
     const logoutBtnHeader = document.getElementById('logoutBtnHeader');
     const abrirMesaBtn = document.getElementById('abrirMesaBtn');
-    const searchTableBtnTrigger = document.getElementById('searchTableBtn'); // O botão de busca
+    const searchTableBtnTrigger = document.getElementById('searchTableBtn');
 
     if (openManagerPanelBtn) { 
         openManagerPanelBtn.addEventListener('click', () => {
