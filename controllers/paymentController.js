@@ -3,18 +3,12 @@ import { goToScreen, userRole, currentTableId, currentOrderSnapshot } from "../a
 import { formatCurrency, calculateItemsValue, getNumericValueFromCurrency } from "../utils.js";
 import { getTableDocRef } from "../services/firebaseService.js";
 import { updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { openManagerAuthModal } from "./managerController.js"; 
-import { handleTableTransferConfirmed } from "./panelController.js"; // Importado para concluir a transferência
+import { openManagerAuthModal } from "./managerController.js"; // Importado para proteção de exclusão
 
 
 // Variáveis de estado do módulo
 let currentPaymentMethod = 'Dinheiro'; // Padrão
 let isMassSelectionActive = false; // NOVO: Estado para controle do modo de seleção
-
-
-// --- Variáveis de estado para a Transferência de Mesa ---
-let itemsToTransfer = [];
-
 
 // Função para calcular o total geral (subtotal + serviço)
 const calculateTotal = (subtotal, applyServiceTax) => {
@@ -163,16 +157,16 @@ export const activateItemSelection = (action) => {
         }
 
         if (action === 'transfer') {
-             // Lógica de Transferência de Mesa
-             itemsToTransfer = selectedItemsGroups.flatMap(group => 
-                group.itemKeys.map(key => {
-                    const [orderId, sentAt] = key.split('_');
-                    // Retorna o item completo do sentItems para facilitar a transferência
-                    return currentOrderSnapshot.sentItems.find(item => item.orderId === orderId && item.sentAt == sentAt);
-                }).filter(Boolean)
-             );
+             // Lógica de Transferência de Itens
+             const allItemKeys = selectedItemsGroups.flatMap(group => group.itemKeys);
              
-             openTableTransferModal(itemsToTransfer);
+             // Encontra os itens completos para transferência
+             const itemsToTransferPayload = allItemKeys.map(key => {
+                 const [orderId, sentAt] = key.split('_');
+                 return currentOrderSnapshot.sentItems.find(item => item.orderId === orderId && item.sentAt == sentAt);
+             }).filter(Boolean);
+             
+             openTableTransferModal(itemsToTransferPayload);
              
         } else if (action === 'delete') {
              // Lógica de Exclusão de Itens
@@ -241,64 +235,6 @@ export const handleMassDeleteConfirmed = async (selectedGroups) => {
 window.handleMassDeleteConfirmed = handleMassDeleteConfirmed;
 
 
-// 5. Lógica de Abertura do Modal de Transferência de MESA (Novo)
-export const openTableTransferModal = (items) => {
-    itemsToTransfer = items; // Armazena o payload globalmente
-    const itemCount = itemsToTransfer.length;
-    
-    const modal = document.getElementById('tableTransferModal');
-    if (!modal) return;
-    
-    document.getElementById('transferModalTitle').textContent = `Transferir ${itemCount} Item(s)`;
-    document.getElementById('transferOriginTable').textContent = `Mesa ${currentTableId}`;
-    document.getElementById('targetTableInput').value = '';
-    document.getElementById('newTableDinersInput').classList.add('hidden'); // Esconde inputs de nova mesa
-    document.getElementById('confirmTableTransferBtn').textContent = 'Prosseguir';
-    document.getElementById('confirmTableTransferBtn').disabled = false;
-    
-    modal.style.display = 'flex';
-};
-
-
-// 6. Lógica de Confirmação de Transferência de MESA (Chamado do botão do modal)
-export const handleConfirmTableTransfer = async () => {
-    const targetTableInput = document.getElementById('targetTableInput');
-    const targetTableNumber = targetTableInput.value.trim();
-    
-    if (!targetTableNumber || parseInt(targetTableNumber) <= 0 || targetTableNumber === currentTableId) {
-        alert("Insira um número de mesa de destino válido e diferente da mesa atual.");
-        return;
-    }
-    
-    const dinersInput = document.getElementById('newTableDiners');
-    const sectorInput = document.getElementById('newTableSector');
-    
-    let diners = 0;
-    let sector = '';
-    
-    // Verifica se os campos de nova mesa estão visíveis
-    if (!document.getElementById('newTableDinersInput').classList.contains('hidden')) {
-        diners = parseInt(dinersInput.value);
-        sector = sectorInput.value;
-        if (!diners || !sector) {
-            alert('Preencha a quantidade de pessoas e o setor para abrir a nova mesa.');
-            return;
-        }
-    }
-    
-    const confirmBtn = document.getElementById('confirmTableTransferBtn');
-    confirmBtn.disabled = true;
-
-    // Chama a função centralizada em panelController para processar a transferência/abertura
-    // NOTE: Esta função é importada no escopo do módulo e exposta no window pelo panelController
-    window.handleTableTransferConfirmed(currentTableId, targetTableNumber, itemsToTransfer, diners, sector);
-    
-    document.getElementById('tableTransferModal').style.display = 'none';
-    itemsToTransfer = []; // Limpa o payload global
-};
-window.handleConfirmTableTransfer = handleConfirmTableTransfer;
-
-
 // Exportado para ser chamado no app.js, que acessa o estado global (currentTableId, currentOrderSnapshot)
 export const handleAddSplitAccount = async (currentTableId, currentOrderSnapshot) => {
     if (!currentTableId || userRole === 'client') return;
@@ -330,10 +266,10 @@ window.handleAddSplitAccount = handleAddSplitAccount; // Exposto ao escopo globa
 
 // Implementar no futuro: Lógica para mover itens para as subcontas.
 const openSplitTransferModal = (targetKey, mode, itemsToTransfer = null) => {
-    // Mantido o modal de splits para ser usado nos botões de split
     const itemCount = itemsToTransfer ? itemsToTransfer.length : 0;
     
     if (itemsToTransfer && mode === 'move_out') {
+        
         const modal = document.getElementById('selectiveTransferModal');
         const splits = currentOrderSnapshot.splits || {};
         const splitKeys = Object.keys(splits);
@@ -456,6 +392,83 @@ export const renderPaymentSummary = (currentTableId, currentOrderSnapshot) => {
     renderPaymentSplits(currentTableId, currentOrderSnapshot);
 };
 
+
+// Renderiza os botões/cards de divisão de conta (Painel 3)
+export const renderPaymentSplits = (currentTableId, currentOrderSnapshot) => {
+    const paymentSplitsContainer = document.getElementById('paymentSplitsContainer');
+    const addSplitAccountBtn = document.getElementById('addSplitAccountBtn');
+    if (!paymentSplitsContainer || !currentOrderSnapshot) return;
+
+    const sentItems = currentOrderSnapshot.sentItems || [];
+    // Inicializa splits se não existir
+    const splits = currentOrderSnapshot.splits || {};
+    
+    // Calcula o total dos itens que JÁ FORAM MOVIMENTADOS para as subcontas
+    let totalItemsInSplits = 0;
+    Object.values(splits).forEach(split => totalItemsInSplits += split.items.reduce((sum, item) => sum + item.price, 0));
+
+    const totalSentItems = sentItems.reduce((sum, item) => sum + item.price, 0);
+    const totalInMainAccount = Math.max(0, totalSentItems - totalItemsInSplits);
+    const itemsRemaining = sentItems.length - Object.values(splits).reduce((c, s) => c + (s.items || []).length, 0);
+    
+    // Apenas o Garçom/Gerente pode adicionar divisões, e se houver itens para dividir
+    if (addSplitAccountBtn) {
+        addSplitAccountBtn.disabled = userRole === 'client' || itemsRemaining === 0;
+    }
+
+    paymentSplitsContainer.innerHTML = '';
+    let accountCounter = 0;
+    
+    // 1. Renderiza a Conta Principal (Restante)
+    paymentSplitsContainer.innerHTML += `
+        <div class="bg-gray-200 p-3 rounded-lg border border-indigo-400">
+            <h4 class="font-bold text-lg flex justify-between items-center text-indigo-800">
+                <span>Conta Principal (Restante)</span>
+                <span class="text-xl">${formatCurrency(totalInMainAccount)}</span>
+            </h4>
+            <p class="text-sm text-gray-700 mt-1">
+                Itens restantes a pagar: ${itemsRemaining}
+            </p>
+            <button class="text-xs mt-2 px-3 py-1 bg-yellow-500 text-white rounded-full hover:bg-yellow-600 transition disabled:opacity-50" 
+                    onclick="window.openSplitTransferModal('main', 'move_out')" ${userRole === 'client' || totalInMainAccount === 0 ? 'disabled' : ''}>
+                <i class="fas fa-cut"></i> Mover Itens
+            </button>
+        </div>
+    `;
+
+    // 2. Renderiza as Contas de Divisão
+    Object.keys(splits).forEach(splitKey => {
+        const split = splits[splitKey];
+        accountCounter++;
+        const splitTotal = split.total || 0;
+        const splitPaymentsTotal = split.payments ? split.payments.reduce((sum, p) => sum + p.value, 0) : 0;
+        const isPaid = splitTotal <= splitPaymentsTotal;
+        
+        paymentSplitsContainer.innerHTML += `
+            <div class="bg-white p-3 rounded-lg border ${isPaid ? 'border-green-500' : 'border-red-500'} shadow">
+                <h4 class="font-bold text-lg flex justify-between items-center text-gray-800">
+                    <span>Conta ${accountCounter}</span>
+                    <span class="text-xl ${isPaid ? 'text-green-600' : 'text-red-600'}">${formatCurrency(splitTotal)}</span>
+                </h4>
+                <p class="text-sm text-gray-700 mt-1">
+                    Itens: ${split.items.length}. Pagamentos: ${formatCurrency(splitPaymentsTotal)}
+                </p>
+                <div class="flex space-x-2 mt-2">
+                    <button class="text-xs px-3 py-1 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition" 
+                            onclick="window.openPaymentModalForSplit('${splitKey}')" ${userRole === 'client' ? 'disabled' : ''}>
+                        <i class="fas fa-credit-card"></i> Pagar
+                    </button>
+                    <button class="text-xs px-3 py-1 bg-gray-500 text-white rounded-full hover:bg-gray-600 transition" 
+                            onclick="window.moveItemsToMainAccount('${splitKey}')" ${userRole === 'client' ? 'disabled' : ''}>
+                        <i class="fas fa-arrow-left"></i> Desfazer
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+};
+
+
 // Exportada para uso no app.js
 export { renderPaymentSummary, renderPaymentSplits };
 
@@ -483,36 +496,5 @@ document.addEventListener('DOMContentLoaded', () => {
     const finalizeOrderBtn = document.getElementById('finalizeOrderBtn');
     if (finalizeOrderBtn) {
         finalizeOrderBtn.addEventListener('click', handleFinalizeOrder);
-    }
-    
-    const confirmTransferBtn = document.getElementById('confirmTableTransferBtn');
-    if (confirmTransferBtn) {
-        confirmTransferBtn.addEventListener('click', handleConfirmTableTransfer);
-    }
-
-    const targetTableInput = document.getElementById('targetTableInput');
-    const newTableDinersInput = document.getElementById('newTableDinersInput');
-
-    if (targetTableInput) {
-        targetTableInput.addEventListener('input', async (e) => {
-             const tableNumber = e.target.value.trim();
-             const confirmBtn = document.getElementById('confirmTableTransferBtn');
-             newTableDinersInput.classList.add('hidden'); // Esconde por padrão
-             confirmBtn.textContent = 'Prosseguir';
-             
-             if (tableNumber) {
-                 const tableRef = getTableDocRef(tableNumber);
-                 const docSnap = await getDoc(tableRef);
-                 
-                 if (docSnap.exists() && docSnap.data().status === 'open') {
-                     // Mesa aberta: só transfere
-                     confirmBtn.textContent = `Transferir para Mesa ${tableNumber}`;
-                 } else {
-                     // Mesa fechada/inexistente: precisa abrir
-                     newTableDinersInput.classList.remove('hidden');
-                     confirmBtn.textContent = `Abrir Mesa ${tableNumber} e Transferir`;
-                 }
-             }
-        });
     }
 });
