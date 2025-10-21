@@ -12,13 +12,16 @@ import { renderPaymentSummary } from './controllers/paymentController.js';
 import { openManagerAuthModal } from './controllers/managerController.js';
 
 // --- VARIÁVEIS DE ESTADO GLOBAL ---
-export const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2, 'managerScreen': 3 };
+// Index 4 para o novo painel do cliente
+export const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2, 'managerScreen': 3, 'clientOrderScreen': 4 };
 export const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
 
 // Credenciais Staff Centralizadas (para login unificado)
 const STAFF_CREDENTIALS = {
     'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' }, 
     'garcom@fator.com': { password: '1234', role: 'garcom', name: 'Mock Garçom' },
+    // NOVO: Credencial para Cliente
+    'cliente@fator.com': { password: '1234', role: 'client', name: 'Cliente Teste' }, 
 };
 
 // Variáveis Mutáveis (Estado da Sessão)
@@ -81,6 +84,8 @@ export const goToScreen = (screenId) => {
     const screenIndex = screens[screenId];
     if (screenIndex !== undefined) {
         if (appContainer) {
+            // Ajuste o CSS se width: 400vw estiver inline no HTML, para 500vw
+            // Ou use transform corretamente:
             appContainer.style.transform = `translateX(-${screenIndex * 100}vw)`;
         }
         document.body.classList.toggle('bg-gray-900', screenId === 'managerScreen');
@@ -121,6 +126,9 @@ export const setCurrentTable = (tableId) => {
     
     document.getElementById('current-table-number').textContent = `Mesa ${tableId}`; 
     document.getElementById('payment-table-number').textContent = `Mesa ${tableId}`; 
+    if (document.getElementById('client-table-number')) {
+         document.getElementById('client-table-number').textContent = `Mesa ${tableId}`; 
+    }
     
     setTableListener(tableId); 
 };
@@ -170,7 +178,16 @@ const handleStaffLogin = async () => {
             fetchWooCommerceProducts(renderMenu);
             fetchWooCommerceCategories(renderTableFilters); 
             
-            goToScreen('panelScreen');
+            // NOVO FLUXO: Roteamento baseado na função
+            if (userRole === 'client') {
+                 // Cliente precisa informar a mesa para começar
+                 // Implementação futura: modal para inserir número da mesa
+                 alert("Bem-vindo Cliente! Insira o número da sua mesa no campo de busca para começar a pedir.");
+                 goToScreen('panelScreen');
+            } else {
+                 // Staff vai direto para o painel de mesas
+                 goToScreen('panelScreen');
+            }
             
         } catch (error) {
              console.error("Erro ao autenticar Staff (Firebase/Anônimo):", error);
@@ -245,7 +262,14 @@ document.addEventListener('DOMContentLoaded', () => {
         abrirMesaBtn.addEventListener('click', handleAbrirMesa);
     }
     if (searchTableBtnTrigger) {
-        searchTableBtnTrigger.addEventListener('click', handleSearchTable);
+        // Se for cliente, a busca de mesa o levará para a tela de pedidos dele
+        searchTableBtnTrigger.addEventListener('click', () => {
+            if (userRole === 'client') {
+                 handleSearchTable(true); // Passa flag para ir para a tela de cliente
+            } else {
+                 handleSearchTable();
+            }
+        });
     }
 
     // 3. Carrega UI Inicial
