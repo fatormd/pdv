@@ -56,7 +56,7 @@ let searchTableInput = null;
 export const hideStatus = () => {
     if (statusScreen && mainContent) {
         statusScreen.style.display = 'none';
-        // Removido display: block aqui, pois o CSS já faz o trabalho quando o modal de login some
+        // Removido display: block aqui, pois o CSS já faz o trabalho quando o modal de login som
     }
 };
 
@@ -150,9 +150,9 @@ export const setCurrentTable = (tableId) => {
 // --- INICIALIZAÇÃO ESPECÍFICA (Staff e Cliente) ---
 
 const initStaffApp = async () => {
-    // 1. Carrega dados assíncronos
-    loadOpenTables();
+    // 1. Carrega dados assíncronos (CRÍTICO: Inverte a ordem para garantir a renderização dos filtros antes do load)
     renderTableFilters(); 
+    loadOpenTables(); 
     
     // 2. Carrega Produtos e Categorias (CRÍTICO: Await aqui)
     await fetchWooCommerceProducts(() => { 
@@ -333,7 +333,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 3. Carrega UI Inicial
-    loadOpenTables();
-    renderTableFilters(); 
+    // 3. Carrega UI Inicial (Inicialização ocorre apenas após o login, em initStaffApp ou initClientApp)
+    // As chamadas loadOpenTables() e renderTableFilters() foram removidas daqui para evitar inicialização prematura do Firebase.
 });
