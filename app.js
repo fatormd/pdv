@@ -202,6 +202,7 @@ const handleStaffLogin = async () => {
                 renderOrderScreen(); 
             });
             await fetchWooCommerceCategories(renderTableFilters); // <-- AGUARDA CARREGAMENTO DE CATEGORIAS
+                hideStatus();
             
             // NOVO FLUXO DE ROTEAMENTO
             if (userRole === 'client') {
