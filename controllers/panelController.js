@@ -14,7 +14,7 @@ let currentSectorFilter = 'Todos';
 let unsubscribeTables = null; 
 
 
-// --- FUNÇÃO DE ALERTA CUSTOMIZADO ---
+// --- FUNÇÃO DE ALERTA CUSTOMIZADO (Mantida, pois é usada no fluxo de cliente) ---
 const showCustomAlert = (title, message) => {
     const modal = document.getElementById('customAlertModal');
     const titleEl = document.getElementById('customAlertTitle');
@@ -22,7 +22,7 @@ const showCustomAlert = (title, message) => {
     const okBtn = document.getElementById('customAlertOkBtn');
 
     if (!modal || !titleEl || !messageEl || !okBtn) {
-        // Fallback para o alert nativo se o modal não for encontrado
+        // Fallback
         alert(`${title}: ${message}`);
         return;
     }
@@ -30,10 +30,8 @@ const showCustomAlert = (title, message) => {
     titleEl.textContent = title;
     messageEl.textContent = message;
     
-    // Configura o comportamento do botão para fechar o modal
     okBtn.onclick = () => {
         modal.style.display = 'none';
-        // Limpa o input de busca para que o cliente possa tentar de novo
         const searchTableInput = document.getElementById('searchTableInput');
         if (searchTableInput) {
             searchTableInput.value = '';
@@ -48,21 +46,17 @@ const showCustomAlert = (title, message) => {
 // --- RENDERIZAÇÃO DE SETORES ---
 
 export const renderTableFilters = () => {
-//... (mantém a mesma)
     const sectorFiltersContainer = document.getElementById('sectorFilters');
     const sectorInput = document.getElementById('sectorInput');
     
-    // Elementos do Cliente (Restrição)
     const abrirMesaCard = document.querySelector('#panelScreen .content-card:first-child');
     const tableListTitle = document.querySelector('#panelScreen .space-y-3 h3');
     
     if (!sectorFiltersContainer || !sectorInput) return;
 
-    // NOVO: Esconde elementos de Staff para o Cliente
     if (userRole === 'client') {
         if (abrirMesaCard) abrirMesaCard.style.display = 'none';
         if (tableListTitle) tableListTitle.textContent = 'Minha Mesa (Busca Abaixo)';
-        // O restante dos filtros e lista de mesas é escondido via CSS (client-mode)
     } else {
         if (abrirMesaCard) abrirMesaCard.style.display = 'block';
         if (tableListTitle) tableListTitle.textContent = 'Mesas Abertas';
@@ -83,7 +77,6 @@ export const renderTableFilters = () => {
                             SECTORS.filter(s => s !== 'Todos')
                                    .map(s => `<option value="${s}">${s}</option>`).join('');
     
-    // Adiciona as opções de setor ao modal de Transferência (index.html)
     const newTableSectorInput = document.getElementById('newTableSector');
     if (newTableSectorInput) {
         newTableSectorInput.innerHTML = '<option value="" disabled selected>Setor</option>' + 
@@ -117,7 +110,6 @@ const renderTables = (docs) => {
     const openTablesCount = document.getElementById('openTablesCount');
     if (!openTablesList || !openTablesCount) return;
 
-    // CRÍTICO: Limpa o conteúdo da lista, removendo o placeholder "Carregando mesas..."
     openTablesList.innerHTML = '';
     let count = 0;
 
@@ -129,7 +121,6 @@ const renderTables = (docs) => {
             count++;
             const total = table.total || 0;
             
-            // NOVO: Lógica de Notificação do Cliente
             const isClientPending = table.clientOrderPending || false; 
             
             let cardColor = total > 0 ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200';
@@ -137,9 +128,7 @@ const renderTables = (docs) => {
             let attentionIconHtml = '';
             
             if (isClientPending) {
-                // Modo Noturno/Escuro e Sino (usando indigo-900 e amarelo)
                 cardColor = 'bg-indigo-900 text-white hover:bg-indigo-800 border-2 border-yellow-400'; 
-                // Ícone do sino
                 bellIconHtml = `<i class="fas fa-bell attention-icon text-yellow-400" title="Pedido Novo de Cliente"></i>`;
             }
             
@@ -147,7 +136,6 @@ const renderTables = (docs) => {
                 item.note && item.note.toLowerCase().includes('espera')
             );
             
-            // A prioridade de ícone é: Sino > Atenção Normal
             if (isClientPending) {
                  attentionIconHtml = bellIconHtml;
             } else {
@@ -194,12 +182,11 @@ const renderTables = (docs) => {
 
     openTablesCount.textContent = count;
     
-    // CORREÇÃO CRÍTICA: Insere mensagem se não houver mesas abertas (remove o status de "carregando")
+    // CRÍTICO: Se não houver mesas abertas, exibe a mensagem de status final.
     if (count === 0) {
         openTablesList.innerHTML = `<div class="col-span-full text-sm text-gray-500 italic p-4 content-card bg-white">Nenhuma mesa aberta no setor "${currentSectorFilter}".</div>`;
     }
     
-    // Listener para abrir a mesa ao clicar no card
     document.querySelectorAll('.table-card-panel').forEach(card => {
         card.addEventListener('click', (e) => {
             if (e.target.closest('.kds-status-icon-btn')) return; 
@@ -213,7 +200,6 @@ const renderTables = (docs) => {
 };
 
 export const loadOpenTables = () => {
-//... (mantém a mesma)
     if (unsubscribeTables) unsubscribeTables(); 
     
     const tablesCollection = getTablesCollectionRef();
@@ -232,16 +218,24 @@ export const loadOpenTables = () => {
         const docs = snapshot.docs;
         renderTables(docs);
     }, (error) => {
-        // CORREÇÃO CRÍTICA: EXIBE O ERRO DO FIREBASE DIRETAMENTE NA TELA PARA DIAGNÓSTICO
-        const errorMessage = error.message || "Erro desconhecido ao carregar mesas.";
-        showCustomAlert("Erro Crítico de Sincronização (Firebase)", `A sincronização de mesas falhou. O índice, permissão, ou regra de segurança está incorreta. Causa: ${errorMessage}`);
-        console.error("Erro ao carregar mesas (onSnapshot): Verifique permissões do Firebase (regras de segurança) ou índices.", error);
+        // CRÍTICO: Exibe o erro do Firebase diretamente na LISTA DE MESAS (não no modal, para garantir visibilidade)
+        const openTablesList = document.getElementById('openTablesList');
+        const errorMessage = error.message || "Erro desconhecido.";
+        
+        if (openTablesList) {
+            openTablesList.innerHTML = `<div class="col-span-full text-sm text-red-600 font-bold italic p-4 content-card bg-white">
+                ERRO CRÍTICO FIREBASE: A sincronização de mesas falhou.
+                Verifique as regras de segurança ou o índice composto (status, sector, tableNumber).
+                Detalhe: ${errorMessage.substring(0, 100)}...
+            </div>`;
+        }
+        
+        console.error("Erro fatal ao carregar mesas (onSnapshot):", error);
     });
 };
 
 // Item 2: Abrir Mesa
 export const handleAbrirMesa = async () => {
-//... (mantém a mesma)
     const mesaInput = document.getElementById('mesaInput');
     const pessoasInput = document.getElementById('pessoasInput');
     const sectorInput = document.getElementById('sectorInput');
@@ -292,7 +286,6 @@ export const handleAbrirMesa = async () => {
 
 // Item 3: Busca de Mesa (Ajustada para o fluxo de Cliente)
 export const handleSearchTable = async (isClientFlow = false) => {
-//... (mantém a mesma)
     const searchTableInput = document.getElementById('searchTableInput');
     const searchTableBtn = document.getElementById('searchTableBtn');
     const tableNumber = searchTableInput.value.trim();
@@ -310,7 +303,6 @@ export const handleSearchTable = async (isClientFlow = false) => {
         if (isClientFlow) {
             // LÓGICA CLIENTE 1: MESA OCUPADA/ABERTA (CLIENTE NÃO PODE USAR)
             showCustomAlert("Mesa Ocupada", "A mesa já está em uso. Informe o garçom para se vincular.");
-            // A função showCustomAlert já limpa o input e retorna o foco
             return; 
         } else {
             // LÓGICA STAFF: Abre a mesa para pedido
