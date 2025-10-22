@@ -77,6 +77,22 @@ export const renderMenu = (filter = currentCategoryFilter, search = '', screen =
         }).join('');
     }
     
+    // NOVO: Adiciona Listener para Filtros de Categoria
+    const categoryButtons = categoryFiltersContainer.querySelectorAll('.category-btn');
+    categoryButtons.forEach(btn => {
+        if (!btn.hasAttribute('data-listener')) { // Evita anexar o listener mais de uma vez
+            btn.addEventListener('click', (e) => {
+                const newFilter = e.target.closest('.category-btn').dataset.category;
+                currentCategoryFilter = newFilter;
+                
+                // CRÍTICO: Re-renderiza o menu inteiro para aplicar o novo filtro.
+                renderOrderScreen(); 
+            });
+            btn.setAttribute('data-listener', 'true');
+        }
+    });
+    // FIM NOVO
+    
     // ... (Lógica de Filtro e Busca) ...
 
     let filteredProducts = products;
