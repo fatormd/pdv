@@ -232,7 +232,9 @@ export const loadOpenTables = () => {
         const docs = snapshot.docs;
         renderTables(docs);
     }, (error) => {
-        // CORREÇÃO: Tratamento de erro melhorado para diagnosticar o Firebase
+        // CORREÇÃO CRÍTICA: EXIBE O ERRO DO FIREBASE DIRETAMENTE NA TELA PARA DIAGNÓSTICO
+        const errorMessage = error.message || "Erro desconhecido ao carregar mesas.";
+        showCustomAlert("Erro Crítico de Sincronização (Firebase)", `A sincronização de mesas falhou. O índice, permissão, ou regra de segurança está incorreta. Causa: ${errorMessage}`);
         console.error("Erro ao carregar mesas (onSnapshot): Verifique permissões do Firebase (regras de segurança) ou índices.", error);
     });
 };
