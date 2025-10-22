@@ -194,12 +194,14 @@ const handleStaffLogin = async () => {
             loadOpenTables();
             renderTableFilters(); 
             
+            // CRÍTICO: ADICIONANDO AWAIT AQUI PARA EVITAR FREEZE E GARANTIR CARREGAMENTO DE DADOS
+            
             // GARANTE PRODUTOS: Chama fetchWooCommerceProducts com callback para renderizar TUDO
-            fetchWooCommerceProducts(() => {
+            await fetchWooCommerceProducts(() => { // <-- AGUARDA CARREGAMENTO DE PRODUTOS
                 // Roda o renderMenu para o Staff e Cliente APÓS o fetch
                 renderOrderScreen(); 
             });
-            fetchWooCommerceCategories(renderTableFilters); 
+            await fetchWooCommerceCategories(renderTableFilters); // <-- AGUARDA CARREGAMENTO DE CATEGORIAS
             
             // NOVO FLUXO DE ROTEAMENTO
             if (userRole === 'client') {
