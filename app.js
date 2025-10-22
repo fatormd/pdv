@@ -147,6 +147,45 @@ export const setCurrentTable = (tableId) => {
 };
 
 
+// --- INICIALIZAÇÃO ESPECÍFICA (Staff e Cliente) ---
+
+const initStaffApp = async () => {
+    // 1. Carrega dados assíncronos
+    loadOpenTables();
+    renderTableFilters(); 
+    
+    // 2. Carrega Produtos e Categorias (CRÍTICO: Await aqui)
+    await fetchWooCommerceProducts(() => { 
+        renderOrderScreen(); 
+    });
+    await fetchWooCommerceCategories(renderTableFilters); 
+    
+    // 3. Finaliza Inicialização
+    if (mainContent) mainContent.style.display = 'block'; 
+    document.body.classList.remove('client-mode');
+    hideStatus();
+    goToScreen('panelScreen'); 
+};
+
+const initClientApp = async () => {
+    // 1. Carrega apenas o essencial do cliente
+    renderTableFilters(); 
+    
+    // 2. Carrega Produtos e Categorias (CRÍTICO: Await aqui)
+    await fetchWooCommerceProducts(() => { 
+        renderOrderScreen(); 
+    });
+    await fetchWooCommerceCategories(renderTableFilters); 
+    
+    // 3. Finaliza Inicialização
+    if (mainContent) mainContent.style.display = 'block'; 
+    document.body.classList.add('client-mode');
+    hideStatus();
+    alert("Bem-vindo Cliente! Insira o número da sua mesa no campo de busca para começar a pedir.");
+    goToScreen('clientOrderScreen'); 
+};
+
+
 // --- LÓGICA DE AUTH/LOGIN ---
 
 const authenticateStaff = (email, password) => {
@@ -187,33 +226,11 @@ const handleStaffLogin = async () => {
             
             hideLoginModal(); 
             
-            // CORREÇÃO CRÍTICA: REEXIBIR O CONTEÚDO PRINCIPAL (MainContent)
-            if (mainContent) mainContent.style.display = 'block'; 
-
-            // NOVO: Chamadas de inicialização do Staff
-            loadOpenTables();
-            renderTableFilters(); 
-            
-            // CRÍTICO: ADICIONANDO AWAIT AQUI PARA EVITAR FREEZE E GARANTIR CARREGAMENTO DE DADOS
-            
-            // GARANTE PRODUTOS: Chama fetchWooCommerceProducts com callback para renderizar TUDO
-            await fetchWooCommerceProducts(() => { // <-- AGUARDA CARREGAMENTO DE PRODUTOS
-                // Roda o renderMenu para o Staff e Cliente APÓS o fetch
-                renderOrderScreen(); 
-            });
-            await fetchWooCommerceCategories(renderTableFilters); // <-- AGUARDA CARREGAMENTO DE CATEGORIAS
-                hideStatus();
-            
-            // NOVO FLUXO DE ROTEAMENTO
+            // ROTEAMENTO PARA AS NOVAS FUNÇÕES DE INICIALIZAÇÃO
             if (userRole === 'client') {
-                 // CLIENTE: Adiciona classe de restrição e vai para a tela de pedidos (Index 0)
-                 document.body.classList.add('client-mode');
-                 alert("Bem-vindo Cliente! Insira o número da sua mesa no campo de busca para começar a pedir.");
-                 goToScreen('clientOrderScreen'); 
+                 await initClientApp();
             } else {
-                 // STAFF: Remove classe de restrição e vai para o painel de mesas (Index 1)
-                 document.body.classList.remove('client-mode');
-                 goToScreen('panelScreen'); 
+                 await initStaffApp();
             }
             
         } catch (error) {
