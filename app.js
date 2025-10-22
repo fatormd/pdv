@@ -151,9 +151,8 @@ export const setCurrentTable = (tableId) => {
 // --- INICIALIZAÇÃO ESPECÍFICA (Staff e Cliente) ---
 
 const initStaffApp = async () => {
-    // 1. Carrega dados assíncronos (CRÍTICO: Ordem invertida para mitigar erro de índice)
+    // 1. Carrega dados síncronos (Filtros de Setor são síncronos)
     renderTableFilters(); // Renderiza filtros de setor primeiro
-    loadOpenTables(); // Inicia a consulta do Firebase (onSnapshot)
     
     // 2. Carrega Produtos e Categorias (CRÍTICO: Await aqui)
     await fetchWooCommerceProducts(() => { 
@@ -161,10 +160,14 @@ const initStaffApp = async () => {
     });
     await fetchWooCommerceCategories(renderTableFilters); 
     
-    // 3. Finaliza Inicialização
+    // 3. Finaliza Inicialização da UI
     if (mainContent) mainContent.style.display = 'block'; 
     document.body.classList.remove('client-mode');
     hideStatus();
+
+    // 4. INICIA O CARREGAMENTO/LISTENER DAS MESAS (Corrigido: Executado após o carregamento dos awaits)
+    loadOpenTables(); // Inicia a consulta do Firebase (onSnapshot)
+    
     goToScreen('panelScreen'); 
 };
 
