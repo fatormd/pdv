@@ -428,7 +428,30 @@
          </div>
 
     <div id="tableTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-         </div>
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+            <h3 id="transferModalTitle" class="text-xl font-bold mb-4 text-indigo-700">Transferir Item(s)</h3>
+            
+            <p class="text-base mb-3">Transferindo itens da <span class="font-bold" id="transferOriginTable">Mesa X</span>.</p>
+            
+            <label class="block text-sm font-medium text-gray-700 mt-4 mb-2">Mesa de Destino</label>
+            <input type="number" id="targetTableInput" placeholder="Nº da Mesa de Destino" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base" min="1">
+            
+            <div id="newTableDinersInput" class="space-y-3 mt-3 hidden">
+                <label class="block text-sm font-medium text-gray-700">Mesa Fechada. Abrir e Transferir:</label>
+                <input type="number" id="newTableDiners" placeholder="Pessoas" class="w-full p-3 border border-gray-300 rounded-lg text-base" min="1">
+                <select id="newTableSector" class="w-full p-3 border border-gray-300 rounded-lg text-base" required>
+                    <option value="" disabled selected>Setor</option>
+                </select>
+            </div>
+
+            <div class="flex justify-end space-x-3 mt-6">
+                <button class="px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition text-base" onclick="document.getElementById('tableTransferModal').style.display='none'">Cancelar</button>
+                <button id="confirmTableTransferBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base" disabled>
+                    Prosseguir
+                </button>
+            </div>
+        </div>
+    </div>
 
 
     <div id="loginModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
