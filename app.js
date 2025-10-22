@@ -12,13 +12,13 @@ import { renderPaymentSummary } from './controllers/paymentController.js';
 import { openManagerAuthModal } from './controllers/managerController.js';
 
 // --- VARIÁVEIS DE ESTADO GLOBAL ---
-// CORRIGIDO: NOVO ORDENAMENTO (Cliente -> Mapa de Mesas -> Pedido Staff)
+// NOVO MAPEAMENTO DE TELAS PARA index.html (Staff)
 export const screens = { 
-    'clientOrderScreen': 0,
-    'panelScreen': 1,
-    'orderScreen': 2,
-    'paymentScreen': 3,
-    'managerScreen': 4
+    'panelScreen': 0, // Novo Índice 0
+    'orderScreen': 1, // Novo Índice 1
+    'paymentScreen': 2, // Novo Índice 2
+    'managerScreen': 3, // Novo Índice 3
+    'clientOrderScreen': 4, // Mantido no final, fora do fluxo Staff principal
 };
 export const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
 
@@ -77,6 +77,7 @@ const hideLoginModal = () => {
 
 export const goToScreen = (screenId) => {
     // 1. Lógica de Restrição de Navegação para o Cliente
+    // Apenas o cliente.html deve ter a classe client-mode, mas mantemos a verificação.
     if (userRole === 'client' && screenId !== 'clientOrderScreen' && currentTableId) {
         // Se o cliente tentar sair da tela de pedidos após se vincular à mesa, ele é impedido.
         if (screenId === 'panelScreen') {
@@ -150,9 +151,9 @@ export const setCurrentTable = (tableId) => {
 // --- INICIALIZAÇÃO ESPECÍFICA (Staff e Cliente) ---
 
 const initStaffApp = async () => {
-    // 1. Carrega dados assíncronos (CRÍTICO: Inverte a ordem para garantir a renderização dos filtros antes do load)
-    renderTableFilters(); 
-    loadOpenTables(); 
+    // 1. Carrega dados assíncronos (CRÍTICO: Ordem invertida para mitigar erro de índice)
+    renderTableFilters(); // Renderiza filtros de setor primeiro
+    loadOpenTables(); // Inicia a consulta do Firebase (onSnapshot)
     
     // 2. Carrega Produtos e Categorias (CRÍTICO: Await aqui)
     await fetchWooCommerceProducts(() => { 
@@ -227,10 +228,12 @@ const handleStaffLogin = async () => {
             hideLoginModal(); 
             
             // ROTEAMENTO PARA AS NOVAS FUNÇÕES DE INICIALIZAÇÃO
+            // Se o usuário estiver no index.html (Staff), ignora initClientApp
             if (userRole === 'client') {
-                 await initClientApp();
+                // Se o cliente logar aqui (o que é incorreto, ele deveria usar client.html), ele será inicializado no modo cliente.
+                await initClientApp();
             } else {
-                 await initStaffApp();
+                await initStaffApp();
             }
             
         } catch (error) {
@@ -334,5 +337,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 3. Carrega UI Inicial (Inicialização ocorre apenas após o login, em initStaffApp ou initClientApp)
-    // As chamadas loadOpenTables() e renderTableFilters() foram removidas daqui para evitar inicialização prematura do Firebase.
 });
