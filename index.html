@@ -463,6 +463,9 @@
     <div id="productManagementModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
          </div>
 
+    <div id="tableTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+         </div>
+
 
     <div id="loginModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
         <div class="content-card bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm text-center">
@@ -491,6 +494,14 @@
         window.decreaseLocalItemQuantity = () => {};
         window.increaseLocalItemQuantity = () => {};
         window.openObsModalForGroup = () => {};
+        window.openProductInfoModal = () => {};
+        window.handleTableTransferConfirmed = () => {};
+        window.handleAddSplitAccount = () => {};
+        window.openSplitTransferModal = () => {};
+        window.openPaymentModalForSplit = () => {};
+        window.moveItemsToMainAccount = () => {};
+        window.handleMassActionRequest = () => {};
+        window.activateItemSelection = () => {};
         
         // CORREÇÃO CRÍTICA DO ERRO JSON.PARSE: Garante que o JSON esteja completo e válido
         window.__app_id = "pdv_fator_instance_001"; // ID da instância do PDV
