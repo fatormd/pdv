@@ -113,11 +113,11 @@ export const renderTableFilters = () => {
 // --- RENDERIZAÇÃO E CARREGAMENTO DE MESAS ---
 
 const renderTables = (docs) => {
-//... (mantém a mesma)
     const openTablesList = document.getElementById('openTablesList');
     const openTablesCount = document.getElementById('openTablesCount');
     if (!openTablesList || !openTablesCount) return;
 
+    // CRÍTICO: Limpa o conteúdo da lista, removendo o placeholder "Carregando mesas..."
     openTablesList.innerHTML = '';
     let count = 0;
 
@@ -193,6 +193,11 @@ const renderTables = (docs) => {
     });
 
     openTablesCount.textContent = count;
+    
+    // CORREÇÃO CRÍTICA: Insere mensagem se não houver mesas abertas (remove o status de "carregando")
+    if (count === 0) {
+        openTablesList.innerHTML = `<div class="col-span-full text-sm text-gray-500 italic p-4 content-card bg-white">Nenhuma mesa aberta no setor "${currentSectorFilter}".</div>`;
+    }
     
     // Listener para abrir a mesa ao clicar no card
     document.querySelectorAll('.table-card-panel').forEach(card => {
