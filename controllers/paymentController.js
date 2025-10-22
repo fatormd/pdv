@@ -62,6 +62,7 @@ const renderReviewItemsList = (currentOrderSnapshot) => {
     const mainAccountItemsCount = Object.values(groupedItems).reduce((sum, group) => sum + group.totalCount, 0);
 
     // Atualiza os ícones para refletir o estado de seleção
+    // Fica cinza (text-gray-500) por padrão e muda para a cor ativa (yellow/red) quando isMassSelectionActive é TRUE
     const transferBtn = document.getElementById('itemMassTransferBtn');
     const deleteBtn = document.getElementById('itemMassDeleteBtn');
     if (transferBtn) transferBtn.classList.toggle('text-yellow-600', isMassSelectionActive);
@@ -81,7 +82,7 @@ const renderReviewItemsList = (currentOrderSnapshot) => {
         // Chave de identificação única do grupo para a ação em massa (contém as chaves dos itens)
         const massItemKeys = group.items.map(item => `${item.orderId}_${item.sentAt}`).join(','); 
         
-        // Determina se a checkbox deve estar habilitada
+        // Determina se a checkbox deve estar habilitada (SÓ HABILITA SE isMassSelectionActive FOR TRUE)
         const disabledAttr = isMassSelectionActive ? '' : 'disabled';
         
         // Mantém o estado visual da checkbox (importante ao re-renderizar no modo de seleção)
@@ -125,7 +126,7 @@ export function activateItemSelection(action) {
     }
 
     if (!isMassSelectionActive) {
-        // --- MODO DE ATIVAÇÃO ---
+        // --- MODO DE ATIVAÇÃO --- (Chamado APÓS a senha correta)
         isMassSelectionActive = true;
         
         checkboxes.forEach(cb => { 
@@ -495,7 +496,7 @@ export const renderPaymentSplits = (currentTableId, currentOrderSnapshot) => {
                 Itens restantes a pagar: ${itemsRemaining}
             </p>
             <button class="text-xs mt-2 px-3 py-1 bg-yellow-500 text-white rounded-full hover:bg-yellow-600 transition disabled:opacity-50" 
-                    onclick="window.openSplitTransferModal('main', 'move_out')" ${userRole === 'client' || totalInMainAccount === 0 ? 'disabled' : ''}>
+                    onclick="window.openSplitTransferModal('main', 'move_out')" ${userRole === 'client' || itemsRemaining === 0 ? 'disabled' : ''}>
                 <i class="fas fa-cut"></i> Mover Itens
             </button>
         </div>
