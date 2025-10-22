@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fator PDV - Cliente (Comanda Digital)</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <link rel="stylesheet" href="style.css">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script>
+        // Configuração do Tailwind (mantida aqui para fácil acesso à paleta de cores)
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'primary': '#4f46e5', // Índigo
+                        'pumpkin': '#ff7518',
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        /* AJUSTE CRÍTICO DE LARGURA PARA CLIENTE: Apenas 2 telas (Pedido + Pagamento) */
+        /* Índice 0: clientOrderScreen, Índice 1: paymentScreen */
+        #appContainer {
+            width: 200vw !important; 
+        }
+        
+        /* Oculta as telas que não pertencem ao cliente */
+        #panelScreen, #orderScreen, #managerScreen {
+            display: none !important; 
+        }
+
+        /* Oculta o cabeçalho de staff/login */
+        .header-bar {
+            display: none !important;
+        }
+
+        /* Corrige o min-height para compensar a falta do header */
+        #clientOrderScreen, #paymentScreen {
+            min-height: 100vh !important;
+        }
+
+        /* Fundo claro para a experiência do cliente */
+        body {
+            background-color: #ffffff; 
+        }
+    </style>
+</head>
+<body class="bg-white min-h-screen client-mode"> 
+    
+    <main id="mainContent" class="relative overflow-hidden"> 
+        <div id="appContainer" class="flex transition-transform duration-300 ease-out">
+            
+            <div id="clientOrderScreen" class="flex-shrink-0">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center text-green-700">
+                        <span class="text-2xl font-semibold mr-3" id="client-table-number">Mesa Cliente</span>
+                    </div>
+                    
+                    <button id="goToPaymentBtnClient" class="rounded-full bg-green-600 p-3 text-white shadow-lg hover:bg-green-700 transition duration-150 w-12 h-12 flex items-center justify-center" title="Ver Conta" onclick="window.goToScreen('paymentScreen')">
+                        <i class="fas fa-receipt text-xl"></i>
+                    </button>
+                </div>
+
+                <div id="orderingInputsClient" class="space-y-4">
+                    <div class="p-4 content-card bg-white">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-semibold text-gray-700 mr-2">Seu Pedido (<span id="openItemsCountClient">0</span>)</h2>
+                            <button id="sendClientOrderBtn" class="bg-green-600 text-white p-3 rounded-full shadow-lg hover:bg-green-700 transition duration-150 w-12 h-12 flex items-center justify-center text-xl disabled:opacity-50" title="Enviar Pedido para Confirmação">
+                                <i class="fas fa-check-circle"></i>
+                            </button>
+                        </div>
+                        
+                        <div id="openOrderListClient" class="space-y-3 mb-4">
+                            <div class="text-base text-gray-500 italic p-2">Nenhum item selecionado.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="menuContainerClient" class="mt-6">
+                    <div class="flex justify-between items-center mb-4 px-4">
+                        <h2 class="text-xl font-bold text-gray-800">Cardápio</h2>
+                        <div class="relative">
+                            <input type="text" id="searchProductInputClient" placeholder="Buscar produtos..." class="pr-8 input-pdv border border-gray-300 rounded-lg text-sm" style="width: 150px;">
+                            <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                        </div>
+                    </div>
+                    
+                    <div id="categoryFiltersClient" class="flex space-x-2 overflow-x-auto pb-2 mb-4 px-4">
+                        </div>
+                    
+                    <div id="menuItemsGridClient" class="px-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                         </div>
+                </div>
+            </div>
+            
+            <div id="paymentScreen" class="flex-shrink-0">
+                 <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center text-indigo-700">
+                        <button id="backToOrderFromPaymentBtn" class="mr-2 text-3xl p-2 hover:text-indigo-900 transition duration-150" title="Voltar para o Pedido" onclick="window.goToScreen('clientOrderScreen')">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <span class="text-2xl font-semibold mr-3" id="payment-table-number">Mesa Selecionada</span>
+                    </div>
+                </div>
+
+                <div class="content-card bg-white p-4 mb-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-green-700">Resumo da Conta</h2>
+                    </div>
+                    
+                    <div id="reviewItemsList" class="space-y-3 pt-2">
+                         <div class="text-sm text-gray-500 italic p-2">Nenhum item na conta para revisão.</div>
+                    </div>
+                    
+                    <div class="content-card bg-white p-4 mb-6 mt-6">
+                        <h2 class="text-xl font-semibold text-indigo-700 mb-4">Divisão da Conta</h2>
+                        <div id="paymentSplitsContainer" class="space-y-3">
+                            <div class="text-sm text-gray-500 italic p-2">Detalhes da conta para pagamento.</div>
+                        </div>
+                        <div class="flex justify-end mt-4">
+                            <button id="addSplitAccountBtn" class="px-4 py-2 bg-blue-500 text-white rounded-lg opacity-50 text-base font-bold disabled" disabled>
+                                + Adicionar Conta para Divisão
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-between items-center border-t border-gray-200 pt-4 mt-4">
+                        <div>
+                            <span class="text-xl font-bold text-gray-800">SUBTOTAL:</span>
+                            <p class="text-xs text-gray-500">Valor dos produtos consumidos.</p>
+                        </div>
+                        <span class="text-2xl font-bold text-indigo-700" id="orderSubtotalDisplayPayment">R$ 0,00</span>
+                    </div>
+
+                    <div class="flex justify-between items-center border-b border-gray-200 pb-2">
+                        <div>
+                            <span class="text-lg font-bold text-green-700">SERVIÇO (10%):</span>
+                            <p class="text-xs text-gray-500">Taxa opcional de serviço.</p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-lg font-bold text-green-700" id="orderServiceTaxDisplayPayment">R$ 0,00</span>
+                            <button id="toggleServiceTaxBtn" class="px-2 py-1 text-xs rounded-full transition duration-150 bg-gray-400 text-white opacity-50" disabled>
+                                Aplicar
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-between items-center border-b border-gray-200 pb-2 pt-2">
+                        <div>
+                            <span class="text-lg font-bold text-indigo-700">VALOR POR PESSOA:</span>
+                            <p class="text-xs text-gray-500">Divisão do Total Geral por pagantes.</p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span id="valuePerDinerDisplay" class="text-lg font-bold text-indigo-700">R$ 0,00</span>
+                            <input type="number" id="dinersSplitInput" class="w-16 p-1 text-sm border border-gray-300 rounded-lg text-center opacity-70" min="1" value="1" readonly>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center pt-2">
+                        <span class="text-xl font-bold text-gray-800">TOTAL GERAL:</span>
+                        <span class="text-3xl font-extrabold text-indigo-700" id="orderTotalDisplayPayment">R$ 0,00</span>
+                    </div>
+                </div>
+
+                <div class="p-4 pt-0 content-card bg-white mt-6">
+                    <button id="requestBillBtn" class="w-full bg-orange-500 text-white font-bold py-3 rounded-lg hover:bg-orange-600 transition duration-150">
+                        <i class="fas fa-cash-register"></i> SOLICITAR FECHAMENTO DE CONTA
+                    </button>
+                    <p class="mt-4 text-sm text-gray-500 text-center">O pagamento deve ser efetuado com o garçom.</p>
+                </div>
+            </div>
+            
+        </div>
+    </main>
+    
+    <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+            <h3 id="obsItemName" class="text-xl font-bold mb-4 text-indigo-700">Adicionar Observação</h3>
+            
+            <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-4">
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="1 CP">1 CP</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="2 CP">2 CP</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="3 CP">3 CP</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Sem Gelo">Sem Gelo</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Gelo à Parte">Gelo à Parte</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Laranja">Laranja</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Limão">Limão</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Limão Espremido">Limão Espremido</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Natural">Natural</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Mal Passado">Mal Passado</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Ponto Menos">Ponto Menos</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Ao Ponto">Ao Ponto</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Ponto Mais">Ponto Mais</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Bem Passado">Bem Passado</button>
+            </div>
+
+            <textarea id="obsInput" rows="3" placeholder="Apenas botões rápidos permitidos." class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base" readonly></textarea>
+            
+            <div class="flex items-center justify-between mt-3 mb-4">
+                 <span class="text-gray-700 font-semibold">Item em Espera?</span>
+                 <label class="switch-obs">
+                     <input type="checkbox" id="esperaSwitch" disabled>
+                     <span class="slider-obs"></span>
+                 </label>
+            </div>
+            
+            <div class="flex justify-end space-x-3 mt-4">
+                <button id="cancelObsBtn" class="px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition text-base">Cancelar</button>
+                <button id="saveObsBtn" class="px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-700 transition text-base">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="customAlertModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm text-center">
+            <h3 class="text-xl font-bold mb-4 text-red-600" id="customAlertTitle">Aviso</h3>
+            <p class="text-base mb-6 text-gray-700" id="customAlertMessage">Mensagem Padrão.</p>
+            <button id="customAlertOkBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition">
+                OK
+            </button>
+        </div>
+    </div>
+
+
+    <div id="calculatorModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
+    <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
+    <div id="waiterRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
+    <div id="customerRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
+    <div id="reportsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
+    <div id="selectiveTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
+    <div id="productManagementModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
+    <div id="tableTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
+
+
+    <div id="loginModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
+        <div class="content-card bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm text-center">
+            <h3 class="text-2xl font-bold text-indigo-700 mb-6">Acesso Mesa Digital</h3>
+            <input type="email" id="loginEmail" placeholder="E-mail (Ex: cliente@fator.com)" class="w-full p-4 mb-4 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
+            <input type="password" id="loginPassword" placeholder="Senha" class="w-full p-4 mb-6 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
+            
+            <div class="flex space-x-3">
+                <button id="loginBtn" class="w-full bg-indigo-600 text-white font-bold py-4 rounded-lg hover:bg-indigo-700 transition text-lg disabled:opacity-50">Entrar</button>
+            </div>
+
+            <p class="mt-4 text-xs text-gray-400">Use 'cliente@fator.com' | Senha: 1234</p>
+        </div>
+    </div>
+    
+    <p class="mt-8 text-center text-xs text-gray-400" id="user-id-display">Usuário ID: Carregando...</p>
+    
+
+    <script>
+        // Funções globais de placeholder (manter para o onclick)
+        window.openManagerAuthModal = () => {};
+        window.goToScreen = () => {};
+        window.openKdsStatusModal = () => {};
+        window.addItemToSelection = () => {};
+        window.appendObs = () => {};
+        window.decreaseLocalItemQuantity = () => {};
+        window.increaseLocalItemQuantity = () => {};
+        window.openObsModalForGroup = () => {};
+        window.openProductInfoModal = () => {}; // Adicionado
+        window.handleTableTransferConfirmed = () => {}; // Adicionado
+        
+        // Configurações do Firebase
+        window.__app_id = "pdv_fator_instance_001"; // ID da instância do PDV
+        window.__firebase_config = JSON.stringify({
+            apiKey: "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY", 
+            authDomain: "fator-pdv.firebaseapp.com",
+            projectId: "fator-pdv", // Chave de projeto corrigida
+            storageBucket: "fator-pdv.appspot.com",
+            messagingSenderId: "1097659747429",
+            appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c"
+        });
+    </script>
+    
+    <script type="module" src="app.js"></script>
+</body>
+</html>
