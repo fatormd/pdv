@@ -1,4 +1,3 @@
-// --- index.html (Staff Only) ---
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -358,19 +357,78 @@
     </main>
     
     <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+            <h3 id="obsItemName" class="text-xl font-bold mb-4 text-indigo-700">Adicionar Observação</h3>
+            
+            <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-4">
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="1 CP">1 CP</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="2 CP">2 CP</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="3 CP">3 CP</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Sem Gelo">Sem Gelo</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Gelo à Parte">Gelo à Parte</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Laranja">Laranja</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Limão">Limão</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Limão Espremido">Limão Espremido</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Natural">Natural</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Mal Passado">Mal Passado</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Ponto Menos">Ponto Menos</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Ao Ponto">Ao Ponto</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Ponto Mais">Ponto Mais</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition" data-obs="Bem Passado">Bem Passado</button>
+            </div>
+
+            <textarea id="obsInput" rows="3" placeholder="Ex: Sem cebola, Ponto da carne mal passada..." class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base"></textarea>
+            
+            <div class="flex items-center justify-between mt-3 mb-4">
+                 <span class="text-gray-700 font-semibold">Item em Espera?</span>
+                 <label class="switch-obs">
+                     <input type="checkbox" id="esperaSwitch">
+                     <span class="slider-obs"></span>
+                 </label>
+            </div>
+            
+            <div class="flex justify-end space-x-3 mt-4">
+                <button id="cancelObsBtn" class="px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition text-base">Cancelar</button>
+                <button id="saveObsBtn" class="px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-700 transition text-base">Salvar</button>
+            </div>
         </div>
+    </div>
 
     <div id="customAlertModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm text-center">
+            <h3 class="text-xl font-bold mb-4 text-red-600" id="customAlertTitle">Aviso</h3>
+            <p class="text-base mb-6 text-gray-700" id="customAlertMessage">Mensagem Padrão.</p>
+            <button id="customAlertOkBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition">
+                OK
+            </button>
+        </div>
+    </div>
+
+
+    <div id="calculatorModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+         </div>
+
+
+    <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        </div>
+    
+    <div id="waiterRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        </div>
+    
+    <div id="customerRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         </div>
 
-    <div id="calculatorModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
-    <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
-    <div id="waiterRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
-    <div id="customerRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
-    <div id="reportsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
-    <div id="selectiveTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
-    <div id="productManagementModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
-    <div id="tableTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
+    <div id="reportsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        </div>
+
+    <div id="selectiveTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+         </div>
+    
+    <div id="productManagementModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+         </div>
+
+    <div id="tableTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+         </div>
 
 
     <div id="loginModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
@@ -417,7 +475,7 @@
             projectId: "fator-pdv", // Chave de projeto corrigida
             storageBucket: "fator-pdv.appspot.com",
             messagingSenderId: "1097659747429",
-            appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c"
+            appId: "1:1097659747429:web:8ec0a7c39778c311dbe0a8c"
         });
     </script>
     
