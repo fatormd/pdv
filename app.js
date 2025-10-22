@@ -228,7 +228,6 @@ const handleStaffLogin = async () => {
             hideLoginModal(); 
             
             // ROTEAMENTO PARA AS NOVAS FUNÇÕES DE INICIALIZAÇÃO
-            // Se o usuário estiver no index.html (Staff), ignora initClientApp
             if (userRole === 'client') {
                 // Se o cliente logar aqui (o que é incorreto, ele deveria usar client.html), ele será inicializado no modo cliente.
                 await initClientApp();
