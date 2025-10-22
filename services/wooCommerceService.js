@@ -20,7 +20,8 @@ const fetchWooCommerceData = async (endpoint) => {
         return await response.json();
     } catch (error) {
         console.error(`Falha ao conectar à API do WooCommerce (${endpoint}):`, error);
-        return [];
+        // Retorna um array vazio em caso de falha de conexão para evitar quebrar o app
+        return []; 
     }
 };
 
@@ -41,10 +42,12 @@ export const fetchWooCommerceProducts = async (renderMenuCallback) => {
         sector: 'cozinha'
     }));
     if (renderMenuCallback) renderMenuCallback();
+    return WOOCOMMERCE_PRODUCTS; // Garante que a promessa resolva com o valor
 };
 
 export const fetchWooCommerceCategories = async (renderCategoryFiltersCallback) => {
     const categories = await fetchWooCommerceData('products/categories');
     WOOCOMMERCE_CATEGORIES = [{ id: 'all', name: 'Todos', slug: 'all' }, ...categories.map(c => ({ id: c.id, name: c.name, slug: c.slug }))];
     if (renderCategoryFiltersCallback) renderCategoryFiltersCallback();
+    return WOOCOMMERCE_CATEGORIES; // Garante que a promessa resolva com o valor
 };
