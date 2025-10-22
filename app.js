@@ -165,7 +165,7 @@ const initStaffApp = async () => {
     document.body.classList.remove('client-mode');
     hideStatus();
 
-    // 4. INICIA O CARREGAMENTO/LISTENER DAS MESAS (Corrigido: Executado após o carregamento dos awaits)
+    // 4. CORREÇÃO CRÍTICA: Carrega mesas *após* carregar produtos e categorias do WooCommerce
     loadOpenTables(); // Inicia a consulta do Firebase (onSnapshot)
     
     goToScreen('panelScreen'); 
