@@ -117,6 +117,7 @@ const renderTables = (docs) => {
         const table = doc.data();
         const tableId = doc.id;
         
+        // FILTRO PRINCIPAL (client-side) para garantir que apenas mesas abertas sejam renderizadas
         if (table.status === 'open') {
             count++;
             const total = table.total || 0;
@@ -170,8 +171,8 @@ const renderTables = (docs) => {
                     ${attentionIconHtml} 
                     ${statusIconHtml} 
                     <h3 class="font-bold text-2xl">Mesa ${table.tableNumber}</h3>
-                    ${clientInfo}
                     <p class="text-xs font-light">Setor: ${table.sector || 'N/A'}</p>
+                    ${clientInfo}
                     <span class="font-bold text-lg mt-2">${formatCurrency(total)}</span>
                     ${timerHtml}
                 </div>
@@ -202,22 +203,23 @@ const renderTables = (docs) => {
 export const loadOpenTables = () => {
     if (unsubscribeTables) unsubscribeTables(); 
     
-    // Diagnóstico: Remova qualquer conteúdo de diagnóstico anterior no console.
-
     const tablesCollection = getTablesCollectionRef();
     let q;
     
+    // CORREÇÃO CRÍTICA: Removendo where('status', '==', 'open') para bypassar inconsistências de índice/dados.
     if (currentSectorFilter === 'Todos') {
-        q = query(tablesCollection, where('status', '==', 'ope'), orderBy('tableNumber', 'asc'));
+        // Apenas ordena. O filtro de status é feito em renderTables.
+        q = query(tablesCollection, orderBy('tableNumber', 'asc'));
     } else {
+        // Filtra por setor E ordena. O filtro de status é feito em renderTables.
         q = query(tablesCollection, 
-                  where('status', '==', 'ope'), 
                   where('sector', '==', currentSectorFilter),
                   orderBy('tableNumber', 'asc'));
     }
 
     unsubscribeTables = onSnapshot(q, (snapshot) => {
         const docs = snapshot.docs;
+        // console.log(`[PDV] Mesas carregadas pelo listener: ${docs.length}`); // Log de diagnóstico
         renderTables(docs);
     }, (error) => {
         // CRÍTICO: Exibe o erro do Firebase diretamente na LISTA DE MESAS
