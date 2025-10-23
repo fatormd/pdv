@@ -13,17 +13,6 @@ let currentClientSearch = '';
 let currentClientCategoryFilter = 'all'; 
 
 
-// Função de Renderização do Menu (Reutilizada, mas focada no cliente)
-export const renderClientMenu = (filter = currentClientCategoryFilter, search = currentClientSearch) => { 
-    const menuItemsGrid = document.getElementById('menuItemsGridClient');
-    const categoryFiltersContainer = document.getElementById('categoryFiltersClient');
-    const searchProductInput = document.getElementById('searchProductInputClient');
-    
-    // (A lógica de renderização do menu é idêntica à do Staff, mas usa IDs com sufixo 'Client')
-    // ... (omitindo a lógica de filtragem e renderização para brevidade, use o código do orderController)
-    // NOTE: Você precisará transferir e adaptar a lógica de renderMenu do orderController para cá
-};
-
 // Função de Renderização da Lista de Pedidos do Cliente
 export const renderClientOrderScreen = () => {
     // Renderiza Tela do Cliente
@@ -38,14 +27,48 @@ export const renderClientOrderScreen = () => {
 
     if (sendBtn) {
         sendBtn.disabled = openItemsCountValue === 0;
+        sendBtn.innerHTML = '<i class="fas fa-check-circle"></i>'; // Garante que o ícone de envio do cliente seja o correto
     }
     
-    // ... (Lógica de Agrupamento de Itens é a mesma) ...
+    if (openItemsCountValue === 0) {
+        openOrderList.innerHTML = `<div class="text-base text-gray-500 italic p-2">Nenhum item selecionado.</div>`;
+    } else {
+        // Lógica de Agrupamento para exibição (CORREÇÃO IMPLEMENTADA AQUI)
+        const groupedItems = selectedItems.reduce((acc, item, index) => {
+            const key = `${item.id}-${item.note || ''}`;
+            if (!acc[key]) {
+                acc[key] = { ...item, count: 0 };
+            }
+            acc[key].count++;
+            return acc;
+        }, {});
+
+        openOrderList.innerHTML = Object.values(groupedItems).map(group => `
+            <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg shadow-sm">
+                <div class="flex flex-col flex-grow min-w-0 mr-2">
+                    <span class="font-semibold text-gray-800">${group.name} (${group.count}x)</span>
+                    <span class="text-sm cursor-pointer" onclick="window.openClientObsModalForGroup('${group.id}', '${group.note || ''}')">
+                        ${group.note ? `(${group.note})` : `(Adicionar Obs.)`}
+                    </span>
+                </div>
+
+                <div class="flex items-center space-x-2 flex-shrink-0">
+                    <button class="qty-btn bg-red-500 text-white rounded-full text-lg hover:bg-red-600 transition duration-150" 
+                            onclick="window.decreaseLocalItemQuantity('${group.id}', '${group.note || ''}')" title="Remover um">
+                        <i class="fas fa-minus"></i>
+                    </button>
+                    <button class="qty-btn bg-green-500 text-white rounded-full text-lg hover:bg-green-600 transition duration-150" 
+                            onclick="window.increaseLocalItemQuantity('${group.id}', '${group.note || ''}')" title="Adicionar um">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
 };
 
 // Abertura do Modal de Observações (COM VALIDAÇÃO DE QUICK-BUTTONS)
 export function openClientObsModalForGroup(itemId, noteKey) {
-    // ... (Lógica de mapeamento e configuração do modal)
     
     // NOVO: Exibir e configurar o modal do cliente (semelhante ao Staff, mas com as restrições)
     const products = getProducts();
@@ -61,6 +84,10 @@ export function openClientObsModalForGroup(itemId, noteKey) {
     
     clientObsModal.dataset.itemId = itemId;
     clientObsModal.dataset.originalNoteKey = noteKey;
+    
+    // O cliente não deve poder definir 'Em Espera'
+    const esperaSwitch = clientObsModal.querySelector('#esperaSwitch');
+    if (esperaSwitch) esperaSwitch.checked = false;
     
     clientObsModal.style.display = 'flex';
 }
@@ -136,7 +163,4 @@ document.addEventListener('DOMContentLoaded', () => {
     if (quickObsButtons) {
         quickObsButtons.addEventListener('click', handleQuickButtonClient);
     }
-
-    // A lógica de SAVE/CANCEL é compartilhada no orderController, mas adaptada para o novo fluxo:
-    // O Cliente só pode usar as quick-buttons para modificar o input.
 });
