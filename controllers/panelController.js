@@ -106,8 +106,7 @@ export const renderTableFilters = () => {
 // --- RENDERIZAÇÃO E CARREGAMENTO DE MESAS ---
 
 const renderTables = (docs) => {
-    // LOG DE DIAGNÓSTICO: Quantos documentos o renderTables recebeu?
-    console.log(`[DIAG] Iniciando renderTables com ${docs.length} documentos.`);
+    // console.log(`[DIAG] Iniciando renderTables com ${docs.length} documentos.`);
 
     const openTablesList = document.getElementById('openTablesList');
     const openTablesCount = document.getElementById('openTablesCount');
@@ -120,9 +119,8 @@ const renderTables = (docs) => {
         const table = doc.data();
         const tableId = doc.id;
         
-        // FILTRO PRINCIPAL (client-side): Se o problema for tipo de dado na query, 
-        // a renderização ainda garante que só mesas abertas apareçam.
-        if (table.status === 'open') { 
+        // CORREÇÃO: Torna o filtro case-insensitive e verifica se o status existe
+        if (table.status && table.status.toLowerCase() === 'open') { 
             count++;
             const total = table.total || 0;
             
@@ -187,8 +185,7 @@ const renderTables = (docs) => {
 
     openTablesCount.textContent = count;
     
-    // LOG DE DIAGNÓSTICO: Quantas mesas foram realmente renderizadas?
-    console.log(`[DIAG] Renderização concluída. ${count} mesas renderizadas/exibidas.`);
+    // console.log(`[DIAG] Renderização concluída. ${count} mesas renderizadas/exibidas.`);
 
     // CRÍTICO: Se não houver mesas abertas, exibe a mensagem de status final.
     if (count === 0) {
@@ -213,7 +210,7 @@ export const loadOpenTables = () => {
     const tablesCollection = getTablesCollectionRef();
     let q;
     
-    // Mantendo a consulta com ORDER BY, mas sem o filtro de status que estava quebrando.
+    // Consulta mínima mantida para garantir que o Firebase retorne os dados
     if (currentSectorFilter === 'Todos') {
         q = query(tablesCollection, orderBy('tableNumber', 'asc'));
     } else {
@@ -225,8 +222,7 @@ export const loadOpenTables = () => {
     unsubscribeTables = onSnapshot(q, (snapshot) => {
         const docs = snapshot.docs;
         
-        // LOG DE DIAGNÓSTICO: Quantos documentos o Firebase retornou?
-        console.log(`[DIAG] FIREBASE retornou ${docs.length} documentos.`);
+        // console.log(`[DIAG] FIREBASE retornou ${docs.length} documentos.`);
 
         renderTables(docs);
     }, (error) => {
@@ -246,7 +242,6 @@ export const loadOpenTables = () => {
     });
 };
 
-// ... (Restante do handleAbrirMesa, handleSearchTable e outras funções inalteradas)
 export const handleAbrirMesa = async () => {
     const mesaInput = document.getElementById('mesaInput');
     const pessoasInput = document.getElementById('pessoasInput');
