@@ -1,7 +1,7 @@
 // --- CONTROLLERS/PAYMENTCONTROLLER.JS (Painel 3) ---
-import { goToScreen, userRole, currentTableId, currentOrderSnapshot } from "../app.js";
-import { formatCurrency, calculateItemsValue, getNumericValueFromCurrency } from "../utils.js";
-import { getTableDocRef } from "../services/firebaseService.js";
+import { goToScreen, userRole, currentTableId, currentOrderSnapshot } from "/app.js";
+import { formatCurrency, calculateItemsValue, getNumericValueFromCurrency } from "/utils.js";
+import { getTableDocRef } from "/services/firebaseService.js";
 import { updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { openManagerAuthModal } from "./managerController.js"; // Importado para proteção de exclusão
 
