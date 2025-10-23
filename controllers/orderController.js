@@ -1,12 +1,12 @@
 // --- CONTROLLERS/ORDERCONTROLLER.JS (Painel 2) ---
-import { getProducts, getCategories } from "../services/wooCommerceService.js";
-import { formatCurrency } from "../utils.js";
-import { saveSelectedItemsToFirebase } from "../services/firebaseService.js"; 
-import { currentTableId, selectedItems, userRole, currentOrderSnapshot } from "../app.js";
+import { getProducts, getCategories } from "/services/wooCommerceService.js";
+import { formatCurrency } from "/utils.js";
+import { saveSelectedItemsToFirebase } from "/services/firebaseService.js"; 
+import { currentTableId, selectedItems, userRole, currentOrderSnapshot } from "/app.js";
 import { arrayUnion, serverTimestamp, doc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { getKdsCollectionRef, getTableDocRef } from "../services/firebaseService.js";
+import { getKdsCollectionRef, getTableDocRef } from "/services/firebaseService.js";
 import { openManagerAuthModal } from "./managerController.js";
-import { renderClientOrderScreen, openClientObsModalForGroup } from "./clientOrderController.js"; // Importa do novo módulo
+import { renderClientOrderScreen, openClientObsModalForGroup } from "./clientOrderController.js";
 
 
 // --- VARIÁVEIS DE ELEMENTOS (Serão definidas em DOMContentLoaded) ---
