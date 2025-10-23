@@ -1,7 +1,7 @@
 // --- CONTROLLERS/MANAGERCONTROLLER.JS (Painel 4) ---
-import { goToScreen } from "../app.js";
-import { getProducts } from "../services/wooCommerceService.js";
-import { formatCurrency } from "../utils.js";
+import { goToScreen } from "/app.js";
+import { getProducts } from "/services/wooCommerceService.js";
+import { formatCurrency } from "/utils.js";
 import { activateItemSelection, handleMassDeleteConfirmed } from "./paymentController.js"; // Importado
 
 // Credenciais Staff Centralizadas (copiadas do app.js)
