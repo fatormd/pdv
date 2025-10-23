@@ -100,6 +100,9 @@ export const renderTableFilters = () => {
             loadOpenTables(); 
         }
     });
+
+    // CORREÇÃO CRÍTICA: Chama a função para carregar as mesas imediatamente
+    loadOpenTables(); 
 };
 
 
