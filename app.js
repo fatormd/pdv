@@ -158,6 +158,7 @@ const initStaffApp = async () => {
     await fetchWooCommerceProducts(() => { 
         renderOrderScreen(); 
     });
+    // fetchWooCommerceCategories chama renderTableFilters como callback para popular o <select>
     await fetchWooCommerceCategories(renderTableFilters); 
     
     // 3. Finaliza Inicialização da UI
@@ -166,7 +167,7 @@ const initStaffApp = async () => {
     hideStatus();
 
     // 4. CORREÇÃO CRÍTICA: Carrega mesas *após* carregar produtos e categorias do WooCommerce
-    loadOpenTables(); // Inicia a consulta do Firebase (onSnapshot)
+    loadOpenTables(); // Inicia o listener do Firebase para o mapa de mesas
     
     goToScreen('panelScreen'); 
 };
