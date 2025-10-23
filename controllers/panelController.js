@@ -1,10 +1,10 @@
 // --- CONTROLLERS/PANELCONTROLLER.JS ---
-import { getTablesCollectionRef, getTableDocRef, auth } from "/services/firebaseService.js"; // CORRIGIDO
+import { getTablesCollectionRef, getTableDocRef, auth } from "/services/firebaseService.js"; // CORREÇÃO: Caminho Absoluto
 import { query, where, orderBy, onSnapshot, getDoc, setDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { formatCurrency, formatElapsedTime } from "/utils.js"; // CORRIGIDO
+import { formatCurrency, formatElapsedTime } from "/utils.js"; // CORREÇÃO: Caminho Absoluto
 // CRITICAL FIX: Adicionado setCurrentTable para controle de estado
-import { goToScreen, currentTableId, selectedItems, unsubscribeTable, currentOrderSnapshot, setCurrentTable, userRole } from "/app.js"; // CORRIGIDO
-import { fetchWooCommerceProducts } from "/services/wooCommerceService.js"; // CORRIGIDO
+import { goToScreen, currentTableId, selectedItems, unsubscribeTable, currentOrderSnapshot, setCurrentTable, userRole } from "/app.js"; // CORREÇÃO: Caminho Absoluto
+import { fetchWooCommerceProducts } from "/services/wooCommerceService.js"; // CORREÇÃO: Caminho Absoluto
 import { renderMenu, renderOrderScreen } from "./orderController.js";
 
 
@@ -210,7 +210,7 @@ export const loadOpenTables = () => {
     const tablesCollection = getTablesCollectionRef();
     let q;
     
-    // USANDO A CONSULTA CORRETA (status, sector, tableNumber) que tem índice configurado
+    // REVERTIDO: Usando a consulta original (status, sector, tableNumber) para usar o índice configurado
     if (currentSectorFilter === 'Todos') {
         q = query(tablesCollection, 
                   where('status', '==', 'open'), 
@@ -264,7 +264,7 @@ export const handleAbrirMesa = async () => {
     try {
         const docSnap = await getDoc(tableRef);
 
-        if (docSnap.exists() && docSnap.data().status === 'open') {
+        if (docSnap.exists() && docSnap.data().status && docSnap.data().status.toLowerCase() === 'open') {
             alert(`A Mesa ${tableNumber} já está aberta!`);
             return;
         }
@@ -307,7 +307,7 @@ export const handleSearchTable = async (isClientFlow = false) => {
     const tableRef = getTableDocRef(tableNumber);
     const docSnap = await getDoc(tableRef);
 
-    if (docSnap.exists() && docSnap.data().status === 'open') {
+    if (docSnap.exists() && docSnap.data().status && docSnap.data().status.toLowerCase() === 'open') {
         
         if (isClientFlow) {
             // LÓGICA CLIENTE 1: MESA OCUPADA/ABERTA (CLIENTE NÃO PODE USAR)
@@ -392,7 +392,7 @@ export const handleTableTransferConfirmed = async (originTableId, targetTableId,
 
     try {
         const targetSnap = await getDoc(targetTableRef);
-        const targetTableIsOpen = targetSnap.exists() && targetSnap.data().status === 'open';
+        const targetTableIsOpen = targetSnap.exists() && targetSnap.data().status && targetSnap.data().status.toLowerCase() === 'open';
 
         // 1. Abertura da Mesa de Destino (se necessário)
         if (!targetTableIsOpen) {
