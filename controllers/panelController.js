@@ -106,6 +106,9 @@ export const renderTableFilters = () => {
 // --- RENDERIZAÇÃO E CARREGAMENTO DE MESAS ---
 
 const renderTables = (docs) => {
+    // LOG DE DIAGNÓSTICO: Quantos documentos o renderTables recebeu?
+    console.log(`[DIAG] Iniciando renderTables com ${docs.length} documentos.`);
+
     const openTablesList = document.getElementById('openTablesList');
     const openTablesCount = document.getElementById('openTablesCount');
     if (!openTablesList || !openTablesCount) return;
@@ -117,8 +120,9 @@ const renderTables = (docs) => {
         const table = doc.data();
         const tableId = doc.id;
         
-        // FILTRO PRINCIPAL (client-side) para garantir que apenas mesas abertas sejam renderizadas
-        if (table.status === 'open') {
+        // FILTRO PRINCIPAL (client-side): Se o problema for tipo de dado na query, 
+        // a renderização ainda garante que só mesas abertas apareçam.
+        if (table.status === 'open') { 
             count++;
             const total = table.total || 0;
             
@@ -183,6 +187,9 @@ const renderTables = (docs) => {
 
     openTablesCount.textContent = count;
     
+    // LOG DE DIAGNÓSTICO: Quantas mesas foram realmente renderizadas?
+    console.log(`[DIAG] Renderização concluída. ${count} mesas renderizadas/exibidas.`);
+
     // CRÍTICO: Se não houver mesas abertas, exibe a mensagem de status final.
     if (count === 0) {
         openTablesList.innerHTML = `<div class="col-span-full text-sm text-gray-500 italic p-4 content-card bg-white">Nenhuma mesa aberta no setor "${currentSectorFilter}".</div>`;
@@ -206,12 +213,10 @@ export const loadOpenTables = () => {
     const tablesCollection = getTablesCollectionRef();
     let q;
     
-    // CORREÇÃO CRÍTICA: Removendo where('status', '==', 'open') para bypassar inconsistências de índice/dados.
+    // Mantendo a consulta com ORDER BY, mas sem o filtro de status que estava quebrando.
     if (currentSectorFilter === 'Todos') {
-        // Apenas ordena. O filtro de status é feito em renderTables.
         q = query(tablesCollection, orderBy('tableNumber', 'asc'));
     } else {
-        // Filtra por setor E ordena. O filtro de status é feito em renderTables.
         q = query(tablesCollection, 
                   where('sector', '==', currentSectorFilter),
                   orderBy('tableNumber', 'asc'));
@@ -219,7 +224,10 @@ export const loadOpenTables = () => {
 
     unsubscribeTables = onSnapshot(q, (snapshot) => {
         const docs = snapshot.docs;
-        // console.log(`[PDV] Mesas carregadas pelo listener: ${docs.length}`); // Log de diagnóstico
+        
+        // LOG DE DIAGNÓSTICO: Quantos documentos o Firebase retornou?
+        console.log(`[DIAG] FIREBASE retornou ${docs.length} documentos.`);
+
         renderTables(docs);
     }, (error) => {
         // CRÍTICO: Exibe o erro do Firebase diretamente na LISTA DE MESAS
@@ -238,7 +246,7 @@ export const loadOpenTables = () => {
     });
 };
 
-// Item 2: Abrir Mesa
+// ... (Restante do handleAbrirMesa, handleSearchTable e outras funções inalteradas)
 export const handleAbrirMesa = async () => {
     const mesaInput = document.getElementById('mesaInput');
     const pessoasInput = document.getElementById('pessoasInput');
@@ -288,7 +296,6 @@ export const handleAbrirMesa = async () => {
     }
 };
 
-// Item 3: Busca de Mesa (Ajustada para o fluxo de Cliente)
 export const handleSearchTable = async (isClientFlow = false) => {
     const searchTableInput = document.getElementById('searchTableInput');
     const searchTableBtn = document.getElementById('searchTableBtn');
@@ -376,8 +383,6 @@ export const loadTableOrder = (tableId) => {
     setCurrentTable(tableId); 
 };
 
-
-// NOVO: Lógica Central para Transferência de Itens para Outra Mesa
 export const handleTableTransferConfirmed = async (originTableId, targetTableId, itemsToTransfer, newDiners = 0, newSector = '') => {
     if (!originTableId || !targetTableId || itemsToTransfer.length === 0) {
         alert("Erro: Dados de transferência incompletos.");
