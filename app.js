@@ -210,11 +210,13 @@ const handleStaffLogin = async () => {
         userRole = staffData.role;
         
         try {
-            const app = initializeApp(JSON.parse(window.__firebase_config));
-            const authInstance = getAuth(app);
+            // FIX: Remove redundant/failing initialization and use existing auth instance
+            const authInstance = auth; 
+            if (!authInstance) throw new Error("Firebase Auth não inicializado. Recarregue a página.");
             
             // --- CORREÇÃO CRÍTICA: BYPASS E TRATAMENTO DE ERRO 403 (AUTH) ---
             try {
+                // Use the existing initialized auth instance
                 const userCredential = await signInAnonymously(authInstance); 
                 userId = userCredential.user.uid; 
                 
@@ -257,7 +259,7 @@ const handleLogout = () => {
     selectedItems = [];
     userRole = 'anonymous'; 
     
-    const authInstance = getAuth(initializeApp(JSON.parse(window.__firebase_config)));
+    const authInstance = auth;
     if (authInstance && authInstance.currentUser) {
         signOut(authInstance).catch(e => console.error("Erro no sign out:", e)); 
     }
@@ -286,6 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loginPasswordInput = loginPasswordInputElement;
     searchTableInput = searchTableInputElement;
     
+    // FIX: Initialize App using the imported function
     const app = initializeApp(firebaseConfig); 
     const dbInstance = getFirestore(app);
     const authInstance = getAuth(app);
@@ -313,7 +316,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (openManagerPanelBtn) { 
         openManagerPanelBtn.addEventListener('click', () => {
-             openManagerAuthModal('goToManagerPanel'); 
+             // Chamada global para a função exposta
+             window.openManagerAuthModal('goToManagerPanel'); 
         });
     }
     if (logoutBtnHeader) {
