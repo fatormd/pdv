@@ -208,10 +208,10 @@ export const loadOpenTables = () => {
     let q;
     
     if (currentSectorFilter === 'Todos') {
-        q = query(tablesCollection, where('status', '==', 'open'), orderBy('tableNumber', 'asc'));
+        q = query(tablesCollection, where('status', '==', 'ope'), orderBy('tableNumber', 'asc'));
     } else {
         q = query(tablesCollection, 
-                  where('status', '==', 'open'), 
+                  where('status', '==', 'ope'), 
                   where('sector', '==', currentSectorFilter),
                   orderBy('tableNumber', 'asc'));
     }
