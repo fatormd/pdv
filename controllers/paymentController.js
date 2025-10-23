@@ -2,9 +2,9 @@
 import { goToScreen, userRole, currentTableId, currentOrderSnapshot } from "/app.js";
 import { formatCurrency, calculateItemsValue, getNumericValueFromCurrency } from "/utils.js";
 import { getTableDocRef } from "/services/firebaseService.js";
-import { updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { updateDoc, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { openManagerAuthModal } from "./managerController.js"; // Importado para proteção de exclusão
-
+import { handleTableTransferConfirmed } from "./panelController.js"; // <--- NOVO: Importado para uso direto
 
 // Variáveis de estado do módulo
 let currentPaymentMethod = 'Dinheiro'; // Padrão
@@ -221,11 +221,14 @@ export const handleMassDeleteConfirmed = async (selectedGroups) => {
              const itemGroupKey = `${item.name}-${item.note || ''}`;
              return !groupKeysToRemove.includes(itemGroupKey);
         });
+        
+        // NOVO: Calcula o novo total
+        const newTotal = Math.max(0, (currentOrderSnapshot.total || 0) - valueRemoved);
 
         // Atualiza o Firebase
         await updateDoc(tableRef, {
             sentItems: sentItemsAfterRemoval,
-            total: (currentOrderSnapshot.total || 0) - valueRemoved
+            total: newTotal // <-- CORRIGIDO: Atualiza o total
         });
         
         alert(`Total de ${selectedGroups.length} grupos (${selectedGroups.flatMap(g => g.itemKeys).length} itens) removidos da conta. Valor: ${formatCurrency(valueRemoved)}.`);
@@ -250,7 +253,10 @@ export function openTableTransferModal(items) {
     document.getElementById('transferModalTitle').textContent = `Transferir ${itemCount} Item(s)`;
     document.getElementById('transferOriginTable').textContent = `Mesa ${currentTableId}`;
     document.getElementById('targetTableInput').value = '';
-    document.getElementById('newTableDinersInput').classList.add('hidden'); // Esconde inputs de nova mesa
+    
+    const newTableDinersInput = document.getElementById('newTableDinersInput');
+    if(newTableDinersInput) newTableDinersInput.classList.add('hidden'); // Esconde inputs de nova mesa
+    
     document.getElementById('confirmTableTransferBtn').textContent = 'Prosseguir';
     document.getElementById('confirmTableTransferBtn').disabled = false;
     
@@ -279,8 +285,9 @@ export function handleConfirmTableTransfer() {
     let diners = 0;
     let sector = '';
     
+    const newTableDinersInput = document.getElementById('newTableDinersInput');
     // Verifica se os campos de nova mesa estão visíveis
-    if (!document.getElementById('newTableDinersInput').classList.contains('hidden')) {
+    if (newTableDinersInput && !newTableDinersInput.classList.contains('hidden')) {
         diners = parseInt(dinersInput.value);
         sector = sectorInput.value;
         if (!diners || !sector) {
@@ -293,7 +300,7 @@ export function handleConfirmTableTransfer() {
     confirmBtn.disabled = true;
 
     // Chama a função centralizada em panelController para processar a transferência/abertura
-    window.handleTableTransferConfirmed(currentTableId, targetTableNumber, items, diners, sector);
+    handleTableTransferConfirmed(currentTableId, targetTableNumber, items, diners, sector); // <-- Chamada direta da função importada
     
     document.getElementById('tableTransferModal').style.display = 'none';
     window.itemsToTransfer = []; // Limpa o payload global
@@ -562,7 +569,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const confirmTransferBtn = document.getElementById('confirmTableTransferBtn');
     if (confirmTransferBtn) {
-        confirmTransferBtn.addEventListener('click', handleConfirmTableTransfer);
+        // Mapeia para a função exportada no escopo global
+        confirmTransferBtn.addEventListener('click', window.handleConfirmTableTransfer);
     }
 
     const targetTableInput = document.getElementById('targetTableInput');
@@ -572,17 +580,13 @@ document.addEventListener('DOMContentLoaded', () => {
         targetTableInput.addEventListener('input', async (e) => {
              const tableNumber = e.target.value.trim();
              const confirmBtn = document.getElementById('confirmTableTransferBtn');
-             newTableDinersInput.classList.add('hidden'); // Esconde por padrão
+             if(newTableDinersInput) newTableDinersInput.classList.add('hidden'); // Esconde por padrão
              confirmBtn.textContent = 'Prosseguir';
              
              if (tableNumber) {
-                 // Esta lógica precisa do getDoc do panelController, mas é um placeholder
-                 // para simular a verificação de mesa aberta/fechada.
-                 // Como estamos no módulo de Pagamento, mantemos a simulação.
-                 
                  // SIMULAÇÃO: Se o número for 99, simula mesa fechada e pede inputs extras.
                  if (tableNumber === '99') {
-                     newTableDinersInput.classList.remove('hidden');
+                     if(newTableDinersInput) newTableDinersInput.classList.remove('hidden');
                      confirmBtn.textContent = `Abrir Mesa ${tableNumber} e Transferir`;
                  } else {
                      // Caso contrário, assume mesa aberta
