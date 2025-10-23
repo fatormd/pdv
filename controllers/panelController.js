@@ -119,7 +119,7 @@ const renderTables = (docs) => {
         const table = doc.data();
         const tableId = doc.id;
         
-        // CORREÇÃO: Torna o filtro case-insensitive e verifica se o status existe
+        // CORREÇÃO FINAL: Usa toLowerCase() para garantir que mesas antigas com 'Open' ou 'OPEN' sejam contadas.
         if (table.status && table.status.toLowerCase() === 'open') { 
             count++;
             const total = table.total || 0;
@@ -210,11 +210,15 @@ export const loadOpenTables = () => {
     const tablesCollection = getTablesCollectionRef();
     let q;
     
-    // Consulta mínima mantida para garantir que o Firebase retorne os dados
+    // REVERTENDO O BYPASS: Reintroduzindo o filtro 'status' para usar o índice existente (status, sector, tableNumber)
     if (currentSectorFilter === 'Todos') {
-        q = query(tablesCollection, orderBy('tableNumber', 'asc'));
-    } else {
         q = query(tablesCollection, 
+                  where('status', '==', 'open'), 
+                  orderBy('tableNumber', 'asc'));
+    } else {
+        // Agora, esta query deve usar o índice que você já tinha: status, sector, tableNumber
+        q = query(tablesCollection, 
+                  where('status', '==', 'open'), // Reintroduzido
                   where('sector', '==', currentSectorFilter),
                   orderBy('tableNumber', 'asc'));
     }
