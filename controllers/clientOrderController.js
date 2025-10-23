@@ -1,10 +1,10 @@
 // --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (Novo Módulo - Painel 5) ---
-import { getProducts } from "../services/wooCommerceService.js";
-import { formatCurrency } from "../utils.js";
-import { saveSelectedItemsToFirebase } from "../services/firebaseService.js"; 
-import { currentTableId, selectedItems, userRole, currentOrderSnapshot } from "../app.js";
+import { getProducts } from "/services/wooCommerceService.js";
+import { formatCurrency } from "/utils.js";
+import { saveSelectedItemsToFirebase } from "/services/firebaseService.js"; 
+import { currentTableId, selectedItems, userRole, currentOrderSnapshot } from "/app.js";
 import { arrayUnion, serverTimestamp, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { getTableDocRef } from "../services/firebaseService.js";
+import { getTableDocRef } from "/services/firebaseService.js";
 
 
 // --- VARIÁVEIS DE ELEMENTOS (Definidas no DOMContentLoaded) ---
