@@ -3,13 +3,13 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebas
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-// Importações dos Módulos Refatorados
-import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, getCustomersCollectionRef, auth } from './services/firebaseService.js';
-import { fetchWooCommerceProducts, fetchWooCommerceCategories } from './services/wooCommerceService.js';
-import { loadOpenTables, renderTableFilters, handleAbrirMesa, loadTableOrder, handleSearchTable } from './controllers/panelController.js';
-import { renderMenu, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity } from './controllers/orderController.js';
-import { renderPaymentSummary } from './controllers/paymentController.js'; 
-import { openManagerAuthModal } from './controllers/managerController.js';
+// Importações dos Módulos Refatorados (CORREÇÃO DE CAMINHOS ABSOLUTOS)
+import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, getCustomersCollectionRef, auth } from '/services/firebaseService.js';
+import { fetchWooCommerceProducts, fetchWooCommerceCategories } from '/services/wooCommerceService.js';
+import { loadOpenTables, renderTableFilters, handleAbrirMesa, loadTableOrder, handleSearchTable } from '/controllers/panelController.js';
+import { renderMenu, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity } from '/controllers/orderController.js';
+import { renderPaymentSummary } from '/controllers/paymentController.js'; 
+import { openManagerAuthModal } from '/controllers/managerController.js';
 
 // --- VARIÁVEIS DE ESTADO GLOBAL ---
 // NOVO MAPEAMENTO DE TELAS PARA index.html (Staff)
@@ -223,7 +223,6 @@ const handleStaffLogin = async () => {
                 if (userRole !== 'client') {
                     console.warn("Firebase Auth falhou (403 Forbidden). Gerando ID de sessão Mock para Staff/Gerente.", authError);
                     userId = `mock_${userRole}_${Date.now()}`;
-                    // MANTENHA A EXECUÇÃO DO FLUXO
                 } else {
                     // Se o cliente falhar na autenticação, é um erro real.
                     throw authError; 
