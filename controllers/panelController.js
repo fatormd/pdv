@@ -1,353 +1,451 @@
-// --- APP.JS ---
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-// Importações dos Módulos Refatorados
-import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, getCustomersCollectionRef, auth } from './services/firebaseService.js';
-import { fetchWooCommerceProducts, fetchWooCommerceCategories } from './services/wooCommerceService.js';
-import { loadOpenTables, renderTableFilters, handleAbrirMesa, loadTableOrder, handleSearchTable } from './controllers/panelController.js';
-import { renderMenu, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity } from './controllers/orderController.js';
-import { renderPaymentSummary } from './controllers/paymentController.js'; 
-import { openManagerAuthModal } from './controllers/managerController.js';
-
-// --- VARIÁVEIS DE ESTADO GLOBAL ---
-// NOVO MAPEAMENTO DE TELAS PARA index.html (Staff)
-export const screens = { 
-    'panelScreen': 0, // Novo Índice 0
-    'orderScreen': 1, // Novo Índice 1
-    'paymentScreen': 2, // Novo Índice 2
-    'managerScreen': 3, // Novo Índice 3
-    'clientOrderScreen': 4, // Mantido no final, fora do fluxo Staff principal
-};
-export const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
-
-// Credenciais Staff Centralizadas (para login unificado)
-const STAFF_CREDENTIALS = {
-    'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' }, 
-    'garcom@fator.com': { password: '1234', role: 'garcom', name: 'Mock Garçom' },
-    'cliente@fator.com': { password: '1234', role: 'client', name: 'Cliente Teste' }, 
-};
-
-// Variáveis Mutáveis (Estado da Sessão)
-export let currentTableId = null;
-export let selectedItems = []; 
-export let currentOrderSnapshot = null;
-export let userRole = 'anonymous'; 
-export let userId = null;
-export let unsubscribeTable = null;
+// --- CONTROLLERS/PANELCONTROLLER.JS ---
+import { getTablesCollectionRef, getTableDocRef, auth } from "/services/firebaseService.js"; // CORRIGIDO
+import { query, where, orderBy, onSnapshot, getDoc, setDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { formatCurrency, formatElapsedTime } from "/utils.js"; // CORRIGIDO
+// CRITICAL FIX: Adicionado setCurrentTable para controle de estado
+import { goToScreen, currentTableId, selectedItems, unsubscribeTable, currentOrderSnapshot, setCurrentTable, userRole } from "/app.js"; // CORRIGIDO
+import { fetchWooCommerceProducts } from "/services/wooCommerceService.js"; // CORRIGIDO
+import { renderMenu, renderOrderScreen } from "./orderController.js";
 
 
-// --- ELEMENTOS UI (Definidos no escopo superior para referências, mas buscados no DOMContentLoaded) ---
-const statusScreen = document.getElementById('statusScreen');
-const mainContent = document.getElementById('mainContent');
-const appContainer = document.getElementById('appContainer');
-const loginModal = document.getElementById('loginModal');
-
-// Variáveis para inputs de Login (inicialmente null, preenchidas no DOMContentLoaded)
-let loginBtn = null; 
-let loginEmailInput = null; 
-let loginPasswordInput = null;
-let searchTableInput = null; 
+// --- ESTADO DO MÓDULO ---
+const SECTORS = ['Todos', 'Salão 1', 'Bar', 'Mezanino', 'Calçada'];
+let currentSectorFilter = 'Todos';
+let unsubscribeTables = null; 
 
 
-// --- FUNÇÕES CORE E ROTIAMENTO ---
+// --- FUNÇÃO DE ALERTA CUSTOMIZADO (Mantida, pois é usada no fluxo de cliente) ---
+const showCustomAlert = (title, message) => {
+    const modal = document.getElementById('customAlertModal');
+    const titleEl = document.getElementById('customAlertTitle');
+    const messageEl = document.getElementById('customAlertMessage');
+    const okBtn = document.getElementById('customAlertOkBtn');
 
-export const hideStatus = () => {
-    if (statusScreen && mainContent) {
-        statusScreen.style.display = 'none';
-        // Removido display: block aqui, pois o CSS já faz o trabalho quando o modal de login som
+    if (!modal || !titleEl || !messageEl || !okBtn) {
+        // Fallback
+        alert(`${title}: ${message}`);
+        return;
     }
-};
-
-const showLoginModal = () => {
-    if (statusScreen) statusScreen.style.display = 'none'; 
-    if (mainContent) mainContent.style.display = 'none'; 
     
-    if (loginModal) {
-        loginModal.style.display = 'flex'; 
-    }
-};
-
-const hideLoginModal = () => {
-    if (loginModal) {
-        loginModal.style.display = 'none';
-    }
-};
-
-export const goToScreen = (screenId) => {
-    // 1. Lógica de Restrição de Navegação para o Cliente
-    // Apenas o cliente.html deve ter a classe client-mode, mas mantemos a verificação.
-    if (userRole === 'client' && screenId !== 'clientOrderScreen' && currentTableId) {
-        // Se o cliente tentar sair da tela de pedidos após se vincular à mesa, ele é impedido.
-        if (screenId === 'panelScreen') {
-             alert("Acesso restrito. Você só pode visualizar a sua mesa.");
-             return; 
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    
+    okBtn.onclick = () => {
+        modal.style.display = 'none';
+        const searchTableInput = document.getElementById('searchTableInput');
+        if (searchTableInput) {
+            searchTableInput.value = '';
+            searchTableInput.focus();
         }
-    }
+    };
     
-    // Salva o estado ao sair da tela de pedidos
-    if (currentTableId) {
-        saveSelectedItemsToFirebase(currentTableId, selectedItems);
-    }
-    
-    // Se o cliente fizer logout ou tentar sair da mesa, desvincula o currentTableId.
-    if (screenId === 'panelScreen' && currentTableId && unsubscribeTable) {
-        unsubscribeTable(); 
-        unsubscribeTable = null; 
-    }
-
-    const screenIndex = screens[screenId];
-    if (screenIndex !== undefined) {
-        if (appContainer) {
-            appContainer.style.transform = `translateX(-${screenIndex * 100}vw)`;
-        }
-        document.body.classList.toggle('bg-gray-900', screenId === 'managerScreen');
-        document.body.classList.toggle('bg-gray-100', screenId !== 'managerScreen');
-    }
-};
-
-window.goToScreen = goToScreen; 
-window.openManagerAuthModal = openManagerAuthModal; 
-
-
-// NOVO: Função para o listener da mesa (MÓDULO DE FLUXO)
-export const setTableListener = (tableId) => {
-    if (unsubscribeTable) unsubscribeTable(); 
-
-    const tableRef = getTableDocRef(tableId);
-
-    // CRITICAL: Atualiza o estado global e chama os renderizadores de tela
-    unsubscribeTable = onSnapshot(tableRef, (docSnapshot) => {
-        if (docSnapshot.exists()) {
-            currentOrderSnapshot = docSnapshot.data();
-            
-            // CORREÇÃO DE LÓGICA: Limpa o array e repopula (evita vazamento de referência)
-            const newSelectedItems = currentOrderSnapshot.selectedItems || [];
-            selectedItems.length = 0; 
-            selectedItems.push(...newSelectedItems);
-            
-            renderOrderScreen(currentOrderSnapshot);
-            renderPaymentSummary(currentTableId, currentOrderSnapshot);
-        }
-    }, (error) => {
-        console.error("Erro ao carregar dados da mesa:", error);
-    });
-};
-
-export const setCurrentTable = (tableId) => {
-    currentTableId = tableId; 
-    
-    document.getElementById('current-table-number').textContent = `Mesa ${tableId}`; 
-    document.getElementById('payment-table-number').textContent = `Mesa ${tableId}`; 
-    if (document.getElementById('client-table-number')) {
-         document.getElementById('client-table-number').textContent = `Mesa ${tableId}`; 
-    }
-    
-    setTableListener(tableId); 
+    modal.style.display = 'flex';
 };
 
 
-// --- INICIALIZAÇÃO ESPECÍFICA (Staff e Cliente) ---
+// --- RENDERIZAÇÃO DE SETORES ---
 
-const initStaffApp = async () => {
-    // 1. Carrega dados síncronos (Filtros de Setor são síncronos)
-    renderTableFilters(); // Renderiza filtros de setor primeiro
+export const renderTableFilters = () => {
+    const sectorFiltersContainer = document.getElementById('sectorFilters');
+    const sectorInput = document.getElementById('sectorInput');
     
-    // 2. Carrega Produtos e Categorias (CRÍTICO: Await aqui)
-    await fetchWooCommerceProducts(() => { 
-        renderOrderScreen(); 
-    });
-    // fetchWooCommerceCategories chama renderTableFilters como callback para popular o <select>
-    await fetchWooCommerceCategories(renderTableFilters); 
+    const abrirMesaCard = document.querySelector('#panelScreen .content-card:first-child');
+    const tableListTitle = document.querySelector('#panelScreen .space-y-3 h3');
     
-    // 3. Finaliza Inicialização da UI
-    if (mainContent) mainContent.style.display = 'block'; 
-    document.body.classList.remove('client-mode');
-    hideStatus();
+    if (!sectorFiltersContainer || !sectorInput) return;
 
-    // 4. CORREÇÃO CRÍTICA: Carrega mesas *após* carregar produtos e categorias do WooCommerce
-    loadOpenTables(); // Inicia o listener do Firebase para o mapa de mesas
-    
-    goToScreen('panelScreen'); 
-};
-
-const initClientApp = async () => {
-    // 1. Carrega apenas o essencial do cliente
-    renderTableFilters(); 
-    
-    // 2. Carrega Produtos e Categorias (CRÍTICO: Await aqui)
-    await fetchWooCommerceProducts(() => { 
-        renderOrderScreen(); 
-    });
-    await fetchWooCommerceCategories(renderTableFilters); 
-    
-    // 3. Finaliza Inicialização
-    if (mainContent) mainContent.style.display = 'block'; 
-    document.body.classList.add('client-mode');
-    hideStatus();
-    alert("Bem-vindo Cliente! Insira o número da sua mesa no campo de busca para começar a pedir.");
-    goToScreen('clientOrderScreen'); 
-};
-
-
-// --- LÓGICA DE AUTH/LOGIN ---
-
-const authenticateStaff = (email, password) => {
-    const creds = STAFF_CREDENTIALS[email];
-    if (creds && creds.password === password) {
-        return creds; 
-    }
-    return null;
-};
-
-const handleStaffLogin = async () => {
-    // Garante que os elementos foram carregados (fix para o erro de login)
-    if (!loginBtn || !loginEmailInput || !loginPasswordInput) {
-         console.error("Erro: Elementos de login não encontrados.");
-         alert("Erro interno: Elementos de login não carregados.");
-         return;
-    }
-    
-    if (loginBtn) loginBtn.disabled = true; 
-    
-    const email = loginEmailInput.value.trim();
-    const password = loginPasswordInput.value.trim();
-    
-    const staffData = authenticateStaff(email, password);
-
-    if (staffData) {
-        userRole = staffData.role;
-        
-        try {
-            const app = initializeApp(JSON.parse(window.__firebase_config));
-            const authInstance = getAuth(app);
-            
-            // --- CORREÇÃO CRÍTICA PARA O ERRO 403 (BYPASS DE AUTH) ---
-            try {
-                const userCredential = await signInAnonymously(authInstance); 
-                userId = userCredential.user.uid; 
-                
-            } catch (authError) {
-                // Se o erro for de Auth/rede (incluindo 403 Forbidden), gere um ID mock para o Staff prosseguir.
-                if (userRole !== 'client') {
-                    console.warn("Firebase Auth falhou (403 ou similar). Gerando ID de sessão Mock para Staff/Gerente.", authError);
-                    userId = `mock_${userRole}_${Date.now()}`;
-                } else {
-                    // Se o cliente falhar na autenticação, é um erro real.
-                    throw authError; 
-                }
-            }
-            // --- FIM CORREÇÃO CRÍTICA ---
-            
-            document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)} | Função: ${userRole.toUpperCase()}`;
-            
-            hideLoginModal(); 
-            
-            // ROTEAMENTO PARA AS NOVAS FUNÇÕES DE INICIALIZAÇÃO
-            if (userRole === 'client') {
-                // Se o cliente logar aqui (o que é incorreto, ele deveria usar client.html), ele será inicializado no modo cliente.
-                await initClientApp();
-            } else {
-                await initStaffApp();
-            }
-            
-        } catch (error) {
-             console.error("Erro ao autenticar Staff (Firebase/Anônimo):", error);
-             alert("Autenticação falhou. Verifique as credenciais ou a configuração do Firebase.");
-        }
+    if (userRole === 'client') {
+        if (abrirMesaCard) abrirMesaCard.style.display = 'none';
+        if (tableListTitle) tableListTitle.textContent = 'Minha Mesa (Busca Abaixo)';
     } else {
-        alert('Credenciais inválidas. Verifique seu e-mail e senha.');
+        if (abrirMesaCard) abrirMesaCard.style.display = 'block';
+        if (tableListTitle) tableListTitle.textContent = 'Mesas Abertas';
     }
-    if (loginBtn) loginBtn.disabled = false;
+
+
+    sectorFiltersContainer.innerHTML = '';
+    SECTORS.forEach(sector => {
+        const isActive = sector === currentSectorFilter ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border border-gray-300';
+        sectorFiltersContainer.innerHTML += `
+            <button class="sector-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap ${isActive}" data-sector="${sector}">
+                ${sector}
+            </button>
+        `;
+    });
+    
+    sectorInput.innerHTML = '<option value="" disabled selected>Setor</option>' + 
+                            SECTORS.filter(s => s !== 'Todos')
+                                   .map(s => `<option value="${s}">${s}</option>`).join('');
+    
+    const newTableSectorInput = document.getElementById('newTableSector');
+    if (newTableSectorInput) {
+        newTableSectorInput.innerHTML = '<option value="" disabled selected>Setor</option>' + 
+                                SECTORS.filter(s => s !== 'Todos')
+                                       .map(s => `<option value="${s}">${s}</option>`).join('');
+    }
+    
+    sectorFiltersContainer.addEventListener('click', (e) => {
+        const btn = e.target.closest('.sector-btn');
+        if (btn) {
+            const sector = btn.dataset.sector;
+            currentSectorFilter = sector;
+            
+            document.querySelectorAll('.sector-btn').forEach(b => {
+                b.classList.remove('bg-indigo-600', 'text-white');
+                b.classList.add('bg-white', 'text-gray-700', 'border', 'border-gray-300');
+            });
+            btn.classList.remove('bg-white', 'text-gray-700', 'border', 'border-gray-300');
+            btn.classList.add('bg-indigo-600', 'text-white');
+            
+            loadOpenTables(); 
+        }
+    });
 };
 
-const handleLogout = () => {
-    userId = null;
-    currentTableId = null;
-    selectedItems = [];
-    userRole = 'anonymous'; 
-    
-    // Obtém a instância correta do auth para logout
-    const authInstance = getAuth(initializeApp(JSON.parse(window.__firebase_config)));
-    if (authInstance && authInstance.currentUser) {
-        signOut(authInstance).catch(e => console.error("Erro no sign out:", e)); 
-    }
-    
-    goToScreen('panelScreen');
-    showLoginModal();
-    document.getElementById('user-id-display').textContent = 'Usuário ID: Carregando...';
-};
 
-window.handleLogout = handleLogout;
+// --- RENDERIZAÇÃO E CARREGAMENTO DE MESAS ---
+
+const renderTables = (docs) => {
+    // console.log(`[DIAG] Iniciando renderTables com ${docs.length} documentos.`);
+
+    const openTablesList = document.getElementById('openTablesList');
+    const openTablesCount = document.getElementById('openTablesCount');
+    if (!openTablesList || !openTablesCount) return;
+
+    openTablesList.innerHTML = '';
+    let count = 0;
+
+    docs.forEach(doc => {
+        const table = doc.data();
+        const tableId = doc.id;
+        
+        // CORREÇÃO FINAL: Usa toLowerCase() para garantir que mesas antigas com 'Open' ou 'OPEN' sejam contadas.
+        if (table.status && table.status.toLowerCase() === 'open') { 
+            count++;
+            const total = table.total || 0;
+            
+            const isClientPending = table.clientOrderPending || false; 
+            
+            let cardColor = total > 0 ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200';
+            let bellIconHtml = '';
+            let attentionIconHtml = '';
+            
+            if (isClientPending) {
+                cardColor = 'bg-indigo-900 text-white hover:bg-indigo-800 border-2 border-yellow-400'; 
+                bellIconHtml = `<i class="fas fa-bell attention-icon text-yellow-400" title="Pedido Novo de Cliente"></i>`;
+            }
+            
+            const hasAguardandoItem = (table.selectedItems || []).some(item => 
+                item.note && item.note.toLowerCase().includes('espera')
+            );
+            
+            if (isClientPending) {
+                 attentionIconHtml = bellIconHtml;
+            } else {
+                 attentionIconHtml = hasAguardandoItem 
+                    ? `<i class="fas fa-exclamation-triangle attention-icon" title="Itens em Espera"></i>` 
+                    : '';
+            }
 
 
-// --- INITIALIZATION ---
-let firebaseConfig;
-document.addEventListener('DOMContentLoaded', () => {
-    
-    // CRIAÇÃO DO OBJETO FIREBASE CONF.
-    firebaseConfig = JSON.parse(window.__firebase_config);
+            const lastSentAt = table.lastKdsSentAt?.toMillis() || null;
+            const elapsedTime = lastSentAt ? formatElapsedTime(lastSentAt) : null;
+            
+            const timerHtml = elapsedTime ? `
+                <div class="table-timer">
+                    <i class="fas fa-clock"></i> 
+                    <span>${elapsedTime}</span>
+                </div>
+            ` : '';
 
-    // Captura dos elementos dentro do DOMContentLoaded
-    const loginBtnElement = document.getElementById('loginBtn');
-    const loginEmailInputElement = document.getElementById('loginEmail'); 
-    const loginPasswordInputElement = document.getElementById('loginPassword');
-    const searchTableInputElement = document.getElementById('searchTableInput'); 
-    
-    // Atribui aos escopos externos
-    loginBtn = loginBtnElement;
-    loginEmailInput = loginEmailInputElement;
-    loginPasswordInput = loginPasswordInputElement;
-    searchTableInput = searchTableInputElement;
-    
-    const app = initializeApp(firebaseConfig); 
-    const dbInstance = getFirestore(app);
-    const authInstance = getAuth(app);
-    
-    initializeFirebase(dbInstance, authInstance, window.__app_id || 'pdv_default_app'); 
+            const statusIconHtml = lastSentAt ? `
+                <button class="kds-status-icon-btn" 
+                        title="Status do Último Pedido"
+                        onclick="window.openKdsStatusModal(${tableId})">
+                    <i class="fas fa-tasks"></i>
+                </button>
+            ` : '';
+            
+            const clientInfo = table.clientName ? `<p class="text-xs font-semibold text-gray-800">Cliente: ${table.clientName}</p>` : '';
 
-    onAuthStateChanged(authInstance, (user) => {
-        if (!user) {
-            showLoginModal();
-        } else if (userRole === 'client') {
-            // Se o cliente já estiver logado (reload)
-            document.body.classList.add('client-mode');
+            const cardHtml = `
+                <div class="table-card-panel ${cardColor} shadow-md transition-colors duration-200 relative" data-table-id="${tableId}">
+                    ${attentionIconHtml} 
+                    ${statusIconHtml} 
+                    <h3 class="font-bold text-2xl">Mesa ${table.tableNumber}</h3>
+                    <p class="text-xs font-light">Setor: ${table.sector || 'N/A'}</p>
+                    ${clientInfo}
+                    <span class="font-bold text-lg mt-2">${formatCurrency(total)}</span>
+                    ${timerHtml}
+                </div>
+            `;
+            openTablesList.innerHTML += cardHtml;
         }
     });
 
-    // 1. Event Listeners de Login
-    if (loginBtn) {
-        loginBtn.addEventListener('click', handleStaffLogin);
+    openTablesCount.textContent = count;
+    
+    // console.log(`[DIAG] Renderização concluída. ${count} mesas renderizadas/exibidas.`);
+
+    // CRÍTICO: Se não houver mesas abertas, exibe a mensagem de status final.
+    if (count === 0) {
+        openTablesList.innerHTML = `<div class="col-span-full text-sm text-gray-500 italic p-4 content-card bg-white">Nenhuma mesa aberta no setor "${currentSectorFilter}".</div>`;
     }
     
-    // 2. Event Listeners do Cabeçalho e Painel
-    const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
-    const logoutBtnHeader = document.getElementById('logoutBtnHeader');
-    const abrirMesaBtn = document.getElementById('abrirMesaBtn');
-    const searchTableBtnTrigger = document.getElementById('searchTableBtn');
-
-    if (openManagerPanelBtn) { 
-        openManagerPanelBtn.addEventListener('click', () => {
-             openManagerAuthModal('goToManagerPanel'); 
-        });
-    }
-    if (logoutBtnHeader) {
-        logoutBtnHeader.addEventListener('click', handleLogout); 
-    }
-    if (abrirMesaBtn) {
-        abrirMesaBtn.addEventListener('click', handleAbrirMesa);
-    }
-    if (searchTableBtnTrigger) {
-        searchTableBtnTrigger.addEventListener('click', () => {
-            // A busca de mesa é o método que o cliente usa para se vincular
-            if (userRole === 'client') {
-                 handleSearchTable(true); // Passa flag para ir para a tela de cliente
-            } else {
-                 handleSearchTable();
+    document.querySelectorAll('.table-card-panel').forEach(card => {
+        card.addEventListener('click', (e) => {
+            if (e.target.closest('.kds-status-icon-btn')) return; 
+            
+            const tableId = card.dataset.tableId;
+            if (tableId) {
+                openTableForOrder(tableId);
             }
         });
+    });
+};
+
+export const loadOpenTables = () => {
+    if (unsubscribeTables) unsubscribeTables(); 
+    
+    const tablesCollection = getTablesCollectionRef();
+    let q;
+    
+    // USANDO A CONSULTA CORRETA (status, sector, tableNumber) que tem índice configurado
+    if (currentSectorFilter === 'Todos') {
+        q = query(tablesCollection, 
+                  where('status', '==', 'open'), 
+                  orderBy('tableNumber', 'asc'));
+    } else {
+        q = query(tablesCollection, 
+                  where('status', '==', 'open'), 
+                  where('sector', '==', currentSectorFilter),
+                  orderBy('tableNumber', 'asc'));
     }
 
-    // 3. Carrega UI Inicial (Inicialização ocorre apenas após o login, em initStaffApp ou initClientApp)
-});
+    unsubscribeTables = onSnapshot(q, (snapshot) => {
+        const docs = snapshot.docs;
+        
+        // console.log(`[DIAG] FIREBASE retornou ${docs.length} documentos.`);
+
+        renderTables(docs);
+    }, (error) => {
+        // CRÍTICO: Exibe o erro do Firebase diretamente na LISTA DE MESAS
+        const openTablesList = document.getElementById('openTablesList');
+        const errorMessage = error.message || "Erro desconhecido. Verifique o Console (F12).";
+        
+        if (openTablesList) {
+            openTablesList.innerHTML = `<div class="col-span-full text-sm text-red-600 font-bold italic p-4 content-card bg-white">
+                ERRO CRÍTICO FIREBASE: A sincronização de mesas falhou!
+                <br>O problema é de Índice Composto ou Regras de Segurança.
+                <br>Detalhe da Falha: ${errorMessage.substring(0, 300)}
+            </div>`;
+        }
+        
+        console.error("Erro fatal ao carregar mesas (onSnapshot):", error);
+    });
+};
+
+export const handleAbrirMesa = async () => {
+    const mesaInput = document.getElementById('mesaInput');
+    const pessoasInput = document.getElementById('pessoasInput');
+    const sectorInput = document.getElementById('sectorInput');
+
+    const tableNumber = parseInt(mesaInput.value);
+    const diners = parseInt(pessoasInput.value);
+    const sector = sectorInput.value;
+
+    if (!tableNumber || !diners || tableNumber <= 0 || diners <= 0 || !sector) {
+        alert('Preencha o número da mesa, a quantidade de pessoas e o setor corretamente.');
+        return;
+    }
+
+    const tableRef = getTableDocRef(tableNumber);
+
+    try {
+        const docSnap = await getDoc(tableRef);
+
+        if (docSnap.exists() && docSnap.data().status === 'open') {
+            alert(`A Mesa ${tableNumber} já está aberta!`);
+            return;
+        }
+
+        await setDoc(tableRef, {
+            tableNumber: tableNumber,
+            diners: diners,
+            sector: sector, 
+            status: 'open',
+            createdAt: serverTimestamp(),
+            total: 0,
+            sentItems: [], 
+            payments: [],
+            serviceTaxApplied: true, 
+            selectedItems: [] 
+        });
+        
+        mesaInput.value = '';
+        pessoasInput.value = '';
+        sectorInput.value = '';
+        
+        openTableForOrder(tableNumber.toString()); 
+        
+    } catch (e) {
+        console.error("Erro ao abrir mesa:", e);
+        alert("Erro ao tentar abrir a mesa.");
+    }
+};
+
+export const handleSearchTable = async (isClientFlow = false) => {
+    const searchTableInput = document.getElementById('searchTableInput');
+    const searchTableBtn = document.getElementById('searchTableBtn');
+    const tableNumber = searchTableInput.value.trim();
+
+    if (!tableNumber || parseInt(tableNumber) <= 0) {
+        alert("Insira um número de mesa válido para buscar.");
+        return;
+    }
+
+    const tableRef = getTableDocRef(tableNumber);
+    const docSnap = await getDoc(tableRef);
+
+    if (docSnap.exists() && docSnap.data().status === 'open') {
+        
+        if (isClientFlow) {
+            // LÓGICA CLIENTE 1: MESA OCUPADA/ABERTA (CLIENTE NÃO PODE USAR)
+            showCustomAlert("Mesa Ocupada", "A mesa já está em uso. Informe o garçom para se vincular.");
+            return; 
+        } else {
+            // LÓGICA STAFF: Abre a mesa para pedido
+            openTableForOrder(tableNumber, isClientFlow); 
+            searchTableInput.value = '';
+        }
+
+    } else {
+        
+        if (isClientFlow) {
+            // LÓGICA CLIENTE 2: MESA FECHADA (ABRE AUTOMATICAMENTE PARA O CLIENTE)
+            const defaultDiners = 1;
+            const defaultSector = 'Salão 1'; 
+            const targetTableId = tableNumber;
+
+            try {
+                await setDoc(tableRef, {
+                    tableNumber: parseInt(targetTableId),
+                    diners: defaultDiners,
+                    sector: defaultSector, 
+                    status: 'open',
+                    createdAt: serverTimestamp(),
+                    total: 0,
+                    sentItems: [], 
+                    payments: [],
+                    serviceTaxApplied: true,
+                    selectedItems: [],
+                    linkedClient: true
+                });
+
+                // Lógica de sucesso (abrir a tela do cliente)
+                openTableForOrder(targetTableId, isClientFlow); 
+                searchTableInput.value = '';
+                searchTableInput.readOnly = true;
+                searchTableInput.placeholder = `Mesa ${tableNumber} vinculada.`;
+                searchTableBtn.style.display = 'none';
+                
+                alert("Mesa aberta com sucesso! Você já pode fazer pedidos.");
+            } catch (e) {
+                 console.error("Erro ao abrir mesa pelo cliente:", e);
+                 alert("Erro ao tentar abrir a mesa. Tente novamente.");
+            }
+            
+        } else {
+            // LÓGICA STAFF: Mesa não existe/fechada, alerta simples.
+            alert(`A Mesa ${tableNumber} não está aberta.`);
+        }
+    }
+};
+
+export const openTableForOrder = async (tableId, isClientFlow = false) => {
+    // Garante que o Menu esteja carregado (dependência para o Painel 2)
+    await fetchWooCommerceProducts(renderMenu); 
+    
+    // Navegação e Carregamento (Item 2)
+    loadTableOrder(tableId); // Inicia o listener e atualiza o estado
+    
+    if (isClientFlow) {
+        goToScreen('clientOrderScreen'); // Cliente vai para sua tela dedicada
+    } else {
+        goToScreen('orderScreen'); // Staff vai para a tela de pedidos normal
+    }
+};
+
+export const loadTableOrder = (tableId) => {
+    // CRITICAL FIX: Chama a função central que define o estado global (currentTableId) e inicia o listener
+    setCurrentTable(tableId); 
+};
+
+export const handleTableTransferConfirmed = async (originTableId, targetTableId, itemsToTransfer, newDiners = 0, newSector = '') => {
+    if (!originTableId || !targetTableId || itemsToTransfer.length === 0) {
+        alert("Erro: Dados de transferência incompletos.");
+        return;
+    }
+
+    const originTableRef = getTableDocRef(originTableId);
+    const targetTableRef = getTableDocRef(targetTableId);
+
+    try {
+        const targetSnap = await getDoc(targetTableRef);
+        const targetTableIsOpen = targetSnap.exists() && targetSnap.data().status === 'open';
+
+        // 1. Abertura da Mesa de Destino (se necessário)
+        if (!targetTableIsOpen) {
+            if (!newDiners || !newSector) {
+                alert("Erro: A mesa de destino está fechada. A quantidade de pessoas e o setor são obrigatórios para abri-la.");
+                return;
+            }
+
+            await setDoc(targetTableRef, {
+                tableNumber: parseInt(targetTableId),
+                diners: newDiners,
+                sector: newSector,
+                status: 'open',
+                createdAt: serverTimestamp(),
+                total: 0,
+                sentItems: [],
+                payments: [],
+                serviceTaxApplied: true,
+                selectedItems: []
+            });
+        }
+
+        // 2. Transferência dos Itens
+        const transferValue = itemsToTransfer.reduce((sum, item) => sum + item.price, 0);
+
+        // a) Remove os itens da mesa de origem
+        const originItemsAfterTransfer = currentOrderSnapshot.sentItems.filter(item => {
+            const itemKey = item.orderId + item.sentAt;
+            const isItemToTransfer = itemsToTransfer.some(tItem => (tItem.orderId + tItem.sentAt) === itemKey);
+            return !isItemToTransfer;
+        });
+
+        await updateDoc(originTableRef, {
+            sentItems: originItemsAfterTransfer,
+            total: (currentOrderSnapshot.total || 0) - transferValue,
+        });
+
+        // b) Adiciona os itens à mesa de destino
+        const targetData = targetTableIsOpen ? targetSnap.data() : { sentItems: [], total: 0 };
+        
+        await updateDoc(targetTableRef, {
+            sentItems: [...(targetData.sentItems || []), ...itemsToTransfer],
+            total: targetData.total + transferValue,
+        });
+
+        alert(`Sucesso! ${itemsToTransfer.length} item(s) transferidos da Mesa ${originTableId} para a Mesa ${targetTableId}.`);
+
+        // Volta para o painel de mesas após a operação
+        goToScreen('panelScreen');
+
+    } catch (e) {
+        console.error("Erro na transferência de mesa:", e);
+        alert("Falha na transferência dos itens.");
+    }
+};
+window.handleTableTransferConfirmed = handleTableTransferConfirmed;
