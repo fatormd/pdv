@@ -66,7 +66,7 @@
                         <span class="text-2xl font-semibold mr-3" id="client-table-number">Mesa Cliente</span>
                     </div>
                     
-                    <button id="goToPaymentBtnClient" class="rounded-full bg-green-600 p-3 text-white shadow-lg hover:bg-green-700 transition duration-150 w-12 h-12 flex items-center justify-center" title="Ver Conta" onclick="window.goToScreen('paymentScreen')">
+                    <button id="goToPaymentBtnClient" class="rounded-full bg-green-600 p-3 text-white shadow-lg hover:bg-green-700 transition duration-150 w-12 h-12 flex items-center justify-center" title="Ver Conta" onclick="document.getElementById('appContainer').style.transform = 'translateX(-100vw)'">
                         <i class="fas fa-receipt text-xl"></i>
                     </button>
                 </div>
@@ -106,7 +106,7 @@
             <div id="paymentScreen" class="flex-shrink-0">
                  <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center text-indigo-700">
-                        <button id="backToOrderFromPaymentBtn" class="mr-2 text-3xl p-2 hover:text-indigo-900 transition duration-150" title="Voltar para o Pedido" onclick="window.goToScreen('clientOrderScreen')">
+                        <button id="backToOrderFromPaymentBtn" class="mr-2 text-3xl p-2 hover:text-indigo-900 transition duration-150" title="Voltar para o Pedido" onclick="document.getElementById('appContainer').style.transform = 'translateX(0)'">
                             <i class="fas fa-arrow-left"></i>
                         </button>
                         <span class="text-2xl font-semibold mr-3" id="payment-table-number">Mesa Selecionada</span>
@@ -261,7 +261,8 @@
     <script>
         // Funções globais de placeholder (manter para o onclick)
         window.openManagerAuthModal = () => {};
-        window.goToScreen = () => {};
+        // Mantemos goToScreen para o app.js usar para fins de estado/lógica, mas a navegação é direta
+        window.goToScreen = () => {}; 
         window.openKdsStatusModal = () => {};
         window.addItemToSelection = () => {};
         window.appendObs = () => {};
