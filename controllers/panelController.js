@@ -1,10 +1,10 @@
 // --- CONTROLLERS/PANELCONTROLLER.JS ---
-import { getTablesCollectionRef, getTableDocRef, auth } from "/services/firebaseService.js"; // CORREÇÃO: Caminho Absoluto
+import { getTablesCollectionRef, getTableDocRef, auth } from "/services/firebaseService.js";
 import { query, where, orderBy, onSnapshot, getDoc, setDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { formatCurrency, formatElapsedTime } from "/utils.js"; // CORREÇÃO: Caminho Absoluto
+import { formatCurrency, formatElapsedTime } from "/utils.js";
 // CRITICAL FIX: Adicionado setCurrentTable para controle de estado
-import { goToScreen, currentTableId, selectedItems, unsubscribeTable, currentOrderSnapshot, setCurrentTable, userRole } from "/app.js"; // CORREÇÃO: Caminho Absoluto
-import { fetchWooCommerceProducts } from "/services/wooCommerceService.js"; // CORREÇÃO: Caminho Absoluto
+import { goToScreen, currentTableId, selectedItems, unsubscribeTable, currentOrderSnapshot, setCurrentTable, userRole } from "/app.js";
+import { fetchWooCommerceProducts } from "/services/wooCommerceService.js";
 import { renderMenu, renderOrderScreen } from "./orderController.js";
 
 
