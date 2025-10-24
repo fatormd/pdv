@@ -14,18 +14,16 @@ body { overflow-x: hidden; }
 /* Contêiner principal para transição de telas */
 #appContainer {
     display: flex;
-    /* CORREÇÃO CRÍTICA: Ajustado para 5 TELAS (Cliente, Painel, Pedido, Pagamento, Gerencial) */
-    width: 500vw; 
+    /* CORREÇÃO: Ajustado para 4 TELAS (Painel, Pedido, Pagamento, Gerencial) */
+    width: 400vw; 
     transition: transform 0.3s ease-out; 
-    /* Ajuste de altura mínima depende se o header está visível ou não */
-    /* Para Staff (com header): min-height: calc(100vh - 56px); */
-    /* Para Cliente (sem header): min-height: 100vh; */
-    /* Usaremos 100vh como padrão e o JS ajusta se necessário */
-     min-height: 100vh; 
+    /* Ajuste de altura mínima com header */
+    min-height: calc(100vh - 56px); 
 }
 
 /* Cada tela ocupa 100vw */
-#clientOrderScreen, #panelScreen, #orderScreen, #paymentScreen, #managerScreen {
+/* REMOVIDO: #clientOrderScreen */
+#panelScreen, #orderScreen, #paymentScreen, #managerScreen {
     width: 100vw;
     max-width: 100%; /* Garante que não ultrapasse a largura da tela */
     flex-shrink: 0; /* Impede que os painéis encolham */
@@ -76,10 +74,7 @@ body { overflow-x: hidden; }
     font-size: 1.25rem;
     z-index: 10;
 }
-/* Cor específica para pedido de cliente pendente (sino) */
-.attention-icon.fa-bell {
-     color: #fbbf24; /* yellow-400 */
-}
+/* REMOVIDO: Cor específica para sino de cliente */
 
 
 /* Timer na Mesa */
@@ -190,51 +185,7 @@ input:checked + .slider-obs:before {
     box-shadow: 0 10px 15px -3px rgba(255, 117, 24, 0.3), 0 4px 6px -4px rgba(255, 117, 24, 0.2); /* Sombra laranja */
 }
 
-
-/* REGRAS DE RESTRIÇÃO PARA CLIENTE (.client-mode) */
-/* Aplicadas via JS adicionando/removendo a classe 'client-mode' no body */
-
-/* Oculta Cabeçalho Staff */
-body.client-mode .header-bar { display: none !important; }
-
-/* Ajusta altura mínima sem header */
-body.client-mode #appContainer { min-height: 100vh; }
-
-/* Oculta Painéis Staff */
-body.client-mode #panelScreen,
-body.client-mode #orderScreen, /* Tela de pedido do Staff */
-body.client-mode #managerScreen {
-    display: none !important;
-}
-
-/* Ajusta largura do container para Cliente (2 telas: Pedido Cliente, Pagamento) */
-body.client-mode #appContainer { width: 200vw !important; }
-
-/* Garante que as telas do cliente estejam visíveis */
-body.client-mode #clientOrderScreen,
-body.client-mode #paymentScreen {
-    display: block !important; /* Sobrescreve possível 'display: none' inicial */
-}
-
-/* Esconde elementos específicos de Staff na tela de Pagamento */
-body.client-mode #chargeInputs, /* Bloco de Registrar Pagamento */
-body.client-mode #itemMassTransferBtn, /* Botão de Transferência em Massa */
-body.client-mode #itemMassDeleteBtn, /* Botão de Exclusão em Massa */
-body.client-mode #addSplitAccountBtn, /* Botão Adicionar Conta Divisão */
-body.client-mode #finalizeOrderBtn, /* Botão Finalizar Conta */
-body.client-mode #openNfeModalBtn { /* Botão NF-e */
-    display: none !important;
-}
-/* Desabilita inputs/botões que o cliente não deve usar na tela de Pagamento */
-body.client-mode #toggleServiceTaxBtn,
-body.client-mode #dinersSplitInput {
-    opacity: 0.6;
-    pointer-events: none; /* Impede cliques */
-}
-/* Esconde botões de ação dentro das contas de divisão para cliente */
-body.client-mode .split-account-actions button {
-    display: none !important;
-}
+/* REMOVIDO: Todas as regras de restrição .client-mode */
 
 /* Animação de Loading */
 @keyframes spin { to { transform: rotate(360deg); } }
