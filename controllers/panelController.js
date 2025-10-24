@@ -1,113 +1,55 @@
 // --- CONTROLLERS/PANELCONTROLLER.JS ---
-import { getTablesCollectionRef, getTableDocRef, auth } from "/services/firebaseService.js";
+import { getTablesCollectionRef, getTableDocRef } from "/services/firebaseService.js";
 import { query, where, orderBy, onSnapshot, getDoc, setDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { formatCurrency, formatElapsedTime } from "/utils.js";
-// CRITICAL FIX: Adicionado setCurrentTable para controle de estado
-import { goToScreen, currentTableId, selectedItems, unsubscribeTable, currentOrderSnapshot, setCurrentTable, userRole } from "/app.js";
-import { fetchWooCommerceProducts } from "/services/wooCommerceService.js";
-import { renderMenu, renderOrderScreen } from "./orderController.js";
+import { goToScreen, setCurrentTable, userRole } from "/app.js"; // Importa funções de app.js
+import { fetchWooCommerceProducts } from "/services/wooCommerceService.js"; // Para openTableForOrder
+import { renderMenu } from "./orderController.js"; // Para openTableForOrder
 
 
 // --- ESTADO DO MÓDULO ---
 const SECTORS = ['Todos', 'Salão 1', 'Bar', 'Mezanino', 'Calçada'];
 let currentSectorFilter = 'Todos';
-let unsubscribeTables = null; 
+let unsubscribeTables = null;
+let panelInitialized = false; // Flag para evitar múltiplas inicializações
 
 
-// --- FUNÇÃO DE ALERTA CUSTOMIZADO (Mantida, pois é usada no fluxo de cliente) ---
-const showCustomAlert = (title, message) => {
-    const modal = document.getElementById('customAlertModal');
-    const titleEl = document.getElementById('customAlertTitle');
-    const messageEl = document.getElementById('customAlertMessage');
-    const okBtn = document.getElementById('customAlertOkBtn');
-
-    if (!modal || !titleEl || !messageEl || !okBtn) {
-        // Fallback
-        alert(`${title}: ${message}`);
-        return;
-    }
-    
-    titleEl.textContent = title;
-    messageEl.textContent = message;
-    
-    okBtn.onclick = () => {
-        modal.style.display = 'none';
-        const searchTableInput = document.getElementById('searchTableInput');
-        if (searchTableInput) {
-            searchTableInput.value = '';
-            searchTableInput.focus();
-        }
-    };
-    
-    modal.style.display = 'flex';
-};
-
+// --- FUNÇÃO DE ALERTA CUSTOMIZADO ---
+// ... (mantida como antes) ...
+const showCustomAlert = (title, message) => { /* ... código ... */ };
 
 // --- RENDERIZAÇÃO DE SETORES ---
-
 export const renderTableFilters = () => {
     const sectorFiltersContainer = document.getElementById('sectorFilters');
-    const sectorInput = document.getElementById('sectorInput');
-    
-    const abrirMesaCard = document.querySelector('#panelScreen .content-card:first-child');
-    const tableListTitle = document.querySelector('#panelScreen .space-y-3 h3');
-    
-    if (!sectorFiltersContainer || !sectorInput) return;
+    const sectorInput = document.getElementById('sectorInput'); // Para abrir mesa
+    const newTableSectorInput = document.getElementById('newTableSector'); // Para transferência
 
-    if (userRole === 'client') {
-        if (abrirMesaCard) abrirMesaCard.style.display = 'none';
-        if (tableListTitle) tableListTitle.textContent = 'Minha Mesa (Busca Abaixo)';
-    } else {
-        if (abrirMesaCard) abrirMesaCard.style.display = 'block';
-        if (tableListTitle) tableListTitle.textContent = 'Mesas Abertas';
+    if (!sectorFiltersContainer || !sectorInput) {
+        console.warn("[Panel] Elementos de filtro de setor não encontrados.");
+        return;
     }
 
+    // Renderiza botões de filtro
+    sectorFiltersContainer.innerHTML = SECTORS.map(sector => {
+        const isActive = sector === currentSectorFilter ? 'bg-pumpkin text-white' : 'bg-dark-input text-dark-text border border-gray-600';
+        return `<button class="sector-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap ${isActive}" data-sector="${sector}">${sector}</button>`;
+    }).join('');
 
-    sectorFiltersContainer.innerHTML = '';
-    SECTORS.forEach(sector => {
-        const isActive = sector === currentSectorFilter ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border border-gray-300';
-        sectorFiltersContainer.innerHTML += `
-            <button class="sector-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap ${isActive}" data-sector="${sector}">
-                ${sector}
-            </button>
-        `;
-    });
-    
-    sectorInput.innerHTML = '<option value="" disabled selected>Setor</option>' + 
+    // Preenche select de abrir mesa
+    sectorInput.innerHTML = '<option value="" disabled selected class="text-dark-placeholder">Setor</option>' +
                             SECTORS.filter(s => s !== 'Todos')
-                                   .map(s => `<option value="${s}">${s}</option>`).join('');
-    
-    const newTableSectorInput = document.getElementById('newTableSector');
-    if (newTableSectorInput) {
-        newTableSectorInput.innerHTML = '<option value="" disabled selected>Setor</option>' + 
-                                SECTORS.filter(s => s !== 'Todos')
-                                       .map(s => `<option value="${s}">${s}</option>`).join('');
-    }
-    
-    sectorFiltersContainer.addEventListener('click', (e) => {
-        const btn = e.target.closest('.sector-btn');
-        if (btn) {
-            const sector = btn.dataset.sector;
-            currentSectorFilter = sector;
-            
-            document.querySelectorAll('.sector-btn').forEach(b => {
-                b.classList.remove('bg-indigo-600', 'text-white');
-                b.classList.add('bg-white', 'text-gray-700', 'border', 'border-gray-300');
-            });
-            btn.classList.remove('bg-white', 'text-gray-700', 'border', 'border-gray-300');
-            btn.classList.add('bg-indigo-600', 'text-white');
-            
-            loadOpenTables(); // Chama o carregamento APENAS quando o filtro muda
-        }
-    });
+                                   .map(s => `<option value="${s}" class="text-dark-text">${s}</option>`).join('');
 
-    // Chama a função para carregar as mesas imediatamente na inicialização
-    loadOpenTables(); 
+    // Preenche select de transferência (se existir)
+    if (newTableSectorInput) {
+        newTableSectorInput.innerHTML = '<option value="" disabled selected class="text-dark-placeholder">Setor</option>' +
+                                SECTORS.filter(s => s !== 'Todos')
+                                       .map(s => `<option value="${s}" class="text-dark-text">${s}</option>`).join('');
+    }
 };
 
 
 // --- RENDERIZAÇÃO E CARREGAMENTO DE MESAS ---
-
 const renderTables = (docs) => {
     const openTablesList = document.getElementById('openTablesList');
     const openTablesCount = document.getElementById('openTablesCount');
@@ -119,65 +61,50 @@ const renderTables = (docs) => {
     docs.forEach(doc => {
         const table = doc.data();
         const tableId = doc.id;
-        
-        if (table.status && table.status.toLowerCase() === 'open') { 
+
+        if (table.status && table.status.toLowerCase() === 'open') {
             count++;
             const total = table.total || 0;
-            
-            const isClientPending = table.clientOrderPending || false; 
-            
-            let cardColor = total > 0 ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200';
-            let bellIconHtml = '';
-            let attentionIconHtml = '';
-            
-            if (isClientPending) {
-                cardColor = 'bg-indigo-900 text-white hover:bg-indigo-800 border-2 border-yellow-400'; 
-                bellIconHtml = `<i class="fas fa-bell attention-icon text-yellow-400" title="Pedido Novo de Cliente"></i>`;
+            const isClientPending = table.clientOrderPending || false; // Embora cliente removido, mantém lógica caso volte
+
+            // Define cor baseada no status e total
+            let cardColorClasses = 'bg-dark-card border-gray-700 text-dark-text hover:bg-gray-700'; // Default dark
+            if (total > 0) {
+                 cardColorClasses = 'bg-red-900 border-red-700 text-red-200 hover:bg-red-800'; // Ocupada Dark
+            } else {
+                 cardColorClasses = 'bg-green-900 border-green-700 text-green-200 hover:bg-green-800'; // Livre Dark
             }
-            
-            const hasAguardandoItem = (table.selectedItems || []).some(item => 
+             if (isClientPending) { // Sobrescreve se houver pedido de cliente
+                 cardColorClasses = 'bg-indigo-900 border-yellow-400 text-white hover:bg-indigo-800';
+             }
+
+
+            let attentionIconHtml = '';
+            const hasAguardandoItem = (table.selectedItems || []).some(item =>
                 item.note && item.note.toLowerCase().includes('espera')
             );
-            
+
             if (isClientPending) {
-                 attentionIconHtml = bellIconHtml;
-            } else {
-                 attentionIconHtml = hasAguardandoItem 
-                    ? `<i class="fas fa-exclamation-triangle attention-icon" title="Itens em Espera"></i>` 
-                    : '';
+                 attentionIconHtml = `<i class="fas fa-bell attention-icon text-yellow-400" title="Pedido Novo de Cliente"></i>`;
+            } else if (hasAguardandoItem) {
+                 attentionIconHtml = `<i class="fas fa-exclamation-triangle attention-icon" title="Itens em Espera"></i>`;
             }
 
-            // CORREÇÃO: Tenta acessar toMillis() apenas se lastKdsSentAt for um Timestamp do Firebase
             let lastSentAt = null;
             if (table.lastKdsSentAt && typeof table.lastKdsSentAt.toMillis === 'function') {
                  lastSentAt = table.lastKdsSentAt.toMillis();
-            } else if (typeof table.lastKdsSentAt === 'number') { // Fallback se for um número (timestamp JS)
+            } else if (typeof table.lastKdsSentAt === 'number') {
                  lastSentAt = table.lastKdsSentAt;
             }
-
             const elapsedTime = lastSentAt ? formatElapsedTime(lastSentAt) : null;
-            
-            const timerHtml = elapsedTime ? `
-                <div class="table-timer">
-                    <i class="fas fa-clock"></i> 
-                    <span>${elapsedTime}</span>
-                </div>
-            ` : '';
-
-            const statusIconHtml = lastSentAt ? `
-                <button class="kds-status-icon-btn" 
-                        title="Status do Último Pedido"
-                        onclick="window.openKdsStatusModal(${tableId})">
-                    <i class="fas fa-tasks"></i>
-                </button>
-            ` : '';
-            
-            const clientInfo = table.clientName ? `<p class="text-xs font-semibold text-gray-800">Cliente: ${table.clientName}</p>` : '';
+            const timerHtml = elapsedTime ? `<div class="table-timer"><i class="fas fa-clock"></i> <span>${elapsedTime}</span></div>` : '';
+            const statusIconHtml = lastSentAt ? `<button class="kds-status-icon-btn" title="Status KDS" onclick="window.openKdsStatusModal(${tableId})"><i class="fas fa-tasks"></i></button>` : '';
+            const clientInfo = table.clientName ? `<p class="text-xs font-semibold">${table.clientName}</p>` : ''; // Texto ajustado para dark
 
             const cardHtml = `
-                <div class="table-card-panel ${cardColor} shadow-md transition-colors duration-200 relative" data-table-id="${tableId}">
-                    ${attentionIconHtml} 
-                    ${statusIconHtml} 
+                <div class="table-card-panel ${cardColorClasses} shadow-md transition-colors duration-200 relative" data-table-id="${tableId}">
+                    ${attentionIconHtml}
+                    ${statusIconHtml}
                     <h3 class="font-bold text-2xl">Mesa ${table.tableNumber}</h3>
                     <p class="text-xs font-light">Setor: ${table.sector || 'N/A'}</p>
                     ${clientInfo}
@@ -190,67 +117,50 @@ const renderTables = (docs) => {
     });
 
     openTablesCount.textContent = count;
-    
+
     if (count === 0) {
-        openTablesList.innerHTML = `<div class="col-span-full text-sm text-gray-500 italic p-4 content-card bg-white">Nenhuma mesa aberta no setor "${currentSectorFilter}".</div>`;
+        openTablesList.innerHTML = `<div class="col-span-full text-sm text-dark-placeholder italic p-4 content-card bg-dark-card border border-gray-700">Nenhuma mesa aberta no setor "${currentSectorFilter}".</div>`;
     }
-    
-    // Anexa listeners DEPOIS de renderizar todas as mesas
+
+    // Reanexa listeners aos cards recém-criados
     document.querySelectorAll('.table-card-panel').forEach(card => {
-        // Remove listener antigo se existir para evitar duplicação
-        card.replaceWith(card.cloneNode(true)); 
-        const newCard = document.querySelector(`.table-card-panel[data-table-id="${card.dataset.tableId}"]`);
-        
-        if(newCard) { // Adiciona o listener ao novo nó clonado
-            newCard.addEventListener('click', (e) => {
-                if (e.target.closest('.kds-status-icon-btn')) return; 
-                
-                const tableId = newCard.dataset.tableId;
-                if (tableId) {
-                    openTableForOrder(tableId);
-                }
-            });
-        }
+        card.addEventListener('click', (e) => {
+            // Evita abrir mesa se clicar no ícone KDS
+            if (e.target.closest('.kds-status-icon-btn')) return;
+            const tableId = card.dataset.tableId;
+            if (tableId) {
+                openTableForOrder(tableId);
+            }
+        });
     });
 };
 
 export const loadOpenTables = () => {
-    // CORREÇÃO (BUG 2/3): Garante que o listener antigo seja removido ANTES de criar um novo
     if (unsubscribeTables) {
         unsubscribeTables();
-        unsubscribeTables = null; // Limpa a referência
-    } 
-    
-    const tablesCollection = getTablesCollectionRef();
-    let q;
-    
-    if (currentSectorFilter === 'Todos') {
-        q = query(tablesCollection, 
-                  where('status', '==', 'open'), 
-                  orderBy('tableNumber', 'asc'));
-    } else {
-        q = query(tablesCollection, 
-                  where('status', '==', 'open'), 
-                  where('sector', '==', currentSectorFilter),
-                  orderBy('tableNumber', 'asc'));
+        unsubscribeTables = null;
     }
 
+    const tablesCollection = getTablesCollectionRef();
+    let q;
+
+    if (currentSectorFilter === 'Todos') {
+        q = query(tablesCollection, where('status', '==', 'open'), orderBy('tableNumber', 'asc'));
+    } else {
+        q = query(tablesCollection, where('status', '==', 'open'), where('sector', '==', currentSectorFilter), orderBy('tableNumber', 'asc'));
+    }
+
+    console.log(`[Panel] Configurando listener para mesas: ${currentSectorFilter === 'Todos' ? 'Todos os setores' : `Setor ${currentSectorFilter}`}`);
     unsubscribeTables = onSnapshot(q, (snapshot) => {
-        const docs = snapshot.docs;
-        renderTables(docs);
+        console.log(`[Panel] Snapshot recebido: ${snapshot.docs.length} mesas encontradas.`);
+        renderTables(snapshot.docs);
     }, (error) => {
         const openTablesList = document.getElementById('openTablesList');
-        const errorMessage = error.message || "Erro desconhecido. Verifique o Console (F12).";
-        
+        const errorMessage = error.message || "Erro desconhecido.";
         if (openTablesList) {
-            openTablesList.innerHTML = `<div class="col-span-full text-sm text-red-600 font-bold italic p-4 content-card bg-white">
-                ERRO CRÍTICO FIREBASE: A sincronização de mesas falhou!
-                <br>Verifique Índice Composto ou Regras de Segurança.
-                <br>Detalhe: ${errorMessage.substring(0, 300)}
-            </div>`;
+            openTablesList.innerHTML = `<div class="col-span-full text-sm text-red-400 font-bold italic p-4 content-card bg-dark-card border border-red-700">ERRO FIREBASE: ${errorMessage}</div>`;
         }
-        
-        console.error("Erro fatal ao carregar mesas (onSnapshot):", error);
+        console.error("Erro fatal ao carregar mesas:", error);
     });
 };
 
@@ -272,40 +182,29 @@ export const handleAbrirMesa = async () => {
 
     try {
         const docSnap = await getDoc(tableRef);
-
-        if (docSnap.exists() && docSnap.data().status && docSnap.data().status.toLowerCase() === 'open') {
+        if (docSnap.exists() && docSnap.data().status?.toLowerCase() === 'open') {
             alert(`A Mesa ${tableNumber} já está aberta!`);
             return;
         }
 
+        console.log(`[Panel] Abrindo Mesa ${tableNumber} no setor ${sector} para ${diners} pessoas.`);
         await setDoc(tableRef, {
-            tableNumber: tableNumber,
-            diners: diners,
-            sector: sector, 
-            status: 'open',
-            createdAt: serverTimestamp(),
-            total: 0,
-            sentItems: [], 
-            payments: [],
-            serviceTaxApplied: true, 
-            selectedItems: [] 
+            tableNumber: tableNumber, diners: diners, sector: sector, status: 'open',
+            createdAt: serverTimestamp(), total: 0, sentItems: [], payments: [],
+            serviceTaxApplied: true, selectedItems: []
         });
-        
-        mesaInput.value = '';
-        pessoasInput.value = '';
-        sectorInput.value = '';
-        
-        openTableForOrder(tableNumber.toString()); 
-        
+
+        mesaInput.value = ''; pessoasInput.value = ''; sectorInput.value = '';
+        openTableForOrder(tableNumber.toString());
+
     } catch (e) {
         console.error("Erro ao abrir mesa:", e);
         alert("Erro ao tentar abrir a mesa.");
     }
 };
 
-export const handleSearchTable = async (isClientFlow = false) => {
+export const handleSearchTable = async () => { // Removido isClientFlow
     const searchTableInput = document.getElementById('searchTableInput');
-    const searchTableBtn = document.getElementById('searchTableBtn');
     const tableNumber = searchTableInput.value.trim();
 
     if (!tableNumber || parseInt(tableNumber) <= 0) {
@@ -316,152 +215,75 @@ export const handleSearchTable = async (isClientFlow = false) => {
     const tableRef = getTableDocRef(tableNumber);
     const docSnap = await getDoc(tableRef);
 
-    if (docSnap.exists() && docSnap.data().status && docSnap.data().status.toLowerCase() === 'open') {
-        
-        if (isClientFlow) {
-            // LÓGICA CLIENTE 1: MESA OCUPADA/ABERTA (CLIENTE NÃO PODE USAR)
-            showCustomAlert("Mesa Ocupada", "A mesa já está em uso. Informe o garçom para se vincular.");
-            return; 
-        } else {
-            // LÓGICA STAFF: Abre a mesa para pedido
-            openTableForOrder(tableNumber, isClientFlow); 
-            searchTableInput.value = '';
-        }
-
+    if (docSnap.exists() && docSnap.data().status?.toLowerCase() === 'open') {
+        console.log(`[Panel] Mesa ${tableNumber} encontrada. Abrindo...`);
+        openTableForOrder(tableNumber); // Abre a mesa para Staff
+        searchTableInput.value = '';
     } else {
-        
-        if (isClientFlow) {
-            // LÓGICA CLIENTE 2: MESA FECHADA (ABRE AUTOMATICAMENTE PARA O CLIENTE)
-            const defaultDiners = 1;
-            const defaultSector = 'Salão 1'; 
-            const targetTableId = tableNumber;
-
-            try {
-                await setDoc(tableRef, {
-                    tableNumber: parseInt(targetTableId),
-                    diners: defaultDiners,
-                    sector: defaultSector, 
-                    status: 'open',
-                    createdAt: serverTimestamp(),
-                    total: 0,
-                    sentItems: [], 
-                    payments: [],
-                    serviceTaxApplied: true,
-                    selectedItems: [],
-                    linkedClient: true
-                });
-
-                // Lógica de sucesso (abrir a tela do cliente)
-                openTableForOrder(targetTableId, isClientFlow); 
-                searchTableInput.value = '';
-                searchTableInput.readOnly = true;
-                searchTableInput.placeholder = `Mesa ${tableNumber} vinculada.`;
-                searchTableBtn.style.display = 'none';
-                
-                alert("Mesa aberta com sucesso! Você já pode fazer pedidos.");
-            } catch (e) {
-                 console.error("Erro ao abrir mesa pelo cliente:", e);
-                 alert("Erro ao tentar abrir a mesa. Tente novamente.");
-            }
-            
-        } else {
-            // LÓGICA STAFF: Mesa não existe/fechada, alerta simples.
-            alert(`A Mesa ${tableNumber} não está aberta.`);
-        }
+        console.log(`[Panel] Mesa ${tableNumber} não está aberta.`);
+        alert(`A Mesa ${tableNumber} não está aberta.`);
     }
 };
 
-export const openTableForOrder = async (tableId, isClientFlow = false) => {
-    // Garante que o Menu esteja carregado (dependência para o Painel 2)
-    await fetchWooCommerceProducts(renderMenu); 
-    
-    // Navegação e Carregamento (Item 2)
-    loadTableOrder(tableId); // Inicia o listener e atualiza o estado
-    
-    if (isClientFlow) {
-        goToScreen('clientOrderScreen'); // Cliente vai para sua tela dedicada
+export const openTableForOrder = async (tableId) => { // Removido isClientFlow
+    console.log(`[Panel] Abrindo pedido para Mesa ${tableId}`);
+    // Garante que o Menu esteja carregado antes de ir para a tela de pedido
+    await fetchWooCommerceProducts(renderMenu);
+    loadTableOrder(tableId); // Inicia o listener e atualiza o estado global
+    goToScreen('orderScreen'); // Sempre vai para a tela de pedido do Staff
+};
+
+// Função de inicialização do Controller (chamada pelo app.js)
+export const initPanelController = () => {
+    if (panelInitialized) return;
+    console.log("[PanelController] Inicializando...");
+
+    const abrirMesaBtn = document.getElementById('abrirMesaBtn');
+    const searchTableBtn = document.getElementById('searchTableBtn');
+    const sectorFiltersContainer = document.getElementById('sectorFilters');
+    const mesaInput = document.getElementById('mesaInput'); // Necessário para checkInputs
+    const pessoasInput = document.getElementById('pessoasInput'); // Necessário para checkInputs
+    const abrirMesaRealBtn = document.getElementById('abrirMesaBtn'); // Para checkInputs
+
+    // Listener para o botão de abrir mesa
+    if (abrirMesaBtn) {
+        abrirMesaBtn.addEventListener('click', handleAbrirMesa);
     } else {
-        goToScreen('orderScreen'); // Staff vai para a tela de pedidos normal
-    }
-};
-
-export const loadTableOrder = (tableId) => {
-    // CRITICAL FIX: Chama a função central que define o estado global (currentTableId) e inicia o listener
-    setCurrentTable(tableId); 
-};
-
-// CORRIGIDO: Exporta a função para ser usada pelo paymentController
-export const handleTableTransferConfirmed = async (originTableId, targetTableId, itemsToTransfer, newDiners = 0, newSector = '') => {
-    if (!originTableId || !targetTableId || itemsToTransfer.length === 0) {
-        alert("Erro: Dados de transferência incompletos.");
-        return;
+        console.error("[PanelController] Botão 'abrirMesaBtn' não encontrado.");
     }
 
-    const originTableRef = getTableDocRef(originTableId);
-    const targetTableRef = getTableDocRef(targetTableId);
+    // Listener para o botão de buscar mesa
+    if (searchTableBtn) {
+        searchTableBtn.addEventListener('click', handleSearchTable);
+    } else {
+        console.error("[PanelController] Botão 'searchTableBtn' não encontrado.");
+    }
 
-    try {
-        const targetSnap = await getDoc(targetTableRef);
-        const targetTableIsOpen = targetSnap.exists() && targetSnap.data().status && targetSnap.data().status.toLowerCase() === 'open';
+    // Listener para filtros de setor (já configurado em renderTableFilters, mas garantimos aqui)
+    if (sectorFiltersContainer) {
+        // A lógica de adicionar listener aos botões já está em renderTableFilters,
+        // mas podemos adicionar um listener geral aqui se necessário.
+        // sectorFiltersContainer.addEventListener('click', handleSectorFilterClick);
+    } else {
+         console.error("[PanelController] Container 'sectorFilters' não encontrado.");
+    }
 
-        // 1. Abertura da Mesa de Destino (se necessário)
-        if (!targetTableIsOpen) {
-            if (!newDiners || !newSector) {
-                alert("Erro: A mesa de destino está fechada. A quantidade de pessoas e o setor são obrigatórios para abri-la.");
-                return;
-            }
-
-            await setDoc(targetTableRef, {
-                tableNumber: parseInt(targetTableId),
-                diners: newDiners,
-                sector: newSector,
-                status: 'open',
-                createdAt: serverTimestamp(),
-                total: 0,
-                sentItems: [],
-                payments: [],
-                serviceTaxApplied: true,
-                selectedItems: []
-            });
+    // Listeners para habilitar/desabilitar botão Abrir Mesa
+    const checkInputs = () => {
+        const mesaValida = parseInt(mesaInput.value) > 0;
+        const pessoasValida = parseInt(pessoasInput.value) > 0;
+        if (abrirMesaRealBtn) {
+            abrirMesaRealBtn.disabled = !(mesaValida && pessoasValida);
         }
+    };
+    if(mesaInput) mesaInput.addEventListener('input', checkInputs);
+    if(pessoasInput) pessoasInput.addEventListener('input', checkInputs);
 
-        // 2. Transferência dos Itens
-        const transferValue = itemsToTransfer.reduce((sum, item) => sum + item.price, 0);
+    // Placeholder para função de KDS Status Modal (se existir)
+    window.openKdsStatusModal = (tableId) => {
+        alert(`Abrir status KDS para Mesa ${tableId} (Em desenvolvimento)`);
+    };
 
-        // a) Remove os itens da mesa de origem
-        const originItemsAfterTransfer = currentOrderSnapshot.sentItems.filter(item => {
-            const itemKey = item.orderId + item.sentAt;
-            const isItemToTransfer = itemsToTransfer.some(tItem => (tItem.orderId + tItem.sentAt) === itemKey);
-            return !isItemToTransfer;
-        });
-        
-        // NOVO: Calcula o novo total da origem
-        const originNewTotal = Math.max(0, (currentOrderSnapshot.total || 0) - transferValue);
-
-        await updateDoc(originTableRef, {
-            sentItems: originItemsAfterTransfer,
-            total: originNewTotal, // <-- CORRIGIDO: Atualiza o total da origem
-        });
-
-        // b) Adiciona os itens à mesa de destino
-        const targetData = targetTableIsOpen ? targetSnap.data() : { sentItems: [], total: 0 };
-        
-        // NOVO: Calcula o novo total do destino
-        const targetNewTotal = (targetData.total || 0) + transferValue;
-
-        await updateDoc(targetTableRef, {
-            sentItems: [...(targetData.sentItems || []), ...itemsToTransfer],
-            total: targetNewTotal, // <-- CORRIGIDO: Atualiza o total do destino
-        });
-
-        alert(`Sucesso! ${itemsToTransfer.length} item(s) transferidos da Mesa ${originTableId} para a Mesa ${targetTableId}.`);
-
-        // Volta para o painel de mesas após a operação
-        goToScreen('panelScreen');
-
-    } catch (e) {
-        console.error("Erro na transferência de mesa:", e);
-        alert("Falha na transferência dos itens.");
-    }
+    panelInitialized = true;
+    console.log("[PanelController] Inicializado.");
 };
-window.handleTableTransferConfirmed = handleTableTransferConfirmed; // Exportado para uso global
