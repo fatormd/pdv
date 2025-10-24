@@ -97,11 +97,11 @@ export const renderTableFilters = () => {
             btn.classList.remove('bg-white', 'text-gray-700', 'border', 'border-gray-300');
             btn.classList.add('bg-indigo-600', 'text-white');
             
-            loadOpenTables(); 
+            loadOpenTables(); // Chama o carregamento APENAS quando o filtro muda
         }
     });
 
-    // CORREÇÃO CRÍTICA: Chama a função para carregar as mesas imediatamente
+    // Chama a função para carregar as mesas imediatamente na inicialização
     loadOpenTables(); 
 };
 
@@ -109,8 +109,6 @@ export const renderTableFilters = () => {
 // --- RENDERIZAÇÃO E CARREGAMENTO DE MESAS ---
 
 const renderTables = (docs) => {
-    // console.log(`[DIAG] Iniciando renderTables com ${docs.length} documentos.`);
-
     const openTablesList = document.getElementById('openTablesList');
     const openTablesCount = document.getElementById('openTablesCount');
     if (!openTablesList || !openTablesCount) return;
@@ -122,7 +120,6 @@ const renderTables = (docs) => {
         const table = doc.data();
         const tableId = doc.id;
         
-        // CORREÇÃO FINAL: Usa toLowerCase() para garantir que mesas antigas com 'Open' ou 'OPEN' sejam contadas.
         if (table.status && table.status.toLowerCase() === 'open') { 
             count++;
             const total = table.total || 0;
@@ -150,8 +147,14 @@ const renderTables = (docs) => {
                     : '';
             }
 
+            // CORREÇÃO: Tenta acessar toMillis() apenas se lastKdsSentAt for um Timestamp do Firebase
+            let lastSentAt = null;
+            if (table.lastKdsSentAt && typeof table.lastKdsSentAt.toMillis === 'function') {
+                 lastSentAt = table.lastKdsSentAt.toMillis();
+            } else if (typeof table.lastKdsSentAt === 'number') { // Fallback se for um número (timestamp JS)
+                 lastSentAt = table.lastKdsSentAt;
+            }
 
-            const lastSentAt = table.lastKdsSentAt?.toMillis() || null;
             const elapsedTime = lastSentAt ? formatElapsedTime(lastSentAt) : null;
             
             const timerHtml = elapsedTime ? `
@@ -188,32 +191,39 @@ const renderTables = (docs) => {
 
     openTablesCount.textContent = count;
     
-    // console.log(`[DIAG] Renderização concluída. ${count} mesas renderizadas/exibidas.`);
-
-    // CRÍTICO: Se não houver mesas abertas, exibe a mensagem de status final.
     if (count === 0) {
         openTablesList.innerHTML = `<div class="col-span-full text-sm text-gray-500 italic p-4 content-card bg-white">Nenhuma mesa aberta no setor "${currentSectorFilter}".</div>`;
     }
     
+    // Anexa listeners DEPOIS de renderizar todas as mesas
     document.querySelectorAll('.table-card-panel').forEach(card => {
-        card.addEventListener('click', (e) => {
-            if (e.target.closest('.kds-status-icon-btn')) return; 
-            
-            const tableId = card.dataset.tableId;
-            if (tableId) {
-                openTableForOrder(tableId);
-            }
-        });
+        // Remove listener antigo se existir para evitar duplicação
+        card.replaceWith(card.cloneNode(true)); 
+        const newCard = document.querySelector(`.table-card-panel[data-table-id="${card.dataset.tableId}"]`);
+        
+        if(newCard) { // Adiciona o listener ao novo nó clonado
+            newCard.addEventListener('click', (e) => {
+                if (e.target.closest('.kds-status-icon-btn')) return; 
+                
+                const tableId = newCard.dataset.tableId;
+                if (tableId) {
+                    openTableForOrder(tableId);
+                }
+            });
+        }
     });
 };
 
 export const loadOpenTables = () => {
-    if (unsubscribeTables) unsubscribeTables(); 
+    // CORREÇÃO (BUG 2/3): Garante que o listener antigo seja removido ANTES de criar um novo
+    if (unsubscribeTables) {
+        unsubscribeTables();
+        unsubscribeTables = null; // Limpa a referência
+    } 
     
     const tablesCollection = getTablesCollectionRef();
     let q;
     
-    // REVERTIDO: Usando a consulta original (status, sector, tableNumber) para usar o índice configurado
     if (currentSectorFilter === 'Todos') {
         q = query(tablesCollection, 
                   where('status', '==', 'open'), 
@@ -227,20 +237,16 @@ export const loadOpenTables = () => {
 
     unsubscribeTables = onSnapshot(q, (snapshot) => {
         const docs = snapshot.docs;
-        
-        // console.log(`[DIAG] FIREBASE retornou ${docs.length} documentos.`);
-
         renderTables(docs);
     }, (error) => {
-        // CRÍTICO: Exibe o erro do Firebase diretamente na LISTA DE MESAS
         const openTablesList = document.getElementById('openTablesList');
         const errorMessage = error.message || "Erro desconhecido. Verifique o Console (F12).";
         
         if (openTablesList) {
             openTablesList.innerHTML = `<div class="col-span-full text-sm text-red-600 font-bold italic p-4 content-card bg-white">
                 ERRO CRÍTICO FIREBASE: A sincronização de mesas falhou!
-                <br>O problema é de Índice Composto ou Regras de Segurança.
-                <br>Detalhe da Falha: ${errorMessage.substring(0, 300)}
+                <br>Verifique Índice Composto ou Regras de Segurança.
+                <br>Detalhe: ${errorMessage.substring(0, 300)}
             </div>`;
         }
         
@@ -384,6 +390,7 @@ export const loadTableOrder = (tableId) => {
     setCurrentTable(tableId); 
 };
 
+// CORRIGIDO: Exporta a função para ser usada pelo paymentController
 export const handleTableTransferConfirmed = async (originTableId, targetTableId, itemsToTransfer, newDiners = 0, newSector = '') => {
     if (!originTableId || !targetTableId || itemsToTransfer.length === 0) {
         alert("Erro: Dados de transferência incompletos.");
