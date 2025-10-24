@@ -3,8 +3,8 @@ import { goToScreen, userRole, currentTableId, currentOrderSnapshot } from "/app
 import { formatCurrency, calculateItemsValue, getNumericValueFromCurrency } from "/utils.js";
 import { getTableDocRef } from "/services/firebaseService.js";
 import { updateDoc, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { openManagerAuthModal } from "./managerController.js"; // Importado para proteção de exclusão
-import { handleTableTransferConfirmed } from "./panelController.js"; // <--- NOVO: Importado para uso direto
+import { openManagerAuthModal } from "./managerController.js"; // Importado
+import { handleTableTransferConfirmed } from "./panelController.js"; // Importado
 
 // Variáveis de estado do módulo
 let currentPaymentMethod = 'Dinheiro'; // Padrão
@@ -50,6 +50,40 @@ const groupMainAccountItems = (currentOrderSnapshot) => {
         return acc;
     }, {});
 };
+
+
+// NOVO: Função para executar a exclusão de pagamento APÓS autenticação
+const executeDeletePayment = async (timestamp) => {
+    if (!currentTableId || !currentOrderSnapshot) return;
+    
+    // Converte o timestamp para número para garantir a comparação
+    const tsNumber = parseInt(timestamp);
+    const paymentToDelete = currentOrderSnapshot.payments.find(p => p.timestamp === tsNumber);
+    
+    if (!paymentToDelete) {
+         alert("Pagamento não encontrado.");
+         return;
+    }
+    
+    // Remoção sem confirmação extra, pois já foi autenticado e confirmado no openManagerModal
+    const tableRef = getTableDocRef(currentTableId);
+    try {
+        await updateDoc(tableRef, {
+            payments: arrayRemove(paymentToDelete)
+        });
+        alert("Pagamento removido da lista.");
+    } catch (e) {
+        console.error("Erro ao deletar pagamento:", e);
+        alert("Erro ao tentar remover o pagamento.");
+    }
+}
+
+// CORRIGIDO: Função para deletar um pagamento (agora chama autenticação)
+export const deletePayment = async (timestamp) => {
+    // Chama o modal de autenticação, passando a ação e o timestamp do pagamento como payload
+    window.openManagerAuthModal('deletePayment', timestamp);
+}
+window.deletePayment = deletePayment; // <--- CRITICAL FIX: Exposes to global window
 
 
 // 1. Renderiza a lista de itens da conta (Com Checkboxes desabilitadas por padrão)
