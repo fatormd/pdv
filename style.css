@@ -1,197 +1,179 @@
 /* Estilização básica e tipografia */
 html { font-family: 'Inter', sans-serif; scroll-behavior: smooth; }
-body { overflow-x: hidden; }
+body { 
+    overflow-x: hidden; 
+    background-color: #111827; /* bg-dark-bg (Cinza 900) */
+    color: #d1d5db; /* text-dark-text (Cinza 300) */
+}
 
-/* Cabeçalho (usado apenas no fluxo Staff) */
-.header-bar { background-color: #4f46e5; padding: 0.75rem 1rem; }
+/* Cabeçalho (Fundo Dark Card) */
+.header-bar { 
+    background-color: #1f2937; /* bg-dark-card (Cinza 800) */
+    padding: 0.75rem 1rem; 
+    border-bottom: 1px solid #374151; /* Cinza 700 */
+}
 
-/* Cards de Conteúdo Genéricos */
+/* Cards de Conteúdo (Fundo Dark Card) */
 .content-card {
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+    background-color: #1f2937; /* bg-dark-card (Cinza 800) */
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3); /* Sombra mais escura */
     border-radius: 0.75rem;
+    border: 1px solid #374151; /* Cinza 700 */
 }
 
 /* Contêiner principal para transição de telas */
 #appContainer {
     display: flex;
-    /* CORREÇÃO: Ajustado para 4 TELAS (Painel, Pedido, Pagamento, Gerencial) */
+    /* CORREÇÃO: Ajustado para 4 TELAS (Login, Painel, Pedido, Pagamento, Gerencial) */
     width: 400vw; 
     transition: transform 0.3s ease-out; 
-    /* Ajuste de altura mínima com header */
-    min-height: calc(100vh - 56px); 
+    min-height: 100vh; /* Ocupa toda a altura visível */
 }
 
 /* Cada tela ocupa 100vw */
-/* REMOVIDO: #clientOrderScreen */
-#panelScreen, #orderScreen, #paymentScreen, #managerScreen {
+#loginScreen, #panelScreen, #orderScreen, #paymentScreen, #managerScreen {
     width: 100vw;
-    max-width: 100%; /* Garante que não ultrapasse a largura da tela */
-    flex-shrink: 0; /* Impede que os painéis encolham */
+    max-width: 100%; 
+    flex-shrink: 0; 
     padding: 1rem;
     box-sizing: border-box;
-    min-height: 100%; /* Garante que ocupem a altura mínima */
+    min-height: 100%; 
 }
 
-/* Estilos Específicos do Painel de Mesas (Staff) */
-.table-card-panel {
-    min-height: 120px; 
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem;
-    text-align: center;
-    cursor: pointer;
-    border-radius: 0.75rem;
-    position: relative; /* Para posicionar ícones */
-}
-
-/* Ícone de Status KDS (Canto Superior Esquerdo) */
-.kds-status-icon-btn {
-    position: absolute;
-    top: 0.5rem;
-    left: 0.5rem;
-    color: #4f46e5; /* indigo-600 */
-    background: none;
-    border: none;
-    font-size: 1.25rem;
-    padding: 0;
-    line-height: 1;
-    z-index: 10;
-    cursor: pointer; /* Adicionado cursor */
-}
-.kds-status-icon-btn:hover {
-    color: #3730a3; /* indigo-800 */
-}
-
-
-/* Ícone de Atenção ("Em Espera" ou Pedido Cliente) (Canto Superior Direito) */
-.attention-icon {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
-    color: #f59e0b; /* yellow-600 - Padrão para Espera */
-    font-size: 1.25rem;
-    z-index: 10;
-}
-/* REMOVIDO: Cor específica para sino de cliente */
-
-
-/* Timer na Mesa */
-.table-timer {
-    font-size: 0.75rem;
-    color: #6b7280; /* gray-500 */
-    margin-top: 0.5rem;
+/* Ajuste específico para o painel de login centralizar o card */
+#loginScreen {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.25rem; /* Espaçamento entre ícone e texto */
-}
-.table-timer i {
-    font-size: 0.75rem;
 }
 
-/* Estilos Gerais de Botões e Inputs */
-.qty-btn { width: 36px; height: 36px; }
-.add-to-order-btn { 
-    padding-top: 0.75rem; 
-    padding-bottom: 0.75rem; 
-    font-size: 1rem; 
-}
-.input-pdv { padding: 0.75rem; font-size: 1rem; }
 
-/* Estilo do botão de método de pagamento ativo */
+/* --- ESTILOS DARK MODE PARA ELEMENTOS COMUNS --- */
+
+/* Inputs e Selects */
+.input-pdv, select {
+    background-color: #374151; /* bg-dark-input (Cinza 700) */
+    border: 1px solid #4b5563; /* Cinza 600 */
+    color: #d1d5db; /* text-dark-text */
+    border-radius: 0.5rem; /* rounded-lg */
+    padding: 0.75rem; 
+    font-size: 1rem;
+}
+.input-pdv::placeholder, select option[disabled] {
+    color: #6b7280; /* placeholder-dark-placeholder (Cinza 500) */
+}
+.input-pdv:focus, select:focus {
+    outline: none;
+    border-color: #ff7518; /* border-pumpkin */
+    box-shadow: 0 0 0 2px rgba(255, 117, 24, 0.5); /* ring-pumpkin */
+}
+
+/* Botões de Categoria */
+.category-btn {
+    border: 1px solid #4b5563; /* Cinza 600 */
+    background-color: #374151; /* bg-dark-input */
+    color: #d1d5db; /* text-dark-text */
+}
+.category-btn.bg-indigo-600 { /* Estilo ativo original (será sobrescrito) */
+    background-color: #ff7518 !important; /* bg-pumpkin */
+    border-color: #ff7518 !important; /* border-pumpkin */
+    color: #ffffff !important; /* text-white */
+}
+
+/* Botões de Método de Pagamento */
+.payment-method-btn {
+    background-color: #374151; /* bg-dark-input */
+    color: #d1d5db; /* text-dark-text */
+    border: 1px solid #4b5563; /* Cinza 600 */
+}
+.payment-method-btn:hover {
+     background-color: #4b5563; /* Cinza 600 */
+}
 .payment-method-btn.active {
-    background-color: #4f46e5 !important;
+    background-color: #ff7518 !important; /* bg-pumpkin */
     color: white !important;
+    border-color: #ff7518 !important;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-/* Estilos para o Cardápio */
-.product-card { /* Nome mais genérico que menu-item */
-     min-height: 110px; /* Um pouco mais de altura para o botão Info */
+/* Cards de Mesa */
+.table-card-panel {
+    /* Cores de fundo e texto são aplicadas via Tailwind no JS agora */
+    /* Ex: bg-gray-700 text-gray-200 hover:bg-gray-600 */
+    border: 1px solid #4b5563; /* Adiciona uma borda sutil */
 }
-.add-icon-btn {
-    width: 36px; 
-    height: 36px;
-    border-radius: 9999px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0; 
+.table-card-panel.bg-red-100 { /* Adapta cor de mesa ocupada */
+    background-color: #4b0e0e; /* Tom de vermelho escuro */
+    color: #fecaca; /* Texto vermelho claro */
+    border-color: #991b1b; /* Borda vermelha escura */
 }
-.add-icon-btn i {
-    font-size: 0.875rem;
+.table-card-panel.bg-red-100:hover {
+     background-color: #7f1d1d; /* Vermelho mais escuro no hover */
 }
+.table-card-panel.bg-green-100 { /* Adapta cor de mesa livre */
+    background-color: #064e3b; /* Tom de verde escuro */
+    color: #a7f3d0; /* Texto verde claro */
+    border-color: #047857; /* Borda verde escura */
+}
+.table-card-panel.bg-green-100:hover {
+    background-color: #059669; /* Verde mais claro no hover */
+}
+.table-timer { color: #9ca3af; /* Cinza 400 */ }
+.attention-icon { color: #fbbf24; /* yellow-400 */ } /* Ícone de atenção geral (Espera) */
+.attention-icon.fa-bell { color: #facc15; } /* Ícone específico (Pedido Cliente - não usado agora) */
 
-/* Estilos para botões de observação rápida */
-.quick-obs-btn {
-    font-size: 0.75rem !important; /* Reduzido para caber mais botões */
-    padding: 0.3rem 0.6rem !important; 
-}
 
-/* Estilos para o Switch de Espera */
-.switch-obs {
-  position: relative;
-  display: inline-block;
-  width: 50px;
-  height: 28px;
+/* Itens na lista de pedido (Painel 2) */
+#openOrderList > div {
+    background-color: #374151; /* bg-dark-input */
+    border: 1px solid #4b5563;
 }
-.switch-obs input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-.slider-obs {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #ccc;
-  transition: .4s;
-  border-radius: 28px;
-}
-.slider-obs:before {
-  position: absolute;
-  content: "";
-  height: 20px;
-  width: 20px;
-  left: 4px;
-  bottom: 4px;
-  background-color: white;
-  transition: .4s;
-  border-radius: 50%;
-}
-input:checked + .slider-obs {
-  background-color: #fbbf24; /* Yellow-400 - Cor para "Espera" ON */
-}
-input:checked + .slider-obs:before {
-  transform: translateX(22px);
-}
+#openOrderList span.font-semibold { color: #e5e7eb; } /* Cinza 200 */
+#openOrderList span.cursor-pointer { color: #a5b4fc; } /* indigo-300 */
+#openOrderList span.cursor-pointer.text-yellow-600 { color: #facc15; } /* yellow-400 */
+#openOrderList span.font-bold { color: #ff7518; } /* pumpkin */
 
-/* Estilos Específicos do Painel Gerencial */
-#managerScreen {
-    background-color: #1f2937; /* gray-800 - Fundo escuro */
-    color: #d1d5db; /* gray-300 - Texto claro */
-}
-.manager-card {
-    /* Estilos base já definidos no HTML com Tailwind */
-    transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
-}
-.manager-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 10px 15px -3px rgba(255, 117, 24, 0.3), 0 4px 6px -4px rgba(255, 117, 24, 0.2); /* Sombra laranja */
-}
 
-/* REMOVIDO: Todas as regras de restrição .client-mode */
+/* Itens na lista de revisão (Painel 3) */
+#reviewItemsList > div {
+     border-bottom-color: #374151; /* Cinza 700 */
+}
+#reviewItemsList > div:hover {
+    background-color: #374151; /* Cinza 700 */
+}
+#reviewItemsList span.font-semibold { color: #e5e7eb; } /* Cinza 200 */
+#reviewItemsList span.text-gray-500 { color: #9ca3af; } /* Cinza 400 */
+#reviewItemsList span.font-bold { color: #ff7518; } /* pumpkin */
+#reviewItemsList input[type="checkbox"] { background-color: #4b5563; border-color: #6b7280; }
+#reviewItemsList input[type="checkbox"]:checked { background-color: #ff7518; border-color: #ff7518; }
 
-/* Animação de Loading */
+/* Lista de Pagamentos Registrados */
+#paymentSummaryList { background-color: #111827; border-color: #374151; }
+#paymentSummaryList > div { border-bottom-color: #374151; }
+#paymentSummaryList span.text-gray-700 { color: #9ca3af; } /* Cinza 400 */
+#paymentSummaryList span.font-semibold { color: #e5e7eb; } /* Cinza 200 */
+
+
+/* Cardápio */
+.product-card {
+    background-color: #1f2937; /* Cinza 800 */
+    border-color: #374151; /* Cinza 700 */
+}
+.product-card h4 { color: #e5e7eb; } /* Cinza 200 */
+.product-card p { color: #9ca3af; } /* Cinza 400 */
+.product-card span.font-bold { color: #ff7518; } /* pumpkin */
+
+
+/* Switch Espera */
+.slider-obs { background-color: #4b5563; } /* Cinza 600 */
+input:checked + .slider-obs { background-color: #fbbf24; } /* Amarelo */
+
+
+/* Animação de Loading (Cor Pumpkin) */
 @keyframes spin { to { transform: rotate(360deg); } }
 .loading-spinner {
-    border: 4px solid rgba(0, 0, 0, 0.1);
-    border-left-color: #4f46e5;
+    border: 4px solid rgba(255, 255, 255, 0.1);
+    border-left-color: #ff7518; /* pumpkin */
     border-radius: 50%;
     width: 40px;
     height: 40px;
