@@ -8,32 +8,32 @@ import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, getCus
 import { fetchWooCommerceProducts, fetchWooCommerceCategories } from '/services/wooCommerceService.js';
 import { loadOpenTables, renderTableFilters, handleAbrirMesa, loadTableOrder, handleSearchTable } from '/controllers/panelController.js';
 import { renderMenu, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity } from '/controllers/orderController.js';
-import { renderPaymentSummary } from '/controllers/paymentController.js'; 
+import { renderPaymentSummary } from '/controllers/paymentController.js';
 import { openManagerAuthModal } from '/controllers/managerController.js';
 
 // --- VARIÁVEIS DE ESTADO GLOBAL ---
-// NOVO MAPEAMENTO DE TELAS PARA index.html (Staff)
-export const screens = { 
-    'panelScreen': 0, // Novo Índice 0
-    'orderScreen': 1, // Novo Índice 1
-    'paymentScreen': 2, // Novo Índice 2
-    'managerScreen': 3, // Novo Índice 3
-    'clientOrderScreen': 4, // Mantido no final, fora do fluxo Staff principal
+// CORREÇÃO: Mapeamento de telas para corresponder à ordem no index.html
+export const screens = {
+    'clientOrderScreen': 0, // Primeira tela no HTML
+    'panelScreen': 1,       // Segunda tela no HTML
+    'orderScreen': 2,       // Terceira tela no HTML
+    'paymentScreen': 3,     // Quarta tela no HTML
+    'managerScreen': 4      // Quinta tela no HTML
 };
 export const mockUsers = { 'gerente': '1234', 'garcom': '1234' };
 
 // Credenciais Staff Centralizadas (para login unificado)
 const STAFF_CREDENTIALS = {
-    'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' }, 
+    'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' },
     'garcom@fator.com': { password: '1234', role: 'garcom', name: 'Mock Garçom' },
-    'cliente@fator.com': { password: '1234', role: 'client', name: 'Cliente Teste' }, 
+    'cliente@fator.com': { password: '1234', role: 'client', name: 'Cliente Teste' },
 };
 
 // Variáveis Mutáveis (Estado da Sessão)
 export let currentTableId = null;
-export let selectedItems = []; 
+export let selectedItems = [];
 export let currentOrderSnapshot = null;
-export let userRole = 'anonymous'; 
+export let userRole = 'anonymous';
 export let userId = null;
 export let unsubscribeTable = null;
 
@@ -45,10 +45,10 @@ const appContainer = document.getElementById('appContainer');
 const loginModal = document.getElementById('loginModal');
 
 // Variáveis para inputs de Login (inicialmente null, preenchidas no DOMContentLoaded)
-let loginBtn = null; 
-let loginEmailInput = null; 
+let loginBtn = null;
+let loginEmailInput = null;
 let loginPasswordInput = null;
-let searchTableInput = null; 
+let searchTableInput = null;
 
 
 // --- FUNÇÕES CORE E ROTIAMENTO ---
@@ -60,11 +60,11 @@ export const hideStatus = () => {
 };
 
 const showLoginModal = () => {
-    if (statusScreen) statusScreen.style.display = 'none'; 
-    if (mainContent) mainContent.style.display = 'none'; 
-    
+    if (statusScreen) statusScreen.style.display = 'none';
+    if (mainContent) mainContent.style.display = 'none';
+
     if (loginModal) {
-        loginModal.style.display = 'flex'; 
+        loginModal.style.display = 'flex';
     }
 };
 
@@ -78,22 +78,24 @@ export const goToScreen = (screenId) => {
     if (userRole === 'client' && screenId !== 'clientOrderScreen' && currentTableId) {
         if (screenId === 'panelScreen') {
              alert("Acesso restrito. Você só pode visualizar a sua mesa.");
-             return; 
+             return;
         }
     }
-    
+
     if (currentTableId) {
         saveSelectedItemsToFirebase(currentTableId, selectedItems);
     }
-    
+
     if (screenId === 'panelScreen' && currentTableId && unsubscribeTable) {
-        unsubscribeTable(); 
-        unsubscribeTable = null; 
+        unsubscribeTable();
+        unsubscribeTable = null;
     }
 
+    // Usa o mapa 'screens' CORRIGIDO para obter o índice correto
     const screenIndex = screens[screenId];
     if (screenIndex !== undefined) {
         if (appContainer) {
+            // Aplica o translateX correto baseado no índice do mapa corrigido
             appContainer.style.transform = `translateX(-${screenIndex * 100}vw)`;
         }
         document.body.classList.toggle('bg-gray-900', screenId === 'managerScreen');
@@ -101,13 +103,13 @@ export const goToScreen = (screenId) => {
     }
 };
 
-window.goToScreen = goToScreen; 
-window.openManagerAuthModal = openManagerAuthModal; 
+window.goToScreen = goToScreen;
+window.openManagerAuthModal = openManagerAuthModal;
 
 
 // NOVO: Função para o listener da mesa (MÓDULO DE FLUXO)
 export const setTableListener = (tableId) => {
-    if (unsubscribeTable) unsubscribeTable(); 
+    if (unsubscribeTable) unsubscribeTable();
 
     const tableRef = getTableDocRef(tableId);
 
@@ -115,11 +117,11 @@ export const setTableListener = (tableId) => {
     unsubscribeTable = onSnapshot(tableRef, (docSnapshot) => {
         if (docSnapshot.exists()) {
             currentOrderSnapshot = docSnapshot.data();
-            
+
             const newSelectedItems = currentOrderSnapshot.selectedItems || [];
-            selectedItems.length = 0; 
+            selectedItems.length = 0;
             selectedItems.push(...newSelectedItems);
-            
+
             renderOrderScreen(currentOrderSnapshot);
             renderPaymentSummary(currentTableId, currentOrderSnapshot);
         }
@@ -129,29 +131,29 @@ export const setTableListener = (tableId) => {
 };
 
 export const setCurrentTable = (tableId) => {
-    currentTableId = tableId; 
-    
-    document.getElementById('current-table-number').textContent = `Mesa ${tableId}`; 
-    document.getElementById('payment-table-number').textContent = `Mesa ${tableId}`; 
+    currentTableId = tableId;
+
+    document.getElementById('current-table-number').textContent = `Mesa ${tableId}`;
+    document.getElementById('payment-table-number').textContent = `Mesa ${tableId}`;
     if (document.getElementById('client-table-number')) {
-         document.getElementById('client-table-number').textContent = `Mesa ${tableId}`; 
+         document.getElementById('client-table-number').textContent = `Mesa ${tableId}`;
     }
-    
-    setTableListener(tableId); 
+
+    setTableListener(tableId);
 };
 
 
 // FIX: Re-add window.openNfeModal definition to global scope
 window.openNfeModal = () => {
     const nfeModal = document.getElementById('nfeModal');
-    if (!nfeModal) return; 
-    
+    if (!nfeModal) return;
+
     nfeModal.innerHTML = `
         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 class="text-xl font-bold mb-4 text-green-700">NF-e / Recibo</h3>
             <p class="text-base mb-3">Deseja incluir CPF/CNPJ?</p>
             <input type="text" id="nfeCpfCnpjInput" placeholder="CPF ou CNPJ (Opcional)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-base">
-            
+
             <div class="flex flex-col space-y-2 mt-4">
                 <button class="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-base">Imprimir Recibo</button>
                 <button class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base">Enviar por Email</button>
@@ -170,40 +172,40 @@ window.openNfeModal = () => {
 
 const initStaffApp = async () => {
     // 1. Carrega dados síncronos (Filtros de Setor são síncronos)
-    renderTableFilters(); 
-    
+    renderTableFilters();
+
     // 2. INÍCIO DA CARGA DE DADOS PARALELA (WOOCOMMERCE)
     // REMOVENDO AWAIT para garantir que loadOpenTables() seja chamado imediatamente.
     fetchWooCommerceProducts(renderOrderScreen).catch(e => console.error("Falha ao carregar produtos Woo:", e));
     fetchWooCommerceCategories(renderTableFilters).catch(e => console.error("Falha ao carregar categorias Woo:", e));
-    
+
     // 3. Finaliza Inicialização da UI
-    if (mainContent) mainContent.style.display = 'block'; 
+    if (mainContent) mainContent.style.display = 'block';
     document.body.classList.remove('client-mode');
     hideStatus();
 
     // 4. CHAMADA GARANTIDA: Carrega mesas imediatamente.
-    loadOpenTables(); 
-    
-    goToScreen('panelScreen'); 
+    loadOpenTables();
+
+    goToScreen('panelScreen'); // Vai para o Painel de Mesas (Staff)
 };
 
 const initClientApp = async () => {
     // 1. Carrega apenas o essencial do cliente
-    renderTableFilters(); 
-    
+    renderTableFilters();
+
     // 2. Carrega Produtos e Categorias (MANTENDO AWAIT para o cliente, que precisa do menu)
-    await fetchWooCommerceProducts(() => { 
-        renderOrderScreen(); 
+    await fetchWooCommerceProducts(() => {
+        renderOrderScreen();
     });
-    await fetchWooCommerceCategories(renderTableFilters); 
-    
+    await fetchWooCommerceCategories(renderTableFilters);
+
     // 3. Finaliza Inicialização
-    if (mainContent) mainContent.style.display = 'block'; 
+    if (mainContent) mainContent.style.display = 'block';
     document.body.classList.add('client-mode');
     hideStatus();
     alert("Bem-vindo Cliente! Insira o número da sua mesa no campo de busca para começar a pedir.");
-    goToScreen('clientOrderScreen'); 
+    goToScreen('clientOrderScreen'); // Vai para a tela de Pedido do Cliente
 };
 
 
@@ -212,7 +214,7 @@ const initClientApp = async () => {
 const authenticateStaff = (email, password) => {
     const creds = STAFF_CREDENTIALS[email];
     if (creds && creds.password === password) {
-        return creds; 
+        return creds;
     }
     return null;
 };
@@ -223,28 +225,28 @@ const handleStaffLogin = async () => {
          alert("Erro interno: Elementos de login não carregados.");
          return;
     }
-    
-    if (loginBtn) loginBtn.disabled = true; 
-    
+
+    if (loginBtn) loginBtn.disabled = true;
+
     const email = loginEmailInput.value.trim();
     const password = loginPasswordInput.value.trim();
-    
+
     const staffData = authenticateStaff(email, password);
 
     if (staffData) {
         userRole = staffData.role;
-        
+
         try {
             // FIX: Remove redundant/failing initialization and use existing auth instance
-            const authInstance = auth; 
+            const authInstance = auth;
             if (!authInstance) throw new Error("Firebase Auth não inicializado. Recarregue a página.");
-            
+
             // --- CORREÇÃO CRÍTICA: BYPASS E TRATAMENTO DE ERRO 403 (AUTH) ---
             try {
                 // Use the existing initialized auth instance
-                const userCredential = await signInAnonymously(authInstance); 
-                userId = userCredential.user.uid; 
-                
+                const userCredential = await signInAnonymously(authInstance);
+                userId = userCredential.user.uid;
+
             } catch (authError) {
                 // Se o erro for de Auth (403 Forbidden persistente), gere um ID mock para o Staff prosseguir.
                 if (userRole !== 'client') {
@@ -252,22 +254,22 @@ const handleStaffLogin = async () => {
                     userId = `mock_${userRole}_${Date.now()}`;
                 } else {
                     // Se o cliente falhar na autenticação, é um erro real.
-                    throw authError; 
+                    throw authError;
                 }
             }
             // --- FIM CORREÇÃO CRÍTICA ---
-            
+
             document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)} | Função: ${userRole.toUpperCase()}`;
-            
-            hideLoginModal(); 
-            
+
+            hideLoginModal();
+
             // ROTEAMENTO PARA AS NOVAS FUNÇÕES DE INICIALIZAÇÃO
             if (userRole === 'client') {
                 await initClientApp();
             } else {
                 await initStaffApp();
             }
-            
+
         } catch (error) {
              console.error("Erro ao autenticar Staff (Firebase/Anônimo):", error);
              alert("Autenticação falhou. Verifique as credenciais ou a configuração do Firebase.");
@@ -282,13 +284,13 @@ const handleLogout = () => {
     userId = null;
     currentTableId = null;
     selectedItems = [];
-    userRole = 'anonymous'; 
-    
+    userRole = 'anonymous';
+
     const authInstance = auth;
     if (authInstance && authInstance.currentUser) {
-        signOut(authInstance).catch(e => console.error("Erro no sign out:", e)); 
+        signOut(authInstance).catch(e => console.error("Erro no sign out:", e));
     }
-    
+
     goToScreen('panelScreen');
     showLoginModal();
     document.getElementById('user-id-display').textContent = 'Usuário ID: Carregando...';
@@ -300,25 +302,25 @@ window.handleLogout = handleLogout;
 // --- INITIALIZATION ---
 let firebaseConfig;
 document.addEventListener('DOMContentLoaded', () => {
-    
+
     firebaseConfig = JSON.parse(window.__firebase_config);
 
     const loginBtnElement = document.getElementById('loginBtn');
-    const loginEmailInputElement = document.getElementById('loginEmail'); 
+    const loginEmailInputElement = document.getElementById('loginEmail');
     const loginPasswordInputElement = document.getElementById('loginPassword');
-    const searchTableInputElement = document.getElementById('searchTableInput'); 
-    
+    const searchTableInputElement = document.getElementById('searchTableInput');
+
     loginBtn = loginBtnElement;
     loginEmailInput = loginEmailInputElement;
     loginPasswordInput = loginPasswordInputElement;
     searchTableInput = searchTableInputElement;
-    
+
     // FIX: Initialize App using the imported function
-    const app = initializeApp(firebaseConfig); 
+    const app = initializeApp(firebaseConfig);
     const dbInstance = getFirestore(app);
     const authInstance = getAuth(app);
-    
-    initializeFirebase(dbInstance, authInstance, window.__app_id || 'pdv_default_app'); 
+
+    initializeFirebase(dbInstance, authInstance, window.__app_id || 'pdv_default_app');
 
     onAuthStateChanged(authInstance, (user) => {
         if (!user) {
@@ -332,21 +334,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (loginBtn) {
         loginBtn.addEventListener('click', handleStaffLogin);
     }
-    
+
     // 2. Event Listeners do Cabeçalho e Painel
     const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
     const logoutBtnHeader = document.getElementById('logoutBtnHeader');
     const abrirMesaBtn = document.getElementById('abrirMesaBtn');
     const searchTableBtnTrigger = document.getElementById('searchTableBtn');
 
-    if (openManagerPanelBtn) { 
+    if (openManagerPanelBtn) {
         openManagerPanelBtn.addEventListener('click', () => {
              // Chamada global para a função exposta
-             window.openManagerAuthModal('goToManagerPanel'); 
+             window.openManagerAuthModal('goToManagerPanel');
         });
     }
     if (logoutBtnHeader) {
-        logoutBtnHeader.addEventListener('click', handleLogout); 
+        logoutBtnHeader.addEventListener('click', handleLogout);
     }
     if (abrirMesaBtn) {
         abrirMesaBtn.addEventListener('click', handleAbrirMesa);
