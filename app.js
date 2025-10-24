@@ -198,34 +198,38 @@ window.openNfeModal = () => {
 const initStaffApp = async () => {
     console.log("[INIT] Iniciando app para Staff...");
     try {
-        // 1. Carrega dados síncronos (Filtros de Setor são síncronos)
+        // 1. Renderiza Filtros (Síncrono)
+        console.log("[INIT] Tentando renderizar filtros de setor...");
         renderTableFilters();
         console.log("[INIT] Filtros de setor renderizados.");
 
-        // 2. INÍCIO DA CARGA DE DADOS PARALELA (WOOCOMMERCE)
+        // 2. Carrega Dados WooCommerce (Assíncrono, não bloqueia)
+        console.log("[INIT] Iniciando carregamento de dados WooCommerce...");
         fetchWooCommerceProducts(renderOrderScreen)
             .then(() => console.log("[INIT] Produtos WooCommerce carregados."))
-            .catch(e => console.error("Falha ao carregar produtos Woo:", e));
+            .catch(e => console.error("[INIT ERROR] Falha ao carregar produtos Woo:", e));
         fetchWooCommerceCategories(renderTableFilters)
             .then(() => console.log("[INIT] Categorias WooCommerce carregadas."))
-            .catch(e => console.error("Falha ao carregar categorias Woo:", e));
+            .catch(e => console.error("[INIT ERROR] Falha ao carregar categorias Woo:", e));
 
-        // 3. Finaliza Inicialização da UI
+        // 3. Mostra UI Principal e Esconde Status
         if (mainContent) mainContent.style.display = 'block';
         hideStatus();
         console.log("[INIT] UI principal visível.");
 
-        // 4. CHAMADA GARANTIDA: Carrega mesas imediatamente.
-        loadOpenTables();
-        console.log("[INIT] Carregamento inicial de mesas iniciado.");
+        // 4. Carrega Mesas Abertas (Assíncrono via onSnapshot)
+        console.log("[INIT] Tentando carregar mesas abertas...");
+        loadOpenTables(); // Esta função configura o listener
+        console.log("[INIT] Listener de mesas abertas configurado.");
 
-        // 5. Navega para a tela inicial do Staff
+        // 5. Navega para a Tela Inicial
+        console.log("[INIT] Tentando navegar para panelScreen...");
         goToScreen('panelScreen');
-        console.log("[INIT] Navegação para panelScreen concluída.");
+        console.log("[INIT] Navegação para panelScreen solicitada.");
 
     } catch (error) {
-        console.error("[INIT] Erro durante a inicialização do app Staff:", error);
-        alert("Ocorreu um erro ao iniciar o PDV. Verifique o console.");
+        console.error("[INIT] Erro CRÍTICO durante a inicialização do app Staff:", error);
+        alert("Ocorreu um erro grave ao iniciar o PDV. Verifique o console (F12).");
         showLoginModal(); // Volta para o login em caso de erro na inicialização
     }
 };
@@ -286,6 +290,7 @@ const handleStaffLogin = async () => {
             // CHAMA A INICIALIZAÇÃO DA APLICAÇÃO STAFF
             console.log("[LOGIN] Chamando initStaffApp...");
             await initStaffApp(); // Espera a inicialização antes de reabilitar o botão
+            console.log("[LOGIN] initStaffApp concluído.");
 
         } catch (error) {
              console.error("[LOGIN] Erro durante o processo de login:", error);
@@ -296,7 +301,9 @@ const handleStaffLogin = async () => {
         console.log(`[LOGIN] Credenciais inválidas para ${email}.`);
         alert('Credenciais inválidas ou não permitidas para Staff. Verifique seu e-mail e senha.');
     }
-    if (loginBtn) loginBtn.disabled = false; // Reabilita o botão
+    // Garante que o botão seja reabilitado mesmo em caso de falha
+    if (loginBtn) loginBtn.disabled = false;
+    console.log("[LOGIN] Processo de login finalizado.");
 };
 
 const handleLogout = () => {
@@ -368,7 +375,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!user && userRole !== 'gerente' && userRole !== 'garcom') {
                 showLoginModal();
             }
-            // REMOVIDO: else if (userRole === 'client') ...
         });
         console.log("[INIT] Listener onAuthStateChanged configurado.");
 
@@ -407,8 +413,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (searchTableBtnTrigger) {
         searchTableBtnTrigger.addEventListener('click', () => {
-            // REMOVIDO: Verificação de isClientFlow
-             handleSearchTable();
+             handleSearchTable(); // Apenas fluxo Staff agora
         });
     }
 
@@ -416,4 +421,5 @@ document.addEventListener('DOMContentLoaded', () => {
     const openNfeModalBtn = document.getElementById('openNfeModalBtn');
     if (openNfeModalBtn) openNfeModalBtn.addEventListener('click', window.openNfeModal);
     console.log("[INIT] Listeners restantes adicionados.");
+    console.log("[INIT] Inicialização do DOMContentLoaded concluída.");
 });
