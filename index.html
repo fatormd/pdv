@@ -13,126 +13,39 @@
                 extend: {
                     fontFamily: { sans: ['Inter', 'sans-serif'] },
                     colors: {
-                        'primary': '#4f46e5', // Índigo (mantido, mas menos usado)
-                        'pumpkin': '#ff7518', // Laranja Abóbora Principal
-                        'pumpkin-dark': '#e46815', // Laranja mais escuro para hover/ativo
-                        'dark-bg': '#111827', // Cinza 900 (Fundo Principal dos Painéis)
-                        'dark-card': '#1f2937', // Cinza 800 (Fundo Card/Header)
-                        'dark-input': '#374151', // Cinza 700 (Fundo Input/Botões inativos)
-                        'dark-text': '#d1d5db', // Cinza 300 (Texto Principal)
-                        'dark-placeholder': '#6b7280', // Cinza 500 (Placeholder/Texto secundário)
-                        'dark-border': '#374151', // Cinza 700 (Bordas)
+                        'primary': '#4f46e5',
+                        'pumpkin': '#ff7518',
+                        'pumpkin-dark': '#e46815',
+                        'dark-bg': '#111827',
+                        'dark-card': '#1f2937',
+                        'dark-input': '#374151',
+                        'dark-text': '#d1d5db',
+                        'dark-placeholder': '#6b7280',
+                        'dark-border': '#374151',
                     },
                 }
             }
         }
     </script>
 </head>
-<body class="bg-dark-bg min-h-screen text-dark-text"> <div id="statusScreen" class="absolute inset-0 bg-dark-bg z-50 flex items-center justify-center p-6" style="display: flex;">
-        <div class="flex flex-col items-center p-8 max-w-sm w-full text-center">
-            <i class="fas fa-spinner fa-spin text-4xl text-pumpkin mb-4"></i>
-            <h2 class="text-xl font-bold mb-2 text-dark-text">Iniciando PDV...</h2>
-            <p class="text-dark-placeholder">Conectando...</p>
-        </div>
-    </div>
+<body class="bg-dark-bg min-h-screen text-dark-text"> 
 
+    <div id="statusScreen" class="absolute inset-0 bg-dark-bg z-50 flex items-center justify-center p-6" style="display: flex;">
+        </div>
     <div id="mainHeader" class="header-bar bg-dark-card text-white p-4 flex justify-between items-center sticky top-0 z-20 border-b border-dark-border" style="display: none;">
-         <h1 class="text-xl font-bold text-pumpkin">Fator PDV</h1>
-         <div class="flex items-center space-x-3">
-             <button id="openManagerPanelBtn" class="rounded-full bg-pumpkin p-2 text-white shadow-lg hover:bg-pumpkin-dark transition duration-150 w-10 h-10 flex items-center justify-center hidden" title="Ações Gerenciais">
-                 <i class="fas fa-cog text-lg"></i>
-             </button>
-             <button id="logoutBtnHeader" class="rounded-full bg-red-600 p-2 text-white shadow-lg hover:bg-red-700 transition duration-150 w-10 h-10 flex items-center justify-center hidden" title="Sair / Logout">
-                 <i class="fas fa-sign-out-alt text-lg"></i>
-             </button>
-         </div>
-    </div>
+        </div>
 
     <main id="mainContent" class="relative overflow-hidden" style="display: none;">
         <div id="appContainer" class="flex transition-transform duration-300 ease-out">
 
             <div id="loginScreen" class="w-screen flex-shrink-0 flex items-center justify-center p-4 bg-dark-bg">
-                <div class="bg-dark-card p-8 rounded-xl shadow-2xl w-full max-w-md border-t-4 border-pumpkin">
-                    <div class="text-center mb-8">
-                         <i class="fas fa-utensils text-6xl text-pumpkin"></i>
-                         <h2 class="text-3xl font-bold text-pumpkin mt-2">Fator PDV</h2>
-                    </div>
-                    <h3 class="text-2xl font-bold text-dark-text mb-6 text-center">Acesso Staff</h3>
-                    <input type="email" id="loginEmail" placeholder="E-mail" class="w-full p-4 mb-4 bg-dark-input border border-gray-600 rounded-lg text-dark-text placeholder-dark-placeholder focus:outline-none focus:ring-2 focus:ring-pumpkin focus:border-transparent text-base">
-                    <input type="password" id="loginPassword" placeholder="Senha" class="w-full p-4 mb-6 bg-dark-input border border-gray-600 rounded-lg text-dark-text placeholder-dark-placeholder focus:outline-none focus:ring-2 focus:ring-pumpkin focus:border-transparent text-base">
-                    <p id="loginErrorMsg" class="text-red-500 text-sm mb-4 text-center" style="display: none;"></p>
-                    <button id="loginBtn" class="w-full bg-pumpkin text-white font-bold py-4 rounded-lg hover:bg-pumpkin-dark transition text-lg disabled:opacity-50">Entrar</button>
                 </div>
-            </div>
 
             <div id="panelScreen" class="flex-shrink-0 bg-dark-bg text-dark-text">
-                <div class="content-card bg-dark-card p-4 mb-6 border border-gray-700">
-                    <h3 class="text-lg font-semibold text-pumpkin mb-3">Abrir Nova Mesa</h3>
-                    <div class="flex flex-wrap sm:flex-nowrap space-y-2 sm:space-y-0 sm:space-x-3 mb-3 items-center">
-                        <input type="number" id="mesaInput" placeholder="Nº Mesa" class="w-full sm:w-1/4 input-pdv bg-dark-input border border-gray-600 rounded-lg text-dark-text placeholder-dark-placeholder focus:ring-pumpkin focus:border-pumpkin" min="1" required>
-                        <input type="number" id="pessoasInput" placeholder="Pessoas" class="w-full sm:w-1/4 input-pdv bg-dark-input border border-gray-600 rounded-lg text-dark-text placeholder-dark-placeholder focus:ring-pumpkin focus:border-pumpkin" min="1" required>
-                         <select id="sectorInput" class="w-full sm:w-1/3 p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text focus:ring-pumpkin focus:border-pumpkin text-base" required>
-                            <option value="" disabled selected class="text-dark-placeholder">Setor</option>
-                            </select>
-                        <button id="abrirMesaBtn" class="w-full sm:w-auto flex-grow sm:flex-grow-0 bg-pumpkin text-white font-bold py-3 px-4 rounded-lg hover:bg-pumpkin-dark transition duration-150 shadow-md text-lg disabled:opacity-50">
-                            + Abrir
-                        </button>
-                    </div>
                 </div>
-                <div class="space-y-3">
-                    <div class="flex flex-col sm:flex-row justify-between items-center mb-3 space-y-2 sm:space-y-0">
-                        <h3 class="text-xl font-semibold text-dark-text">Mesas Abertas (<span id="openTablesCount">0</span>)</h3>
-                        <div class="flex items-center space-x-2">
-                            <input type="number" id="searchTableInput" placeholder="Nº Mesa" class="input-pdv bg-dark-input border border-gray-600 rounded-lg text-dark-text placeholder-dark-placeholder focus:ring-pumpkin focus:border-pumpkin text-sm" style="width: 100px;">
-                            <button id="searchTableBtn" class="bg-pumpkin text-white font-bold py-2 px-3 rounded-lg hover:bg-pumpkin-dark transition duration-150 shadow-md text-lg" title="Buscar Mesa">
-                                <i class="fas fa-search"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div id="sectorFilters" class="flex space-x-2 overflow-x-auto pb-2 mb-4"></div>
-                    <div id="openTablesList" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                         <div class="col-span-full text-sm text-dark-placeholder italic p-4 content-card bg-dark-card border border-gray-700">Carregando mesas...</div>
-                    </div>
-                </div>
-            </div>
 
             <div id="orderScreen" class="flex-shrink-0 bg-dark-bg text-dark-text">
-                 <div class="flex items-center justify-between mb-4">
-                    <div class="flex items-center text-pumpkin">
-                        <button id="backToPanelFromOrderBtn" class="mr-2 text-3xl p-2 hover:text-pumpkin-dark transition duration-150" title="Voltar para o Painel" onclick="window.goToScreen('panelScreen')">
-                            <i class="fas fa-arrow-left"></i>
-                        </button>
-                        <span class="text-2xl font-semibold mr-3 text-dark-text" id="current-table-number">Mesa Selecionada</span>
-                    </div>
-                    <button id="goToPaymentBtn" class="rounded-full bg-pumpkin p-3 text-white shadow-lg hover:bg-green-600 transition duration-150 w-12 h-12 flex items-center justify-center" title="Ir para Pagamento" onclick="window.goToScreen('paymentScreen')">
-                        <i class="fas fa-money-bill-wave text-xl"></i>
-                    </button>
                 </div>
-                <div id="orderingInputs" class="space-y-4">
-                    <div class="p-4 content-card bg-dark-card border border-gray-700">
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-xl font-semibold text-dark-text mr-2">Itens Selecionados (<span id="openItemsCount">0</span>)</h2>
-                            <button id="sendSelectedItemsBtn" class="bg-pumpkin text-white p-3 rounded-full shadow-lg hover:bg-pumpkin-dark transition duration-150 w-12 h-12 flex items-center justify-center text-xl disabled:opacity-50" title="Enviar Itens Selecionados (MARCHA)">
-                                <i class="fas fa-paper-plane"></i>
-                            </button>
-                        </div>
-                        <div id="openOrderList" class="space-y-3 mb-4">
-                            <div class="text-base text-dark-placeholder italic p-2">Nenhum item selecionado.</div>
-                        </div>
-                    </div>
-                </div>
-                <div id="menuContainer" class="mt-6">
-                    <div class="flex justify-between items-center mb-4 px-4">
-                        <h2 class="text-xl font-bold text-dark-text">Cardápio</h2>
-                        <div class="relative">
-                            <input type="text" id="searchProductInput" placeholder="Buscar produtos..." class="pr-8 input-pdv bg-dark-input border border-gray-600 rounded-lg text-dark-text placeholder-dark-placeholder focus:ring-pumpkin focus:border-pumpkin text-sm" style="width: 150px;">
-                            <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                        </div>
-                    </div>
-                    <div id="categoryFilters" class="flex space-x-2 overflow-x-auto pb-2 mb-4 px-4"></div>
-                    <div id="menuItemsGrid" class="px-4 grid grid-cols-2 md:grid-cols-3 gap-4"></div>
-                </div>
-            </div>
 
             <div id="paymentScreen" class="flex-shrink-0 bg-dark-bg text-dark-text">
                  <div class="flex items-center justify-between mb-4">
@@ -144,223 +57,43 @@
                     </div>
                 </div>
                 <div class="content-card bg-dark-card border border-gray-700 p-4 mb-6">
+                    
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="text-xl font-semibold text-green-400">Resumo da Conta</h2>
-                        <div class="flex space-x-2">
-                             <button id="itemMassTransferBtn" class="text-gray-400 hover:text-yellow-400 transition" title="Ativar Seleção para Transferência (Gerente)" onclick="window.handleMassActionRequest('transfer')">
-                                <i class="fas fa-exchange-alt text-lg"></i>
-                            </button>
-                             <button id="itemMassDeleteBtn" class="text-gray-400 hover:text-red-400 transition" title="Ativar Seleção para Exclução (Gerente)" onclick="window.handleMassActionRequest('delete')">
-                                <i class="fas fa-trash-alt text-lg"></i>
-                            </button>
                         </div>
-                    </div>
+                    
                     <div id="reviewItemsList" class="space-y-1 pt-2">
-                        <div class="text-sm text-dark-placeholder italic p-2">Nenhum item na conta para revisão.</div>
+                         <div class="text-sm text-dark-placeholder italic p-2">Nenhum item na conta para revisão.</div>
                     </div>
+                    
                     <div class="flex justify-between items-center border-t border-gray-600 pt-4 mt-4">
-                        <div>
-                            <span class="text-xl font-bold text-dark-text">SUBTOTAL:</span>
-                            <p class="text-xs text-dark-placeholder">Valor dos produtos consumidos.</p>
                         </div>
-                        <span class="text-2xl font-bold text-pumpkin" id="orderSubtotalDisplayPayment">R$ 0,00</span>
-                    </div>
                     <div class="flex justify-between items-center border-b border-gray-600 pb-2">
-                        <div>
-                            <span class="text-lg font-bold text-green-400">SERVIÇO (10%):</span>
-                            <p class="text-xs text-dark-placeholder">Taxa opcional de serviço.</p>
                         </div>
-                        <div class="flex items-center space-x-2">
-                            <span class="text-lg font-bold text-green-400" id="orderServiceTaxDisplayPayment">R$ 0,00</span>
-                            <button id="toggleServiceTaxBtn" class="px-2 py-1 text-xs rounded-full transition duration-150 bg-green-600 text-white hover:bg-green-700" title="Aplicar/Remover Taxa">Remover</button>
-                        </div>
-                    </div>
                     <div class="flex justify-between items-center border-b border-gray-600 pb-2 pt-2">
-                        <div>
-                            <span class="text-lg font-bold text-pumpkin">VALOR POR PESSOA:</span>
-                            <p class="text-xs text-dark-placeholder">Divisão do Total Geral por pagantes.</p>
                         </div>
-                        <div class="flex items-center space-x-2">
-                            <span id="valuePerDinerDisplay" class="text-lg font-bold text-pumpkin">R$ 0,00</span>
-                            <input type="number" id="dinersSplitInput" class="w-16 p-1 text-sm bg-dark-input border border-gray-600 rounded-lg text-dark-text text-center focus:ring-pumpkin focus:border-pumpkin" min="1" value="1">
-                        </div>
-                    </div>
                     <div class="flex justify-between items-center pt-2">
-                        <span class="text-xl font-bold text-dark-text">TOTAL GERAL:</span>
-                        <span class="text-3xl font-extrabold text-pumpkin" id="orderTotalDisplayPayment">R$ 0,00</span>
-                    </div>
-                </div>
-                 <div class="p-4 pt-0 content-card bg-dark-card border border-gray-700 mt-6">
-                    <h4 class="text-sm font-semibold text-dark-placeholder mb-2">Pagamentos Registrados:</h4>
-                    <div id="paymentSummaryList" class="space-y-1 p-2 bg-dark-bg rounded-lg border border-gray-600 text-sm max-h-32 overflow-y-auto">
-                        <p class="text-xs text-dark-placeholder italic p-2">Nenhum pagamento registrado.</p>
-                    </div>
-                </div>
-                <div id="chargeInputs" class="p-4 pt-0 content-card bg-dark-card border border-gray-700 mt-6">
-                    <h4 class="text-lg font-semibold text-dark-text mb-3">Registrar Pagamento</h4>
-                    <div class="flex items-center space-x-2 mb-3">
-                        <button id="openCustomerRegBtn" class="bg-pumpkin text-white font-bold py-3 px-4 rounded-lg hover:bg-pumpkin-dark transition duration-150 disabled:opacity-50" title="Cadastrar Cliente">
-                            <i class="fas fa-plus"></i>
-                        </button>
-                        <input type="text" id="customerSearchInput" placeholder="Buscar Cliente (Nome/WhatsApp)" class="w-full p-3 input-pdv bg-dark-input border border-gray-600 rounded-lg text-dark-text placeholder-dark-placeholder focus:ring-pumpkin focus:border-pumpkin text-base">
-                    </div>
-                    <div class="space-y-3">
-                        <div id="paymentMethodButtons" class="grid grid-cols-3 md:grid-cols-3 gap-2"></div>
-                        <div class="flex space-x-2">
-                            <input type="text" id="paymentValueInput" placeholder="Valor Pago (R$ 0,00)" class="w-full p-3 input-pdv bg-dark-input border border-gray-600 rounded-lg text-dark-text placeholder-dark-placeholder focus:ring-pumpkin focus:border-pumpkin text-base text-right" value="R$ 0,00">
-                            <button class="bg-gray-600 text-gray-300 font-bold py-3 px-4 rounded-lg hover:bg-gray-500 transition text-base disabled:opacity-50" id="openCalculatorBtn" title="Abrir Calculadora">
-                                <i class="fas fa-calculator"></i>
-                            </button>
                         </div>
-                        <button id="addPaymentBtn" class="w-full bg-pumpkin text-white font-bold py-3 rounded-lg hover:bg-pumpkin-dark transition duration-150 text-base disabled:opacity-50">
-                            Adicionar Pagamento
-                        </button>
-                    </div>
                 </div>
-                <div class="p-4 pt-0 content-card bg-dark-card border border-gray-700 mt-6">
-                    <div class="flex justify-between items-center py-1 font-bold border-t border-gray-600 mt-2 pt-2">
-                        <span class="text-dark-text text-lg" id="remainingBalanceLabel">VALOR RESTANTE:</span>
-                        <span id="remainingBalanceDisplay" class="text-red-400 text-xl">R$ 0,00</span>
+                 
+                 <div class="p-4 pt-0 content-card bg-dark-card border border-gray-700 mt-6">
                     </div>
-                    <div class="flex justify-between space-x-3 pt-2">
-                         <button id="finalizeOrderBtn" class="w-1/2 px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition duration-150 text-base disabled:opacity-50">
-                            FINALIZAR CONTA
-                        </button>
-                        <button id="openNfeModalBtn" class="w-1/2 px-4 py-3 bg-yellow-600 text-white font-bold rounded-lg hover:bg-yellow-700 transition duration-150 text-base disabled:opacity-50" title="Emitir Nota Fiscal (em desenvolvimento)">
-                            NF-e (DEV)
-                        </button>
+                 <div id="chargeInputs" class="p-4 pt-0 content-card bg-dark-card border border-gray-700 mt-6">
                     </div>
-                </div>
+                 <div class="p-4 pt-0 content-card bg-dark-card border border-gray-700 mt-6">
+                    </div>
             </div>
 
             <div id="managerScreen" class="flex-shrink-0 bg-gray-900 text-dark-text">
-                 <div class="flex items-center mb-6 border-b border-pumpkin pb-3">
-                    <button id="backToPanelFromManagerBtn" class="mr-2 text-3xl p-2 text-pumpkin hover:text-pumpkin-dark transition duration-150" title="Voltar para o Painel" onclick="window.goToScreen('panelScreen')">
-                        <i class="fas fa-arrow-left"></i>
-                    </button>
-                    <span class="text-2xl font-semibold text-pumpkin">Painel Gerencial</span>
                 </div>
-                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 p-4">
-                    <div class="manager-card bg-dark-card border-2 border-pumpkin rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="window.openManagerAuthModal('openProductManagement')">
-                        <i class="fas fa-box-open text-4xl text-pumpkin mb-2"></i>
-                        <h4 class="font-bold text-lg text-dark-text">Produtos (Woo)</h4>
-                        <p class="text-sm text-dark-placeholder">Criar, Editar, Ocultar</p>
-                    </div>
-                    <div class="manager-card bg-dark-card border-2 border-pumpkin rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="window.openManagerAuthModal('openCategoryManagement')">
-                        <i class="fas fa-tags text-4xl text-pumpkin mb-2"></i>
-                        <h4 class="font-bold text-lg text-dark-text">Categorias (Woo)</h4>
-                        <p class="text-sm text-dark-placeholder">Criar, Editar, Sincronizar</p>
-                    </div>
-                    <div class="manager-card bg-dark-card border-2 border-pumpkin rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="window.openManagerAuthModal('openInventoryManagement')">
-                         <i class="fas fa-warehouse text-4xl text-pumpkin mb-2"></i><h4 class="font-bold text-lg text-dark-text">Estoque (ERP)</h4><p class="text-sm text-dark-placeholder">Entrada, Balanço, CMV</p></div>
-                    <div class="manager-card bg-dark-card border-2 border-pumpkin rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="window.openManagerAuthModal('openRecipesManagement')">
-                         <i class="fas fa-receipt text-4xl text-pumpkin mb-2"></i><h4 class="font-bold text-lg text-dark-text">Ficha Técnica (BOM)</h4><p class="text-sm text-dark-placeholder">Definir insumos/consumo</p></div>
-                    <div class="manager-card bg-dark-card border-2 border-green-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="window.openManagerAuthModal('openCashManagement')">
-                        <i class="fas fa-cash-register text-4xl text-green-400 mb-2"></i><h4 class="font-bold text-lg text-dark-text">Caixa (Sangria)</h4><p class="text-sm text-dark-placeholder">Abertura, Sangria, Fechamento</p></div>
-                    <div class="manager-card bg-dark-card border-2 border-indigo-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="window.openManagerAuthModal('openReservations')">
-                        <i class="fas fa-calendar-alt text-4xl text-indigo-400 mb-2"></i><h4 class="font-bold text-lg text-dark-text">Reservas/Fila</h4><p class="text-sm text-dark-placeholder">Gestão de Mesas, Check-in</p></div>
-                    <div class="manager-card bg-dark-card border-2 border-pumpkin rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="window.openManagerAuthModal('openCustomerCRM')">
-                        <i class="fas fa-address-book text-4xl text-pumpkin mb-2"></i><h4 class="font-bold text-lg text-dark-text">CRM/Fidelidade</h4><p class="text-sm text-dark-placeholder">Clientes, Pontos, Histórico</p></div>
-                    <div class="manager-card bg-dark-card border-2 border-pumpkin rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="window.openManagerAuthModal('openWaiterReg')">
-                        <i class="fas fa-users text-4xl text-pumpkin mb-2"></i><h4 class="font-bold text-lg text-dark-text">Usuários Staff</h4><p class="text-sm text-dark-placeholder">Criar, Editar, Excluir</p></div>
-                    <div class="manager-card bg-dark-card border-2 border-pumpkin rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="document.getElementById('reportsModal').style.display='flex'">
-                        <i class="fas fa-chart-line text-4xl text-pumpkin mb-2"></i><h4 class="font-bold text-lg text-dark-text">Relatórios</h4><p class="text-sm text-dark-placeholder">Vendas, Itens, Taxas</p></div>
-                    <div class="manager-card bg-dark-card border-2 border-red-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="window.openManagerAuthModal('deleteMass')">
-                        <i class="fas fa-trash-alt text-4xl text-red-400 mb-2"></i><h4 class="font-bold text-lg text-dark-text">Exclusão em Massa</h4><p class="text-sm text-dark-placeholder">Itens enviados da conta</p></div>
-                    <div class="manager-card bg-dark-card border-2 border-red-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="window.openManagerAuthModal('openSelectiveTransfer')">
-                        <i class="fas fa-exchange-alt text-4xl text-red-400 mb-2"></i><h4 class="font-bold text-lg text-dark-text">Transferência Seletiva</h4><p class="text-sm text-dark-placeholder">Itens entre mesas</p></div>
-                    <div class="manager-card bg-dark-card border-2 border-gray-500 rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="window.openManagerAuthModal('openWooSync')">
-                        <i class="fas fa-sync-alt text-4xl text-gray-400 mb-2"></i><h4 class="font-bold text-lg text-dark-text">Sincronização</h4><p class="text-sm text-dark-placeholder">Forçar Woo / Firebase</p></div>
-                </div>
-            </div>
 
         </div> </main>
 
-    <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-        <div class="bg-dark-card border border-gray-600 p-6 rounded-xl shadow-2xl w-full max-w-sm">
-            <h3 id="obsItemName" class="text-xl font-bold mb-4 text-pumpkin">Adicionar Observação</h3>
-            <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-4">
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-600 text-gray-200 rounded-full hover:bg-gray-500 transition" data-obs="1 CP">1 CP</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-600 text-gray-200 rounded-full hover:bg-gray-500 transition" data-obs="2 CP">2 CP</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-600 text-gray-200 rounded-full hover:bg-gray-500 transition" data-obs="3 CP">3 CP</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-600 text-gray-200 rounded-full hover:bg-gray-500 transition" data-obs="Sem Gelo">Sem Gelo</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-600 text-gray-200 rounded-full hover:bg-gray-500 transition" data-obs="Gelo à Parte">Gelo à Parte</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-600 text-gray-200 rounded-full hover:bg-gray-500 transition" data-obs="Laranja">Laranja</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-600 text-gray-200 rounded-full hover:bg-gray-500 transition" data-obs="Limão">Limão</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-600 text-gray-200 rounded-full hover:bg-gray-500 transition" data-obs="Limão Espremido">Limão Espremido</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-600 text-gray-200 rounded-full hover:bg-gray-500 transition" data-obs="Natural">Natural</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-600 text-gray-200 rounded-full hover:bg-gray-500 transition" data-obs="Mal Passado">Mal Passado</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-600 text-gray-200 rounded-full hover:bg-gray-500 transition" data-obs="Ponto Menos">Ponto Menos</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-600 text-gray-200 rounded-full hover:bg-gray-500 transition" data-obs="Ao Ponto">Ao Ponto</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-600 text-gray-200 rounded-full hover:bg-gray-500 transition" data-obs="Ponto Mais">Ponto Mais</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-600 text-gray-200 rounded-full hover:bg-gray-500 transition" data-obs="Bem Passado">Bem Passado</button>
-            </div>
-            <textarea id="obsInput" rows="3" placeholder="Ex: Sem cebola..." class="w-full p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text placeholder-dark-placeholder focus:ring-pumpkin focus:border-pumpkin text-base"></textarea>
-            <div class="flex items-center justify-between mt-3 mb-4">
-                 <span class="text-dark-text font-semibold">Item em Espera?</span>
-                 <label class="switch-obs">
-                     <input type="checkbox" id="esperaSwitch">
-                     <span class="slider-obs"></span>
-                 </label>
-            </div>
-            <div class="flex justify-end space-x-3 mt-4">
-                <button id="cancelObsBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-base">Cancelar</button>
-                <button id="saveObsBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base">Salvar</button>
-            </div>
-        </div>
-    </div>
-
-     <div id="calculatorModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-         <div class="bg-dark-card border border-gray-600 p-6 rounded-xl shadow-2xl w-full max-w-xs">
-            <h3 class="text-xl font-bold mb-4 text-pumpkin">Calculadora</h3>
-            <input type="text" id="calcDisplay" value="0,00" readonly class="w-full p-3 mb-4 text-4xl text-right font-mono border-2 border-pumpkin rounded-lg bg-dark-input text-dark-text">
-            <div class="grid grid-cols-4 gap-2">
-                <button class="calc-btn p-3 bg-gray-600 text-gray-200 rounded-lg text-xl font-bold hover:bg-gray-500" data-key="C">C</button>
-                <button class="calc-btn p-3 bg-pumpkin text-white rounded-lg text-xl font-bold hover:bg-pumpkin-dark" data-key="/">/</button>
-                <button class="calc-btn p-3 bg-pumpkin text-white rounded-lg text-xl font-bold hover:bg-pumpkin-dark" data-key="*">x</button>
-                <button id="closeCalcBtnX" class="calc-btn p-3 bg-red-600 text-white rounded-lg text-xl font-bold hover:bg-red-700" data-key="close"><i class="fas fa-times"></i></button>
-                <button class="calc-btn p-3 bg-gray-700 text-gray-200 rounded-lg text-xl font-bold hover:bg-gray-600" data-key="7">7</button>
-                <button class="calc-btn p-3 bg-gray-700 text-gray-200 rounded-lg text-xl font-bold hover:bg-gray-600" data-key="8">8</button>
-                <button class="calc-btn p-3 bg-gray-700 text-gray-200 rounded-lg text-xl font-bold hover:bg-gray-600" data-key="9">9</button>
-                <button class="calc-btn p-3 bg-pumpkin text-white rounded-lg text-xl font-bold hover:bg-pumpkin-dark" data-key="-">-</button>
-                <button class="calc-btn p-3 bg-gray-700 text-gray-200 rounded-lg text-xl font-bold hover:bg-gray-600" data-key="4">4</button>
-                <button class="calc-btn p-3 bg-gray-700 text-gray-200 rounded-lg text-xl font-bold hover:bg-gray-600" data-key="5">5</button>
-                <button class="calc-btn p-3 bg-gray-700 text-gray-200 rounded-lg text-xl font-bold hover:bg-gray-600" data-key="6">6</button>
-                <button class="calc-btn p-3 bg-pumpkin text-white rounded-lg text-xl font-bold hover:bg-pumpkin-dark" data-key="+">+</button>
-                <button class="calc-btn p-3 bg-gray-700 text-gray-200 rounded-lg text-xl font-bold" data-key="1">1</button>
-                <button class="calc-btn p-3 bg-gray-700 text-gray-200 rounded-lg text-xl font-bold" data-key="2">2</button>
-                <button class="calc-btn p-3 bg-gray-700 text-gray-200 rounded-lg text-xl font-bold" data-key="3">3</button>
-                <button class="calc-btn p-3 bg-green-600 text-white rounded-lg text-xl font-bold row-span-2 hover:bg-green-700" data-key="ok">OK</button>
-                <button class="calc-btn p-3 bg-gray-700 text-gray-200 rounded-lg text-xl font-bold col-span-2 hover:bg-gray-600" data-key="0">0</button>
-                <button class="calc-btn p-3 bg-gray-700 text-gray-200 rounded-lg text-xl font-bold hover:bg-gray-600" data-key="00">00</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
-    <div id="waiterRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
-    <div id="customerRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
-    <div id="reportsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
-    <div id="selectiveTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
-    <div id="productManagementModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
-    <div id="tableTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
-    <div id="nfeModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
-
-
     <p class="mt-8 text-center text-xs text-dark-placeholder" id="user-id-display">Usuário ID: Carregando...</p>
 
-
     <script>
-        // Funções globais de placeholder (mínimas)
-        window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`);
-
-        // Configurações do Firebase
-        window.__app_id = "pdv_fator_instance_001";
-        window.__firebase_config = JSON.stringify({
-            apiKey: "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY", authDomain: "fator-pdv.firebaseapp.com", projectId: "fator-pdv", storageBucket: "fator-pdv.appspot.com", messagingSenderId: "1097659747429", appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c"
-        });
+        // ... (Placeholders e Config Firebase) ...
     </script>
-
     <script type="module" src="app.js"></script>
 </body>
 </html>
