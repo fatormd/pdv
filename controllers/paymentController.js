@@ -3,10 +3,10 @@ import { currentTableId, currentOrderSnapshot } from "/app.js";
 import { formatCurrency, calculateItemsValue, getNumericValueFromCurrency } from "/utils.js";
 import { getTableDocRef } from "/services/firebaseService.js";
 import { updateDoc, arrayUnion, arrayRemove, writeBatch, getFirestore, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-// REMOVIDO: import { openManagerAuthModal } from "./managerController.js"; // Quebra o ciclo
+// REMOVIDO: import { openManagerAuthModal } from "./managerController.js"; // <-- CAUSA DO ERRO
 import { handleTableTransferConfirmed } from "./panelController.js";
 
-// --- VARIÁVEIS DE ELEMENTOS (CORRIGIDO: Todas declaradas com let) ---
+// --- VARIÁVEIS DE ELEMENTOS ---
 let paymentSplitsContainer, addSplitAccountBtn;
 let reviewItemsList;
 let orderSubtotalDisplay, orderServiceTaxDisplay, orderTotalDisplay, valuePerDinerDisplay, remainingBalanceDisplay;
@@ -39,7 +39,7 @@ const groupMainAccountItems = (orderSnapshot) => {
     if (!orderSnapshot || !orderSnapshot.sentItems) return {};
     const sentItems = orderSnapshot.sentItems || [];
     
-    // Agrupa diretamente os sentItems
+    // Agrupa diretamente os sentItems (lógica de splits removida por hora)
     return sentItems.reduce((acc, item) => {
         const groupKey = `${item.name}-${item.note || ''}`;
         if (!acc[groupKey]) {
@@ -53,6 +53,7 @@ const groupMainAccountItems = (orderSnapshot) => {
 };
 
 // --- FUNÇÕES DE AÇÃO ---
+// AÇÃO REAL (chamada pelo app.js após a senha)
 export const executeDeletePayment = async (timestamp) => {
     if (!currentTableId || !currentOrderSnapshot) return;
     const tsNumber = parseInt(timestamp);
@@ -65,8 +66,10 @@ export const executeDeletePayment = async (timestamp) => {
     } catch (e) { console.error("Erro ao deletar pagamento:", e); alert("Erro ao tentar remover."); }
 }
 
+// INICIA o fluxo de senha (chamada pelo HTML)
 export const deletePayment = async (timestamp) => {
-    window.openManagerAuthModal('deletePayment', timestamp); // Chama função global do app.js
+    // Chama a função GLOBAL do app.js
+    window.openManagerAuthModal('deletePayment', timestamp);
 }
 // window.deletePayment = deletePayment; // Exposto globalmente no app.js
 
@@ -159,7 +162,8 @@ const renderRegisteredPayments = (payments) => {
             `;
             const deleteBtn = paymentDiv.querySelector('.delete-payment-btn');
             if (deleteBtn) {
-                deleteBtn.onclick = () => window.deletePayment(p.timestamp); // Chama a função global
+                // Chama a função GLOBAL (window.deletePayment)
+                deleteBtn.onclick = () => window.deletePayment(p.timestamp);
             }
             paymentSummaryList.appendChild(paymentDiv);
         });
@@ -241,12 +245,122 @@ export const renderPaymentSummary = (tableId, orderSnapshot) => {
 
 
 // --- LÓGICAS DE AÇÃO EM MASSA E TRANSFERÊNCIA ---
-export function activateItemSelection(action) { /* ... (lógica mantida) ... */ };
-export const handleMassActionRequest = (action) => { /* ... (lógica mantida) ... */ };
-export const handleMassDeleteConfirmed = async (selectedGroups) => { /* ... (lógica mantida) ... */ };
-export function openTableTransferModal(items) { /* ... (lógica mantida) ... */ };
-export function handleConfirmTableTransfer() { /* ... (lógica mantida) ... */ };
-window.handleConfirmTableTransfer = handleConfirmTableTransfer; // Expor globalmente
+export function activateItemSelection(action) {
+    const checkboxes = document.querySelectorAll('.item-select-checkbox');
+    if (!checkboxes.length && !isMassSelectionActive) { alert("Não há itens para selecionar."); return; }
+
+    if (!isMassSelectionActive) {
+        isMassSelectionActive = true;
+        checkboxes.forEach(cb => { cb.disabled = false; cb.checked = false; });
+        alert(`SELEÇÃO ATIVA para ${action.toUpperCase()}. Clique no ícone novamente para executar.`);
+    } else {
+        isMassSelectionActive = false;
+        const selectedGroups = Array.from(checkboxes).filter(cb => cb.checked).map(cb => ({ groupKey: cb.dataset.groupKey, itemKeys: cb.dataset.itemKeys.split(',') }));
+        checkboxes.forEach(cb => { cb.disabled = true; cb.checked = false; });
+
+        if (selectedGroups.length === 0) {
+            alert("Nenhum item selecionado. Modo desativado.");
+        } else if (action === 'transfer') {
+            const allItemKeys = selectedGroups.flatMap(group => group.itemKeys);
+            const itemsToTransferPayload = allItemKeys.map(key => {
+                const [orderId, sentAt] = key.split('_');
+                return currentOrderSnapshot?.sentItems?.find(item => item.orderId === orderId && String(item.sentAt) === sentAt);
+            }).filter(Boolean);
+            if (itemsToTransferPayload.length > 0) {
+                openTableTransferModal(itemsToTransferPayload);
+            } else {
+                alert("Erro ao encontrar itens selecionados.");
+            }
+        } else if (action === 'delete') {
+            handleMassDeleteConfirmed(selectedGroups);
+        }
+    }
+    renderReviewItemsList(currentOrderSnapshot);
+};
+
+export const handleMassActionRequest = (action) => {
+    if (isMassSelectionActive) {
+        activateItemSelection(action); // Executa
+    } else {
+        // Chama a função GLOBAL do app.js
+        window.openManagerAuthModal(action === 'delete' ? 'openMassDelete' : 'openMassTransfer', action);
+    }
+};
+
+export const handleMassDeleteConfirmed = async (selectedGroups) => {
+    if (!currentTableId || !currentOrderSnapshot || !selectedGroups || selectedGroups.length === 0) return;
+    try {
+        const tableRef = getTableDocRef(currentTableId);
+        let valueRemoved = 0;
+        const groupKeysToRemove = selectedGroups.map(g => g.groupKey);
+        const sentItemsAfterRemoval = currentOrderSnapshot.sentItems.filter(item => {
+             const itemGroupKey = `${item.name}-${item.note || ''}`;
+             if (groupKeysToRemove.includes(itemGroupKey)) {
+                 valueRemoved += (item.price || 0);
+                 return false;
+             }
+             return true;
+        });
+        const newTotal = Math.max(0, (currentOrderSnapshot.total || 0) - valueRemoved);
+        await updateDoc(tableRef, {
+            sentItems: sentItemsAfterRemoval,
+            total: newTotal
+        });
+        alert(`Total de ${selectedGroups.length} grupos removidos. Valor: ${formatCurrency(valueRemoved)}.`);
+    } catch (e) {
+        console.error("Erro ao remover itens:", e);
+        alert("Falha ao remover itens.");
+    }
+};
+
+export function openTableTransferModal(items) {
+     window.itemsToTransfer = items; // Armazena payload
+     const itemCount = items.length;
+     const modal = document.getElementById('tableTransferModal');
+     if (!modal) return;
+
+     const title = modal.querySelector('#transferModalTitle');
+     const origin = modal.querySelector('#transferOriginTable');
+     const targetInput = modal.querySelector('#targetTableInput');
+     const dinersContainer = modal.querySelector('#newTableDinersInput');
+     const confirmBtn = modal.querySelector('#confirmTableTransferBtn');
+
+     if(title) title.textContent = `Transferir ${itemCount} Item(s)`;
+     if(origin) origin.textContent = `Mesa ${currentTableId}`;
+     if(targetInput) targetInput.value = '';
+     if(dinersContainer) dinersContainer.classList.add('hidden');
+     if(confirmBtn) {
+         confirmBtn.textContent = 'Prosseguir';
+         confirmBtn.disabled = true; // Desabilita até verificar mesa
+     }
+     modal.style.display = 'flex';
+};
+export function handleConfirmTableTransfer() {
+     const targetTableInput = document.getElementById('targetTableInput');
+     const targetTableNumber = targetTableInput?.value.trim();
+     if (!targetTableNumber || parseInt(targetTableNumber) <= 0 || targetTableNumber === currentTableId) { alert("Insira um número de mesa de destino válido e diferente."); return; }
+     const items = window.itemsToTransfer || [];
+     if(items.length === 0) { alert("Erro: Nenhum item selecionado para transferência."); return; }
+     const dinersInput = document.getElementById('newTableDiners');
+     const sectorInput = document.getElementById('newTableSector');
+     const dinersContainer = document.getElementById('newTableDinersInput');
+     let diners = 0;
+     let sector = '';
+     if (dinersContainer && !dinersContainer.classList.contains('hidden')) {
+         diners = parseInt(dinersInput?.value);
+         sector = sectorInput?.value;
+         if (!diners || !sector) { alert('Preencha pessoas e setor.'); return; }
+     }
+     const confirmBtn = document.getElementById('confirmTableTransferBtn');
+     if(confirmBtn) confirmBtn.disabled = true;
+     // Chama a função importada do panelController
+     handleTableTransferConfirmed(currentTableId, targetTableNumber, items, diners, sector);
+     const modal = document.getElementById('tableTransferModal');
+     if(modal) modal.style.display = 'none';
+     window.itemsToTransfer = [];
+ };
+// Expor globalmente
+window.handleConfirmTableTransfer = handleConfirmTableTransfer;
 
 // Placeholders (Exportados)
 export const handleAddSplitAccount = async () => { alert("Divisão de conta (DEV)."); };
@@ -311,11 +425,11 @@ export const initPaymentController = () => {
     if(paymentInitialized) return;
     console.log("[PaymentController] Inicializando...");
 
-    // **CORREÇÃO:** Mapeia TODOS os elementos PRIMEIRO
+    // Mapeia Elementos
     reviewItemsList = document.getElementById('reviewItemsList');
     paymentSplitsContainer = document.getElementById('paymentSplitsContainer');
     addSplitAccountBtn = document.getElementById('addSplitAccountBtn');
-    orderSubtotalDisplay = document.getElementById('orderSubtotalDisplayPayment'); // <-- Variável que causou o erro
+    orderSubtotalDisplay = document.getElementById('orderSubtotalDisplayPayment');
     orderServiceTaxDisplay = document.getElementById('orderServiceTaxDisplayPayment');
     orderTotalDisplay = document.getElementById('orderTotalDisplayPayment');
     valuePerDinerDisplay = document.getElementById('valuePerDinerDisplay');
@@ -348,13 +462,9 @@ export const initPaymentController = () => {
     if(selectiveTransferModal) {
         transferItemsList = selectiveTransferModal.querySelector('#transferItemsList');
     }
-    // Fim do bloco de mapeamento
+    // Fim Mapeamento
 
-    // Verifica elemento essencial
-    if (!reviewItemsList) {
-        console.error("[PaymentController] Erro Fatal: Elemento 'reviewItemsList' não encontrado.");
-        return; // Interrompe
-    }
+    if (!reviewItemsList) { console.error("[PaymentController] Erro Fatal: 'reviewItemsList' não encontrado."); return; }
     
     renderPaymentMethodButtons(); // Renderiza botões de pagamento
 
@@ -379,7 +489,8 @@ export const initPaymentController = () => {
             const tableNumber = e.target.value.trim();
             const confirmBtn = document.getElementById('confirmTableTransferBtn');
             const newTableDinersInputEl = document.getElementById('newTableDinersInput');
-            const transferStatusEl = document.getElementById('transferStatus');
+            // Tenta encontrar 'transferStatus' dentro do modal correto
+            const transferStatusEl = tableTransferModal?.querySelector('#transferStatus'); 
             
             if(!confirmBtn || !newTableDinersInputEl) return; 
 
