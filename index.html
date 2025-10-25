@@ -31,13 +31,19 @@
 <body class="bg-dark-bg min-h-screen text-dark-text"> 
 
     <div id="statusScreen" class="absolute inset-0 bg-dark-bg z-50 flex items-center justify-center p-6" style="display: flex;">
+        <div class="flex flex-col items-center p-8 max-w-sm w-full text-center">
+            <i class="fas fa-spinner fa-spin text-4xl text-pumpkin mb-4"></i>
+            <h2 class="text-xl font-bold mb-2 text-dark-text">Iniciando PDV...</h2>
+            <p class="text-dark-placeholder">Conectando...</p>
         </div>
-    <div id="mainHeader" class="header-bar bg-dark-card text-white p-4 flex justify-between items-center sticky top-0 z-20 border-b border-dark-border" style="display: none;">
-        </div>
+    </div>
+
+    <div id="mainHeader" class.="... (etc)">
+         </div>
 
     <main id="mainContent" class="relative overflow-hidden" style="display: none;">
         <div id="appContainer" class="flex transition-transform duration-300 ease-out">
-
+            
             <div id="loginScreen" class="w-screen flex-shrink-0 flex items-center justify-center p-4 bg-dark-bg">
                 </div>
 
@@ -46,54 +52,25 @@
 
             <div id="orderScreen" class="flex-shrink-0 bg-dark-bg text-dark-text">
                 </div>
-
+            
             <div id="paymentScreen" class="flex-shrink-0 bg-dark-bg text-dark-text">
-                 <div class="flex items-center justify-between mb-4">
-                    <div class="flex items-center text-pumpkin">
-                        <button id="backToOrderFromPaymentBtn" class="mr-2 text-3xl p-2 hover:text-pumpkin-dark transition duration-150" title="Voltar para o Pedido" onclick="window.goToScreen('orderScreen')">
-                            <i class="fas fa-arrow-left"></i>
-                        </button>
-                        <span class="text-2xl font-semibold mr-3 text-dark-text" id="payment-table-number">Mesa Selecionada</span>
-                    </div>
                 </div>
-                <div class="content-card bg-dark-card border border-gray-700 p-4 mb-6">
-                    
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-xl font-semibold text-green-400">Resumo da Conta</h2>
-                        </div>
-                    
-                    <div id="reviewItemsList" class="space-y-1 pt-2">
-                         <div class="text-sm text-dark-placeholder italic p-2">Nenhum item na conta para revisão.</div>
-                    </div>
-                    
-                    <div class="flex justify-between items-center border-t border-gray-600 pt-4 mt-4">
-                        </div>
-                    <div class="flex justify-between items-center border-b border-gray-600 pb-2">
-                        </div>
-                    <div class="flex justify-between items-center border-b border-gray-600 pb-2 pt-2">
-                        </div>
-                    <div class="flex justify-between items-center pt-2">
-                        </div>
-                </div>
-                 
-                 <div class="p-4 pt-0 content-card bg-dark-card border border-gray-700 mt-6">
-                    </div>
-                 <div id="chargeInputs" class="p-4 pt-0 content-card bg-dark-card border border-gray-700 mt-6">
-                    </div>
-                 <div class="p-4 pt-0 content-card bg-dark-card border border-gray-700 mt-6">
-                    </div>
-            </div>
 
             <div id="managerScreen" class="flex-shrink-0 bg-gray-900 text-dark-text">
                 </div>
-
+            
         </div> </main>
-
+    
     <p class="mt-8 text-center text-xs text-dark-placeholder" id="user-id-display">Usuário ID: Carregando...</p>
 
+
     <script>
-        // ... (Placeholders e Config Firebase) ...
+        // **CORREÇÃO:** Removidas as definições de window.__app_id e window.__firebase_config
+        // Elas agora vivem diretamente no app.js
+
+        // Funções globais de placeholder (mínimas)
+        // (Deixado em branco, pois app.js agora expõe o que é necessário)
     </script>
-    <script type="module" src="app.js"></script>
-</body>
+    
+    <script type="module" src="app.js"></script> </body>
 </html>
