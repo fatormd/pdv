@@ -2,11 +2,11 @@
 import { getProducts, getCategories } from "/services/wooCommerceService.js";
 import { formatCurrency } from "/utils.js";
 import { saveSelectedItemsToFirebase } from "/services/firebaseService.js";
-import { currentTableId, selectedItems, userRole, currentOrderSnapshot } from "/app.js"; // Importa estados globais
+// CORREÇÃO: Importa 'screens' do app.js
+import { currentTableId, selectedItems, userRole, currentOrderSnapshot, screens } from "/app.js"; 
 import { arrayUnion, serverTimestamp, doc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { getKdsCollectionRef, getTableDocRef } from "/services/firebaseService.js";
-// Importar explicitamente a função de navegação, se necessário (embora os botões de voltar/pagamento usem window.goToScreen)
-import { goToScreen } from "/app.js";
+import { goToScreen } from "/app.js"; // Importar explicitamente
 
 
 // --- VARIÁVEIS DE ELEMENTOS (Definidas na função init) ---
@@ -145,11 +145,11 @@ const _renderSelectedItemsList = () => {
                 <div class="flex items-center space-x-2 flex-shrink-0">
                     <button class="qty-btn bg-red-600 text-white rounded-full text-lg hover:bg-red-700 transition duration-150"
                             data-item-id="${group.id}" data-item-note-key="${group.note || ''}" data-action="decrease">
-                        <i class="fas fa-minus pointer-events-none"></i> {/* Evita clique no ícone */}
+                        <i class="fas fa-minus pointer-events-none"></i>
                     </button>
                     <button class="qty-btn bg-green-600 text-white rounded-full text-lg hover:bg-green-700 transition duration-150"
                             data-item-id="${group.id}" data-item-note-key="${group.note || ''}" data-action="increase">
-                        <i class="fas fa-plus pointer-events-none"></i> {/* Evita clique no ícone */}
+                        <i class="fas fa-plus pointer-events-none"></i>
                     </button>
                 </div>
             </div>
@@ -159,9 +159,11 @@ const _renderSelectedItemsList = () => {
 
 // Função principal para renderizar toda a tela de pedido
 export const renderOrderScreen = (orderSnapshot) => {
-    // Se um snapshot for passado, atualiza o estado de selectedItems (se não estiver na tela de pedido)
+    // Se um snapshot for passado (do listener do app.js)
     if (orderSnapshot) {
          const firebaseSelectedItems = orderSnapshot.selectedItems || [];
+         // Verifica se a tela de pedido é a tela ativa
+         // **CORREÇÃO:** Usa 'screens' importado
          const isOrderScreenActive = document.getElementById('appContainer')?.style.transform === `translateX(-${screens['orderScreen'] * 100}vw)`;
          
          if (!isOrderScreenActive && JSON.stringify(firebaseSelectedItems) !== JSON.stringify(selectedItems)) {
@@ -230,6 +232,7 @@ export const addItemToSelection = (product) => {
 
     openObsModalForGroup(product.id, ''); // Abre modal para o item recém-adicionado
 };
+// window.addItemToSelection = addItemToSelection; // Não é mais necessário, listener de cardápio cuida disso
 
 
 // Envia Pedidos ao KDS e Resumo (Função de Staff)
@@ -246,7 +249,6 @@ export const handleSendSelectedItems = async () => {
         return;
     }
 
-    // const itemsToSendValue = itemsToSend.reduce((sum, item) => sum + item.price, 0);
     const kdsOrderRef = doc(getKdsCollectionRef()); // Cria referência para novo doc KDS
 
     const itemsForFirebase = itemsToSend.map(item => ({
@@ -283,17 +285,13 @@ export const handleSendSelectedItems = async () => {
         await updateDoc(tableRef, {
             sentItems: arrayUnion(...itemsForFirebase), // Adiciona itens enviados
             selectedItems: itemsToHold,                // Atualiza selecionados (só os em espera)
-            // total: (currentOrderSnapshot?.total || 0) + itemsToSendValue, // Deixa onSnapshot recalcular
             lastKdsSentAt: serverTimestamp()           // Atualiza timestamp do último envio
         });
         console.log("[Order] Mesa atualizada com sucesso.");
 
         // 3. Sucesso: Atualiza o estado local e UI
-        
-        // **CORREÇÃO 2: Mutar o array importado**
         selectedItems.length = 0; // Limpa o array importado
         selectedItems.push(...itemsToHold); // Adiciona de volta os itens em espera
-        // REMOVIDO: selectedItems = [...itemsToHold]; // <-- LINHA QUE CAUSA ERRO
         
         renderOrderScreen(); // Re-renderiza
 
@@ -358,7 +356,6 @@ export const initOrderController = () => {
     if (openOrderList) {
         openOrderList.addEventListener('click', (e) => {
             const target = e.target;
-            // Garante que o clique seja no botão e não no ícone (ícone tem pointer-events-none)
             const qtyBtn = target.closest('.qty-btn'); 
             const obsSpan = target.closest('span[data-item-id]'); // Clica na observação
 
@@ -424,8 +421,8 @@ export const initOrderController = () => {
                 newNote = noteCleaned;
             }
 
-            // **CORREÇÃO 1: Mutar o array importado**
             let updated = false;
+            // Cria um novo array temporário com as atualizações
             const updatedItems = selectedItems.map(item => {
                 if (item.id == itemId && (item.note || '') === originalNoteKey) {
                     updated = true;
@@ -434,10 +431,9 @@ export const initOrderController = () => {
                 return item;
             });
             
-            // Reatribui o conteúdo da lista global (selectedItems)
+            // Muta o array original 'selectedItems'
             selectedItems.length = 0; 
             selectedItems.push(...updatedItems);
-            // REMOVIDO: selectedItems = updatedItems; // <-- LINHA QUE CAUSA ERRO
 
             if (updated) {
                 obsModal.style.display = 'none';
@@ -445,7 +441,7 @@ export const initOrderController = () => {
                 saveSelectedItemsToFirebase(currentTableId, selectedItems);
             } else {
                 console.warn("Nenhum item encontrado para atualizar a observação.");
-                obsModal.style.display = 'none'; // Fecha mesmo se não achar
+                obsModal.style.display = 'none';
             }
         });
     } else {
@@ -473,8 +469,8 @@ export const initOrderController = () => {
             }
 
             obsModal.style.display = 'none';
-            renderOrderScreen(); // Re-renderiza para refletir possível remoção
-            saveSelectedItemsToFirebase(currentTableId, selectedItems); // Salva estado
+            renderOrderScreen(); // Re-renderiza
+            saveSelectedItemsToFirebase(currentTableId, selectedItems); // Salva
         });
     } else {
         console.error("[OrderController] Botão 'cancelObsBtn' não encontrado.");
