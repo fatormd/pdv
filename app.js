@@ -3,25 +3,27 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebas
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-// Importações dos Serviços e Utils
+// Importações dos Módulos Refatorados
 import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, auth } from '/services/firebaseService.js';
 import { fetchWooCommerceProducts, fetchWooCommerceCategories } from '/services/wooCommerceService.js';
-import { formatCurrency, formatElapsedTime } from '/utils.js';
+import { formatCurrency, formatElapsedTime } from '/utils.js'; // Importar utils
 
-// Importações dos Controllers
+// Importações dos Controllers (com funções init e outras necessárias)
 import { loadOpenTables, renderTableFilters, handleAbrirMesa, handleSearchTable, initPanelController, handleTableTransferConfirmed as panel_handleTableTransferConfirmed } from '/controllers/panelController.js';
 import { renderMenu, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity, openObsModalForGroup, initOrderController, handleSendSelectedItems } from '/controllers/orderController.js';
-// Importa as *ações* que o modal de senha chamará
-import {
-    renderPaymentSummary, deletePayment, 
-    // Removido: handleMassActionRequest (obsoleto)
-    // Removido: activateItemSelection (obsoleto)
-    handleConfirmTableTransfer,
-    initPaymentController, handleFinalizeOrder,
-    handleMassDeleteConfirmed, executeDeletePayment, // Funções de ação
-    openTableTransferModal // Modal de transferência
-} from '/controllers/paymentController.js';
-import { initManagerController, handleGerencialAction } from '/controllers/managerController.js'; // Importa a ação gerencial
+import { renderPaymentSummary, deletePayment, handleMassActionRequest, handleConfirmTableTransfer, handleAddSplitAccount, openPaymentModalForSplit, moveItemsToMainAccount, openSplitTransferModal, openTableTransferModal, initPaymentController, handleFinalizeOrder } from '/controllers/paymentController.js';
+import { openManagerAuthModal, initManagerController } from '/controllers/managerController.js';
+
+// --- CONFIGURAÇÃO (Movida do index.html para cá) ---
+const APP_ID = "pdv_fator_instance_001";
+const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY",
+    authDomain: "fator-pdv.firebaseapp.com",
+    projectId: "fator-pdv",
+    storageBucket: "fator-pdv.appspot.com",
+    messagingSenderId: "1097659747429",
+    appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c"
+};
 
 // --- VARIÁVEIS DE ESTADO GLOBAL ---
 export const screens = {
@@ -31,7 +33,7 @@ const STAFF_CREDENTIALS = {
     'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' },
     'garcom@fator.com': { password: '1234', role: 'garcom', name: 'Mock Garçom' },
 };
-const MANAGER_PASSWORD = '1234'; // Senha Mestra
+const MANAGER_PASSWORD = '1234';
 
 export let currentTableId = null;
 export let selectedItems = [];
@@ -47,13 +49,91 @@ let loginBtn, loginEmailInput, loginPasswordInput, loginErrorMsg;
 
 
 // --- FUNÇÕES CORE E ROTIAMENTO ---
-export const hideStatus = () => { /* ... (mantida) ... */ };
-const showLoginScreen = () => { /* ... (mantida) ... */ };
-const hideLoginScreen = () => { /* ... (mantida) ... */ };
-export const goToScreen = (screenId) => { /* ... (lógica mantida) ... */ };
+export const hideStatus = () => {
+    if (!statusScreen) statusScreen = document.getElementById('statusScreen');
+    if (statusScreen) {
+        statusScreen.style.cssText = 'display: none !important';
+        console.log("[UI] hideStatus executado.");
+    } else {
+        console.error("[UI] Elemento statusScreen não encontrado.");
+    }
+};
+
+const showLoginScreen = () => {
+    console.log("[UI] Chamando showLoginScreen...");
+    if (!statusScreen) statusScreen = document.getElementById('statusScreen');
+    if (!mainContent) mainContent = document.getElementById('mainContent');
+    if (!mainHeader) mainHeader = document.getElementById('mainHeader');
+    if (!appContainer) appContainer = document.getElementById('appContainer');
+    if (!loginEmailInput) loginEmailInput = document.getElementById('loginEmail');
+    if (!loginPasswordInput) loginPasswordInput = document.getElementById('loginPassword');
+    if (!loginErrorMsg) loginErrorMsg = document.getElementById('loginErrorMsg');
+
+    hideStatus();
+    if (mainHeader) mainHeader.style.display = 'none';
+    if (mainContent) mainContent.style.display = 'block';
+    if (appContainer) appContainer.style.transform = `translateX(0vw)`;
+    document.body.classList.add('bg-dark-bg');
+    document.body.classList.remove('bg-gray-900', 'logged-in');
+
+    if(loginEmailInput) loginEmailInput.value = '';
+    if(loginPasswordInput) loginPasswordInput.value = '';
+    if(loginErrorMsg) loginErrorMsg.style.display = 'none';
+    console.log("[UI] showLoginScreen concluído.");
+};
+
+const hideLoginScreen = () => {
+    if (!mainHeader) mainHeader = document.getElementById('mainHeader');
+    if (!mainContent) mainContent = document.getElementById('mainContent');
+    if (mainHeader) mainHeader.style.display = 'flex';
+    if (mainContent) mainContent.style.display = 'block';
+    document.body.classList.add('logged-in');
+
+    const logoutBtn = document.getElementById('logoutBtnHeader');
+    const managerBtn = document.getElementById('openManagerPanelBtn');
+    if (logoutBtn) logoutBtn.classList.remove('hidden');
+    if (managerBtn) {
+        managerBtn.classList.toggle('hidden', userRole !== 'gerente');
+    }
+};
+
+export const goToScreen = (screenId) => {
+    if (!appContainer) appContainer = document.getElementById('appContainer');
+    if (!mainContent) mainContent = document.getElementById('mainContent');
+
+    if (currentTableId && screenId === 'panelScreen') {
+        const currentTransform = appContainer?.style.transform || '';
+        const currentScreenKey = Object.keys(screens).find(key => screens[key] * -100 + 'vw' === currentTransform.replace(/translateX\((.*?)\)/, '$1'));
+        if (currentScreenKey === 'orderScreen' || currentScreenKey === 'paymentScreen') {
+             console.log(`[NAV] Salvando itens da mesa ${currentTableId} ao sair de ${currentScreenKey}`);
+            saveSelectedItemsToFirebase(currentTableId, selectedItems);
+        }
+    }
+
+    if ((screenId === 'panelScreen' || screenId === 'loginScreen') && currentTableId && unsubscribeTable) {
+        console.log(`[NAV] Desinscrevendo do listener da mesa ${currentTableId}`);
+        unsubscribeTable(); unsubscribeTable = null;
+        currentTableId = null; currentOrderSnapshot = null; selectedItems.length = 0;
+        const currentTableNumEl = document.getElementById('current-table-number');
+        const paymentTableNumEl = document.getElementById('payment-table-number');
+        if(currentTableNumEl) currentTableNumEl.textContent = `Mesa`;
+        if(paymentTableNumEl) paymentTableNumEl.textContent = `Mesa`;
+    }
+
+    const screenIndex = screens[screenId];
+    if (screenIndex !== undefined) {
+        console.log(`[NAV] Navegando para ${screenId} (índice ${screenIndex})`);
+        if (appContainer) appContainer.style.transform = `translateX(-${screenIndex * 100}vw)`;
+        if (mainContent && screenId !== 'loginScreen') mainContent.style.display = 'block';
+        document.body.classList.toggle('bg-gray-900', screenId === 'managerScreen');
+        document.body.classList.toggle('bg-dark-bg', screenId !== 'managerScreen');
+    } else {
+        console.error(`[NAV] Tentativa de navegar para tela inválida: ${screenId}`);
+    }
+};
 window.goToScreen = goToScreen;
 
-// **CORREÇÃO: MODAL DE AUTENTICAÇÃO ATUALIZADO**
+// MODAL DE AUTENTICAÇÃO GLOBAL
 window.openManagerAuthModal = (action, payload = null) => {
     const managerModal = document.getElementById('managerModal');
     if (!managerModal) { console.error("Modal Gerente não encontrado!"); return; }
@@ -82,31 +162,21 @@ window.openManagerAuthModal = (action, payload = null) => {
                 
                 console.log(`[AUTH MODAL] Ação '${action}' autorizada.`);
                 switch (action) {
-                    // **AÇÕES ATUALIZADAS (Execução Direta)**
-                    case 'executeMassDelete':
-                        handleMassDeleteConfirmed(); // Chama a função importada
-                        break;
-                    case 'executeMassTransfer':
-                        openTableTransferModal(); // Chama a função importada
-                        break;
+                    // Ações do PaymentController
+                    case 'openMassDelete':
+                    case 'openMassTransfer':
+                        activateItemSelection(payload);
                     case 'deletePayment':
-                        executeDeletePayment(payload); // 'payload' é o timestamp
+                        executeDeletePayment(payload);
                         break;
-                    
-                    // Ações do ManagerController (mantidas)
+                    // Ações do ManagerController
                     case 'goToManagerPanel':
                     case 'openProductManagement':
-                    case 'openCategoryManagement':
                     // ... (outras ações do manager)
                         handleGerencialAction(action, payload);
                         break;
-
                     default:
                         console.warn(`Ação ${action} não reconhecida pelo modal.`);
-                        // Fallback para ações do manager
-                        if (!action.includes('Mass') && !action.includes('Payment')) {
-                             handleGerencialAction(action, payload);
-                        }
                 }
             } else {
                 alert("Senha incorreta.");
@@ -120,13 +190,12 @@ window.openManagerAuthModal = (action, payload = null) => {
     }
 };
 
-// Expor funções globais necessárias dos controllers
-window.deletePayment = deletePayment; // Exposto por paymentController
-// window.handleMassActionRequest = handleMassActionRequest; // REMOVIDO (não é mais chamado pelo HTML)
-window.handleConfirmTableTransfer = handleConfirmTableTransfer; // Exposto por paymentController
-window.openTableTransferModal = openTableTransferModal; // Exposto por paymentController
+// Expor outras funções globais
+window.deletePayment = deletePayment;
+window.handleMassActionRequest = handleMassActionRequest;
+window.handleConfirmTableTransfer = handleConfirmTableTransfer;
+window.openTableTransferModal = openTableTransferModal;
 window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`);
-// Funções de item/obs
 window.increaseLocalItemQuantity = increaseLocalItemQuantity;
 window.decreaseLocalItemQuantity = decreaseLocalItemQuantity;
 window.openObsModalForGroup = openObsModalForGroup;
@@ -156,21 +225,22 @@ window.handleLogout = handleLogout;
 // --- INICIALIZAÇÃO PRINCIPAL ---
 document.addEventListener('DOMContentLoaded', () => {
     console.log("[INIT] DOMContentLoaded.");
-    let firebaseConfig;
+    // REMOVIDO: let firebaseConfig;
 
     try {
-        firebaseConfig = JSON.parse(window.__firebase_config);
-        console.log("[INIT] Config Firebase carregada.");
+        // **CORREÇÃO:** Usa o objeto FIREBASE_CONFIG definido no topo do arquivo
+        // REMOVIDO: firebaseConfig = JSON.parse(window.__firebase_config);
+        console.log("[INIT] Config Firebase carregada do módulo.");
 
-        const app = initializeApp(firebaseConfig);
+        // Inicializa Firebase App e Serviços
+        const app = initializeApp(FIREBASE_CONFIG); // Usa o objeto direto
         const dbInstance = getFirestore(app);
         const authInstance = getAuth(app);
-        initializeFirebase(dbInstance, authInstance, window.__app_id || 'pdv_default_app');
+        initializeFirebase(dbInstance, authInstance, APP_ID); // Usa o APP_ID do topo
         console.log("[INIT] Firebase App e Serviços inicializados.");
 
         // Mapeia elementos Globais e de Login
         statusScreen = document.getElementById('statusScreen');
-        // ... (outros mapeamentos) ...
         mainContent = document.getElementById('mainContent');
         appContainer = document.getElementById('appContainer');
         mainHeader = document.getElementById('mainHeader');
@@ -181,7 +251,25 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("[INIT] Elementos Globais e de Login mapeados.");
 
         // Listener de Autenticação Firebase
-        onAuthStateChanged(authInstance, async (user) => { /* ... (lógica mantida) ... */ });
+        onAuthStateChanged(authInstance, async (user) => { // Tornar async
+            console.log("[AUTH] State Changed:", user ? `User UID: ${user.uid}` : 'No user');
+            if (user) {
+                userId = user.uid;
+                console.log(`[AUTH] Usuário Firebase ${userId} detectado.`);
+                if (userRole === 'gerente' || userRole === 'garcom') {
+                    console.log(`[AUTH] Role ${userRole} já definida. Iniciando app...`);
+                     const userName = STAFF_CREDENTIALS[loginEmailInput?.value?.trim()]?.name || userRole;
+                     document.getElementById('user-id-display').textContent = `Usuário: ${userName} | ${userRole.toUpperCase()}`;
+                    await initStaffApp();
+                } else {
+                    console.warn("[AUTH] Usuário Firebase existe, mas role local é 'anonymous'. Forçando logout.");
+                    handleLogout();
+                }
+            } else if (userRole !== 'gerente' && userRole !== 'garcom') {
+                 console.log("[AUTH] -> showLoginScreen()");
+                 showLoginScreen();
+            }
+        });
         console.log("[INIT] Listener AuthStateChanged configurado.");
 
         // Adiciona Listener ao Botão de Login
