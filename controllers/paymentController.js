@@ -278,16 +278,38 @@ export function activateItemSelection(action) {
 };
 
 export const handleMassActionRequest = (action) => {
-    if (isMassSelectionActive) {
-        activateItemSelection(action); // Executa
-    } else {
-        // Chama a função GLOBAL do app.js
-        window.openManagerAuthModal(action === 'delete' ? 'openMassDelete' : 'openMassTransfer', action);
+    // Esta função agora é chamada pelos botões (com contador)
+    // O fluxo antigo de "ativar" não é mais necessário
+    // window.openManagerAuthModal(action === 'delete' ? 'openMassDelete' : 'openMassTransfer', action);
+    
+    // **NOVO FLUXO DIRETO:**
+    const selectedGroups = Array.from(document.querySelectorAll('#reviewItemsList input[type="checkbox"].item-select-checkbox:checked'));
+    if (selectedGroups.length === 0) {
+        alert("Nenhum item selecionado.");
+        return;
+    }
+    
+    if (action === 'delete') {
+        window.openManagerAuthModal('executeMassDelete', null); // Chama a ação de execução
+    } else if (action === 'transfer') {
+        window.openManagerAuthModal('executeMassTransfer', null); // Chama a ação de execução
     }
 };
+// window.handleMassActionRequest = handleMassActionRequest; // Exposto no app.js
 
-export const handleMassDeleteConfirmed = async (selectedGroups) => {
-    if (!currentTableId || !currentOrderSnapshot || !selectedGroups || selectedGroups.length === 0) return;
+// AÇÃO REAL (chamada pelo app.js)
+export const handleMassDeleteConfirmed = async () => {
+    // Pega os itens selecionados do DOM AGORA
+    const selectedCheckboxes = document.querySelectorAll('#reviewItemsList input[type="checkbox"].item-select-checkbox:checked');
+    if (selectedCheckboxes.length === 0) {
+        alert("Nenhum item selecionado.");
+        return;
+    }
+    const selectedGroups = Array.from(selectedCheckboxes).map(cb => ({ groupKey: cb.dataset.groupKey }));
+    
+    if (!currentTableId || !currentOrderSnapshot) return;
+    if (!confirm(`Tem certeza que deseja EXCLUIR ${selectedGroups.length} grupo(s) de item(s) da conta?`)) return;
+
     try {
         const tableRef = getTableDocRef(currentTableId);
         let valueRemoved = 0;
@@ -305,16 +327,36 @@ export const handleMassDeleteConfirmed = async (selectedGroups) => {
             sentItems: sentItemsAfterRemoval,
             total: newTotal
         });
-        alert(`Total de ${selectedGroups.length} grupos removidos. Valor: ${formatCurrency(valueRemoved)}.`);
+        alert(`Grupos de itens removidos. Valor: ${formatCurrency(valueRemoved)}.`);
     } catch (e) {
         console.error("Erro ao remover itens:", e);
         alert("Falha ao remover itens.");
     }
 };
 
-export function openTableTransferModal(items) {
-     window.itemsToTransfer = items; // Armazena payload
-     const itemCount = items.length;
+// AÇÃO REAL (chamada pelo app.js)
+export function openTableTransferModal() {
+    // Pega os itens selecionados do DOM AGORA
+    const selectedCheckboxes = document.querySelectorAll('#reviewItemsList input[type="checkbox"].item-select-checkbox:checked');
+    if (selectedCheckboxes.length === 0) {
+        alert("Nenhum item selecionado.");
+        return;
+    }
+    const selectedGroups = Array.from(selectedCheckboxes).map(cb => ({ groupKey: cb.dataset.groupKey, itemKeys: cb.dataset.itemKeys.split(',') }));
+
+    const allItemKeys = selectedGroups.flatMap(group => group.itemKeys);
+    const itemsToTransferPayload = allItemKeys.map(key => {
+        const [orderId, sentAt] = key.split('_');
+        return currentOrderSnapshot?.sentItems?.find(item => item.orderId === orderId && String(item.sentAt) === sentAt);
+    }).filter(Boolean);
+
+    if (itemsToTransferPayload.length === 0) {
+        alert("Erro ao encontrar itens selecionados.");
+        return;
+    }
+
+     window.itemsToTransfer = itemsToTransferPayload; // Armazena payload
+     const itemCount = itemsToTransferPayload.length;
      const modal = document.getElementById('tableTransferModal');
      if (!modal) return;
 
@@ -330,10 +372,12 @@ export function openTableTransferModal(items) {
      if(dinersContainer) dinersContainer.classList.add('hidden');
      if(confirmBtn) {
          confirmBtn.textContent = 'Prosseguir';
-         confirmBtn.disabled = true; // Desabilita até verificar mesa
+         confirmBtn.disabled = true;
      }
      modal.style.display = 'flex';
 };
+// window.openTableTransferModal = openTableTransferModal; // Exposto no app.js
+
 export function handleConfirmTableTransfer() {
      const targetTableInput = document.getElementById('targetTableInput');
      const targetTableNumber = targetTableInput?.value.trim();
@@ -358,8 +402,7 @@ export function handleConfirmTableTransfer() {
      if(modal) modal.style.display = 'none';
      window.itemsToTransfer = [];
  };
-// Expor globalmente
-window.handleConfirmTableTransfer = handleConfirmTableTransfer;
+// window.handleConfirmTableTransfer = handleConfirmTableTransfer; // Exposto no app.js
 
 // Placeholders (Exportados)
 export const handleAddSplitAccount = async () => { alert("Divisão de conta (DEV)."); };
@@ -370,7 +413,6 @@ export const handleFinalizeOrder = () => { alert("Finalizar Conta (DEV)"); };
 
 // --- INICIALIZAÇÃO DO CONTROLLER ---
 const attachReviewListListeners = () => {
-    // Esta função é chamada após renderReviewItemsList
     const selectAllItems = document.getElementById('selectAllItems');
     const itemCheckboxes = reviewItemsList?.querySelectorAll('.item-checkbox');
     const massDeleteBtn = document.getElementById('massDeleteBtn');
@@ -406,15 +448,16 @@ const attachReviewListListeners = () => {
         });
     }
 
+    // **CORREÇÃO:** Altera listeners para chamar o modal de senha com a AÇÃO DE EXECUÇÃO
     if (massDeleteBtn) {
          const newDeleteBtn = massDeleteBtn.cloneNode(true);
          massDeleteBtn.parentNode.replaceChild(newDeleteBtn, massDeleteBtn);
-         newDeleteBtn.addEventListener('click', () => window.handleMassActionRequest('delete')); // Chama global
+         newDeleteBtn.addEventListener('click', () => window.openManagerAuthModal('executeMassDelete', null));
     }
      if (massTransferBtn) {
          const newTransferBtn = massTransferBtn.cloneNode(true);
          massTransferBtn.parentNode.replaceChild(newTransferBtn, massTransferBtn);
-         newTransferBtn.addEventListener('click', () => window.handleMassActionRequest('transfer')); // Chama global
+         newTransferBtn.addEventListener('click', () => window.openManagerAuthModal('executeMassTransfer', null));
     }
 
     updateMassActionButtons();
@@ -424,7 +467,7 @@ export const initPaymentController = () => {
     if(paymentInitialized) return;
     console.log("[PaymentController] Inicializando...");
 
-    // **CORREÇÃO:** Mapeia TODOS os elementos PRIMEIRO
+    // Mapeia Elementos
     reviewItemsList = document.getElementById('reviewItemsList');
     paymentSplitsContainer = document.getElementById('paymentSplitsContainer');
     addSplitAccountBtn = document.getElementById('addSplitAccountBtn');
@@ -461,7 +504,6 @@ export const initPaymentController = () => {
     if(selectiveTransferModal) {
         transferItemsList = selectiveTransferModal.querySelector('#transferItemsList');
     }
-    // Fim do bloco de mapeamento
 
     if (!reviewItemsList) { console.error("[PaymentController] Erro Fatal: 'reviewItemsList' não encontrado."); return; }
     
@@ -488,7 +530,7 @@ export const initPaymentController = () => {
             const tableNumber = e.target.value.trim();
             const confirmBtn = document.getElementById('confirmTableTransferBtn');
             const newTableDinersInputEl = document.getElementById('newTableDinersInput');
-            const transferStatusEl = tableTransferModal?.querySelector('#transferStatus'); // Busca status no modal correto
+            const transferStatusEl = tableTransferModal?.querySelector('#transferStatus'); 
             
             if(!confirmBtn || !newTableDinersInputEl) return; 
 
