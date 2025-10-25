@@ -195,7 +195,6 @@ export const renderPaymentSummary = (tableId, orderSnapshot) => {
     const serviceTaxApplied = orderSnapshot.serviceTaxApplied === undefined ? true : orderSnapshot.serviceTaxApplied;
     const { total: generalTotal, serviceValue } = calculateTotal(subtotal, serviceTaxApplied);
     
-    // Garante que dinersSplitInput exista antes de ler .value
     const diners = (dinersSplitInput ? parseInt(dinersSplitInput.value) : 1) || 1;
     const valuePerDiner = diners > 0 ? generalTotal / diners : 0;
     
@@ -425,7 +424,7 @@ export const initPaymentController = () => {
     if(paymentInitialized) return;
     console.log("[PaymentController] Inicializando...");
 
-    // Mapeia Elementos
+    // **CORREÇÃO:** Mapeia TODOS os elementos PRIMEIRO
     reviewItemsList = document.getElementById('reviewItemsList');
     paymentSplitsContainer = document.getElementById('paymentSplitsContainer');
     addSplitAccountBtn = document.getElementById('addSplitAccountBtn');
@@ -462,7 +461,7 @@ export const initPaymentController = () => {
     if(selectiveTransferModal) {
         transferItemsList = selectiveTransferModal.querySelector('#transferItemsList');
     }
-    // Fim Mapeamento
+    // Fim do bloco de mapeamento
 
     if (!reviewItemsList) { console.error("[PaymentController] Erro Fatal: 'reviewItemsList' não encontrado."); return; }
     
@@ -489,8 +488,7 @@ export const initPaymentController = () => {
             const tableNumber = e.target.value.trim();
             const confirmBtn = document.getElementById('confirmTableTransferBtn');
             const newTableDinersInputEl = document.getElementById('newTableDinersInput');
-            // Tenta encontrar 'transferStatus' dentro do modal correto
-            const transferStatusEl = tableTransferModal?.querySelector('#transferStatus'); 
+            const transferStatusEl = tableTransferModal?.querySelector('#transferStatus'); // Busca status no modal correto
             
             if(!confirmBtn || !newTableDinersInputEl) return; 
 
