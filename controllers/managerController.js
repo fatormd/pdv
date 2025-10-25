@@ -25,11 +25,7 @@ const renderProductManagement = () => {
                 <span class="font-semibold text-dark-text">${p.name}</span>
                 <span class="text-xs text-dark-placeholder">ID: ${p.id} | Setor: ${p.sector}</span>
             </div>
-            <div class="flex items-center space-x-2">
-                <span class="font-bold text-pumpkin">${formatCurrency(p.price)}</span>
-                <button class="px-3 py-1 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition" onclick="alert('Editar ${p.id}')">Editar</button>
-                <button class="px-3 py-1 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 transition" onclick="alert('Excluir ${p.id}')">Excluir</button>
-            </div>
+            {/* ... (botões editar/excluir) ... */}
         </div>
     `).join('');
 
