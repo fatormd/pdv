@@ -62,7 +62,7 @@
                     <input type="password" id="loginPassword" placeholder="Senha" class="w-full p-4 mb-6 bg-dark-input border border-gray-600 rounded-lg text-dark-text placeholder-dark-placeholder focus:outline-none focus:ring-2 focus:ring-pumpkin focus:border-transparent text-base">
                     <p id="loginErrorMsg" class="text-red-500 text-sm mb-4 text-center" style="display: none;"></p>
                     <button id="loginBtn" class="w-full bg-pumpkin text-white font-bold py-4 rounded-lg hover:bg-pumpkin-dark transition text-lg disabled:opacity-50">Entrar</button>
-                    </div>
+                </div>
             </div>
 
             <div id="panelScreen" class="flex-shrink-0 bg-dark-bg text-dark-text">
@@ -99,13 +99,11 @@
             <div id="orderScreen" class="flex-shrink-0 bg-dark-bg text-dark-text">
                  <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center text-pumpkin">
-                        {/* Botão voltar usa window.goToScreen diretamente */}
                         <button id="backToPanelFromOrderBtn" class="mr-2 text-3xl p-2 hover:text-pumpkin-dark transition duration-150" title="Voltar para o Painel" onclick="window.goToScreen('panelScreen')">
                             <i class="fas fa-arrow-left"></i>
                         </button>
                         <span class="text-2xl font-semibold mr-3 text-dark-text" id="current-table-number">Mesa Selecionada</span>
                     </div>
-                    {/* Botão pagamento usa window.goToScreen diretamente */}
                     <button id="goToPaymentBtn" class="rounded-full bg-pumpkin p-3 text-white shadow-lg hover:bg-green-600 transition duration-150 w-12 h-12 flex items-center justify-center" title="Ir para Pagamento" onclick="window.goToScreen('paymentScreen')">
                         <i class="fas fa-money-bill-wave text-xl"></i>
                     </button>
@@ -139,7 +137,6 @@
             <div id="paymentScreen" class="flex-shrink-0 bg-dark-bg text-dark-text">
                  <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center text-pumpkin">
-                        {/* Botão voltar usa window.goToScreen diretamente */}
                         <button id="backToOrderFromPaymentBtn" class="mr-2 text-3xl p-2 hover:text-pumpkin-dark transition duration-150" title="Voltar para o Pedido" onclick="window.goToScreen('orderScreen')">
                             <i class="fas fa-arrow-left"></i>
                         </button>
@@ -150,16 +147,15 @@
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="text-xl font-semibold text-green-400">Resumo da Conta</h2>
                         <div class="flex space-x-2">
-                             {/* Botões usam handleMassActionRequest global */}
                              <button id="itemMassTransferBtn" class="text-gray-400 hover:text-yellow-400 transition" title="Ativar Seleção para Transferência (Gerente)" onclick="window.handleMassActionRequest('transfer')">
                                 <i class="fas fa-exchange-alt text-lg"></i>
                             </button>
-                             <button id="itemMassDeleteBtn" class="text-gray-400 hover:text-red-400 transition" title="Ativar Seleção para Exclusão (Gerente)" onclick="window.handleMassActionRequest('delete')">
+                             <button id="itemMassDeleteBtn" class="text-gray-400 hover:text-red-400 transition" title="Ativar Seleção para Exclução (Gerente)" onclick="window.handleMassActionRequest('delete')">
                                 <i class="fas fa-trash-alt text-lg"></i>
                             </button>
                         </div>
                     </div>
-                    <div id="reviewItemsList" class="space-y-1 pt-2"> {/* Reduzido space-y */}
+                    <div id="reviewItemsList" class="space-y-1 pt-2">
                         <div class="text-sm text-dark-placeholder italic p-2">Nenhum item na conta para revisão.</div>
                     </div>
                     <div class="flex justify-between items-center border-t border-gray-600 pt-4 mt-4">
@@ -237,16 +233,14 @@
                 </div>
             </div>
 
-            <div id="managerScreen" class="flex-shrink-0 bg-gray-900 text-dark-text"> {/* Fundo ainda mais escuro */}
+            <div id="managerScreen" class="flex-shrink-0 bg-gray-900 text-dark-text">
                  <div class="flex items-center mb-6 border-b border-pumpkin pb-3">
-                    {/* Botão voltar usa window.goToScreen diretamente */}
                     <button id="backToPanelFromManagerBtn" class="mr-2 text-3xl p-2 text-pumpkin hover:text-pumpkin-dark transition duration-150" title="Voltar para o Painel" onclick="window.goToScreen('panelScreen')">
                         <i class="fas fa-arrow-left"></i>
                     </button>
                     <span class="text-2xl font-semibold text-pumpkin">Painel Gerencial</span>
                 </div>
                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 p-4">
-                    {/* Cards usam openManagerAuthModal global */}
                     <div class="manager-card bg-dark-card border-2 border-pumpkin rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="window.openManagerAuthModal('openProductManagement')">
                         <i class="fas fa-box-open text-4xl text-pumpkin mb-2"></i>
                         <h4 class="font-bold text-lg text-dark-text">Produtos (Woo)</h4>
@@ -257,7 +251,6 @@
                         <h4 class="font-bold text-lg text-dark-text">Categorias (Woo)</h4>
                         <p class="text-sm text-dark-placeholder">Criar, Editar, Sincronizar</p>
                     </div>
-                     {/* ... (restante dos cards gerenciais com onclick global) ... */}
                     <div class="manager-card bg-dark-card border-2 border-pumpkin rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="window.openManagerAuthModal('openInventoryManagement')">
                          <i class="fas fa-warehouse text-4xl text-pumpkin mb-2"></i><h4 class="font-bold text-lg text-dark-text">Estoque (ERP)</h4><p class="text-sm text-dark-placeholder">Entrada, Balanço, CMV</p></div>
                     <div class="manager-card bg-dark-card border-2 border-pumpkin rounded-xl shadow-xl p-4 text-center cursor-pointer hover:bg-gray-700 transition" onclick="window.openManagerAuthModal('openRecipesManagement')">
@@ -289,7 +282,7 @@
             <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-4">
                  <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-600 text-gray-200 rounded-full hover:bg-gray-500 transition" data-obs="1 CP">1 CP</button>
                  <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-600 text-gray-200 rounded-full hover:bg-gray-500 transition" data-obs="2 CP">2 CP</button>
-                 {/* ... (outros botões rápidos com estilo dark) ... */}
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-600 text-gray-200 rounded-full hover:bg-gray-500 transition" data-obs="3 CP">3 CP</button>
                  <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-600 text-gray-200 rounded-full hover:bg-gray-500 transition" data-obs="Sem Gelo">Sem Gelo</button>
                  <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-600 text-gray-200 rounded-full hover:bg-gray-500 transition" data-obs="Gelo à Parte">Gelo à Parte</button>
                  <button class="quick-obs-btn text-xs px-3 py-1 bg-gray-600 text-gray-200 rounded-full hover:bg-gray-500 transition" data-obs="Laranja">Laranja</button>
@@ -358,26 +351,8 @@
 
 
     <script>
-        // Funções globais de placeholder (apenas as estritamente necessárias)
-        // A maioria agora é importada/chamada via módulos
-        // window.openManagerAuthModal = () => {}; // Definida no managerController
-        // window.goToScreen = () => {}; // Definida no app.js
-        window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`); // Placeholder
-        // Funções de item/obs são chamadas internamente ou via listener agora
-        // window.addItemToSelection = () => {};
-        // window.decreaseLocalItemQuantity = () => {};
-        // window.increaseLocalItemQuantity = () => {};
-        // window.openObsModalForGroup = () => {};
-        // window.deletePayment = () => {}; // Definida no paymentController
-        // window.handleMassActionRequest = () => {}; // Definida no paymentController
-        // window.handleConfirmTableTransfer = () => {}; // Definida no paymentController
-        // window.openTableTransferModal = () => {}; // Definida no paymentController
-        // window.handleAddSplitAccount = () => {}; // Definida no paymentController
-        // window.openPaymentModalForSplit = () => {}; // Definida no paymentController
-        // window.moveItemsToMainAccount = () => {}; // Definida no paymentController
-        // window.openSplitTransferModal = () => {}; // Definida no paymentController
-        // window.openNfeModal = () => {}; // Definida no app.js
-
+        // Funções globais de placeholder (mínimas)
+        window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`);
 
         // Configurações do Firebase
         window.__app_id = "pdv_fator_instance_001";
