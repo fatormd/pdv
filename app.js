@@ -6,16 +6,17 @@ import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapsh
 // Importações dos Serviços e Utils
 import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, auth } from '/services/firebaseService.js';
 import { fetchWooCommerceProducts, fetchWooCommerceCategories } from '/services/wooCommerceService.js';
-import { formatCurrency, formatElapsedTime } from '/utils.js'; // Importar utils
+import { formatCurrency, formatElapsedTime } from '/utils.js';
 
 // Importações dos Controllers
-import { loadOpenTables, renderTableFilters, handleAbrirMesa, handleSearchTable, initPanelController, handleTableTransferConfirmed as panel_handleTableTransferConfirmed } from '/controllers/panelController.js';
+import { loadOpenTables, renderTableFilters, handleAbrirMesa, handleSearchTable, initPanelController } from '/controllers/panelController.js';
 import { renderMenu, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity, openObsModalForGroup, initOrderController, handleSendSelectedItems } from '/controllers/orderController.js';
 // Importa as *ações* que o modal de senha chamará
 import {
     renderPaymentSummary, deletePayment, handleMassActionRequest, handleConfirmTableTransfer,
     initPaymentController, handleFinalizeOrder,
-    activateItemSelection, handleMassDeleteConfirmed, executeDeletePayment // Funções de ação
+    activateItemSelection, handleMassDeleteConfirmed, executeDeletePayment, // Funções de ação
+    openTableTransferModal // Modal de transferência
 } from '/controllers/paymentController.js';
 import { initManagerController, handleGerencialAction } from '/controllers/managerController.js'; // Importa a ação gerencial
 
@@ -23,7 +24,6 @@ import { initManagerController, handleGerencialAction } from '/controllers/manag
 export const screens = {
     'loginScreen': 0, 'panelScreen': 1, 'orderScreen': 2, 'paymentScreen': 3, 'managerScreen': 4,
 };
-
 const STAFF_CREDENTIALS = {
     'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' },
     'garcom@fator.com': { password: '1234', role: 'garcom', name: 'Mock Garçom' },
@@ -130,15 +130,7 @@ export const goToScreen = (screenId) => {
 };
 window.goToScreen = goToScreen;
 
-// Expor funções globais necessárias (agora definidas localmente ou importadas)
-window.deletePayment = deletePayment;
-window.handleMassActionRequest = handleMassActionRequest;
-window.handleConfirmTableTransfer = handleConfirmTableTransfer;
-window.openTableTransferModal = openTableTransferModal;
-window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`);
-
-
-// **NOVA FUNÇÃO GLOBAL:** Modal de Autenticação (movido do managerController)
+// **CORREÇÃO: MODAL DE AUTENTICAÇÃO MOVIDO PARA CÁ**
 window.openManagerAuthModal = (action, payload = null) => {
     const managerModal = document.getElementById('managerModal');
     if (!managerModal) { console.error("Modal Gerente não encontrado!"); return; }
@@ -166,6 +158,7 @@ window.openManagerAuthModal = (action, payload = null) => {
                 managerModal.style.display = 'none';
                 
                 // ROTEIA A AÇÃO PARA A FUNÇÃO CORRETA (IMPORTADA)
+                console.log(`[AUTH MODAL] Ação '${action}' autorizada.`);
                 switch (action) {
                     // Ações do PaymentController
                     case 'openMassDelete':
@@ -192,10 +185,6 @@ window.openManagerAuthModal = (action, payload = null) => {
 
                     default:
                         console.warn(`Ação ${action} não reconhecida pelo modal de autenticação.`);
-                        // Tenta chamar a ação gerencial como fallback se não for do payment
-                        if (!action.includes('Mass') && !action.includes('Payment')) {
-                             handleGerencialAction(action, payload);
-                        }
                 }
             } else {
                 alert("Senha incorreta.");
@@ -209,6 +198,13 @@ window.openManagerAuthModal = (action, payload = null) => {
     }
 };
 
+// Expor outras funções globais necessárias dos controllers
+window.deletePayment = deletePayment;
+window.handleMassActionRequest = handleMassActionRequest;
+window.handleConfirmTableTransfer = handleConfirmTableTransfer;
+window.openTableTransferModal = openTableTransferModal;
+window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`);
+
 
 // Listener da Mesa
 export const setTableListener = (tableId) => { /* ... (lógica mantida) ... */ };
@@ -216,10 +212,11 @@ export const setTableListener = (tableId) => { /* ... (lógica mantida) ... */ }
 export const setCurrentTable = (tableId) => { /* ... (lógica mantida) ... */ };
 // Seleciona a mesa e inicia o listener
 export const selectTableAndStartListener = async (tableId) => { /* ... (lógica mantida) ... */ };
-window.selectTableAndStartListener = selectTableAndStartListener; // Expor globalmente
+window.selectTableAndStartListener = selectTableAndStartListener;
 
 // Função NF-e (Placeholder global)
 window.openNfeModal = () => { /* ... (lógica mantida) ... */ };
+
 
 // --- INICIALIZAÇÃO APP STAFF ---
 const initStaffApp = async () => { /* ... (lógica mantida) ... */ };
@@ -247,7 +244,7 @@ document.addEventListener('DOMContentLoaded', () => {
         initializeFirebase(dbInstance, authInstance, window.__app_id || 'pdv_default_app');
         console.log("[INIT] Firebase App e Serviços inicializados.");
 
-        // Mapeia elementos Globais e de Login
+        // Mapeia elementos Globais e de Login AQUI
         statusScreen = document.getElementById('statusScreen');
         mainContent = document.getElementById('mainContent');
         appContainer = document.getElementById('appContainer');
