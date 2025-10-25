@@ -1,50 +1,73 @@
 /* Estilização básica e tipografia */
 html { font-family: 'Inter', sans-serif; scroll-behavior: smooth; }
-body { 
-    overflow-x: hidden; 
-    background-color: #111827; /* bg-dark-bg (Cinza 900) */
-    color: #d1d5db; /* text-dark-text (Cinza 300) */
+body {
+    overflow-x: hidden;
+    background-color: #111827; /* bg-dark-bg */
+    color: #d1d5db; /* text-dark-text */
+    min-height: 100vh; /* Garante que o body ocupe a altura total */
+    margin: 0; /* Remove margem padrão do body */
 }
 
-/* Cabeçalho (Fundo Dark Card) */
-.header-bar { 
-    background-color: #1f2937; /* bg-dark-card (Cinza 800) */
-    padding: 0.75rem 1rem; 
-    border-bottom: 1px solid #374151; /* Cinza 700 */
+/* Cabeçalho (usado apenas no fluxo Staff) */
+.header-bar {
+    background-color: #1f2937; /* bg-dark-card */
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #374151; /* dark-border */
+    height: 56px; /* Define altura fixa para cálculo */
+    box-sizing: border-box;
 }
 
-/* Cards de Conteúdo (Fundo Dark Card) */
+/* Container principal */
+#mainContent {
+    position: relative;
+    overflow: hidden;
+    /* Define altura para ocupar espaço restante APÓS o header (se visível) */
+    height: calc(100vh - 56px);
+}
+/* Quando o login estiver ativo (sem header), mainContent ocupa tudo */
+body:not(.logged-in) #mainContent {
+    height: 100vh;
+}
+
+
+/* Cards de Conteúdo Genéricos */
 .content-card {
-    background-color: #1f2937; /* bg-dark-card (Cinza 800) */
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3); /* Sombra mais escura */
+    background-color: #1f2937; /* bg-dark-card */
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
     border-radius: 0.75rem;
-    border: 1px solid #374151; /* Cinza 700 */
+    border: 1px solid #374151; /* dark-border */
 }
 
 /* Contêiner principal para transição de telas */
 #appContainer {
     display: flex;
-    /* CORREÇÃO: Ajustado para 4 TELAS (Login, Painel, Pedido, Pagamento, Gerencial) */
-    width: 400vw; 
-    transition: transform 0.3s ease-out; 
-    min-height: 100vh; /* Ocupa toda a altura visível */
+    width: 400vw; /* Ajustado para 4 TELAS */
+    transition: transform 0.3s ease-out;
+    height: 100%; /* Ocupa a altura do #mainContent */
 }
 
-/* Cada tela ocupa 100vw */
+/* Cada tela ocupa 100vw e a altura do container */
 #loginScreen, #panelScreen, #orderScreen, #paymentScreen, #managerScreen {
     width: 100vw;
-    max-width: 100%; 
-    flex-shrink: 0; 
-    padding: 1rem;
+    max-width: 100%;
+    flex-shrink: 0;
+    padding: 1rem; /* Padding interno */
     box-sizing: border-box;
-    min-height: 100%; 
+    height: 100%; /* Ocupa a altura do #appContainer */
+    overflow-y: auto; /* Adiciona rolagem SE o conteúdo interno exceder */
 }
 
 /* Ajuste específico para o painel de login centralizar o card */
 #loginScreen {
     display: flex;
-    align-items: center;
-    justify-content: center;
+    align-items: center; /* Centraliza verticalmente */
+    justify-content: center; /* Centraliza horizontalmente */
+    padding: 2rem; /* Mais padding na tela de login */
+}
+/* Card de login */
+#loginScreen > div {
+   width: 100%;
+   max-width: 450px; /* Limita largura máxima */
 }
 
 
@@ -52,15 +75,15 @@ body {
 
 /* Inputs e Selects */
 .input-pdv, select {
-    background-color: #374151; /* bg-dark-input (Cinza 700) */
+    background-color: #374151; /* bg-dark-input */
     border: 1px solid #4b5563; /* Cinza 600 */
     color: #d1d5db; /* text-dark-text */
     border-radius: 0.5rem; /* rounded-lg */
-    padding: 0.75rem; 
+    padding: 0.75rem;
     font-size: 1rem;
 }
 .input-pdv::placeholder, select option[disabled] {
-    color: #6b7280; /* placeholder-dark-placeholder (Cinza 500) */
+    color: #6b7280; /* placeholder-dark-placeholder */
 }
 .input-pdv:focus, select:focus {
     outline: none;
@@ -68,23 +91,39 @@ body {
     box-shadow: 0 0 0 2px rgba(255, 117, 24, 0.5); /* ring-pumpkin */
 }
 
-/* Botões de Categoria */
-.category-btn {
+/* Botões de Categoria/Setor */
+.category-btn, .sector-btn {
     border: 1px solid #4b5563; /* Cinza 600 */
     background-color: #374151; /* bg-dark-input */
     color: #d1d5db; /* text-dark-text */
+    padding: 0.75rem 1rem; /* py-3 px-4 */
+    border-radius: 9999px; /* rounded-full */
+    font-size: 1rem; /* text-base */
+    font-weight: 600; /* font-semibold */
+    white-space: nowrap;
+    transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
-.category-btn.bg-indigo-600 { /* Estilo ativo original (será sobrescrito) */
+.category-btn:hover, .sector-btn:hover {
+    background-color: #4b5563; /* Cinza 600 */
+}
+/* Estilo Ativo (Laranja) */
+.category-btn.bg-pumpkin, .sector-btn.bg-pumpkin {
     background-color: #ff7518 !important; /* bg-pumpkin */
     border-color: #ff7518 !important; /* border-pumpkin */
     color: #ffffff !important; /* text-white */
 }
+
 
 /* Botões de Método de Pagamento */
 .payment-method-btn {
     background-color: #374151; /* bg-dark-input */
     color: #d1d5db; /* text-dark-text */
     border: 1px solid #4b5563; /* Cinza 600 */
+    padding: 0.75rem; /* py-3 */
+    border-radius: 0.5rem; /* rounded-lg */
+    font-weight: 700; /* font-bold */
+    transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+    font-size: 1rem; /* text-base */
 }
 .payment-method-btn:hover {
      background-color: #4b5563; /* Cinza 600 */
@@ -98,84 +137,92 @@ body {
 
 /* Cards de Mesa */
 .table-card-panel {
-    /* Cores de fundo e texto são aplicadas via Tailwind no JS agora */
-    /* Ex: bg-gray-700 text-gray-200 hover:bg-gray-600 */
-    border: 1px solid #4b5563; /* Adiciona uma borda sutil */
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    text-align: center;
+    cursor: pointer;
+    border-radius: 0.75rem;
+    position: relative;
+    border: 1px solid #4b5563; /* Borda sutil padrão */
+    transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
-.table-card-panel.bg-red-100 { /* Adapta cor de mesa ocupada */
-    background-color: #4b0e0e; /* Tom de vermelho escuro */
-    color: #fecaca; /* Texto vermelho claro */
-    border-color: #991b1b; /* Borda vermelha escura */
+/* Cores aplicadas via JS, mas definimos os estilos aqui para referência/fallback */
+.table-card-panel.status-free { /* Mesa livre */
+    background-color: #064e3b; color: #a7f3d0; border-color: #047857;
 }
-.table-card-panel.bg-red-100:hover {
-     background-color: #7f1d1d; /* Vermelho mais escuro no hover */
+.table-card-panel.status-free:hover { background-color: #059669; }
+.table-card-panel.status-occupied { /* Mesa ocupada */
+     background-color: #4b0e0e; color: #fecaca; border-color: #991b1b;
 }
-.table-card-panel.bg-green-100 { /* Adapta cor de mesa livre */
-    background-color: #064e3b; /* Tom de verde escuro */
-    color: #a7f3d0; /* Texto verde claro */
-    border-color: #047857; /* Borda verde escura */
-}
-.table-card-panel.bg-green-100:hover {
-    background-color: #059669; /* Verde mais claro no hover */
-}
-.table-timer { color: #9ca3af; /* Cinza 400 */ }
-.attention-icon { color: #fbbf24; /* yellow-400 */ } /* Ícone de atenção geral (Espera) */
-.attention-icon.fa-bell { color: #facc15; } /* Ícone específico (Pedido Cliente - não usado agora) */
+ .table-card-panel.status-occupied:hover { background-color: #7f1d1d; }
+ .table-card-panel.status-pending { /* Pedido pendente cliente */
+     background-color: #312e81; color: #e0e7ff; border-color: #fbbf24; border-width: 2px;
+ }
+ .table-card-panel.status-pending:hover { background-color: #4338ca; }
+
+.table-timer { color: #9ca3af; /* Cinza 400 */ font-size: 0.75rem; margin-top: 0.5rem; display: flex; align-items: center; justify-content: center; gap: 0.25rem;}
+.table-timer i { font-size: 0.75rem; }
+.attention-icon { position: absolute; top: 0.5rem; right: 0.5rem; font-size: 1.25rem; z-index: 10; color: #fbbf24; /* yellow-400 - Espera/Pendente */ }
+.kds-status-icon-btn { position: absolute; top: 0.5rem; left: 0.5rem; color: #a5b4fc; /* indigo-300 */ font-size: 1.25rem; z-index: 10; background: none; border: none; cursor: pointer; padding: 0; line-height: 1;}
+.kds-status-icon-btn:hover { color: #c7d2fe; } /* indigo-200 */
 
 
 /* Itens na lista de pedido (Painel 2) */
-#openOrderList > div {
-    background-color: #374151; /* bg-dark-input */
-    border: 1px solid #4b5563;
-}
-#openOrderList span.font-semibold { color: #e5e7eb; } /* Cinza 200 */
-#openOrderList span.cursor-pointer { color: #a5b4fc; } /* indigo-300 */
-#openOrderList span.cursor-pointer.text-yellow-600 { color: #facc15; } /* yellow-400 */
-#openOrderList span.font-bold { color: #ff7518; } /* pumpkin */
+#openOrderList > div { background-color: #374151; border: 1px solid #4b5563; }
+#openOrderList span.font-semibold { color: #e5e7eb; }
+#openOrderList span.cursor-pointer { color: #a5b4fc; } /* indigo-300 para obs */
+#openOrderList span.cursor-pointer .text-yellow-400 { color: #facc15; } /* Amarelo para obs 'Espera' */
+#openOrderList span.font-bold { color: #ff7518; } /* pumpkin para preço */
 
 
 /* Itens na lista de revisão (Painel 3) */
-#reviewItemsList > div {
-     border-bottom-color: #374151; /* Cinza 700 */
-}
-#reviewItemsList > div:hover {
-    background-color: #374151; /* Cinza 700 */
-}
-#reviewItemsList span.font-semibold { color: #e5e7eb; } /* Cinza 200 */
-#reviewItemsList span.text-gray-500 { color: #9ca3af; } /* Cinza 400 */
-#reviewItemsList span.font-bold { color: #ff7518; } /* pumpkin */
+#reviewItemsList .border-b { border-bottom-color: #374151; }
+#reviewItemsList > div > div:hover { background-color: #374151; } /* Fundo sutil no hover */
+#reviewItemsList span.font-semibold { color: #e5e7eb; }
+#reviewItemsList span.text-dark-placeholder { color: #9ca3af; }
+#reviewItemsList span.font-bold { color: #ff7518; }
 #reviewItemsList input[type="checkbox"] { background-color: #4b5563; border-color: #6b7280; }
 #reviewItemsList input[type="checkbox"]:checked { background-color: #ff7518; border-color: #ff7518; }
 
 /* Lista de Pagamentos Registrados */
 #paymentSummaryList { background-color: #111827; border-color: #374151; }
 #paymentSummaryList > div { border-bottom-color: #374151; }
-#paymentSummaryList span.text-gray-700 { color: #9ca3af; } /* Cinza 400 */
-#paymentSummaryList span.font-semibold { color: #e5e7eb; } /* Cinza 200 */
+#paymentSummaryList span.text-gray-400 { color: #9ca3af; }
+#paymentSummaryList span.font-semibold { color: #e5e7eb; }
 
 
 /* Cardápio */
-.product-card {
-    background-color: #1f2937; /* Cinza 800 */
-    border-color: #374151; /* Cinza 700 */
-}
-.product-card h4 { color: #e5e7eb; } /* Cinza 200 */
-.product-card p { color: #9ca3af; } /* Cinza 400 */
-.product-card span.font-bold { color: #ff7518; } /* pumpkin */
+.product-card { background-color: #1f2937; border-color: #374151; }
+.product-card h4 { color: #e5e7eb; }
+.product-card p { color: #9ca3af; }
+.product-card span.font-bold { color: #ff7518; }
 
 
 /* Switch Espera */
-.slider-obs { background-color: #4b5563; } /* Cinza 600 */
-input:checked + .slider-obs { background-color: #fbbf24; } /* Amarelo */
+.slider-obs { background-color: #4b5563; }
+input:checked + .slider-obs { background-color: #fbbf24; }
+input:checked + .slider-obs:before { transform: translateX(22px); }
+ .slider-obs:before { background-color: white; height: 20px; width: 20px; left: 4px; bottom: 4px; border-radius: 50%; position: absolute; content: ""; transition: .4s;}
 
 
-/* Animação de Loading (Cor Pumpkin) */
+/* Painel Gerencial */
+#managerScreen { background-color: #111827; /* Fundo ainda mais escuro */ }
+.manager-card { background-color: #1f2937; border-color: #ff7518; transition: transform 0.2s ease-out, box-shadow 0.2s ease-out; }
+.manager-card:hover { transform: translateY(-4px); box-shadow: 0 10px 15px -3px rgba(255, 117, 24, 0.3), 0 4px 6px -4px rgba(255, 117, 24, 0.2); }
+.manager-card h4 { color: #e5e7eb; }
+.manager-card p { color: #9ca3af; }
+.manager-card i { color: #ff7518; }
+/* Cores específicas para ícones de cards gerenciais */
+.manager-card .text-green-400 { color: #34d399; }
+.manager-card .text-indigo-400 { color: #818cf8; }
+.manager-card .text-red-400 { color: #f87171; }
+.manager-card .text-gray-400 { color: #9ca3af; }
+
+
+/* Animação de Loading */
 @keyframes spin { to { transform: rotate(360deg); } }
-.loading-spinner {
-    border: 4px solid rgba(255, 255, 255, 0.1);
-    border-left-color: #ff7518; /* pumpkin */
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    animation: spin 1s linear infinite;
-}
+.loading-spinner { border: 4px solid rgba(255, 255, 255, 0.1); border-left-color: #ff7518; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
