@@ -3,10 +3,10 @@ import { currentTableId, currentOrderSnapshot } from "/app.js";
 import { formatCurrency, calculateItemsValue, getNumericValueFromCurrency } from "/utils.js";
 import { getTableDocRef } from "/services/firebaseService.js";
 import { updateDoc, arrayUnion, arrayRemove, writeBatch, getFirestore, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-// REMOVIDO: import { openManagerAuthModal } from "./managerController.js"; // <-- CAUSA DO ERRO
+// REMOVIDO: import { openManagerAuthModal } from "./managerController.js"; // Quebra o ciclo
 import { handleTableTransferConfirmed } from "./panelController.js";
 
-// --- VARIÁVEIS DE ELEMENTOS ---
+// --- VARIÁVEIS DE ELEMENTOS (Declaradas aqui, atribuídas no Init) ---
 let paymentSplitsContainer, addSplitAccountBtn;
 let reviewItemsList;
 let orderSubtotalDisplay, orderServiceTaxDisplay, orderTotalDisplay, valuePerDinerDisplay, remainingBalanceDisplay;
@@ -76,13 +76,14 @@ export const deletePayment = async (timestamp) => {
 
 // --- FUNÇÕES DE RENDERIZAÇÃO ---
 const renderReviewItemsList = (orderSnapshot) => {
-    if (!reviewItemsList) return;
+    if (!reviewItemsList) return; // Se reviewItemsList ainda não foi mapeado, sai
     const groupedItems = groupMainAccountItems(orderSnapshot);
     const mainAccountItemsCount = Object.values(groupedItems).reduce((sum, group) => sum + group.totalCount, 0);
 
     const transferBtn = document.getElementById('itemMassTransferBtn');
     const deleteBtn = document.getElementById('itemMassDeleteBtn');
     
+    // (Lógica de toggle/disable dos botões de ação em massa)
     if(transferBtn) transferBtn.classList.toggle('text-yellow-400', isMassSelectionActive);
     if(deleteBtn) deleteBtn.classList.toggle('text-red-400', isMassSelectionActive);
     if(transferBtn) transferBtn.classList.toggle('text-gray-400', !isMassSelectionActive);
@@ -106,15 +107,14 @@ const renderReviewItemsList = (orderSnapshot) => {
         const firstItem = group.items[0];
         const groupKey = group.groupKey;
         const massItemKeys = group.items.map(item => `${item.orderId}_${item.sentAt}`).join(',');
-        const disabledAttr = isMassSelectionActive ? '' : 'disabled';
+        // **CORREÇÃO:** Checkboxes agora estão sempre habilitados (sem 'disabledAttr')
         const existingCheckbox = document.querySelector(`.item-select-checkbox[data-group-key="${groupKey}"]`);
         const checkedAttr = (existingCheckbox && existingCheckbox.checked) ? 'checked' : '';
 
         return `
             <div class="flex items-start justify-between py-1 border-b border-gray-600 hover:bg-gray-700 transition">
                 <input type="checkbox" class="item-select-checkbox mt-1.5 ml-1 mr-2 h-4 w-4 rounded bg-dark-input border-gray-500 text-pumpkin focus:ring-pumpkin"
-                       data-group-key="${groupKey}" data-item-keys="${massItemKeys}"
-                       ${disabledAttr} ${checkedAttr}>
+                       data-group-key="${groupKey}" data-item-keys="${massItemKeys}" ${checkedAttr}>
                 <div class="flex flex-col flex-grow min-w-0 pr-2">
                     <span class="text-sm font-semibold text-dark-text">${firstItem.name} (${group.totalCount}x)</span>
                     ${firstItem.note ? `<span class="text-xs text-dark-placeholder truncate">(${firstItem.note})</span>` : ''}
@@ -162,8 +162,7 @@ const renderRegisteredPayments = (payments) => {
             `;
             const deleteBtn = paymentDiv.querySelector('.delete-payment-btn');
             if (deleteBtn) {
-                // Chama a função GLOBAL (window.deletePayment)
-                deleteBtn.onclick = () => window.deletePayment(p.timestamp);
+                deleteBtn.onclick = () => window.deletePayment(p.timestamp); // Chama a função global
             }
             paymentSummaryList.appendChild(paymentDiv);
         });
@@ -244,6 +243,7 @@ export const renderPaymentSummary = (tableId, orderSnapshot) => {
 
 
 // --- LÓGICAS DE AÇÃO EM MASSA E TRANSFERÊNCIA ---
+// AÇÃO REAL (chamada pelo app.js)
 export function activateItemSelection(action) {
     const checkboxes = document.querySelectorAll('.item-select-checkbox');
     if (!checkboxes.length && !isMassSelectionActive) { alert("Não há itens para selecionar."); return; }
@@ -251,7 +251,7 @@ export function activateItemSelection(action) {
     if (!isMassSelectionActive) {
         isMassSelectionActive = true;
         checkboxes.forEach(cb => { cb.disabled = false; cb.checked = false; });
-        alert(`SELEÇÃO ATIVA para ${action.toUpperCase()}. Clique no ícone novamente para executar.`);
+        alert(`SELEÇÃO ATIVA. Selecione os itens e clique em 'Excluir' ou 'Transferir' novamente para executar.`);
     } else {
         isMassSelectionActive = false;
         const selectedGroups = Array.from(checkboxes).filter(cb => cb.checked).map(cb => ({ groupKey: cb.dataset.groupKey, itemKeys: cb.dataset.itemKeys.split(',') }));
@@ -277,14 +277,11 @@ export function activateItemSelection(action) {
     renderReviewItemsList(currentOrderSnapshot);
 };
 
+// INICIA fluxo de senha (chamada pelo HTML)
 export const handleMassActionRequest = (action) => {
-    // Esta função agora é chamada pelos botões (com contador)
-    // O fluxo antigo de "ativar" não é mais necessário
-    // window.openManagerAuthModal(action === 'delete' ? 'openMassDelete' : 'openMassTransfer', action);
-    
-    // **NOVO FLUXO DIRETO:**
-    const selectedGroups = Array.from(document.querySelectorAll('#reviewItemsList input[type="checkbox"].item-select-checkbox:checked'));
-    if (selectedGroups.length === 0) {
+    // **FLUXO OTIMIZADO:** Pede a senha e executa a ação
+    const selectedCheckboxes = document.querySelectorAll('#reviewItemsList input[type="checkbox"].item-select-checkbox:checked');
+    if (selectedCheckboxes.length === 0) {
         alert("Nenhum item selecionado.");
         return;
     }
@@ -413,6 +410,7 @@ export const handleFinalizeOrder = () => { alert("Finalizar Conta (DEV)"); };
 
 // --- INICIALIZAÇÃO DO CONTROLLER ---
 const attachReviewListListeners = () => {
+    // Esta função é chamada após renderReviewItemsList
     const selectAllItems = document.getElementById('selectAllItems');
     const itemCheckboxes = reviewItemsList?.querySelectorAll('.item-checkbox');
     const massDeleteBtn = document.getElementById('massDeleteBtn');
@@ -452,11 +450,13 @@ const attachReviewListListeners = () => {
     if (massDeleteBtn) {
          const newDeleteBtn = massDeleteBtn.cloneNode(true);
          massDeleteBtn.parentNode.replaceChild(newDeleteBtn, massDeleteBtn);
+         // Chama a função GLOBAL do app.js
          newDeleteBtn.addEventListener('click', () => window.openManagerAuthModal('executeMassDelete', null));
     }
      if (massTransferBtn) {
          const newTransferBtn = massTransferBtn.cloneNode(true);
          massTransferBtn.parentNode.replaceChild(newTransferBtn, massTransferBtn);
+         // Chama a função GLOBAL do app.js
          newTransferBtn.addEventListener('click', () => window.openManagerAuthModal('executeMassTransfer', null));
     }
 
@@ -467,7 +467,7 @@ export const initPaymentController = () => {
     if(paymentInitialized) return;
     console.log("[PaymentController] Inicializando...");
 
-    // Mapeia Elementos
+    // **CORREÇÃO:** Mapeia TODOS os elementos PRIMEIRO
     reviewItemsList = document.getElementById('reviewItemsList');
     paymentSplitsContainer = document.getElementById('paymentSplitsContainer');
     addSplitAccountBtn = document.getElementById('addSplitAccountBtn');
@@ -504,17 +504,53 @@ export const initPaymentController = () => {
     if(selectiveTransferModal) {
         transferItemsList = selectiveTransferModal.querySelector('#transferItemsList');
     }
+    // Fim do bloco de mapeamento
 
     if (!reviewItemsList) { console.error("[PaymentController] Erro Fatal: 'reviewItemsList' não encontrado."); return; }
     
     renderPaymentMethodButtons(); // Renderiza botões de pagamento
 
     // Adiciona Listeners Essenciais
-    if(toggleServiceTaxBtn) toggleServiceTaxBtn.addEventListener('click', async () => { /* ... */ });
+    if(toggleServiceTaxBtn) toggleServiceTaxBtn.addEventListener('click', async () => {
+        if (!currentTableId || !currentOrderSnapshot) return;
+        const currentStatus = currentOrderSnapshot.serviceTaxApplied === undefined ? true : currentOrderSnapshot.serviceTaxApplied;
+        try {
+            await updateDoc(getTableDocRef(currentTableId), { serviceTaxApplied: !currentStatus });
+            console.log(`Taxa de serviço ${!currentStatus ? 'aplicada' : 'removida'}.`);
+        } catch(e) { console.error("Erro ao alternar taxa:", e); }
+    });
+    
     if(dinersSplitInput) dinersSplitInput.addEventListener('input', () => renderPaymentSummary(currentTableId, currentOrderSnapshot));
-    if(paymentMethodButtonsContainer) paymentMethodButtonsContainer.addEventListener('click', (e) => { /* ... */ });
-    if(addPaymentBtn) addPaymentBtn.addEventListener('click', async () => { /* ... */ });
+    
+    if(paymentMethodButtonsContainer) paymentMethodButtonsContainer.addEventListener('click', (e) => {
+        const btn = e.target.closest('.payment-method-btn');
+        if (btn) {
+            paymentMethodButtonsContainer.querySelectorAll('.payment-method-btn').forEach(b => b.classList.remove('active', 'bg-pumpkin', 'text-white'));
+            btn.classList.add('active', 'bg-pumpkin', 'text-white');
+            if(addPaymentBtn && remainingBalanceDisplay) {
+                 const isClosed = remainingBalanceDisplay.classList.contains('text-green-400') || (getNumericValueFromCurrency(remainingBalanceDisplay.textContent || 'R$ 0,00') === 0 && (currentOrderSnapshot?.payments?.length || 0) > 0);
+                 addPaymentBtn.disabled = isClosed;
+            }
+        }
+    });
+    
+    if(addPaymentBtn) addPaymentBtn.addEventListener('click', async () => {
+         if (!currentTableId || !currentOrderSnapshot) return;
+         const value = getNumericValueFromCurrency(paymentValueInput?.value || '0');
+         const activeMethodBtn = paymentMethodButtonsContainer?.querySelector('.payment-method-btn.active');
+         const method = activeMethodBtn ? activeMethodBtn.dataset.method : null;
+         if (!method || value <= 0) { alert("Selecione método e valor válido."); return; }
+         const newPayment = { method, value, timestamp: Date.now(), userId: window.userId || 'unknown' };
+         try {
+             await updateDoc(getTableDocRef(currentTableId), { payments: arrayUnion(newPayment) });
+             if(paymentValueInput) paymentValueInput.value = 'R$ 0,00';
+             activeMethodBtn?.classList.remove('active', 'bg-pumpkin', 'text-white');
+             addPaymentBtn.disabled = true;
+         } catch(e) { console.error("Erro ao adicionar pagamento:", e); alert("Falha ao registrar pagamento."); }
+    });
+
     if(finalizeOrderBtn) finalizeOrderBtn.addEventListener('click', handleFinalizeOrder);
+    
     if (openCalculatorBtn) openCalculatorBtn.addEventListener('click', () => { if(calculatorModal) calculatorModal.style.display = 'flex'; });
     if (closeCalcBtnX) closeCalcBtnX.addEventListener('click', () => { if (calculatorModal) calculatorModal.style.display = 'none'; });
     if (calcButtons) calcButtons.addEventListener('click', (e) => { /* (lógica da calc mantida) */ });
