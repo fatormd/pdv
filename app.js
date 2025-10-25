@@ -3,23 +3,33 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebas
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-// Importações dos Serviços e Utils
+// Importações dos Módulos Refatorados
 import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, auth } from '/services/firebaseService.js';
 import { fetchWooCommerceProducts, fetchWooCommerceCategories } from '/services/wooCommerceService.js';
-import { formatCurrency, formatElapsedTime } from '/utils.js';
+import { formatCurrency, formatElapsedTime } from '/utils.js'; // Importar utils
 
-// Importações dos Controllers
+// Importações dos Controllers (com funções init e outras necessárias)
+// Removido 'loadTableOrder' da importação do panelController (quebrava ciclo)
 import { loadOpenTables, renderTableFilters, handleAbrirMesa, handleSearchTable, initPanelController, handleTableTransferConfirmed as panel_handleTableTransferConfirmed } from '/controllers/panelController.js';
 import { renderMenu, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity, openObsModalForGroup, initOrderController, handleSendSelectedItems } from '/controllers/orderController.js';
-// Importa as *ações* que o modal de senha chamará
 import {
     renderPaymentSummary, deletePayment, handleMassActionRequest, handleConfirmTableTransfer,
     initPaymentController, handleFinalizeOrder,
     activateItemSelection, handleMassDeleteConfirmed, executeDeletePayment, // Funções de ação
     openTableTransferModal // Modal de transferência
 } from '/controllers/paymentController.js';
-// CORREÇÃO: Removido 'openManagerAuthModal' da importação abaixo
-import { initManagerController, handleGerencialAction } from '/controllers/managerController.js'; // Importa a ação gerencial
+import { initManagerController, handleGerencialAction } from '/controllers/managerController.js';
+
+// --- CONFIGURAÇÃO (Movida do index.html para cá) ---
+const APP_ID = "pdv_fator_instance_001";
+const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY",
+    authDomain: "fator-pdv.firebaseapp.com",
+    projectId: "fator-pdv",
+    storageBucket: "fator-pdv.appspot.com",
+    messagingSenderId: "1097659747429",
+    appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c"
+};
 
 // --- VARIÁVEIS DE ESTADO GLOBAL ---
 export const screens = {
@@ -29,7 +39,6 @@ const STAFF_CREDENTIALS = {
     'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' },
     'garcom@fator.com': { password: '1234', role: 'garcom', name: 'Mock Garçom' },
 };
-// Senha Mestra definida aqui
 const MANAGER_PASSWORD = '1234';
 
 export let currentTableId = null;
@@ -46,14 +55,13 @@ let loginBtn, loginEmailInput, loginPasswordInput, loginErrorMsg;
 
 
 // --- FUNÇÕES CORE E ROTIAMENTO ---
-
 export const hideStatus = () => {
     if (!statusScreen) statusScreen = document.getElementById('statusScreen');
     if (statusScreen) {
-        statusScreen.style.cssText = 'display: none !important'; // Força esconder
+        statusScreen.style.cssText = 'display: none !important';
         console.log("[UI] hideStatus executado.");
     } else {
-        console.error("[UI] Elemento statusScreen não encontrado em hideStatus.");
+        console.error("[UI] Elemento statusScreen não encontrado.");
     }
 };
 
@@ -131,7 +139,7 @@ export const goToScreen = (screenId) => {
 };
 window.goToScreen = goToScreen;
 
-// **CORREÇÃO: MODAL DE AUTENTICAÇÃO MOVIDO PARA CÁ**
+// MODAL DE AUTENTICAÇÃO GLOBAL
 window.openManagerAuthModal = (action, payload = null) => {
     const managerModal = document.getElementById('managerModal');
     if (!managerModal) { console.error("Modal Gerente não encontrado!"); return; }
@@ -163,12 +171,10 @@ window.openManagerAuthModal = (action, payload = null) => {
                     // Ações do PaymentController
                     case 'openMassDelete':
                     case 'openMassTransfer':
-                        activateItemSelection(payload); // 'payload' aqui é 'delete' ou 'transfer'
-                        break;
+                        activateItemSelection(payload);
                     case 'deletePayment':
-                        executeDeletePayment(payload); // 'payload' aqui é o timestamp
+                        executeDeletePayment(payload);
                         break;
-                    
                     // Ações do ManagerController
                     case 'goToManagerPanel':
                     case 'openProductManagement':
@@ -180,15 +186,10 @@ window.openManagerAuthModal = (action, payload = null) => {
                     case 'openCustomerCRM':
                     case 'openWaiterReg':
                     case 'openWooSync':
-                        handleGerencialAction(action, payload); // Chama a função do managerController
+                        handleGerencialAction(action, payload);
                         break;
-
                     default:
-                        console.warn(`Ação ${action} não reconhecida pelo modal de autenticação.`);
-                        // Fallback para ações do manager (caso tenhamos perdido alguma)
-                        if (!action.includes('Mass') && !action.includes('Payment')) {
-                             handleGerencialAction(action, payload);
-                        }
+                        console.warn(`Ação ${action} não reconhecida pelo modal.`);
                 }
             } else {
                 alert("Senha incorreta.");
@@ -208,7 +209,7 @@ window.handleMassActionRequest = handleMassActionRequest;
 window.handleConfirmTableTransfer = handleConfirmTableTransfer;
 window.openTableTransferModal = openTableTransferModal;
 window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`);
-// Funções de item/obs
+// Funções de item/obs (ainda usadas por `onclick` no `orderController`)
 window.increaseLocalItemQuantity = increaseLocalItemQuantity;
 window.decreaseLocalItemQuantity = decreaseLocalItemQuantity;
 window.openObsModalForGroup = openObsModalForGroup;
@@ -392,11 +393,12 @@ window.handleLogout = handleLogout;
 // --- INICIALIZAÇÃO PRINCIPAL ---
 document.addEventListener('DOMContentLoaded', () => {
     console.log("[INIT] DOMContentLoaded.");
-    let firebaseConfig; // Declarado aqui
+    // **CORREÇÃO:** Variável movida para dentro do try para escopo
+    // let firebaseConfig; // Não mais necessário aqui
 
     try {
-        // **CORREÇÃO:** Usa o objeto FIREBASE_CONFIG definido no topo
-        firebaseConfig = FIREBASE_CONFIG; // Atribui a partir da const global do módulo
+        // **CORREÇÃO:** Usa o objeto FIREBASE_CONFIG definido no topo do arquivo
+        const firebaseConfig = FIREBASE_CONFIG; // Usa a const global do módulo
         console.log("[INIT] Config Firebase carregada do módulo.");
 
         // Inicializa Firebase App e Serviços
