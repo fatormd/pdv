@@ -2,13 +2,11 @@
 import { goToScreen } from "/app.js";
 import { getProducts } from "/services/wooCommerceService.js";
 import { formatCurrency } from "/utils.js";
-// REMOVIDO: import { activateItemSelection, handleMassDeleteConfirmed } from "./paymentController.js";
+// REMOVIDO: Importação do paymentController
 
 // Estado
 let managerInitialized = false;
-// Mapeado dentro do init para garantir que o DOM esteja pronto
-let productManagementModal; 
-
+let productManagementModal; // Mapeado no init
 
 // --- FUNÇÕES DE GESTÃO (Placeholders) ---
 const renderProductManagement = () => {
@@ -16,7 +14,7 @@ const renderProductManagement = () => {
          alert("Módulo de Gestão de Produtos em desenvolvimento.");
          return;
     }
-    // ... (lógica para renderizar o modal de produtos, se existir) ...
+    // ... (lógica de renderização do modal de produtos) ...
     const products = getProducts();
     let listHtml = products.map(p => `
         <div class="flex justify-between items-center py-2 border-b border-gray-600">
@@ -24,11 +22,7 @@ const renderProductManagement = () => {
                 <span class="font-semibold text-dark-text">${p.name}</span>
                 <span class="text-xs text-dark-placeholder">ID: ${p.id} | Setor: ${p.sector}</span>
             </div>
-            <div class="flex items-center space-x-2">
-                <span class="font-bold text-pumpkin">${formatCurrency(p.price)}</span>
-                <button class="px-3 py-1 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition" onclick="alert('Editar ${p.id}')">Editar</button>
-                <button class="px-3 py-1 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 transition" onclick="alert('Excluir ${p.id}')">Excluir</button>
-            </div>
+            {/* ... (botões editar/excluir) ... */}
         </div>
     `).join('');
 
@@ -61,30 +55,29 @@ export const handleGerencialAction = (action, payload) => {
              break;
         case 'openProductManagement':
         case 'openCategoryManagement':
-            renderProductManagement(); // Usa o mesmo modal para visualização
+            renderProductManagement();
             break;
         case 'openInventoryManagement':
-            alert("Módulo de ESTOQUE/INVENTÁRIO (Fase 2) em desenvolvimento.");
+            alert("Módulo de ESTOQUE/INVENTÁRIO (DEV).");
             break;
         case 'openCashManagement':
-            alert("Módulo de GESTÃO DE CAIXA (Fase 1) em desenvolvimento.");
+            alert("Módulo de GESTÃO DE CAIXA (DEV).");
             break;
         case 'openReservations':
-            alert("Módulo de RESERVAS/FILA DE ESPERA em desenvolvimento.");
+            alert("Módulo de RESERVAS/FILA (DEV).");
             break;
         case 'openCustomerCRM':
-            alert("Módulo de CRM (Fidelidade) em desenvolvimento.");
+            alert("Módulo de CRM (DEV).");
             break;
         case 'openWaiterReg':
-            alert("Módulo de Cadastro de Usuários em desenvolvimento.");
+            alert("Módulo de Cadastro de Usuários (DEV).");
             break;
         case 'openRecipesManagement':
-            alert("Módulo de FICHA TÉCNICA (BOM) em desenvolvimento.");
+            alert("Módulo de FICHA TÉCNICA (DEV).");
             break;
         case 'openWooSync':
-            alert("Ação de SINCRONIZAÇÃO FORÇADA em desenvolvimento.");
+            alert("Ação de SINCRONIZAÇÃO (DEV).");
             break;
-        // REMOVIDO: 'deleteMass', 'openSelectiveTransfer' (tratados pelo app.js/paymentController)
         default:
              alert(`Módulo Gerencial não reconhecido: ${action}.`);
     }
@@ -98,15 +91,13 @@ export const initManagerController = () => {
     if(managerInitialized) return;
     console.log("[ManagerController] Inicializando...");
 
-    // Mapeia o modal de produtos
     productManagementModal = document.getElementById('productManagementModal');
     const managerCards = document.querySelectorAll('#managerScreen .manager-card');
 
     managerCards.forEach(card => {
         const onclickAttr = card.getAttribute('onclick');
         if (onclickAttr) {
-            // Remove o onclick inline para substituí-lo por listener
-            card.removeAttribute('onclick');
+            card.removeAttribute('onclick'); // Remove onclick inline
 
             // Tenta extrair a ação do openManagerAuthModal
             const matchAuth = onclickAttr.match(/openManagerAuthModal\('([^']+)'/);
@@ -124,9 +115,10 @@ export const initManagerController = () => {
                  // Trata o botão de Relatórios especificamente
                  card.addEventListener('click', () => {
                      const modal = document.getElementById('reportsModal');
+                     // (O modal de relatórios também precisa de estilo dark)
                      if(modal) modal.style.display = 'flex';
+                     else alert("Modal de relatórios não encontrado.");
                  });
-                 // console.log(`[Manager] Card 'Relatórios' configurado.`);
             } else {
                  console.warn("Não foi possível parsear onclick para card:", card.outerHTML);
                  // Adiciona um listener de fallback
@@ -140,6 +132,8 @@ export const initManagerController = () => {
     // Mapeia e adiciona listener para o botão de voltar
     const backBtn = document.getElementById('backToPanelFromManagerBtn');
     if (backBtn) {
+        // Remove onclick inline se existir
+        backBtn.removeAttribute('onclick');
         backBtn.addEventListener('click', () => window.goToScreen('panelScreen'));
     }
 
