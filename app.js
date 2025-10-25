@@ -9,7 +9,7 @@ import { fetchWooCommerceProducts, fetchWooCommerceCategories } from '/services/
 import { formatCurrency, formatElapsedTime } from '/utils.js';
 
 // Importações dos Controllers
-import { loadOpenTables, renderTableFilters, handleAbrirMesa, handleSearchTable, initPanelController } from '/controllers/panelController.js';
+import { loadOpenTables, renderTableFilters, handleAbrirMesa, handleSearchTable, initPanelController, handleTableTransferConfirmed as panel_handleTableTransferConfirmed } from '/controllers/panelController.js';
 import { renderMenu, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity, openObsModalForGroup, initOrderController, handleSendSelectedItems } from '/controllers/orderController.js';
 // Importa as *ações* que o modal de senha chamará
 import {
@@ -198,20 +198,85 @@ window.openManagerAuthModal = (action, payload = null) => {
     }
 };
 
-// Expor outras funções globais necessárias dos controllers
+// Expor funções globais necessárias dos controllers
 window.deletePayment = deletePayment;
 window.handleMassActionRequest = handleMassActionRequest;
 window.handleConfirmTableTransfer = handleConfirmTableTransfer;
 window.openTableTransferModal = openTableTransferModal;
 window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`);
+// Expor funções de item/obs (ainda usadas por `onclick` no `orderController`)
+window.increaseLocalItemQuantity = increaseLocalItemQuantity;
+window.decreaseLocalItemQuantity = decreaseLocalItemQuantity;
+window.openObsModalForGroup = openObsModalForGroup;
 
 
 // Listener da Mesa
-export const setTableListener = (tableId) => { /* ... (lógica mantida) ... */ };
+export const setTableListener = (tableId) => {
+    if (unsubscribeTable) unsubscribeTable();
+    console.log(`[APP] Configurando listener para mesa ${tableId}`);
+    const tableRef = getTableDocRef(tableId);
+    unsubscribeTable = onSnapshot(tableRef, (docSnapshot) => {
+        if (docSnapshot.exists()) {
+            console.log(`[APP] Snapshot recebido para mesa ${tableId}`);
+            currentOrderSnapshot = docSnapshot.data();
+            const firebaseSelectedItems = currentOrderSnapshot.selectedItems || [];
+            
+            // Verifica se a tela de pedido está ativa
+            const isOrderScreenActive = appContainer?.style.transform === `translateX(-${screens['orderScreen'] * 100}vw)`;
+            
+            // Atualiza selectedItems local APENAS se mudou no Firebase E não estamos na tela de pedido
+            if (!isOrderScreenActive && JSON.stringify(firebaseSelectedItems) !== JSON.stringify(selectedItems)) {
+                console.log("[APP] Sincronizando 'selectedItems' local com dados do Firebase.");
+                selectedItems.length = 0;
+                selectedItems.push(...firebaseSelectedItems);
+            }
+            
+            renderOrderScreen(currentOrderSnapshot);
+            renderPaymentSummary(currentTableId, currentOrderSnapshot);
+        } else {
+             console.warn(`[APP] Listener: Mesa ${tableId} não existe ou foi fechada.`);
+             if (currentTableId === tableId) {
+                 alert(`Mesa ${tableId} foi fechada ou removida.`);
+                 if (unsubscribeTable) unsubscribeTable(); unsubscribeTable = null;
+                 currentTableId = null; currentOrderSnapshot = null; selectedItems.length = 0;
+                 goToScreen('panelScreen');
+             }
+        }
+    }, (error) => {
+        console.error(`[APP] Erro no listener da mesa ${tableId}:`, error);
+         if (unsubscribeTable) unsubscribeTable(); unsubscribeTable = null;
+         alert("Erro ao sincronizar com a mesa. Voltando ao painel.");
+         goToScreen('panelScreen');
+    });
+};
+
 // Define a mesa atual e inicia o listener
-export const setCurrentTable = (tableId) => { /* ... (lógica mantida) ... */ };
+export const setCurrentTable = (tableId) => {
+    if (currentTableId === tableId && unsubscribeTable) {
+        console.log(`[APP] Listener para mesa ${tableId} já ativo.`);
+        return;
+    }
+    currentTableId = tableId;
+    console.log(`[APP] Definindo mesa atual para ${tableId}`);
+    const currentTableNumEl = document.getElementById('current-table-number');
+    const paymentTableNumEl = document.getElementById('payment-table-number');
+    if(currentTableNumEl) currentTableNumEl.textContent = `Mesa ${tableId}`;
+    if(paymentTableNumEl) paymentTableNumEl.textContent = `Mesa ${tableId}`;
+    setTableListener(tableId);
+};
+
 // Seleciona a mesa e inicia o listener
-export const selectTableAndStartListener = async (tableId) => { /* ... (lógica mantida) ... */ };
+export const selectTableAndStartListener = async (tableId) => {
+    console.log(`[APP] Selecionando mesa ${tableId} e iniciando listener.`);
+    try {
+        await fetchWooCommerceProducts(/* Callback opcional */); // Garante menu
+        setCurrentTable(tableId); // Define mesa e inicia listener
+        goToScreen('orderScreen'); // Navega
+    } catch (error) {
+        console.error(`[APP] Erro ao selecionar mesa ${tableId}:`, error);
+        alert("Erro ao abrir a mesa. Verifique a conexão.");
+    }
+};
 window.selectTableAndStartListener = selectTableAndStartListener;
 
 // Função NF-e (Placeholder global)
@@ -219,12 +284,106 @@ window.openNfeModal = () => { /* ... (lógica mantida) ... */ };
 
 
 // --- INICIALIZAÇÃO APP STAFF ---
-const initStaffApp = async () => { /* ... (lógica mantida) ... */ };
+const initStaffApp = async () => {
+    console.log("[INIT] Iniciando app para Staff...");
+    try {
+        renderTableFilters();
+        console.log("[INIT] Filtros de setor renderizados.");
+
+        fetchWooCommerceProducts().catch(e => console.error("[INIT ERROR] Falha ao carregar produtos:", e));
+        fetchWooCommerceCategories().catch(e => console.error("[INIT ERROR] Falha ao carregar categorias:", e));
+
+        hideStatus();
+        hideLoginScreen(); // Mostra header/main
+        console.log("[INIT] UI principal visível.");
+
+        loadOpenTables(); // Configura listener das mesas
+        console.log("[INIT] Listener de mesas configurado.");
+
+        goToScreen('panelScreen'); // Navega para o painel de mesas
+        console.log("[INIT] Navegação inicial para panelScreen.");
+
+    } catch (error) {
+        console.error("[INIT] Erro CRÍTICO durante initStaffApp:", error);
+        alert("Erro grave ao iniciar. Verifique o console.");
+        showLoginScreen();
+    }
+};
 
 // --- LÓGICA DE AUTH/LOGIN ---
-const authenticateStaff = (email, password) => { /* ... (lógica mantida) ... */ };
-const handleStaffLogin = async () => { /* ... (lógica mantida) ... */ };
-const handleLogout = () => { /* ... (lógica mantida) ... */ };
+const authenticateStaff = (email, password) => {
+    const creds = STAFF_CREDENTIALS[email];
+    return (creds && creds.password === password && creds.role !== 'client') ? creds : null;
+};
+
+const handleStaffLogin = async () => {
+    loginBtn = document.getElementById('loginBtn');
+    loginEmailInput = document.getElementById('loginEmail');
+    loginPasswordInput = document.getElementById('loginPassword');
+    loginErrorMsg = document.getElementById('loginErrorMsg');
+
+    if (!loginBtn || !loginEmailInput || !loginPasswordInput) { /* ... (erro mantido) ... */ return; }
+    if (loginErrorMsg) loginErrorMsg.style.display = 'none';
+    loginBtn.disabled = true; loginBtn.textContent = 'Entrando...';
+
+    const email = loginEmailInput.value.trim();
+    const password = loginPasswordInput.value.trim();
+
+    console.log(`[LOGIN] Tentando autenticar ${email}...`);
+    const staffData = authenticateStaff(email, password);
+
+    if (staffData) {
+        console.log(`[LOGIN] Autenticação local OK. Role: ${staffData.role}`);
+        userRole = staffData.role;
+        try {
+            const authInstance = auth;
+            if (!authInstance) throw new Error("Firebase Auth não inicializado.");
+            console.log("[LOGIN] Tentando login anônimo Firebase...");
+            try {
+                const userCredential = await signInAnonymously(authInstance);
+                userId = userCredential.user.uid;
+                console.log(`[LOGIN] Login Firebase OK. UID: ${userId}`);
+            } catch (authError) {
+                console.warn("[LOGIN] Login Firebase falhou. Usando Mock ID.", authError);
+                userId = `mock_${userRole}_${Date.now()}`;
+            }
+            document.getElementById('user-id-display').textContent = `Usuário: ${staffData.name} | ${userRole.toUpperCase()}`;
+            console.log("[LOGIN] User info display atualizado.");
+
+            console.log("[LOGIN] Chamando initStaffApp...");
+            await initStaffApp();
+            console.log("[LOGIN] initStaffApp concluído.");
+
+        } catch (error) {
+             console.error("[LOGIN] Erro pós-autenticação:", error);
+             alert(`Erro ao iniciar sessão: ${error.message}.`);
+             showLoginScreen();
+             if(loginErrorMsg) { loginErrorMsg.textContent = `Erro: ${error.message}`; loginErrorMsg.style.display = 'block'; }
+        }
+    } else {
+        console.log(`[LOGIN] Credenciais inválidas para ${email}.`);
+        if(loginErrorMsg) { loginErrorMsg.textContent = 'E-mail ou senha inválidos.'; loginErrorMsg.style.display = 'block'; }
+    }
+    if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Entrar'; }
+    console.log("[LOGIN] Fim do handleStaffLogin.");
+};
+
+const handleLogout = () => {
+    console.log("[LOGOUT] Iniciando...");
+    const authInstance = auth;
+    if (authInstance && authInstance.currentUser && (!userId || !userId.startsWith('mock_'))) {
+        console.log("[LOGOUT] Fazendo signOut Firebase...");
+        signOut(authInstance).catch(e => console.error("Erro no sign out:", e));
+    } else {
+        console.log("[LOGOUT] Pulando signOut Firebase (usuário mock ou já deslogado).");
+    }
+    userId = null; currentTableId = null; selectedItems.length = 0; userRole = 'anonymous'; currentOrderSnapshot = null;
+    if (unsubscribeTable) { unsubscribeTable(); unsubscribeTable = null; }
+
+    showLoginScreen();
+    document.getElementById('user-id-display').textContent = 'Usuário ID: Carregando...';
+    console.log("[LOGOUT] Concluído.");
+};
 window.handleLogout = handleLogout;
 
 
@@ -244,7 +403,7 @@ document.addEventListener('DOMContentLoaded', () => {
         initializeFirebase(dbInstance, authInstance, window.__app_id || 'pdv_default_app');
         console.log("[INIT] Firebase App e Serviços inicializados.");
 
-        // Mapeia elementos Globais e de Login AQUI
+        // Mapeia elementos Globais e de Login
         statusScreen = document.getElementById('statusScreen');
         mainContent = document.getElementById('mainContent');
         appContainer = document.getElementById('appContainer');
