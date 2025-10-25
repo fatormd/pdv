@@ -9,14 +9,15 @@ import { fetchWooCommerceProducts, fetchWooCommerceCategories } from '/services/
 import { formatCurrency, formatElapsedTime } from '/utils.js'; // Importar utils
 
 // Importações dos Controllers (com funções init e outras necessárias)
-import { loadOpenTables, renderTableFilters, handleAbrirMesa, handleSearchTable, initPanelController, handleTableTransferConfirmed as panel_handleTableTransferConfirmed } from '/controllers/panelController.js';
+import { loadOpenTables, renderTableFilters, handleAbrirMesa, handleSearchTable, initPanelController, handleTableTransferConfirmed as panel_handleTableTransferConfirmed } from '/controllers/panelController.js'; // Renomeia import para evitar conflito
 import { renderMenu, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity, openObsModalForGroup, initOrderController, handleSendSelectedItems } from '/controllers/orderController.js';
+// Importa funções necessárias, incluindo as que precisam ser globais
 import { renderPaymentSummary, deletePayment, handleMassActionRequest, handleConfirmTableTransfer, handleAddSplitAccount, openPaymentModalForSplit, moveItemsToMainAccount, openSplitTransferModal, openTableTransferModal, initPaymentController, handleFinalizeOrder } from '/controllers/paymentController.js';
 import { openManagerAuthModal, initManagerController } from '/controllers/managerController.js';
 
 // --- VARIÁVEIS DE ESTADO GLOBAL ---
 export const screens = {
-    'loginScreen': 0,
+    'loginScreen': 0, // Tela de Login é o índice 0
     'panelScreen': 1,
     'orderScreen': 2,
     'paymentScreen': 3,
@@ -87,6 +88,7 @@ const showLoginScreen = () => {
     if (appContainer) appContainer.style.transform = `translateX(0vw)`; // Move para painel 0 (login)
     document.body.classList.add('bg-dark-bg'); // Garante fundo escuro
     document.body.classList.remove('bg-gray-900'); // Remove fundo do manager se estava ativo
+    document.body.classList.remove('logged-in'); // Remove classe de logado
 
     // Limpa campos ao mostrar login
     if(loginEmailInput) loginEmailInput.value = '';
@@ -102,6 +104,7 @@ const hideLoginScreen = () => {
 
     if (mainHeader) mainHeader.style.display = 'flex'; // Mostra o header principal
     if (mainContent) mainContent.style.display = 'block'; // Garante que main content está visível
+    document.body.classList.add('logged-in'); // Adiciona classe para indicar login
 
     // Mostra/Esconde botões do header baseados no role
     const logoutBtn = document.getElementById('logoutBtnHeader');
@@ -166,6 +169,7 @@ window.handleMassActionRequest = handleMassActionRequest; // Exportada de paymen
 window.handleConfirmTableTransfer = handleConfirmTableTransfer; // Exportada de paymentController, exposta aqui
 window.openTableTransferModal = openTableTransferModal; // Exportada de paymentController, exposta aqui
 window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`); // Placeholder
+
 
 // Listener da Mesa (atualiza controllers relevantes)
 export const setTableListener = (tableId) => {
@@ -235,7 +239,25 @@ export const selectTableAndStartListener = async (tableId) => {
 window.selectTableAndStartListener = selectTableAndStartListener;
 
 // Função NF-e (Placeholder global)
-window.openNfeModal = () => { /* ... (lógica mantida) ... */ };
+window.openNfeModal = () => {
+    const nfeModal = document.getElementById('nfeModal');
+    if (!nfeModal) return;
+    nfeModal.innerHTML = `
+        <div class="bg-dark-card border border-gray-600 p-6 rounded-xl shadow-2xl w-full max-w-sm">
+            <h3 class="text-xl font-bold mb-4 text-green-400">NF-e / Recibo</h3>
+            <p class="text-base mb-3 text-dark-text">Deseja incluir CPF/CNPJ?</p>
+            <input type="text" id="nfeCpfCnpjInput" placeholder="CPF ou CNPJ (Opcional)" class="w-full p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text placeholder-dark-placeholder focus:ring-pumpkin focus:border-pumpkin text-base">
+            <div class="flex flex-col space-y-2 mt-4">
+                <button class="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-base">Imprimir Recibo</button>
+                <button class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base">Enviar por Email</button>
+            </div>
+            <div class="flex justify-end mt-4">
+                <button class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition text-base" onclick="document.getElementById('nfeModal').style.display='none'">Fechar</button>
+            </div>
+        </div>
+    `;
+    nfeModal.style.display = 'flex';
+};
 
 
 // --- INICIALIZAÇÃO APP STAFF ---
@@ -271,16 +293,99 @@ const initStaffApp = async () => {
 };
 
 // --- LÓGICA DE AUTH/LOGIN ---
-const authenticateStaff = (email, password) => { /* ... (lógica mantida) ... */ };
-const handleStaffLogin = async () => { /* ... (lógica mantida) ... */ };
-const handleLogout = () => { /* ... (lógica mantida) ... */ };
+const authenticateStaff = (email, password) => {
+    const creds = STAFF_CREDENTIALS[email];
+    return (creds && creds.password === password && creds.role !== 'client') ? creds : null;
+};
+
+// Define handleStaffLogin no escopo do módulo para garantir que esteja acessível
+const handleStaffLogin = async () => {
+    // Garante que os elementos de login estejam acessíveis aqui
+    loginBtn = document.getElementById('loginBtn');
+    loginEmailInput = document.getElementById('loginEmail');
+    loginPasswordInput = document.getElementById('loginPassword');
+    loginErrorMsg = document.getElementById('loginErrorMsg');
+
+    if (!loginBtn || !loginEmailInput || !loginPasswordInput) {
+         console.error("Erro FATAL: Elementos de login não encontrados DENTRO de handleStaffLogin.");
+         alert("Erro interno crítico. Recarregue a página.");
+         return;
+    }
+    if (loginErrorMsg) loginErrorMsg.style.display = 'none';
+    loginBtn.disabled = true; loginBtn.textContent = 'Entrando...';
+
+    const email = loginEmailInput.value.trim();
+    const password = loginPasswordInput.value.trim();
+
+    console.log(`[LOGIN] Tentando autenticar ${email}...`); // LOG INICIAL DA FUNÇÃO
+    const staffData = authenticateStaff(email, password);
+
+    if (staffData) {
+        console.log(`[LOGIN] Autenticação local OK. Role: ${staffData.role}`);
+        userRole = staffData.role;
+
+        try {
+            const authInstance = auth; // Usa a instância global inicializada
+            if (!authInstance) throw new Error("Firebase Auth não inicializado.");
+
+            console.log("[LOGIN] Tentando login anônimo Firebase...");
+            try {
+                const userCredential = await signInAnonymously(authInstance);
+                userId = userCredential.user.uid;
+                console.log(`[LOGIN] Login Firebase OK. UID: ${userId}`);
+            } catch (authError) {
+                console.warn("[LOGIN] Login Firebase falhou. Usando Mock ID.", authError);
+                userId = `mock_${userRole}_${Date.now()}`;
+            }
+
+            document.getElementById('user-id-display').textContent = `Usuário: ${staffData.name} | ${userRole.toUpperCase()}`;
+            console.log("[LOGIN] User info display atualizado.");
+
+            // Não chama mais hideLoginModal, pois agora a tela é um painel
+            // A inicialização cuidará de mostrar o header/main
+
+            console.log("[LOGIN] Chamando initStaffApp...");
+            await initStaffApp(); // Chama a inicialização principal APÓS definir userId
+            console.log("[LOGIN] initStaffApp concluído.");
+
+        } catch (error) {
+             console.error("[LOGIN] Erro pós-autenticação:", error);
+             alert(`Erro ao iniciar sessão: ${error.message}.`);
+             showLoginScreen(); // Garante que a tela de login seja exibida em caso de erro
+             if(loginErrorMsg) { loginErrorMsg.textContent = `Erro: ${error.message}`; loginErrorMsg.style.display = 'block'; }
+        }
+    } else {
+        console.log(`[LOGIN] Credenciais inválidas para ${email}.`);
+        if(loginErrorMsg) { loginErrorMsg.textContent = 'E-mail ou senha inválidos.'; loginErrorMsg.style.display = 'block'; }
+    }
+    // Garante que o botão seja reabilitado mesmo em caso de falha
+    if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Entrar'; }
+    console.log("[LOGIN] Fim do handleStaffLogin.");
+};
+
+const handleLogout = () => {
+    console.log("[LOGOUT] Iniciando...");
+    const authInstance = auth; // Usa a instância global
+    if (authInstance && authInstance.currentUser && (!userId || !userId.startsWith('mock_'))) {
+        console.log("[LOGOUT] Fazendo signOut Firebase...");
+        signOut(authInstance).catch(e => console.error("Erro no sign out:", e));
+    } else {
+        console.log("[LOGOUT] Pulando signOut Firebase (usuário mock ou já deslogado).");
+    }
+    // Reseta estado global
+    userId = null; currentTableId = null; selectedItems = []; userRole = 'anonymous'; currentOrderSnapshot = null;
+    if (unsubscribeTable) { unsubscribeTable(); unsubscribeTable = null; }
+
+    showLoginScreen(); // Mostra a tela de login (Painel 0)
+    document.getElementById('user-id-display').textContent = 'Usuário ID: Carregando...';
+    console.log("[LOGOUT] Concluído.");
+};
 window.handleLogout = handleLogout;
 
 
 // --- INICIALIZAÇÃO PRINCIPAL ---
 document.addEventListener('DOMContentLoaded', () => {
     console.log("[INIT] DOMContentLoaded.");
-
     // **CRITICAL FIX:** Declara firebaseConfig DENTRO do escopo do listener
     let firebaseConfig;
 
