@@ -45,11 +45,9 @@ let loginBtn, loginEmailInput, loginPasswordInput, loginErrorMsg;
 // --- FUNÇÕES CORE E ROTIAMENTO ---
 
 export const hideStatus = () => {
-    // Garante que o elemento seja encontrado
     if (!statusScreen) statusScreen = document.getElementById('statusScreen');
     if (statusScreen) {
-        // **CORREÇÃO:** Usa !important para sobrescrever o estilo inline
-        statusScreen.style.cssText = 'display: none !important'; 
+        statusScreen.style.cssText = 'display: none !important'; // Força esconder
         console.log("[UI] hideStatus executado.");
     } else {
         console.error("[UI] Elemento statusScreen não encontrado em hideStatus.");
@@ -59,7 +57,6 @@ export const hideStatus = () => {
 // Mostra a Tela de Login (Painel 0)
 const showLoginScreen = () => {
     console.log("[UI] Chamando showLoginScreen...");
-    // Garante mapeamento dos elementos essenciais para esta função
     if (!statusScreen) statusScreen = document.getElementById('statusScreen');
     if (!mainContent) mainContent = document.getElementById('mainContent');
     if (!mainHeader) mainHeader = document.getElementById('mainHeader');
@@ -92,14 +89,13 @@ const showLoginScreen = () => {
 
 // Esconde a Tela de Login e mostra o conteúdo principal (Chamado após login SUCESSO)
 const hideLoginScreen = () => {
-    if (!mainHeader) mainHeader = document.getElementById('mainHeader'); // Garante mapeamento
-    if (!mainContent) mainContent = document.getElementById('mainContent'); // Garante mapeamento
+    if (!mainHeader) mainHeader = document.getElementById('mainHeader');
+    if (!mainContent) mainContent = document.getElementById('mainContent');
 
-    if (mainHeader) mainHeader.style.display = 'flex'; // Mostra o header principal
-    if (mainContent) mainContent.style.display = 'block'; // Garante que main content está visível
+    if (mainHeader) mainHeader.style.display = 'flex';
+    if (mainContent) mainContent.style.display = 'block';
     document.body.classList.add('logged-in'); // Adiciona classe para indicar login
 
-    // Mostra/Esconde botões do header baseados no role
     const logoutBtn = document.getElementById('logoutBtnHeader');
     const managerBtn = document.getElementById('openManagerPanelBtn');
     if (logoutBtn) logoutBtn.classList.remove('hidden');
@@ -110,13 +106,15 @@ const hideLoginScreen = () => {
 
 // Função de Navegação Principal
 export const goToScreen = (screenId) => {
-    if (!appContainer) appContainer = document.getElementById('appContainer'); // Garante mapeamento
-    if (!mainContent) mainContent = document.getElementById('mainContent'); // Garante mapeamento
+    if (!appContainer) appContainer = document.getElementById('appContainer');
+    if (!mainContent) mainContent = document.getElementById('mainContent');
 
     // Salva itens ao sair da tela de pedido ou pagamento e voltar pro painel
     if (currentTableId && screenId === 'panelScreen') {
         const currentTransform = appContainer?.style.transform || '';
+        // Encontra a chave da tela atual no mapa 'screens'
         const currentScreenKey = Object.keys(screens).find(key => screens[key] * -100 + 'vw' === currentTransform.replace(/translateX\((.*?)\)/, '$1'));
+        
         if (currentScreenKey === 'orderScreen' || currentScreenKey === 'paymentScreen') {
              console.log(`[NAV] Salvando itens da mesa ${currentTableId} ao sair de ${currentScreenKey}`);
             saveSelectedItemsToFirebase(currentTableId, selectedItems);
@@ -130,7 +128,7 @@ export const goToScreen = (screenId) => {
         unsubscribeTable = null;
         currentTableId = null; // Limpa mesa ativa ao voltar
         currentOrderSnapshot = null;
-        selectedItems = [];
+        selectedItems.length = 0; // Limpa array local
         // Limpa displays de número da mesa
         const currentTableNumEl = document.getElementById('current-table-number');
         const paymentTableNumEl = document.getElementById('payment-table-number');
@@ -144,24 +142,22 @@ export const goToScreen = (screenId) => {
         if (appContainer) {
             appContainer.style.transform = `translateX(-${screenIndex * 100}vw)`;
         }
-        // Garante que mainContent esteja visível ao navegar para qualquer tela pós-login
         if (mainContent && screenId !== 'loginScreen') mainContent.style.display = 'block';
-
         document.body.classList.toggle('bg-gray-900', screenId === 'managerScreen');
         document.body.classList.toggle('bg-dark-bg', screenId !== 'managerScreen');
     } else {
         console.error(`[NAV] Tentativa de navegar para tela inválida: ${screenId}`);
     }
 };
-window.goToScreen = goToScreen; // Expor globalmente
+window.goToScreen = goToScreen;
 
-// Expor funções globais necessárias dos controllers que são chamadas pelo HTML
+// Expor funções globais necessárias dos controllers
 window.openManagerAuthModal = openManagerAuthModal;
-window.deletePayment = deletePayment; // Exportada de paymentController, exposta aqui
-window.handleMassActionRequest = handleMassActionRequest; // Exportada de paymentController, exposta aqui
-window.handleConfirmTableTransfer = handleConfirmTableTransfer; // Exportada de paymentController, exposta aqui
-window.openTableTransferModal = openTableTransferModal; // Exportada de paymentController, exposta aqui
-window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`); // Placeholder
+window.deletePayment = deletePayment;
+window.handleMassActionRequest = handleMassActionRequest;
+window.handleConfirmTableTransfer = handleConfirmTableTransfer;
+window.openTableTransferModal = openTableTransferModal;
+window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`);
 
 
 // Listener da Mesa (atualiza controllers relevantes)
@@ -173,14 +169,25 @@ export const setTableListener = (tableId) => {
         if (docSnapshot.exists()) {
             console.log(`[APP] Snapshot recebido para mesa ${tableId}`);
             currentOrderSnapshot = docSnapshot.data();
-            // Atualiza selectedItems local APENAS se mudou no Firebase E não estamos na tela de pedido
+            
             const firebaseSelectedItems = currentOrderSnapshot.selectedItems || [];
-            const isOrderScreenActive = appContainer?.style.transform === `translateX(-${screens['orderScreen'] * 100}vw)`;
-            if (!isOrderScreenActive && JSON.stringify(firebaseSelectedItems) !== JSON.stringify(selectedItems)) {
-                console.log("[APP] Atualizando selectedItems local com dados do Firebase.");
-                selectedItems.length = 0;
-                selectedItems.push(...firebaseSelectedItems);
+            
+            // **CORREÇÃO APLICADA AQUI**
+            // Removemos a lógica condicional `!isOrderScreenActive`.
+            // Sempre que um snapshot é recebido, o estado local 'selectedItems'
+            // deve ser resetado para a fonte da verdade (Firebase).
+            // A única exceção é se o usuário estiver *ativamente* editando (o que não tratamos ainda).
+            // Para o fluxo de "sair e voltar", o Firebase DEVE ser a fonte.
+            
+            // Compara antes de sobrescrever para evitar loops desnecessários se o snapshot
+            // foi disparado por uma gravação local idêntica.
+            if (JSON.stringify(firebaseSelectedItems) !== JSON.stringify(selectedItems)) {
+                 console.log("[APP] Sincronizando 'selectedItems' local com dados do Firebase.");
+                 selectedItems.length = 0; // Limpa o array local
+                 selectedItems.push(...firebaseSelectedItems); // Preenche com dados do Firebase
             }
+
+            // Chama as funções de renderização que usarão o 'selectedItems' agora correto
             renderOrderScreen(currentOrderSnapshot); // Atualiza Painel 2
             renderPaymentSummary(currentTableId, currentOrderSnapshot); // Atualiza Painel 3
         } else {
@@ -188,7 +195,7 @@ export const setTableListener = (tableId) => {
              if (currentTableId === tableId) {
                  alert(`Mesa ${tableId} foi fechada ou removida.`);
                  if (unsubscribeTable) unsubscribeTable(); unsubscribeTable = null;
-                 currentTableId = null; currentOrderSnapshot = null; selectedItems = [];
+                 currentTableId = null; currentOrderSnapshot = null; selectedItems.length = 0;
                  goToScreen('panelScreen');
              }
         }
@@ -204,7 +211,7 @@ export const setTableListener = (tableId) => {
 export const setCurrentTable = (tableId) => {
     if (currentTableId === tableId && unsubscribeTable) {
         console.log(`[APP] Listener para mesa ${tableId} já ativo.`);
-        return; // Evita reiniciar listener desnecessariamente
+        return; // Evita reiniciar listener
     }
     currentTableId = tableId;
     console.log(`[APP] Definindo mesa atual para ${tableId}`);
@@ -412,7 +419,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Verifica se já temos uma role definida (pode ter vindo de um login local anterior)
                 if (userRole === 'gerente' || userRole === 'garcom') {
                     console.log(`[AUTH] Role ${userRole} já definida. Iniciando app...`);
-                     const userName = STAFF_CREDENTIALS[loginEmailInput?.value?.trim()]?.name || userRole; // Tenta pegar nome do input se ainda estiver lá
+                     // Tenta pegar o nome do usuário das credenciais (se o input ainda tiver valor)
+                     const userName = STAFF_CREDENTIALS[loginEmailInput?.value?.trim()]?.name || userRole;
                      document.getElementById('user-id-display').textContent = `Usuário: ${userName} | ${userRole.toUpperCase()}`; // Atualiza display
                     await initStaffApp(); // Inicia app para usuário existente
                 } else {
