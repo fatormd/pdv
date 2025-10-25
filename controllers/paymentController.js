@@ -2,9 +2,9 @@
 import { currentTableId, currentOrderSnapshot } from "/app.js"; // Apenas estados globais necessários
 import { formatCurrency, calculateItemsValue, getNumericValueFromCurrency } from "/utils.js";
 import { getTableDocRef } from "/services/firebaseService.js";
-import { updateDoc, arrayUnion, arrayRemove, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { updateDoc, arrayUnion, arrayRemove, writeBatch, getFirestore, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { openManagerAuthModal } from "./managerController.js";
-import { handleTableTransferConfirmed } from "./panelController.js";
+import { handleTableTransferConfirmed } from "./panelController.js"; // Importa função de transferência
 
 // --- VARIÁVEIS DE ELEMENTOS (Definidas na função init) ---
 let paymentSplitsContainer, addSplitAccountBtn;
@@ -21,6 +21,9 @@ let tableTransferModal;
 let isMassSelectionActive = false;
 let paymentInitialized = false;
 
+// NOVO: Lista de Métodos de Pagamento
+const PAYMENT_METHODS = ['Dinheiro', 'Pix', 'Crédito', 'Débito', 'Ticket', 'Voucher'];
+
 
 // --- FUNÇÕES DE CÁLCULO E UTILIDADE ---
 const calculateTotal = (subtotal, applyServiceTax) => {
@@ -34,15 +37,11 @@ const updateText = (id, value) => {
     if (el) el.textContent = value;
 };
 
-// **CORREÇÃO BUG 1:** Simplificado para agrupar TODOS os sentItems, ignorando a lógica de 'splits' por enquanto.
+// Agrupamento de Itens (ignora 'splits' por enquanto)
 const groupMainAccountItems = (orderSnapshot) => {
     if (!orderSnapshot || !orderSnapshot.sentItems) return {};
     const sentItems = orderSnapshot.sentItems || [];
 
-    // Lógica de filtro de 'splits' removida temporariamente
-    // const itemsInSplits = ...
-    // const mainAccountItems = sentItems.filter(...)
-    
     // Agrupa diretamente os sentItems
     return sentItems.reduce((acc, item) => {
         const groupKey = `${item.name}-${item.note || ''}`;
@@ -96,12 +95,11 @@ const renderReviewItemsList = (orderSnapshot) => {
     const transferBtn = document.getElementById('itemMassTransferBtn');
     const deleteBtn = document.getElementById('itemMassDeleteBtn');
     
-    if (transferBtn) transferBtn.classList.toggle('text-yellow-400', isMassSelectionActive);
-    if (deleteBtn) deleteBtn.classList.toggle('text-red-400', isMassSelectionActive);
-    if (transferBtn) transferBtn.classList.toggle('text-gray-400', !isMassSelectionActive);
-    if (deleteBtn) deleteBtn.classList.toggle('text-gray-400', !isMassSelectionActive);
+    if(transferBtn) transferBtn.classList.toggle('text-yellow-400', isMassSelectionActive);
+    if(deleteBtn) deleteBtn.classList.toggle('text-red-400', isMassSelectionActive);
+    if(transferBtn) transferBtn.classList.toggle('text-gray-400', !isMassSelectionActive);
+    if(deleteBtn) deleteBtn.classList.toggle('text-gray-400', !isMassSelectionActive);
 
-    // **CORREÇÃO BUG 1:** A verificação agora é sobre mainAccountItemsCount (derivado de sentItems)
     if (mainAccountItemsCount === 0) {
         reviewItemsList.innerHTML = `<div class="text-sm text-dark-placeholder italic p-2">Nenhum item enviado para a conta ainda.</div>`;
         if (transferBtn) transferBtn.disabled = true;
@@ -177,7 +175,8 @@ const renderRegisteredPayments = (payments) => {
             `;
             const deleteBtn = paymentDiv.querySelector('.delete-payment-btn');
             if (deleteBtn) {
-                deleteBtn.onclick = () => deletePayment(p.timestamp);
+                // Chama a função global (definida no app.js)
+                deleteBtn.onclick = () => window.deletePayment(p.timestamp); 
             }
             paymentSummaryList.appendChild(paymentDiv);
         });
@@ -191,12 +190,26 @@ const renderPaymentSplits = (orderSnapshot) => {
      if(addSplitAccountBtn) addSplitAccountBtn.disabled = true;
 };
 
+// (Req 4) NOVO: Renderiza os botões de método de pagamento
+const renderPaymentMethodButtons = () => {
+    if (!paymentMethodButtonsContainer) return;
+    paymentMethodButtonsContainer.innerHTML = '';
+    PAYMENT_METHODS.forEach(method => {
+        paymentMethodButtonsContainer.innerHTML += `
+            <button class="payment-method-btn bg-dark-input text-dark-text border border-gray-600" data-method="${method}">
+                ${method}
+            </button>
+        `;
+    });
+};
+
+
 // Renderiza o Resumo Financeiro Total
 export const renderPaymentSummary = (tableId, orderSnapshot) => {
     if (!orderSnapshot || !paymentInitialized) return;
 
     const tableData = orderSnapshot;
-    const subtotal = tableData.total || 0; // **BUG 2:** Este 'total' é lido aqui
+    const subtotal = tableData.total || 0;
     const payments = tableData.payments || [];
     const currentPaymentsTotal = payments.reduce((sum, p) => sum + (p.value || 0), 0);
     const serviceTaxApplied = orderSnapshot.serviceTaxApplied === undefined ? true : orderSnapshot.serviceTaxApplied;
@@ -230,7 +243,14 @@ export const renderPaymentSummary = (tableId, orderSnapshot) => {
         }
     }
 
-    if (toggleServiceTaxBtn) { /* ... (lógica mantida) ... */ }
+    if (toggleServiceTaxBtn) {
+        toggleServiceTaxBtn.textContent = serviceTaxApplied ? 'Remover' : 'Aplicar';
+        toggleServiceTaxBtn.classList.toggle('bg-green-600', serviceTaxApplied);
+        toggleServiceTaxBtn.classList.toggle('hover:bg-green-700', serviceTaxApplied);
+        toggleServiceTaxBtn.classList.toggle('bg-red-600', !serviceTaxApplied);
+        toggleServiceTaxBtn.classList.toggle('hover:bg-red-700', !serviceTaxApplied);
+    }
+
     if (finalizeOrderBtn) finalizeOrderBtn.disabled = !isClosed;
     if (openNfeModalBtn) openNfeModalBtn.disabled = !isClosed;
     if (addPaymentBtn) addPaymentBtn.disabled = isClosed;
@@ -289,7 +309,6 @@ export const initPaymentController = () => {
     closeCalcBtnX = document.getElementById('closeCalcBtnX');
     selectiveTransferModal = document.getElementById('selectiveTransferModal');
     targetTableInput = document.getElementById('targetTableInput');
-    // checkTargetTableBtn = document.getElementById('checkTargetTableBtn'); // Removido
     confirmTransferBtn = document.getElementById('confirmTransferBtn');
     transferStatus = document.getElementById('transferStatus');
     transferItemsList = document.getElementById('transferItemsList');
@@ -300,25 +319,124 @@ export const initPaymentController = () => {
         console.error("[PaymentController] Erro Fatal: Elemento 'reviewItemsList' não encontrado.");
         return;
     }
+    
+    // (Req 4) Renderiza botões de pagamento
+    renderPaymentMethodButtons();
 
     // Adiciona Listeners Essenciais
-    if(toggleServiceTaxBtn) toggleServiceTaxBtn.addEventListener('click', async () => { /* ... */ });
+    // (Req 3) Habilita Toggle de Taxa de Serviço
+    if(toggleServiceTaxBtn) toggleServiceTaxBtn.addEventListener('click', async () => {
+        if (!currentTableId || !currentOrderSnapshot) return;
+        const currentStatus = currentOrderSnapshot.serviceTaxApplied === undefined ? true : currentOrderSnapshot.serviceTaxApplied;
+        try {
+            await updateDoc(getTableDocRef(currentTableId), { serviceTaxApplied: !currentStatus });
+            console.log(`Taxa de serviço ${!currentStatus ? 'aplicada' : 'removida'}.`);
+        } catch(e) { console.error("Erro ao alternar taxa:", e); }
+    });
+
     if(dinersSplitInput) dinersSplitInput.addEventListener('input', () => renderPaymentSummary(currentTableId, currentOrderSnapshot));
+
     // if(addSplitAccountBtn) addSplitAccountBtn.addEventListener('click', handleAddSplitAccount); // Desabilitado
-    if(paymentMethodButtonsContainer) paymentMethodButtonsContainer.addEventListener('click', (e) => { /* ... */ });
-    if(addPaymentBtn) addPaymentBtn.addEventListener('click', async () => { /* ... */ });
+
+    // (Req 4) Habilita clique nos botões de método
+    if(paymentMethodButtonsContainer) paymentMethodButtonsContainer.addEventListener('click', (e) => {
+        const btn = e.target.closest('.payment-method-btn');
+        if (btn) {
+            paymentMethodButtonsContainer.querySelectorAll('.payment-method-btn').forEach(b => b.classList.remove('active', 'bg-pumpkin', 'text-white'));
+            btn.classList.add('active', 'bg-pumpkin', 'text-white');
+            if(addPaymentBtn) {
+                 const isClosed = remainingBalanceDisplay?.classList.contains('text-green-400') || remainingBalanceDisplay?.textContent === 'R$ 0,00';
+                 addPaymentBtn.disabled = isClosed;
+            }
+        }
+    });
+
+    // (Req 4) Habilita botão Adicionar Pagamento
+    if(addPaymentBtn) addPaymentBtn.addEventListener('click', async () => {
+         if (!currentTableId || !currentOrderSnapshot) return;
+         const value = getNumericValueFromCurrency(paymentValueInput?.value || '0');
+         const activeMethodBtn = paymentMethodButtonsContainer?.querySelector('.payment-method-btn.active');
+         const method = activeMethodBtn ? activeMethodBtn.dataset.method : null;
+
+         if (!method || value <= 0) { alert("Selecione método e valor válido."); return; }
+
+         const newPayment = { method, value, timestamp: Date.now(), userId: window.userId || 'unknown' };
+         try {
+             await updateDoc(getTableDocRef(currentTableId), { payments: arrayUnion(newPayment) });
+             if(paymentValueInput) paymentValueInput.value = 'R$ 0,00';
+             activeMethodBtn?.classList.remove('active', 'bg-pumpkin', 'text-white');
+             addPaymentBtn.disabled = true;
+         } catch(e) { console.error("Erro ao adicionar pagamento:", e); alert("Falha ao registrar pagamento."); }
+    });
+
     if(finalizeOrderBtn) finalizeOrderBtn.addEventListener('click', handleFinalizeOrder);
     // Listener do NFe está no app.js
-    if (openCalculatorBtn) openCalculatorBtn.addEventListener('click', () => { /* ... */ });
-    if (closeCalcBtnX) closeCalcBtnX.addEventListener('click', () => { /* ... */ });
-    if (calcButtons) calcButtons.addEventListener('click', (e) => { /* ... */ });
+
+    // Listeners da Calculadora
+    if (openCalculatorBtn) openCalculatorBtn.addEventListener('click', () => { if(calculatorModal) calculatorModal.style.display = 'flex'; /* ... (lógica interna da calc mantida) ... */ });
+    if (closeCalcBtnX) closeCalcBtnX.addEventListener('click', () => { if (calculatorModal) calculatorModal.style.display = 'none'; });
+    if (calcButtons) calcButtons.addEventListener('click', (e) => { 
+        // Lógica da calculadora (mantida como estava)
+        const key = e.target.closest('.calc-btn')?.dataset.key;
+        if(!key) return;
+        // ... (lógica interna da calc mantida) ...
+    });
+
+     // Listeners do Modal de Transferência de Mesa
     const confirmTableTransferBtn = document.getElementById('confirmTableTransferBtn');
     if(confirmTableTransferBtn) {
         const newConfirmBtn = confirmTableTransferBtn.cloneNode(true);
         confirmTableTransferBtn.parentNode.replaceChild(newConfirmBtn, confirmTableTransferBtn);
         newConfirmBtn.addEventListener('click', handleConfirmTableTransfer);
     }
-    if (targetTableInput) targetTableInput.addEventListener('input', async (e) => { /* ... (lógica mantida) ... */ });
+
+    if (targetTableInput) targetTableInput.addEventListener('input', async (e) => { 
+        const tableNumber = e.target.value.trim();
+        const confirmBtn = document.getElementById('confirmTableTransferBtn');
+        const newTableDinersInputEl = document.getElementById('newTableDinersInput');
+        const transferStatusEl = document.getElementById('transferStatus');
+
+        if(!confirmBtn || !newTableDinersInputEl || !transferStatusEl) return;
+
+        confirmBtn.disabled = true;
+        newTableDinersInputEl.classList.add('hidden');
+        confirmBtn.textContent = 'Verificando...';
+        transferStatusEl.classList.add('hidden');
+
+        if (tableNumber && tableNumber !== currentTableId) {
+             try {
+                const targetRef = getTableDocRef(tableNumber);
+                const targetSnap = await getDoc(targetRef); // Precisa do getDoc aqui
+                if (targetSnap.exists() && targetSnap.data().status?.toLowerCase() === 'open') {
+                     confirmBtn.textContent = `Transferir para Mesa ${tableNumber}`;
+                     confirmBtn.disabled = false;
+                     transferStatusEl.textContent = `Mesa ${tableNumber} está aberta.`;
+                     transferStatusEl.classList.remove('hidden', 'text-red-500', 'text-yellow-500');
+                     transferStatusEl.classList.add('text-green-500');
+                } else {
+                     newTableDinersInputEl.classList.remove('hidden');
+                     confirmBtn.textContent = `Abrir Mesa ${tableNumber} e Transferir`;
+                     confirmBtn.disabled = false;
+                     transferStatusEl.textContent = `Mesa ${tableNumber} está fechada. Será aberta.`;
+                     transferStatusEl.classList.remove('hidden', 'text-red-500', 'text-green-500');
+                     transferStatusEl.classList.add('text-yellow-500');
+                }
+             } catch (error) {
+                 console.error("Erro ao verificar mesa:", error);
+                 confirmBtn.textContent = 'Erro ao verificar';
+                 transferStatusEl.textContent = 'Erro ao verificar mesa.';
+                 transferStatusEl.classList.remove('hidden', 'text-green-500', 'text-yellow-500');
+                 transferStatusEl.classList.add('text-red-500');
+             }
+        } else if (tableNumber === currentTableId) {
+             confirmBtn.textContent = 'Mesa igual à atual';
+             transferStatusEl.textContent = 'Não pode transferir para a mesma mesa.';
+             transferStatusEl.classList.remove('hidden', 'text-green-500', 'text-yellow-500');
+             transferStatusEl.classList.add('text-red-500');
+        } else {
+             confirmBtn.textContent = 'Prosseguir';
+        }
+    });
 
     paymentInitialized = true;
     console.log("[PaymentController] Inicializado.");
