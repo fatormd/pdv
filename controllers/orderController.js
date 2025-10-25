@@ -5,6 +5,9 @@ import { saveSelectedItemsToFirebase } from "/services/firebaseService.js";
 import { currentTableId, selectedItems, userRole, currentOrderSnapshot } from "/app.js"; // Importa estados globais
 import { arrayUnion, serverTimestamp, doc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { getKdsCollectionRef, getTableDocRef } from "/services/firebaseService.js";
+// Importar explicitamente a função de navegação, se necessário (embora os botões de voltar/pagamento usem window.goToScreen)
+import { goToScreen } from "/app.js";
+
 
 // --- VARIÁVEIS DE ELEMENTOS (Definidas na função init) ---
 let obsModal, obsItemName, obsInput, saveObsBtn, cancelObsBtn, esperaSwitch;
@@ -26,32 +29,38 @@ export const increaseLocalItemQuantity = (itemId, noteKey) => {
     );
 
     if (itemToCopy) {
-        selectedItems.push({ ...itemToCopy, note: noteKey });
+        selectedItems.push({ ...itemToCopy, note: noteKey }); // MUTATE (OK)
         renderOrderScreen(); // Re-renderiza a lista de itens selecionados
         saveSelectedItemsToFirebase(currentTableId, selectedItems); // Salva no Firebase
     }
 };
-// window.increaseLocalItemQuantity = increaseLocalItemQuantity; // Exposto no app.js
+window.increaseLocalItemQuantity = increaseLocalItemQuantity; // Exposto no app.js
+
 
 export const decreaseLocalItemQuantity = (itemId, noteKey) => {
-    const indexToRemove = selectedItems.findIndex(item =>
-        item.id == itemId && (item.note || '') === noteKey
-    );
+    // Encontra o ÍNDICE do último item correspondente
+    let indexToRemove = -1;
+    for (let i = selectedItems.length - 1; i >= 0; i--) {
+        if (selectedItems[i].id == itemId && (selectedItems[i].note || '') === noteKey) {
+            indexToRemove = i;
+            break;
+        }
+    }
 
     if (indexToRemove > -1) {
-        selectedItems.splice(indexToRemove, 1);
+        selectedItems.splice(indexToRemove, 1); // MUTATE (OK)
         renderOrderScreen(); // Re-renderiza a lista de itens selecionados
         saveSelectedItemsToFirebase(currentTableId, selectedItems); // Salva no Firebase
     }
 };
-// window.decreaseLocalItemQuantity = decreaseLocalItemQuantity; // Exposto no app.js
+window.decreaseLocalItemQuantity = decreaseLocalItemQuantity; // Exposto no app.js
 
 
 // --- FUNÇÕES DE EXIBIÇÃO DE TELA E MODAL ---
 
 export const renderMenu = () => {
     if (!menuItemsGrid || !categoryFiltersContainer) {
-        console.warn("[Order] Elementos do menu não encontrados para renderizar.");
+        // console.warn("[Order] Elementos do menu não encontrados para renderizar.");
         return;
     }
 
@@ -91,7 +100,6 @@ export const renderMenu = () => {
     if (filteredProducts.length === 0) {
         menuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-red-400 italic">Nenhum produto encontrado.</div>`;
     } else {
-        // **CORREÇÃO:** Aplicado tema dark mode aos cards e removidos comentários
         menuItemsGrid.innerHTML = filteredProducts.map(product => `
             <div class="product-card bg-dark-card border border-gray-700 p-4 rounded-xl shadow-md cursor-pointer hover:shadow-lg transition duration-150">
                 <h4 class="font-bold text-base text-dark-text">${product.name}</h4>
@@ -103,7 +111,7 @@ export const renderMenu = () => {
                         <i class="fas fa-plus text-lg"></i>
                     </button>
                 </div>
-                </div>
+            </div>
         `).join('');
     }
 };
@@ -126,7 +134,6 @@ const _renderSelectedItemsList = () => {
             return acc;
         }, {});
 
-        // **CORREÇÃO:** Aplicado tema dark mode
         openOrderList.innerHTML = Object.values(groupedItems).map(group => `
             <div class="flex justify-between items-center bg-dark-input border border-gray-600 p-3 rounded-lg shadow-sm">
                 <div class="flex flex-col flex-grow min-w-0 mr-2">
@@ -138,11 +145,11 @@ const _renderSelectedItemsList = () => {
                 <div class="flex items-center space-x-2 flex-shrink-0">
                     <button class="qty-btn bg-red-600 text-white rounded-full text-lg hover:bg-red-700 transition duration-150"
                             data-item-id="${group.id}" data-item-note-key="${group.note || ''}" data-action="decrease">
-                        <i class="fas fa-minus"></i>
+                        <i class="fas fa-minus pointer-events-none"></i> {/* Evita clique no ícone */}
                     </button>
                     <button class="qty-btn bg-green-600 text-white rounded-full text-lg hover:bg-green-700 transition duration-150"
                             data-item-id="${group.id}" data-item-note-key="${group.note || ''}" data-action="increase">
-                        <i class="fas fa-plus"></i>
+                        <i class="fas fa-plus pointer-events-none"></i> {/* Evita clique no ícone */}
                     </button>
                 </div>
             </div>
@@ -151,7 +158,18 @@ const _renderSelectedItemsList = () => {
 };
 
 // Função principal para renderizar toda a tela de pedido
-export const renderOrderScreen = () => {
+export const renderOrderScreen = (orderSnapshot) => {
+    // Se um snapshot for passado, atualiza o estado de selectedItems (se não estiver na tela de pedido)
+    if (orderSnapshot) {
+         const firebaseSelectedItems = orderSnapshot.selectedItems || [];
+         const isOrderScreenActive = document.getElementById('appContainer')?.style.transform === `translateX(-${screens['orderScreen'] * 100}vw)`;
+         
+         if (!isOrderScreenActive && JSON.stringify(firebaseSelectedItems) !== JSON.stringify(selectedItems)) {
+             console.log("[OrderController] Atualizando selectedItems com snapshot.");
+             selectedItems.length = 0;
+             selectedItems.push(...firebaseSelectedItems);
+         }
+    }
     _renderSelectedItemsList();
     renderMenu(); // Renderiza/Atualiza o menu
 };
@@ -163,7 +181,7 @@ export const openObsModalForGroup = (itemId, noteKey) => {
     const product = products.find(p => p.id == itemId);
 
     if (!obsModal || !obsItemName || !obsInput || !esperaSwitch || !product) {
-        console.error("Erro: Elementos do modal OBS ou produto não encontrados.", {obsModal, obsItemName, obsInput, esperaSwitch, product});
+        console.error("Erro: Elementos do modal OBS ou produto não encontrados.");
         return;
     }
 
@@ -182,8 +200,7 @@ export const openObsModalForGroup = (itemId, noteKey) => {
 
     obsModal.style.display = 'flex';
 };
-// Expor globalmente para ser chamado pelo onclick gerado dinamicamente
-window.openObsModalForGroup = openObsModalForGroup;
+window.openObsModalForGroup = openObsModalForGroup; // Expor globalmente
 
 
 // Adicionar Produto à Lista de Selecionados (chamado pelo botão + no cardápio)
@@ -202,19 +219,17 @@ export const addItemToSelection = (product) => {
         name: product.name,
         price: product.price,
         sector: product.sector || 'cozinha',
-        category: product.category || 'uncategorized', // Garante que categoria exista
+        category: product.category || 'uncategorized',
         note: ''
     };
 
-    selectedItems.push(newItem);
+    selectedItems.push(newItem); // MUTATE (OK)
 
-    renderOrderScreen(); // Atualiza a UI da lista de selecionados
+    renderOrderScreen(); // Atualiza a UI
     saveSelectedItemsToFirebase(currentTableId, selectedItems); // Salva no Firebase
 
-    openObsModalForGroup(product.id, '');
+    openObsModalForGroup(product.id, ''); // Abre modal para o item recém-adicionado
 };
-// Expor globalmente
-// window.addItemToSelection = addItemToSelection; // Não é mais necessário, listener de cardápio cuida disso
 
 
 // Envia Pedidos ao KDS e Resumo (Função de Staff)
@@ -231,7 +246,7 @@ export const handleSendSelectedItems = async () => {
         return;
     }
 
-    const itemsToSendValue = itemsToSend.reduce((sum, item) => sum + item.price, 0);
+    // const itemsToSendValue = itemsToSend.reduce((sum, item) => sum + item.price, 0);
     const kdsOrderRef = doc(getKdsCollectionRef()); // Cria referência para novo doc KDS
 
     const itemsForFirebase = itemsToSend.map(item => ({
@@ -241,8 +256,8 @@ export const handleSendSelectedItems = async () => {
         category: item.category,
         sector: item.sector,
         note: item.note || '',
-        sentAt: Date.now(), // Timestamp JS para referência rápida
-        orderId: kdsOrderRef.id, // ID do pedido KDS
+        sentAt: Date.now(), // Timestamp JS
+        orderId: kdsOrderRef.id,
     }));
 
     try {
@@ -274,8 +289,12 @@ export const handleSendSelectedItems = async () => {
         console.log("[Order] Mesa atualizada com sucesso.");
 
         // 3. Sucesso: Atualiza o estado local e UI
-        selectedItems.length = 0; // Limpa localmente
-        selectedItems.push(...itemsToHold); // Adiciona de volta os que ficaram em espera
+        
+        // **CORREÇÃO 2: Mutar o array importado**
+        selectedItems.length = 0; // Limpa o array importado
+        selectedItems.push(...itemsToHold); // Adiciona de volta os itens em espera
+        // REMOVIDO: selectedItems = [...itemsToHold]; // <-- LINHA QUE CAUSA ERRO
+        
         renderOrderScreen(); // Re-renderiza
 
         alert(`Pedido enviado! ${itemsToHold.length > 0 ? `(${itemsToHold.length} itens retidos em espera)` : ''}`);
@@ -283,7 +302,7 @@ export const handleSendSelectedItems = async () => {
     } catch (e) {
         console.error("Erro ao enviar pedido:", e);
         alert("Falha ao enviar pedido ao KDS/Firebase. Tente novamente.");
-        // Restaura selectedItems em caso de falha
+        // Restaura selectedItems em caso de falha (mutando)
         selectedItems.length = 0;
         selectedItems.push(...itemsToSend, ...itemsToHold);
         renderOrderScreen();
@@ -339,7 +358,8 @@ export const initOrderController = () => {
     if (openOrderList) {
         openOrderList.addEventListener('click', (e) => {
             const target = e.target;
-            const qtyBtn = target.closest('.qty-btn');
+            // Garante que o clique seja no botão e não no ícone (ícone tem pointer-events-none)
+            const qtyBtn = target.closest('.qty-btn'); 
             const obsSpan = target.closest('span[data-item-id]'); // Clica na observação
 
             if (qtyBtn) {
@@ -395,9 +415,8 @@ export const initOrderController = () => {
             const isEsperaActive = esperaSwitch.checked;
             const esperaTag = ' [EM ESPERA]';
 
-            // Remove a tag antiga antes de adicionar a nova, se necessário
             let noteCleaned = newNote.replace(esperaTag, '').trim();
-            noteCleaned = noteCleaned.replace(/,?\s*\[EM ESPERA\]/gi, '').trim(); // Regex
+            noteCleaned = noteCleaned.replace(/,?\s*\[EM ESPERA\]/gi, '').trim();
 
             if (isEsperaActive) {
                 newNote = (noteCleaned + esperaTag).trim();
@@ -405,15 +424,20 @@ export const initOrderController = () => {
                 newNote = noteCleaned;
             }
 
-            // Atualiza TODOS os itens que pertencem a esse grupo de obs original
+            // **CORREÇÃO 1: Mutar o array importado**
             let updated = false;
-            selectedItems = selectedItems.map(item => {
+            const updatedItems = selectedItems.map(item => {
                 if (item.id == itemId && (item.note || '') === originalNoteKey) {
                     updated = true;
                     return { ...item, note: newNote };
                 }
                 return item;
             });
+            
+            // Reatribui o conteúdo da lista global (selectedItems)
+            selectedItems.length = 0; 
+            selectedItems.push(...updatedItems);
+            // REMOVIDO: selectedItems = updatedItems; // <-- LINHA QUE CAUSA ERRO
 
             if (updated) {
                 obsModal.style.display = 'none';
@@ -430,13 +454,11 @@ export const initOrderController = () => {
 
     if (cancelObsBtn) {
         cancelObsBtn.addEventListener('click', () => {
-            // Se o item foi recém-adicionado (originalNoteKey é vazio) E a nova nota está vazia, remove o último item adicionado com esse ID
             const itemId = obsModal.dataset.itemId;
             const originalNoteKey = obsModal.dataset.originalNoteKey;
             const currentNote = obsInput.value.trim();
 
             if (originalNoteKey === '' && currentNote === '') {
-                 // Encontra o último índice (o mais recente)
                  let lastIndex = -1;
                  for (let i = selectedItems.length - 1; i >= 0; i--) {
                      if (selectedItems[i].id == itemId && selectedItems[i].note === '') {
@@ -445,7 +467,7 @@ export const initOrderController = () => {
                      }
                  }
                  if (lastIndex > -1) {
-                     selectedItems.splice(lastIndex, 1);
+                     selectedItems.splice(lastIndex, 1); // MUTATE (OK)
                      console.log("Item recém-adicionado cancelado.");
                  }
             }
@@ -461,14 +483,13 @@ export const initOrderController = () => {
     if (quickObsButtons) {
         quickObsButtons.addEventListener('click', (e) => {
              const btn = e.target.closest('.quick-obs-btn');
-             if (btn && obsInput && !obsInput.readOnly) { // Verifica se não está readonly
+             if (btn && obsInput && !obsInput.readOnly) {
                  const obsText = btn.dataset.obs;
                  let currentValue = obsInput.value.trim();
-                 // Adiciona vírgula e espaço se necessário
                  if (currentValue && !currentValue.endsWith(',') && !currentValue.endsWith(' ')) {
                      currentValue += ', ';
                  } else if (currentValue && (currentValue.endsWith(',') || currentValue.endsWith(' '))) {
-                     currentValue += ' '; // Garante espaço após vírgula
+                     currentValue += ' ';
                  }
                  obsInput.value = (currentValue + obsText).trim();
              }
