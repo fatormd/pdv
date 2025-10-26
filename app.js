@@ -9,13 +9,11 @@ import { fetchWooCommerceProducts, fetchWooCommerceCategories } from '/services/
 import { formatCurrency, formatElapsedTime } from '/utils.js';
 
 // Importações dos Controllers
-// CORREÇÃO: Removido 'handleTableTransferConfirmed' da importação do panelController
 import { loadOpenTables, renderTableFilters, handleAbrirMesa, handleSearchTable, initPanelController } from '/controllers/panelController.js';
 import { renderMenu, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity, openObsModalForGroup, initOrderController, handleSendSelectedItems } from '/controllers/orderController.js';
 import {
     renderPaymentSummary, deletePayment, handleMassActionRequest, 
     initPaymentController, handleFinalizeOrder,
-    // --- CORREÇÃO AQUI: 'activateItemSelection' REMOVIDO DA IMPORTAÇÃO ---
     handleMassDeleteConfirmed, executeDeletePayment, // Funções de ação
     openTableTransferModal, handleConfirmTableTransfer // Funções de UI
 } from '/controllers/paymentController.js';
@@ -109,6 +107,7 @@ export const goToScreen = (screenId) => {
     if (!appContainer) appContainer = document.getElementById('appContainer');
     if (!mainContent) mainContent = document.getElementById('mainContent');
 
+    // Salva os itens locais no Firebase ANTES de navegar para o painel
     if (currentTableId && screenId === 'panelScreen') {
         const currentTransform = appContainer?.style.transform || '';
         const currentScreenKey = Object.keys(screens).find(key => screens[key] * -100 + 'vw' === currentTransform.replace(/translateX\((.*?)\)/, '$1'));
@@ -118,10 +117,11 @@ export const goToScreen = (screenId) => {
         }
     }
 
+    // Desliga o listener e limpa o estado local DEPOIS de salvar
     if ((screenId === 'panelScreen' || screenId === 'loginScreen') && currentTableId && unsubscribeTable) {
         console.log(`[NAV] Desinscrevendo do listener da mesa ${currentTableId}`);
         unsubscribeTable(); unsubscribeTable = null;
-        currentTableId = null; currentOrderSnapshot = null; selectedItems.length = 0;
+        currentTableId = null; currentOrderSnapshot = null; selectedItems.length = 0; // Limpa o array local
         const currentTableNumEl = document.getElementById('current-table-number');
         const paymentTableNumEl = document.getElementById('payment-table-number');
         if(currentTableNumEl) currentTableNumEl.textContent = `Mesa`;
@@ -141,7 +141,6 @@ export const goToScreen = (screenId) => {
 };
 window.goToScreen = goToScreen;
 
-// **CORREÇÃO:** LÓGICA DE TRANSFERÊNCIA MOVIDA DO panelController PARA CÁ
 export const handleTableTransferConfirmed = async (originTableId, targetTableId, itemsToTransfer, newDiners = 0, newSector = '') => {
     if (!originTableId || !targetTableId || itemsToTransfer.length === 0) {
         alert("Erro: Dados de transferência incompletos.");
@@ -282,6 +281,9 @@ window.decreaseLocalItemQuantity = decreaseLocalItemQuantity;
 window.openObsModalForGroup = openObsModalForGroup;
 
 
+// ==================================================================
+//               FUNÇÃO CORRIGIDA / ATUALIZADA
+// ==================================================================
 // Listener da Mesa
 export const setTableListener = (tableId) => {
     if (unsubscribeTable) unsubscribeTable();
@@ -293,16 +295,22 @@ export const setTableListener = (tableId) => {
             currentOrderSnapshot = docSnapshot.data();
             const firebaseSelectedItems = currentOrderSnapshot.selectedItems || [];
             
-            const isOrderScreenActive = appContainer?.style.transform === `translateX(-${screens['orderScreen'] * 100}vw)`;
-            
-            if (!isOrderScreenActive && JSON.stringify(firebaseSelectedItems) !== JSON.stringify(selectedItems)) {
-                console.log("[APP] Sincronizando 'selectedItems' local com dados do Firebase.");
-                selectedItems.length = 0;
-                selectedItems.push(...firebaseSelectedItems);
+            // --- INÍCIO DA CORREÇÃO ---
+            // A lógica de sincronização foi simplificada.
+            // O app.js (listener) é a "fonte da verdade". Ele SEMPRE atualiza
+            // o array 'selectedItems' local para espelhar o Firebase.
+            if (JSON.stringify(firebaseSelectedItems) !== JSON.stringify(selectedItems)) {
+                 console.log("[APP] Sincronizando 'selectedItems' local com dados do Firebase.");
+                 selectedItems.length = 0; // Limpa o array local
+                 selectedItems.push(...firebaseSelectedItems); // Preenche com os dados do Firebase
             }
-            
+            // --- FIM DA CORREÇÃO ---
+
+            // Agora, chama as funções de renderização, que vão usar
+            // o array 'selectedItems' que ACABAMOS de atualizar.
             renderOrderScreen(currentOrderSnapshot);
             renderPaymentSummary(currentTableId, currentOrderSnapshot);
+
         } else {
              console.warn(`[APP] Listener: Mesa ${tableId} não existe ou foi fechada.`);
              if (currentTableId === tableId) {
@@ -319,19 +327,27 @@ export const setTableListener = (tableId) => {
          goToScreen('panelScreen');
     });
 };
+// ==================================================================
+//                  FIM DA FUNÇÃO CORRIGIDA
+// ==================================================================
 
 // Define a mesa atual e inicia o listener
 export const setCurrentTable = (tableId) => {
     if (currentTableId === tableId && unsubscribeTable) {
         console.log(`[APP] Listener para mesa ${tableId} já ativo.`);
-        return;
+        // Mesmo se o listener estiver ativo, precisamos carregar os itens (caso tenham sido limpos)
+        // A chamada ao setTableListener abaixo vai lidar com isso
     }
+    
     currentTableId = tableId;
     console.log(`[APP] Definindo mesa atual para ${tableId}`);
+    
     const currentTableNumEl = document.getElementById('current-table-number');
     const paymentTableNumEl = document.getElementById('payment-table-number');
     if(currentTableNumEl) currentTableNumEl.textContent = `Mesa ${tableId}`;
     if(paymentTableNumEl) paymentTableNumEl.textContent = `Mesa ${tableId}`;
+    
+    // Inicia o listener (ou reinicia, se já estava ativo, para garantir a carga inicial)
     setTableListener(tableId);
 };
 
@@ -339,9 +355,15 @@ export const setCurrentTable = (tableId) => {
 export const selectTableAndStartListener = async (tableId) => {
     console.log(`[APP] Selecionando mesa ${tableId} e iniciando listener.`);
     try {
-        await fetchWooCommerceProducts(/* Callback opcional */); // Garante menu
-        setCurrentTable(tableId); // Define mesa e inicia listener
-        goToScreen('orderScreen'); // Navega
+        // Garante que o menu esteja carregado ANTES de ir para a tela
+        await fetchWooCommerceProducts(/* Callback opcional */); 
+        
+        // Define a mesa atual e inicia o listener
+        // O listener (setTableListener) JÁ VAI carregar os 'selectedItems' do Firebase
+        setCurrentTable(tableId); 
+        
+        // Navega para a tela
+        goToScreen('orderScreen'); 
     } catch (error) {
         console.error(`[APP] Erro ao selecionar mesa ${tableId}:`, error);
         alert("Erro ao abrir a mesa. Verifique a conexão.");
@@ -350,7 +372,7 @@ export const selectTableAndStartListener = async (tableId) => {
 window.selectTableAndStartListener = selectTableAndStartListener;
 
 // Função NF-e (Placeholder global)
-window.openNfeModal = () => { /* ... (lógica mantida) ... */ };
+window.openNfeModal = () => { alert("Abrir modal NF-e (DEV)"); };
 
 
 // --- INICIALIZAÇÃO APP STAFF ---
@@ -417,7 +439,9 @@ const handleStaffLogin = async () => {
                 console.warn("[LOGIN] Login Firebase falhou. Usando Mock ID.", authError);
                 userId = `mock_${userRole}_${Date.now()}`;
             }
-            document.getElementById('user-id-display').textContent = `Usuário: ${staffData.name} | ${userRole.toUpperCase()}`;
+            
+            const userName = staffData.name || userRole;
+            document.getElementById('user-id-display').textContent = `Usuário: ${userName} | ${userRole.toUpperCase()}`;
             console.log("[LOGIN] User info display atualizado.");
 
             console.log("[LOGIN] Chamando initStaffApp...");
@@ -461,17 +485,16 @@ window.handleLogout = handleLogout;
 document.addEventListener('DOMContentLoaded', () => {
     console.log("[INIT] DOMContentLoaded.");
     
-    // **CORREÇÃO:** Usa o objeto FIREBASE_CONFIG definido no topo
     const firebaseConfig = FIREBASE_CONFIG;
     
     try {
         console.log("[INIT] Config Firebase carregada do módulo.");
 
         // Inicializa Firebase App e Serviços
-        const app = initializeApp(firebaseConfig); // Usa a variável local
+        const app = initializeApp(firebaseConfig);
         const dbInstance = getFirestore(app);
         const authInstance = getAuth(app);
-        initializeFirebase(dbInstance, authInstance, APP_ID); // Usa a const global do módulo
+        initializeFirebase(dbInstance, authInstance, APP_ID); 
         console.log("[INIT] Firebase App e Serviços inicializados.");
 
         // Mapeia elementos Globais e de Login
@@ -486,7 +509,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("[INIT] Elementos Globais e de Login mapeados.");
 
         // Listener de Autenticação Firebase
-        onAuthStateChanged(authInstance, async (user) => { // Tornar async
+        onAuthStateChanged(authInstance, async (user) => {
             console.log("[AUTH] State Changed:", user ? `User UID: ${user.uid}` : 'No user');
             if (user) {
                 userId = user.uid;
