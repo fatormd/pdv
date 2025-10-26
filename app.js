@@ -250,7 +250,7 @@ window.openManagerAuthModal = (action, payload = null) => {
                     case 'openCategoryManagement':
                     case 'openInventoryManagement':
                     case 'openRecipesManagement':
-                    V... (outras ações do manager)
+                    // V... (outras ações do manager)
                         handleGerencialAction(action, payload); // Chama a função do managerController
                         break;
 
