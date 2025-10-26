@@ -58,9 +58,15 @@ const renderPaymentSplits = (orderSnapshot) => { /* ... (lógica placeholder man
 const renderPaymentMethodButtons = () => { /* ... (lógica mantida) ... */ };
 export const renderPaymentSummary = (tableId, orderSnapshot) => {
     if (!orderSnapshot || !paymentInitialized) return;
+
+    // <-- CORREÇÃO AQUI
+    // A variável 'payments' precisa ser definida a partir do snapshot
+    const payments = orderSnapshot.payments || [];
+    // --- FIM DA CORREÇÃO ---
+
     // ... (lógica de cálculo e atualização de UI mantida) ...
     renderReviewItemsList(orderSnapshot);
-    renderRegisteredPayments(payments);
+    renderRegisteredPayments(payments); // Agora 'payments' existe
     renderPaymentSplits(orderSnapshot);
 };
 
