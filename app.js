@@ -15,7 +15,8 @@ import { renderMenu, renderOrderScreen, increaseLocalItemQuantity, decreaseLocal
 import {
     renderPaymentSummary, deletePayment, handleMassActionRequest, 
     initPaymentController, handleFinalizeOrder,
-    activateItemSelection, handleMassDeleteConfirmed, executeDeletePayment, // Funções de ação
+    // --- CORREÇÃO AQUI: 'activateItemSelection' REMOVIDO DA IMPORTAÇÃO ---
+    handleMassDeleteConfirmed, executeDeletePayment, // Funções de ação
     openTableTransferModal, handleConfirmTableTransfer // Funções de UI
 } from '/controllers/paymentController.js';
 import { initManagerController, handleGerencialAction } from '/controllers/managerController.js';
