@@ -132,6 +132,12 @@ export const handleFinalizeOrder = () => { alert("Finalizar Conta (DEV)"); };
 
 // --- INICIALIZAÇÃO DO CONTROLLER ---
 const attachReviewListListeners = () => {
+    // ---- INÍCIO DA CORREÇÃO ----
+    // É preciso encontrar os botões aqui, pois eles são criados dinamicamente pela renderReviewItemsList
+    const massDeleteBtn = document.getElementById('massDeleteBtn');
+    const massTransferBtn = document.getElementById('massTransferBtn');
+    // ---- FIM DA CORREÇÃO ----
+
     // ... (lógica mantida) ...
     // **CORREÇÃO:** Garante que os botões chamem a função global
     if (massDeleteBtn) {
