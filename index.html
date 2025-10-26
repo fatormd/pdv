@@ -47,13 +47,10 @@
             <button onclick="window.goToScreen('panelScreen')" class="px-3 py-1 text-2xl text-pumpkin hover:text-pumpkin-dark transition" title="Voltar ao Painel">
                 <i class="fas fa-th-large"></i>
             </button>
-            <h2 id="current-table-number" class="text-xl font-bold text-dark-text ml-2">Painel</h2>
+            <h2 id="current-table-number" class="text-xl font-bold text-dark-text ml-2">Fator MD</h2> 
         </div>
         <div class="flex items-center space-x-3">
-             <button id="openNfeModalBtn" class="p-2 text-dark-placeholder hover:text-dark-text transition" title="Emitir NF-e">
-                <i class="fas fa-receipt text-lg"></i>
-            </button>
-            <button id="openManagerPanelBtn" class="p-2 text-dark-placeholder hover:text-dark-text transition hidden" title="Painel Gerencial">
+             <button id="openManagerPanelBtn" class="p-2 text-dark-placeholder hover:text-dark-text transition hidden" title="Painel Gerencial">
                 <i class="fas fa-shield-alt text-lg"></i>
             </button>
             <button id="logoutBtnHeader" class="p-2 text-red-400 hover:text-red-500 transition hidden" title="Sair">
@@ -68,17 +65,12 @@
             <div id="loginScreen" class="w-screen flex-shrink-0 flex items-center justify-center p-4 bg-dark-bg">
                 <div class="content-card bg-dark-card p-8 rounded-xl shadow-2xl w-full max-w-sm text-center">
                     <h3 class="text-2xl font-bold text-pumpkin mb-6">Fator PDV - Staff</h3>
-                    
                     <input type="email" id="loginEmail" placeholder="E-mail (Ex: agencia@fatormd.com)" class="input-pdv w-full p-4 mb-4 text-base">
-                    
                     <input type="password" id="loginPassword" placeholder="Senha" class="input-pdv w-full p-4 mb-6 text-base">
-                    
                     <div id="loginErrorMsg" class="text-red-400 text-sm mb-4" style="display: none;"></div>
-                    
                     <div class="flex space-x-3">
                         <button id="loginBtn" class="w-full bg-pumpkin text-white font-bold py-4 rounded-lg hover:bg-pumpkin-dark transition text-lg disabled:opacity-50">Entrar</button>
                     </div>
-                    
                     <p class="mt-4 text-xs text-dark-placeholder">Use 'garcom@fator.com' | Senha: 1234</p>
                     <p class="mt-1 text-xs text-dark-placeholder">Use 'agencia@fatormd.com' | Senha: 1234 (Gerente)</p>
                 </div>
@@ -122,9 +114,9 @@
             </div>
 
             <div id="orderScreen" class="flex-shrink-0 bg-dark-bg text-dark-text">
-                <div class="flex items-center justify-between mb-4 -mt-4">
+                 <div class="flex items-center justify-between mb-4 -mt-4">
                     <div class="flex items-center text-green-400">
-                        <span class="text-2xl font-semibold mr-3">(Tela de Pedido)</span>
+                        <span id="order-screen-table-number" class="text-2xl font-semibold mr-3">Pedido</span> 
                     </div>
                     <button id="goToPaymentBtn" class="rounded-full bg-green-600 p-3 text-white shadow-lg hover:bg-green-700 transition w-12 h-12 flex items-center justify-center" title="Ver Conta" onclick="window.goToScreen('paymentScreen')">
                         <i class="fas fa-receipt text-xl"></i>
@@ -136,7 +128,7 @@
                         <div class="flex justify-between items-center mb-4">
                             <h2 class="text-xl font-semibold text-dark-text mr-2">Pedido Atual (<span id="openItemsCount">0</span>)</h2>
                             <button id="sendSelectedItemsBtn" class="bg-green-600 text-white p-3 rounded-full shadow-lg hover:bg-green-700 transition duration-150 w-12 h-12 flex items-center justify-center text-xl disabled:opacity-50" title="Enviar Pedido para Produção">
-                                <i class="fas fa-check-circle"></i>
+                                <i class="fas fa-paper-plane"></i> 
                             </button>
                         </div>
                         <div id="openOrderList" class="space-y-3 mb-4">
@@ -171,41 +163,33 @@
 
                 <div id="chargeInputs" class="content-card p-4 mb-6">
                     <h2 class="text-xl font-semibold text-pumpkin mb-4">Registrar Pagamento</h2>
-                    
                     <div id="paymentSummaryList" class="mb-4 p-3 rounded-lg bg-dark-bg border border-dark-border max-h-40 overflow-y-auto">
                         </div>
-
                     <div class="flex space-x-2 mb-3">
                         <input type="text" id="customerSearchInput" placeholder="Buscar cliente (CPF/Nome)" class="input-pdv w-full">
                         <button id="openCustomerRegBtn" class="p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition w-14">
                             <i class="fas fa-user-plus"></i>
                         </button>
                     </div>
-                    
                     <div id="paymentMethodButtons" class="grid grid-cols-3 gap-2 mb-3">
                         </div>
-
                     <div class="flex space-x-2 mb-4">
                         <input type="text" id="paymentValueInput" placeholder="Valor (Ex: 50,00)" class="input-pdv w-full text-lg">
                         <button id="openCalculatorBtn" class="p-3 bg-gray-600 text-white rounded-lg hover:bg-gray-500 transition w-14">
                             <i class="fas fa-calculator"></i>
                         </button>
                     </div>
-
                     <button id="addPaymentBtn" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition disabled:opacity-50" disabled>
                         <i class="fas fa-plus"></i> Adicionar Pagamento
                     </button>
                 </div>
 
-
                 <div class="content-card p-4 mb-6">
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="text-xl font-semibold text-green-400">Resumo da Conta</h2>
                     </div>
-                    
                     <div id="reviewItemsList" class="space-y-3 pt-2">
                          </div>
-                    
                     <div class="content-card bg-dark-bg border border-dark-border p-4 mb-6 mt-6">
                         <h2 class="text-xl font-semibold text-indigo-400 mb-4">Divisão da Conta</h2>
                         <div id="paymentSplitsContainer" class="space-y-3">
@@ -216,12 +200,10 @@
                             </button>
                         </div>
                     </div>
-                    
                     <div class="flex justify-between items-center border-t border-dark-border pt-4 mt-4">
                         <span class="text-xl font-bold text-dark-text">SUBTOTAL:</span>
                         <span class="text-2xl font-bold text-indigo-400" id="orderSubtotalDisplayPayment">R$ 0,00</span>
                     </div>
-
                     <div class="flex justify-between items-center border-b border-dark-border pb-2">
                         <span class="text-lg font-bold text-green-400">SERVIÇO (10%):</span>
                         <div class="flex items-center space-x-2">
@@ -231,7 +213,6 @@
                             </button>
                         </div>
                     </div>
-                    
                     <div class="flex justify-between items-center border-b border-dark-border pb-2 pt-2">
                         <span class="text-lg font-bold text-indigo-400">VALOR POR PESSOA:</span>
                         <div class="flex items-center space-x-2">
@@ -243,17 +224,21 @@
                         <span class="text-xl font-bold text-dark-text">TOTAL GERAL:</span>
                         <span class="text-3xl font-extrabold text-indigo-400" id="orderTotalDisplayPayment">R$ 0,00</span>
                     </div>
-
                      <div class="flex justify-between items-center pt-4 mt-4 border-t border-dark-border">
                         <span class="text-xl font-bold text-pumpkin">RESTANTE A PAGAR:</span>
                         <span class="text-3xl font-extrabold text-pumpkin" id="remainingBalanceDisplay">R$ 0,00</span>
                     </div>
                 </div>
 
-                <div class="p-4 pt-0 content-card mt-6">
-                    <button id="finalizeOrderBtn" class="w-full bg-pumpkin text-white font-bold py-3 rounded-lg hover:bg-pumpkin-dark transition disabled:opacity-50" disabled>
-                        <i class="fas fa-cash-register"></i> FINALIZAR E FECHAR CONTA
-                    </button>
+                <div class="content-card p-4 pt-0 mt-6">
+                    <div class="flex space-x-2"> 
+                         <button id="openNfeModalBtn" class="w-1/2 bg-gray-600 text-white font-bold py-3 rounded-lg hover:bg-gray-500 transition" title="Emitir NF-e">
+                            <i class="fas fa-receipt"></i> NF-e
+                        </button>
+                        <button id="finalizeOrderBtn" class="w-1/2 bg-pumpkin text-white font-bold py-3 rounded-lg hover:bg-pumpkin-dark transition disabled:opacity-50" disabled>
+                            <i class="fas fa-check-circle"></i> FINALIZAR CONTA
+                        </button>
+                    </div>
                     <p class="mt-4 text-sm text-dark-placeholder text-center">O fechamento da conta remove a mesa do painel.</p>
                 </div>
             </div>
@@ -265,7 +250,6 @@
                     </button>
                     <h2 class="text-2xl font-bold text-pumpkin">Painel Gerencial</h2>
                 </div>
-                
                 <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
                     <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openProductManagement')">
                         <i class="fas fa-box-open text-3xl mb-2"></i>
@@ -316,7 +300,6 @@
     <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 id="obsItemName" class="text-xl font-bold mb-4 text-indigo-400">Adicionar Observação</h3>
-            
             <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-4">
                  <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="1 CP">1 CP</button>
                  <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="2 CP">2 CP</button>
@@ -333,9 +316,7 @@
                  <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Ponto Mais">Ponto Mais</button>
                  <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Bem Passado">Bem Passado</button>
             </div>
-
             <textarea id="obsInput" rows="3" placeholder="Ex: Sem cebola, Ponto da carne..." class="input-pdv w-full p-3 text-base" readonly></textarea>
-            
             <div class="flex items-center justify-between mt-3 mb-4">
                  <span class="text-dark-text font-semibold">Item em Espera?</span>
                  <label class="switch-obs">
@@ -343,14 +324,12 @@
                      <span class="slider-obs"></span>
                  </label>
             </div>
-            
             <div class="flex justify-end space-x-3 mt-4">
                 <button id="cancelObsBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-base">Cancelar</button>
                 <button id="saveObsBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base">Salvar</button>
             </div>
         </div>
     </div>
-
     <div id="customAlertModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm text-center">
             <h3 class="text-xl font-bold mb-4 text-red-400" id="customAlertTitle">Aviso</h3>
@@ -360,12 +339,10 @@
             </button>
         </div>
     </div>
-
     <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         </div>
-    
     <div id="calculatorModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-        <div class="bg-dark-card border border-dark-border p-4 rounded-xl shadow-2xl w-full max-w-xs">
+        <div class="bg-dark-card border border-dark-border p-4 rounded-xl shadow-2xl w-full max-w-xs relative">
              <button id="closeCalcBtnX" class="absolute -top-2 -right-2 bg-red-600 text-white rounded-full h-8 w-8">&times;</button>
              <input type="text" id="calcDisplay" class="input-pdv w-full text-right text-2xl mb-3" readonly>
              <div class="grid grid-cols-4 gap-2">
@@ -386,14 +363,11 @@
              </div>
         </div>
     </div>
-
     <div id="tableTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
             <h3 class="text-xl font-bold mb-4 text-pumpkin">Transferir Itens (Mesa Inteira/Parcial)</h3>
             <p class="text-sm text-dark-placeholder mb-3">Insira a mesa de destino para os itens selecionados.</p>
-            
             <input type="number" id="targetTableInput" placeholder="Nº Mesa Destino" class="input-pdv w-full text-center mb-3">
-            
             <div id="newTableDinersInput" class="hidden space-y-2 mb-3 p-3 bg-dark-bg rounded-lg border border-dark-border">
                 <p class="text-sm text-yellow-400">Mesa destino fechada. Preencha para abrir:</p>
                 <input type="number" id="newTableDiners" placeholder="Pessoas" class="input-pdv w-full text-center" min="1">
@@ -405,16 +379,13 @@
                     <option value="Calçada">Calçada</option>
                 </select>
             </div>
-
             <div id="transferStatus" class="text-green-400 text-sm mb-4 hidden"></div>
-
             <div class="flex justify-end space-x-3 mt-4">
                 <button class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('tableTransferModal').style.display='none'">Cancelar</button>
                 <button id="confirmTableTransferBtn" class="px-4 py-3 bg-pumpkin text-white rounded-lg hover:bg-pumpkin-dark transition" disabled>Prosseguir</button>
             </div>
         </div>
     </div>
-    
     <div id="waiterRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
     <div id="customerRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
     <div id="reportsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
@@ -432,9 +403,10 @@
     
 
     <script>
-        // Funções globais de placeholder (mínimas)
-        // (app.js agora expõe o que é necessário)
+        // Funções globais de placeholder
         window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`);
+        // Funções de seleção de item para pagamento/transferência
+        window.activateItemSelection = () => {}; 
     </script>
     
     <script type="module" src="app.js"></script>
