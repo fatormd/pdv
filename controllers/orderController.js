@@ -117,9 +117,11 @@ export const renderMenu = () => {
 };
 
 // Renderiza a lista de itens selecionados (Painel 2)
+// Esta função usa o array GLOBAL 'selectedItems'
 const _renderSelectedItemsList = () => {
     if (!openOrderList || !openItemsCount || !sendSelectedItemsBtn) return;
 
+    // Usa o array global 'selectedItems', que foi atualizado pelo app.js
     const openItemsCountValue = selectedItems.length;
     openItemsCount.textContent = openItemsCountValue;
     sendSelectedItemsBtn.disabled = openItemsCountValue === 0;
@@ -157,24 +159,23 @@ const _renderSelectedItemsList = () => {
     }
 };
 
+// ==================================================================
+//               FUNÇÃO CORRIGIDA / ATUALIZADA
+// ==================================================================
 // Função principal para renderizar toda a tela de pedido
 export const renderOrderScreen = (orderSnapshot) => {
-    // Se um snapshot for passado (do listener do app.js)
-    if (orderSnapshot) {
-         const firebaseSelectedItems = orderSnapshot.selectedItems || [];
-         
-         // **CORREÇÃO 1:** Usa 'screens' (agora importado) para verificar a tela ativa
-         const isOrderScreenActive = document.getElementById('appContainer')?.style.transform === `translateX(-${screens['orderScreen'] * 100}vw)`;
-         
-         if (!isOrderScreenActive && JSON.stringify(firebaseSelectedItems) !== JSON.stringify(selectedItems)) {
-             console.log("[OrderController] Atualizando selectedItems com snapshot.");
-             selectedItems.length = 0;
-             selectedItems.push(...firebaseSelectedItems);
-         }
-    }
+    // CORREÇÃO: A lógica de atualização do array 'selectedItems'
+    // foi movida para o listener 'onSnapshot' no app.js.
+    
+    // Esta função agora apenas RENDERIZA o estado atual do array 'selectedItems',
+    // que já foi atualizado pelo app.js.
+    
     _renderSelectedItemsList();
-    renderMenu(); // Renderiza/Atualiza o menu (agora é chamado após a correção do erro)
+    renderMenu(); 
 };
+// ==================================================================
+//                  FIM DA FUNÇÃO CORRIGIDA
+// ==================================================================
 
 
 // Abertura do Modal de Observações (Apenas Staff)
@@ -244,7 +245,13 @@ export const handleSendSelectedItems = async () => {
     const itemsToHold = selectedItems.filter(item => item.note && item.note.toLowerCase().includes('espera'));
 
     if (itemsToSend.length === 0) {
-        alert("Nenhum item pronto para envio (todos estão marcados como 'Em Espera').");
+        // Se NADA for enviado, mas houver itens em espera, apenas salva o estado
+        if (itemsToHold.length > 0) {
+             alert("Nenhum item pronto para envio (todos estão marcados como 'Em Espera'). Os itens foram salvos na mesa.");
+             saveSelectedItemsToFirebase(currentTableId, itemsToHold);
+        } else {
+            alert("Nenhum item para enviar.");
+        }
         return;
     }
 
@@ -462,6 +469,8 @@ export const initOrderController = () => {
             const currentNote = obsInput.value.trim();
 
             if (originalNoteKey === '' && currentNote === '') {
+                 // Se o item foi recém-adicionado (note original vazia) E o usuário não digitou nada
+                 // E cancelou, remove o último item adicionado com esse ID
                  let lastIndex = -1;
                  for (let i = selectedItems.length - 1; i >= 0; i--) {
                      if (selectedItems[i].id == itemId && selectedItems[i].note === '') {
