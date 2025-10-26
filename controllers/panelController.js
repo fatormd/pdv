@@ -19,8 +19,35 @@ let panelInitialized = false;
 const showCustomAlert = (title, message) => { /* ... (lógica mantida) ... */ };
 
 
+// ==================================================================
+//               FUNÇÃO CORRIGIDA / IMPLEMENTADA
+// ==================================================================
 // --- RENDERIZAÇÃO DE SETORES ---
-export const renderTableFilters = () => { /* ... (lógica mantida, com classes dark) ... */ };
+export const renderTableFilters = () => {
+    const sectorFiltersContainer = document.getElementById('sectorFilters');
+    if (!sectorFiltersContainer) {
+        console.error("[PanelController] Container 'sectorFilters' não encontrado para renderizar.");
+        return;
+    }
+
+    // Usa a constante SECTORS definida no topo deste arquivo
+    sectorFiltersContainer.innerHTML = SECTORS.map(sector => {
+        // Define 'Todos' como o filtro ativo inicial
+        const isActive = sector === currentSectorFilter;
+        const activeClasses = 'bg-pumpkin text-white border-pumpkin';
+        const inactiveClasses = 'bg-dark-input text-dark-text border-gray-600';
+        
+        return `
+            <button class="sector-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap ${isActive ? activeClasses : inactiveClasses}" 
+                    data-sector="${sector}">
+                ${sector}
+            </button>
+        `;
+    }).join('');
+};
+// ==================================================================
+//                  FIM DA FUNÇÃO CORRIGIDA
+// ==================================================================
 
 
 // --- RENDERIZAÇÃO E CARREGAMENTO DE MESAS ---
