@@ -1,11 +1,12 @@
 // --- CONTROLLERS/PANELCONTROLLER.JS ---
-import { getTablesCollectionRef, getTableDocRef } from "/services/firebaseService.js"; // Removido 'auth' não usado aqui
-import { query, where, orderBy, onSnapshot, getDoc, setDoc, updateDoc, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getTablesCollectionRef, getTableDocRef } from "/services/firebaseService.js";
+import { query, where, orderBy, onSnapshot, getDoc, setDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { formatCurrency, formatElapsedTime } from "/utils.js";
-// Importa funções necessárias do app.js
-import { goToScreen, currentTableId, selectedItems, unsubscribeTable, currentOrderSnapshot, setCurrentTable, userRole, selectTableAndStartListener } from "/app.js"; // Importa selectTableAndStartListener
-// Removido: import { fetchWooCommerceProducts } from "/services/wooCommerceService.js";
-// Removido: import { renderMenu } from "./orderController.js";
+// CORREÇÃO: Importa a função global do app.js
+import { goToScreen, currentTableId, selectedItems, unsubscribeTable, currentOrderSnapshot, setCurrentTable, userRole, selectTableAndStartListener } from "/app.js";
+// import { fetchWooCommerceProducts } from "/services/wooCommerceService.js"; // Não é mais necessário aqui
+// import { renderMenu } from "./orderController.js"; // Não é mais necessário aqui
+
 
 // --- ESTADO DO MÓDULO ---
 const SECTORS = ['Todos', 'Salão 1', 'Bar', 'Mezanino', 'Calçada'];
@@ -15,11 +16,11 @@ let panelInitialized = false;
 
 
 // --- FUNÇÃO DE ALERTA CUSTOMIZADO ---
-const showCustomAlert = (title, message) => { /* ... (mantida) ... */ };
+const showCustomAlert = (title, message) => { /* ... (lógica mantida) ... */ };
 
 
 // --- RENDERIZAÇÃO DE SETORES ---
-export const renderTableFilters = () => { /* ... (lógica mantida) ... */ };
+export const renderTableFilters = () => { /* ... (lógica mantida, com classes dark) ... */ };
 
 
 // --- RENDERIZAÇÃO E CARREGAMENTO DE MESAS ---
@@ -84,7 +85,7 @@ const renderTables = (docs) => {
             if (e.target.closest('.kds-status-icon-btn')) return;
             const tableId = newCard.dataset.tableId;
             if (tableId) {
-                // Chama a função importada do app.js para selecionar a mesa
+                // Chama a função importada do app.js
                 selectTableAndStartListener(tableId);
             }
         });
@@ -110,23 +111,50 @@ export const loadOpenTables = () => {
     });
 };
 
-export const handleAbrirMesa = async () => { /* ... (lógica mantida) ... */ };
+export const handleAbrirMesa = async () => {
+    const mesaInput = document.getElementById('mesaInput');
+    const pessoasInput = document.getElementById('pessoasInput');
+    const sectorInput = document.getElementById('sectorInput');
+    const tableNumber = parseInt(mesaInput.value);
+    const diners = parseInt(pessoasInput.value);
+    const sector = sectorInput.value;
+
+    if (!tableNumber || !diners || tableNumber <= 0 || diners <= 0 || !sector) {
+        alert('Preencha número da mesa, pessoas e setor.');
+        return;
+    }
+    const tableRef = getTableDocRef(tableNumber);
+    try {
+        const docSnap = await getDoc(tableRef);
+        if (docSnap.exists() && docSnap.data().status?.toLowerCase() === 'open') {
+            alert(`A Mesa ${tableNumber} já está aberta!`);
+            return;
+        }
+        console.log(`[Panel] Abrindo Mesa ${tableNumber} / ${sector} / ${diners}p.`);
+        await setDoc(tableRef, {
+            tableNumber, diners, sector, status: 'open', createdAt: serverTimestamp(),
+            total: 0, sentItems: [], payments: [], serviceTaxApplied: true, selectedItems: []
+        });
+        mesaInput.value = ''; pessoasInput.value = ''; sectorInput.value = '';
+        selectTableAndStartListener(tableNumber.toString()); // Chama a função do app.js
+    } catch (e) {
+        console.error("Erro ao abrir mesa:", e);
+        alert("Erro ao tentar abrir a mesa.");
+    }
+};
 
 export const handleSearchTable = async () => {
     const searchTableInput = document.getElementById('searchTableInput');
     const tableNumber = searchTableInput?.value.trim();
-
     if (!tableNumber || parseInt(tableNumber) <= 0) {
         alert("Insira um número de mesa válido.");
         return;
     }
     const tableRef = getTableDocRef(tableNumber);
     const docSnap = await getDoc(tableRef);
-
     if (docSnap.exists() && docSnap.data().status?.toLowerCase() === 'open') {
         console.log(`[Panel] Mesa ${tableNumber} encontrada via busca.`);
-        // Chama a função importada do app.js
-        selectTableAndStartListener(tableNumber);
+        selectTableAndStartListener(tableNumber); // Chama a função do app.js
         if(searchTableInput) searchTableInput.value = '';
     } else {
         console.log(`[Panel] Mesa ${tableNumber} não encontrada ou fechada.`);
@@ -134,58 +162,9 @@ export const handleSearchTable = async () => {
     }
 };
 
-// REMOVIDO: export const openTableForOrder = async (...) => { ... }; // Lógica movida para app.js/selectTableAndStartListener
-// REMOVIDO: export const loadTableOrder = (tableId) => { ... }; // Lógica movida para app.js/setCurrentTable
-
-// FUNÇÃO DE TRANSFERÊNCIA (EXPORTADA)
-export const handleTableTransferConfirmed = async (originTableId, targetTableId, itemsToTransfer, newDiners = 0, newSector = '') => {
-    if (!originTableId || !targetTableId || itemsToTransfer.length === 0) { alert("Erro: Dados de transferência incompletos."); return; }
-    const originTableRef = getTableDocRef(originTableId);
-    const targetTableRef = getTableDocRef(targetTableId);
-    // Importa writeBatch aqui para garantir que esteja disponível
-    const { getFirestore, writeBatch, arrayRemove, arrayUnion } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
-    const db = getFirestore();
-    const batch = writeBatch(db);
-
-    try {
-        const targetSnap = await getDoc(targetTableRef);
-        const targetTableIsOpen = targetSnap.exists() && targetSnap.data().status?.toLowerCase() === 'open';
-
-        // 1. Abertura/Setup da Mesa de Destino
-        if (!targetTableIsOpen) {
-            if (!newDiners || !newSector) { alert("Erro: Mesa destino fechada. Pessoas e setor obrigatórios."); return; }
-            console.log(`[Panel] Abrindo Mesa ${targetTableId} para transferência.`);
-            batch.set(targetTableRef, {
-                tableNumber: parseInt(targetTableId), diners: newDiners, sector: newSector, status: 'open',
-                createdAt: serverTimestamp(), total: 0, sentItems: [], payments: [], serviceTaxApplied: true, selectedItems: []
-            });
-        }
-
-        // 2. Transferência dos Itens
-        const transferValue = itemsToTransfer.reduce((sum, item) => sum + (item.price || 0), 0);
-        const originCurrentTotal = currentOrderSnapshot?.total || 0; // Usa snapshot global
-        const originNewTotal = Math.max(0, originCurrentTotal - transferValue);
-        itemsToTransfer.forEach(item => {
-            batch.update(originTableRef, { sentItems: arrayRemove(item) });
-        });
-        batch.update(originTableRef, { total: originNewTotal });
-
-        const targetData = targetTableIsOpen ? targetSnap.data() : { total: 0 };
-        const targetNewTotal = (targetData.total || 0) + transferValue;
-        batch.update(targetTableRef, {
-            sentItems: arrayUnion(...itemsToTransfer),
-            total: targetNewTotal
-        });
-
-        await batch.commit();
-        alert(`Sucesso! ${itemsToTransfer.length} item(s) transferidos da Mesa ${originTableId} para ${targetTableId}.`);
-        goToScreen('panelScreen');
-
-    } catch (e) {
-        console.error("Erro na transferência de mesa:", e);
-        alert("Falha na transferência dos itens.");
-    }
-};
+// REMOVIDO: export const openTableForOrder = async (...) => { ... };
+// REMOVIDO: export const loadTableOrder = (tableId) => { ... };
+// REMOVIDO: export const handleTableTransferConfirmed = async (...) => { ... }; // Movida para app.js
 
 
 // Função de inicialização do Controller
@@ -199,6 +178,7 @@ export const initPanelController = () => {
     const mesaInput = document.getElementById('mesaInput');
     const pessoasInput = document.getElementById('pessoasInput');
     const sectorInput = document.getElementById('sectorInput');
+    const abrirMesaRealBtn = document.getElementById('abrirMesaBtn'); // Para checkInputs
 
     if (abrirMesaBtn) abrirMesaBtn.addEventListener('click', handleAbrirMesa);
     else console.error("[PanelController] Botão 'abrirMesaBtn' não encontrado.");
@@ -207,13 +187,11 @@ export const initPanelController = () => {
     else console.error("[PanelController] Botão 'searchTableBtn' não encontrado.");
 
     if (sectorFiltersContainer) {
-        // Listener para filtros de setor (delegação)
          sectorFiltersContainer.addEventListener('click', (e) => {
             const btn = e.target.closest('.sector-btn');
             if (btn) {
                 const sector = btn.dataset.sector;
                 currentSectorFilter = sector;
-                // Atualiza visualmente os botões
                 sectorFiltersContainer.querySelectorAll('.sector-btn').forEach(b => {
                     const isActive = b.dataset.sector === currentSectorFilter;
                     b.classList.toggle('bg-pumpkin', isActive);
@@ -230,20 +208,19 @@ export const initPanelController = () => {
          console.error("[PanelController] Container 'sectorFilters' não encontrado.");
     }
 
-
     const checkInputs = () => {
         const mesaValida = parseInt(mesaInput?.value) > 0;
         const pessoasValida = parseInt(pessoasInput?.value) > 0;
         const sectorValido = sectorInput?.value !== '';
-        if (abrirMesaBtn) {
-            abrirMesaBtn.disabled = !(mesaValida && pessoasValida && sectorValido);
+        if (abrirMesaRealBtn) {
+            abrirMesaRealBtn.disabled = !(mesaValida && pessoasValida && sectorValido);
         }
     };
     if(mesaInput) mesaInput.addEventListener('input', checkInputs);
     if(pessoasInput) pessoasInput.addEventListener('input', checkInputs);
     if(sectorInput) sectorInput.addEventListener('change', checkInputs);
 
-    window.openKdsStatusModal = (tableId) => { alert(`Abrir status KDS ${tableId} (DEV)`); };
+    // window.openKdsStatusModal = (tableId) => { alert(`Abrir status KDS ${tableId} (DEV)`); }; // Já definido no app.js
 
     panelInitialized = true;
     console.log("[PanelController] Inicializado.");
