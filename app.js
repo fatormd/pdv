@@ -103,6 +103,9 @@ const hideLoginScreen = () => {
     }
 };
 
+// ==================================================================
+//               FUNÇÃO CORRIGIDA / ATUALIZADA
+// ==================================================================
 export const goToScreen = (screenId) => {
     if (!appContainer) appContainer = document.getElementById('appContainer');
     if (!mainContent) mainContent = document.getElementById('mainContent');
@@ -122,10 +125,17 @@ export const goToScreen = (screenId) => {
         console.log(`[NAV] Desinscrevendo do listener da mesa ${currentTableId}`);
         unsubscribeTable(); unsubscribeTable = null;
         currentTableId = null; currentOrderSnapshot = null; selectedItems.length = 0; // Limpa o array local
+        
+        // --- INÍCIO DA CORREÇÃO ---
+        // Reseta os títulos ao sair da mesa
         const currentTableNumEl = document.getElementById('current-table-number');
         const paymentTableNumEl = document.getElementById('payment-table-number');
-        if(currentTableNumEl) currentTableNumEl.textContent = `Mesa`;
+        const orderScreenTableNumEl = document.getElementById('order-screen-table-number'); // Novo
+        
+        if(currentTableNumEl) currentTableNumEl.textContent = 'Fator MD'; // Reseta para o nome do sistema
         if(paymentTableNumEl) paymentTableNumEl.textContent = `Mesa`;
+        if(orderScreenTableNumEl) orderScreenTableNumEl.textContent = 'Pedido'; // Reseta para o padrão
+        // --- FIM DA CORREÇÃO ---
     }
 
     const screenIndex = screens[screenId];
@@ -139,6 +149,9 @@ export const goToScreen = (screenId) => {
         console.error(`[NAV] Tentativa de navegar para tela inválida: ${screenId}`);
     }
 };
+// ==================================================================
+//                  FIM DA FUNÇÃO CORRIGIDA
+// ==================================================================
 window.goToScreen = goToScreen;
 
 export const handleTableTransferConfirmed = async (originTableId, targetTableId, itemsToTransfer, newDiners = 0, newSector = '') => {
@@ -234,14 +247,14 @@ window.openManagerAuthModal = (action, payload = null) => {
                 console.log(`[AUTH MODAL] Ação '${action}' autorizada.`);
                 switch (action) {
                     // Ações do PaymentController
-                    case 'executeMassDelete': // Ação direta
-                        handleMassDeleteConfirmed(); // Chama a função importada
+                    case 'executeMassDelete': 
+                        handleMassDeleteConfirmed(); 
                         break;
-                    case 'executeMassTransfer': // Ação direta
-                        openTableTransferModal(); // Chama a função importada
+                    case 'executeMassTransfer': 
+                        openTableTransferModal(); 
                         break;
                     case 'deletePayment':
-                        executeDeletePayment(payload); // 'payload' é o timestamp
+                        executeDeletePayment(payload); 
                         break;
                     
                     // Ações do ManagerController
@@ -250,8 +263,7 @@ window.openManagerAuthModal = (action, payload = null) => {
                     case 'openCategoryManagement':
                     case 'openInventoryManagement':
                     case 'openRecipesManagement':
-                    // V... (outras ações do manager)
-                        handleGerencialAction(action, payload); // Chama a função do managerController
+                        handleGerencialAction(action, payload); 
                         break;
 
                     default:
@@ -272,7 +284,6 @@ window.openManagerAuthModal = (action, payload = null) => {
 // Expor funções globais necessárias dos controllers
 window.deletePayment = deletePayment;
 window.handleMassActionRequest = handleMassActionRequest;
-// window.handleConfirmTableTransfer = handleConfirmTableTransfer; // Já exposta acima
 window.openTableTransferModal = openTableTransferModal;
 window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`);
 // Funções de item/obs
@@ -281,9 +292,6 @@ window.decreaseLocalItemQuantity = decreaseLocalItemQuantity;
 window.openObsModalForGroup = openObsModalForGroup;
 
 
-// ==================================================================
-//               FUNÇÃO CORRIGIDA / ATUALIZADA
-// ==================================================================
 // Listener da Mesa
 export const setTableListener = (tableId) => {
     if (unsubscribeTable) unsubscribeTable();
@@ -295,19 +303,12 @@ export const setTableListener = (tableId) => {
             currentOrderSnapshot = docSnapshot.data();
             const firebaseSelectedItems = currentOrderSnapshot.selectedItems || [];
             
-            // --- INÍCIO DA CORREÇÃO ---
-            // A lógica de sincronização foi simplificada.
-            // O app.js (listener) é a "fonte da verdade". Ele SEMPRE atualiza
-            // o array 'selectedItems' local para espelhar o Firebase.
             if (JSON.stringify(firebaseSelectedItems) !== JSON.stringify(selectedItems)) {
                  console.log("[APP] Sincronizando 'selectedItems' local com dados do Firebase.");
-                 selectedItems.length = 0; // Limpa o array local
-                 selectedItems.push(...firebaseSelectedItems); // Preenche com os dados do Firebase
+                 selectedItems.length = 0; 
+                 selectedItems.push(...firebaseSelectedItems); 
             }
-            // --- FIM DA CORREÇÃO ---
 
-            // Agora, chama as funções de renderização, que vão usar
-            // o array 'selectedItems' que ACABAMOS de atualizar.
             renderOrderScreen(currentOrderSnapshot);
             renderPaymentSummary(currentTableId, currentOrderSnapshot);
 
@@ -327,42 +328,44 @@ export const setTableListener = (tableId) => {
          goToScreen('panelScreen');
     });
 };
-// ==================================================================
-//                  FIM DA FUNÇÃO CORRIGIDA
-// ==================================================================
 
+
+// ==================================================================
+//               FUNÇÃO CORRIGIDA / ATUALIZADA
+// ==================================================================
 // Define a mesa atual e inicia o listener
 export const setCurrentTable = (tableId) => {
     if (currentTableId === tableId && unsubscribeTable) {
         console.log(`[APP] Listener para mesa ${tableId} já ativo.`);
-        // Mesmo se o listener estiver ativo, precisamos carregar os itens (caso tenham sido limpos)
-        // A chamada ao setTableListener abaixo vai lidar com isso
     }
     
     currentTableId = tableId;
     console.log(`[APP] Definindo mesa atual para ${tableId}`);
     
-    const currentTableNumEl = document.getElementById('current-table-number');
+    // --- INÍCIO DA CORREÇÃO ---
+    // Atualiza os títulos nas telas relevantes
+    // const currentTableNumEl = document.getElementById('current-table-number'); // NÃO atualiza mais o header
     const paymentTableNumEl = document.getElementById('payment-table-number');
-    if(currentTableNumEl) currentTableNumEl.textContent = `Mesa ${tableId}`;
+    const orderScreenTableNumEl = document.getElementById('order-screen-table-number'); // Novo
+
+    // if(currentTableNumEl) currentTableNumEl.textContent = `Mesa ${tableId}`; // Linha removida
     if(paymentTableNumEl) paymentTableNumEl.textContent = `Mesa ${tableId}`;
+    if(orderScreenTableNumEl) orderScreenTableNumEl.textContent = `Mesa ${tableId}`; // Atualiza título da tela de pedido
+     // --- FIM DA CORREÇÃO ---
     
-    // Inicia o listener (ou reinicia, se já estava ativo, para garantir a carga inicial)
+    // Inicia o listener (ou reinicia)
     setTableListener(tableId);
 };
+// ==================================================================
+//                  FIM DA FUNÇÃO CORRIGIDA
+// ==================================================================
 
 // Seleciona a mesa e inicia o listener
 export const selectTableAndStartListener = async (tableId) => {
     console.log(`[APP] Selecionando mesa ${tableId} e iniciando listener.`);
     try {
-        // Garante que o menu esteja carregado ANTES de ir para a tela
         await fetchWooCommerceProducts(/* Callback opcional */); 
-        
-        // Define a mesa atual e inicia o listener
-        // O listener (setTableListener) JÁ VAI carregar os 'selectedItems' do Firebase
         setCurrentTable(tableId); 
-        
-        // Navega para a tela
         goToScreen('orderScreen'); 
     } catch (error) {
         console.error(`[APP] Erro ao selecionar mesa ${tableId}:`, error);
@@ -549,11 +552,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // Outros Listeners Globais (Header, etc.)
         const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
         const logoutBtnHeader = document.getElementById('logoutBtnHeader');
-        const openNfeModalBtn = document.getElementById('openNfeModalBtn');
+        const openNfeModalBtn = document.getElementById('openNfeModalBtn'); // O listener ainda encontra pelo ID
 
         if (openManagerPanelBtn) openManagerPanelBtn.addEventListener('click', () => { window.openManagerAuthModal('goToManagerPanel'); });
         if (logoutBtnHeader) logoutBtnHeader.addEventListener('click', handleLogout);
-        if (openNfeModalBtn) openNfeModalBtn.addEventListener('click', window.openNfeModal);
+        if (openNfeModalBtn) openNfeModalBtn.addEventListener('click', window.openNfeModal); // Continua funcionando
 
         console.log("[INIT] Listeners restantes adicionados.");
 
