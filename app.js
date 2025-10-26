@@ -3,22 +3,23 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebas
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-// Importações dos Módulos Refatorados
+// Importações dos Serviços e Utils
 import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, auth } from '/services/firebaseService.js';
 import { fetchWooCommerceProducts, fetchWooCommerceCategories } from '/services/wooCommerceService.js';
 import { formatCurrency, formatElapsedTime } from '/utils.js';
 
-// Importações dos Controllers (com funções init e outras necessárias)
+// Importações dos Controllers
 import { loadOpenTables, renderTableFilters, handleAbrirMesa, handleSearchTable, initPanelController, handleTableTransferConfirmed as panel_handleTableTransferConfirmed } from '/controllers/panelController.js';
 import { renderMenu, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity, openObsModalForGroup, initOrderController, handleSendSelectedItems } from '/controllers/orderController.js';
+// Importa as *ações* que o modal de senha chamará
 import {
     renderPaymentSummary, deletePayment, handleMassActionRequest, handleConfirmTableTransfer,
     initPaymentController, handleFinalizeOrder,
     activateItemSelection, handleMassDeleteConfirmed, executeDeletePayment, // Funções de ação
     openTableTransferModal // Modal de transferência
 } from '/controllers/paymentController.js';
-// CORREÇÃO: Removida importação de openManagerAuthModal
-import { initManagerController, handleGerencialAction } from '/controllers/managerController.js';
+// CORREÇÃO: Removido 'openManagerAuthModal' da importação abaixo
+import { initManagerController, handleGerencialAction } from '/controllers/managerController.js'; // Importa a ação gerencial
 
 // --- CONFIGURAÇÃO (Movida do index.html para cá) ---
 const APP_ID = "pdv_fator_instance_001";
@@ -39,6 +40,7 @@ const STAFF_CREDENTIALS = {
     'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' },
     'garcom@fator.com': { password: '1234', role: 'garcom', name: 'Mock Garçom' },
 };
+// Senha Mestra definida aqui
 const MANAGER_PASSWORD = '1234';
 
 export let currentTableId = null;
@@ -140,7 +142,7 @@ export const goToScreen = (screenId) => {
 };
 window.goToScreen = goToScreen;
 
-// **MODAL DE AUTENTICAÇÃO GLOBAL**
+// **CORREÇÃO: MODAL DE AUTENTICAÇÃO MOVIDO PARA CÁ**
 window.openManagerAuthModal = (action, payload = null) => {
     const managerModal = document.getElementById('managerModal');
     if (!managerModal) { console.error("Modal Gerente não encontrado!"); return; }
@@ -170,17 +172,15 @@ window.openManagerAuthModal = (action, payload = null) => {
                 console.log(`[AUTH MODAL] Ação '${action}' autorizada.`);
                 switch (action) {
                     // Ações do PaymentController
-                    case 'openMassDelete':
-                        activateItemSelection('delete');
+                    case 'openMassDelete': // Ação de 'ativação' (agora obsoleta, mas mantida por segurança)
+                    case 'openMassTransfer': // Ação de 'ativação'
+                        activateItemSelection(payload);
                         break;
-                    case 'openMassTransfer':
-                        activateItemSelection('transfer');
+                    case 'executeMassDelete': // Ação de execução direta
+                        handleMassDeleteConfirmed(); // Não precisa de payload, pega do DOM
                         break;
-                    case 'executeMassDelete': // Ação direta
-                        handleMassDeleteConfirmed();
-                        break;
-                    case 'executeMassTransfer': // Ação direta
-                        openTableTransferModal();
+                    case 'executeMassTransfer': // Ação de execução direta
+                        openTableTransferModal(); // Não precisa de payload, pega do DOM
                         break;
                     case 'deletePayment':
                         executeDeletePayment(payload); // 'payload' é o timestamp
@@ -413,10 +413,10 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("[INIT] Config Firebase carregada do módulo.");
 
         // Inicializa Firebase App e Serviços
-        const app = initializeApp(firebaseConfig);
+        const app = initializeApp(firebaseConfig); // Usa a variável local
         const dbInstance = getFirestore(app);
         const authInstance = getAuth(app);
-        initializeFirebase(dbInstance, authInstance, APP_ID);
+        initializeFirebase(dbInstance, authInstance, APP_ID); // Usa a const global do módulo
         console.log("[INIT] Firebase App e Serviços inicializados.");
 
         // Mapeia elementos Globais e de Login
