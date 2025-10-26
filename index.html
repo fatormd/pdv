@@ -50,7 +50,7 @@
             <h2 id="current-table-number" class="text-xl font-bold text-dark-text ml-2">Fator MD</h2> 
         </div>
         <div class="flex items-center space-x-3">
-             <button id="openManagerPanelBtn" class="p-2 text-dark-placeholder hover:text-dark-text transition hidden" title="Painel Gerencial">
+            <button id="openManagerPanelBtn" class="p-2 text-dark-placeholder hover:text-dark-text transition hidden" title="Painel Gerencial">
                 <i class="fas fa-shield-alt text-lg"></i>
             </button>
             <button id="logoutBtnHeader" class="p-2 text-red-400 hover:text-red-500 transition hidden" title="Sair">
@@ -94,7 +94,6 @@
                         <i class="fas fa-plus-circle"></i> Abrir e Iniciar Pedido
                     </button>
                 </div>
-
                 <div class="content-card p-4 mb-4">
                     <h2 class="text-xl font-semibold mb-3 text-dark-text">Buscar Mesa Aberta</h2>
                     <div class="flex space-x-2">
@@ -104,11 +103,9 @@
                         </button>
                     </div>
                 </div>
-                
                 <h2 class="text-xl font-semibold my-3 text-dark-text">Setores (<span id="openTablesCount">0</span>)</h2>
                 <div id="sectorFilters" class="flex space-x-2 overflow-x-auto pb-3 mb-3">
                     </div>
-
                 <div id="openTablesList" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                     </div>
             </div>
@@ -122,7 +119,6 @@
                         <i class="fas fa-receipt text-xl"></i>
                     </button>
                 </div>
-                
                 <div id="orderingInputs" class="space-y-4">
                     <div class="p-4 content-card">
                         <div class="flex justify-between items-center mb-4">
@@ -135,7 +131,6 @@
                             </div>
                     </div>
                 </div>
-
                 <div id="menuContainer" class="mt-6">
                     <div class="flex justify-between items-center mb-4 px-1">
                         <h2 class="text-xl font-bold text-dark-text">Cardápio</h2>
@@ -161,6 +156,42 @@
                     </div>
                 </div>
 
+                <div class="content-card p-4 mb-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-green-400">Resumo da Conta</h2>
+                    </div>
+                    <div id="reviewItemsList" class="space-y-3 pt-2 max-h-60 overflow-y-auto"> </div>
+                    
+                    <div class="content-card bg-dark-bg border border-dark-border p-4 mb-6 mt-6">
+                        <h2 class="text-lg font-semibold text-indigo-400 mb-4">Divisão da Conta</h2> <div id="paymentSplitsContainer" class="space-y-3">
+                            </div>
+                        <div class="flex justify-end mt-4">
+                            <button id="addSplitAccountBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-base font-bold">
+                                + Adicionar Conta para Divisão
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-between items-center border-t border-dark-border pt-4 mt-4">
+                        <span class="text-lg font-bold text-dark-text">SUBTOTAL:</span> <span class="text-xl font-bold text-indigo-400" id="orderSubtotalDisplayPayment">R$ 0,00</span> </div>
+                    <div class="flex justify-between items-center border-b border-dark-border pb-2">
+                        <span class="text-base font-bold text-green-400">SERVIÇO (10%):</span> <div class="flex items-center space-x-2">
+                            <span class="text-base font-bold text-green-400" id="orderServiceTaxDisplayPayment">R$ 0,00</span> <button id="toggleServiceTaxBtn" class="px-2 py-1 text-xs rounded-full transition duration-150 bg-gray-400 text-white opacity-50" disabled>
+                                Aplicar
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center border-b border-dark-border pb-2 pt-2">
+                        <span class="text-base font-bold text-indigo-400">VALOR POR PESSOA:</span> <div class="flex items-center space-x-2">
+                            <span id="valuePerDinerDisplay" class="text-base font-bold text-indigo-400">R$ 0,00</span> <input type="number" id="dinersSplitInput" class="w-16 p-1 text-sm input-pdv text-center" min="1" value="1">
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center pt-2">
+                        <span class="text-xl font-bold text-dark-text">TOTAL GERAL:</span> <span class="text-2xl font-extrabold text-indigo-400" id="orderTotalDisplayPayment">R$ 0,00</span> </div>
+                     <div class="flex justify-between items-center pt-4 mt-4 border-t border-dark-border">
+                        <span class="text-xl font-bold text-pumpkin">RESTANTE A PAGAR:</span> <span class="text-2xl font-extrabold text-pumpkin" id="remainingBalanceDisplay">R$ 0,00</span> </div>
+                </div>
+                
                 <div id="chargeInputs" class="content-card p-4 mb-6">
                     <h2 class="text-xl font-semibold text-pumpkin mb-4">Registrar Pagamento</h2>
                     <div id="paymentSummaryList" class="mb-4 p-3 rounded-lg bg-dark-bg border border-dark-border max-h-40 overflow-y-auto">
@@ -182,52 +213,6 @@
                     <button id="addPaymentBtn" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition disabled:opacity-50" disabled>
                         <i class="fas fa-plus"></i> Adicionar Pagamento
                     </button>
-                </div>
-
-                <div class="content-card p-4 mb-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-xl font-semibold text-green-400">Resumo da Conta</h2>
-                    </div>
-                    <div id="reviewItemsList" class="space-y-3 pt-2">
-                         </div>
-                    <div class="content-card bg-dark-bg border border-dark-border p-4 mb-6 mt-6">
-                        <h2 class="text-xl font-semibold text-indigo-400 mb-4">Divisão da Conta</h2>
-                        <div id="paymentSplitsContainer" class="space-y-3">
-                            </div>
-                        <div class="flex justify-end mt-4">
-                            <button id="addSplitAccountBtn" class="px-4 py-2 bg-blue-500 text-white rounded-lg opacity-50 text-base font-bold disabled" disabled>
-                                + Adicionar Conta para Divisão
-                            </button>
-                        </div>
-                    </div>
-                    <div class="flex justify-between items-center border-t border-dark-border pt-4 mt-4">
-                        <span class="text-xl font-bold text-dark-text">SUBTOTAL:</span>
-                        <span class="text-2xl font-bold text-indigo-400" id="orderSubtotalDisplayPayment">R$ 0,00</span>
-                    </div>
-                    <div class="flex justify-between items-center border-b border-dark-border pb-2">
-                        <span class="text-lg font-bold text-green-400">SERVIÇO (10%):</span>
-                        <div class="flex items-center space-x-2">
-                            <span class="text-lg font-bold text-green-400" id="orderServiceTaxDisplayPayment">R$ 0,00</span>
-                            <button id="toggleServiceTaxBtn" class="px-2 py-1 text-xs rounded-full transition duration-150 bg-gray-400 text-white opacity-50" disabled>
-                                Aplicar
-                            </button>
-                        </div>
-                    </div>
-                    <div class="flex justify-between items-center border-b border-dark-border pb-2 pt-2">
-                        <span class="text-lg font-bold text-indigo-400">VALOR POR PESSOA:</span>
-                        <div class="flex items-center space-x-2">
-                            <span id="valuePerDinerDisplay" class="text-lg font-bold text-indigo-400">R$ 0,00</span>
-                            <input type="number" id="dinersSplitInput" class="w-16 p-1 text-sm input-pdv text-center" min="1" value="1">
-                        </div>
-                    </div>
-                    <div class="flex justify-between items-center pt-2">
-                        <span class="text-xl font-bold text-dark-text">TOTAL GERAL:</span>
-                        <span class="text-3xl font-extrabold text-indigo-400" id="orderTotalDisplayPayment">R$ 0,00</span>
-                    </div>
-                     <div class="flex justify-between items-center pt-4 mt-4 border-t border-dark-border">
-                        <span class="text-xl font-bold text-pumpkin">RESTANTE A PAGAR:</span>
-                        <span class="text-3xl font-extrabold text-pumpkin" id="remainingBalanceDisplay">R$ 0,00</span>
-                    </div>
                 </div>
 
                 <div class="content-card p-4 pt-0 mt-6">
