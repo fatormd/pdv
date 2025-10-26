@@ -4,35 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fator PDV - Login</title>
-    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    
     <link rel="stylesheet" href="style.css">
-
     <script src="https://cdn.tailwindcss.com"></script>
-    
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     fontFamily: { sans: ['Inter', 'sans-serif'] },
                     colors: {
-                        'primary': '#4f46e5',
-                        'pumpkin': '#ff7518',
-                        'pumpkin-dark': '#e46815',
-                        'dark-bg': '#111827',
-                        'dark-card': '#1f2937',
-                        'dark-input': '#374151',
-                        'dark-text': '#d1d5db',
-                        'dark-placeholder': '#6b7280',
-                        'dark-border': '#374151',
+                        'primary': '#4f46e5', 'pumpkin': '#ff7518', 'pumpkin-dark': '#e46815',
+                        'dark-bg': '#111827', 'dark-card': '#1f2937', 'dark-input': '#374151',
+                        'dark-text': '#d1d5db', 'dark-placeholder': '#6b7280', 'dark-border': '#374151',
                     },
                 }
             }
         }
     </script>
 </head>
-<body class="bg-dark-bg min-h-screen text-dark-text"> 
+<body class="bg-dark-bg min-h-screen text-dark-text">
 
     <div id="statusScreen" class="absolute inset-0 bg-dark-bg z-50 flex items-center justify-center p-6" style="display: flex;">
         <div class="flex flex-col items-center p-8 max-w-sm w-full text-center">
@@ -44,391 +34,148 @@
 
     <header id="mainHeader" class="header-bar flex items-center justify-between" style="display: none;">
         <div class="flex items-center">
-            <button onclick="window.goToScreen('panelScreen')" class="px-3 py-1 text-2xl text-pumpkin hover:text-pumpkin-dark transition" title="Voltar ao Painel">
-                <i class="fas fa-th-large"></i>
-            </button>
-            <h2 id="current-table-number" class="text-xl font-bold text-dark-text ml-2">Fator MD</h2> 
+            <button onclick="window.goToScreen('panelScreen')" class="px-3 py-1 text-2xl text-pumpkin hover:text-pumpkin-dark transition" title="Voltar ao Painel"> <i class="fas fa-th-large"></i> </button>
+            <h2 id="current-table-number" class="text-xl font-bold text-dark-text ml-2">Fator MD</h2>
         </div>
         <div class="flex items-center space-x-3">
-            <button id="openManagerPanelBtn" class="p-2 text-dark-placeholder hover:text-dark-text transition hidden" title="Painel Gerencial">
-                <i class="fas fa-shield-alt text-lg"></i>
-            </button>
-            <button id="logoutBtnHeader" class="p-2 text-red-400 hover:text-red-500 transition hidden" title="Sair">
-                <i class="fas fa-sign-out-alt text-lg"></i>
-            </button>
+            <button id="openManagerPanelBtn" class="p-2 text-dark-placeholder hover:text-dark-text transition hidden" title="Painel Gerencial"> <i class="fas fa-shield-alt text-lg"></i> </button>
+            <button id="logoutBtnHeader" class="p-2 text-red-400 hover:text-red-500 transition hidden" title="Sair"> <i class="fas fa-sign-out-alt text-lg"></i> </button>
         </div>
     </header>
 
     <main id="mainContent" class="relative overflow-hidden" style="display: none;">
         <div id="appContainer" class="flex transition-transform duration-300 ease-out" style="width: 500vw;">
-            
+
             <div id="loginScreen" class="w-screen flex-shrink-0 flex items-center justify-center p-4 bg-dark-bg">
                  <div class="content-card bg-dark-card p-8 rounded-xl shadow-2xl w-full max-w-sm text-center">
                     <h3 class="text-2xl font-bold text-pumpkin mb-6">Fator PDV - Staff</h3>
-                    <input type="email" id="loginEmail" placeholder="E-mail (Ex: agencia@fatormd.com)" class="input-pdv w-full p-4 mb-4 text-base">
+                    <input type="email" id="loginEmail" placeholder="E-mail" class="input-pdv w-full p-4 mb-4 text-base">
                     <input type="password" id="loginPassword" placeholder="Senha" class="input-pdv w-full p-4 mb-6 text-base">
                     <div id="loginErrorMsg" class="text-red-400 text-sm mb-4" style="display: none;"></div>
-                    <div class="flex space-x-3">
-                        <button id="loginBtn" class="w-full bg-pumpkin text-white font-bold py-4 rounded-lg hover:bg-pumpkin-dark transition text-lg disabled:opacity-50">Entrar</button>
-                    </div>
+                    <button id="loginBtn" class="w-full bg-pumpkin text-white font-bold py-4 rounded-lg hover:bg-pumpkin-dark transition text-lg disabled:opacity-50">Entrar</button>
                     <p class="mt-4 text-xs text-dark-placeholder">Use 'garcom@fator.com' | Senha: 1234</p>
                     <p class="mt-1 text-xs text-dark-placeholder">Use 'agencia@fatormd.com' | Senha: 1234 (Gerente)</p>
                 </div>
             </div>
 
-            <div id="panelScreen" class="flex-shrink-0 bg-dark-bg text-dark-text">
+            <div id="panelScreen" class="w-screen flex-shrink-0 bg-dark-bg text-dark-text p-4">
                  <div class="content-card p-4 mb-4">
                     <h2 class="text-xl font-semibold mb-3 text-dark-text">Abrir Nova Mesa</h2>
                     <div class="grid grid-cols-3 gap-3">
                         <input type="number" id="mesaInput" placeholder="Nº Mesa" class="input-pdv col-span-1 text-center">
                         <input type="number" id="pessoasInput" placeholder="Pessoas" class="input-pdv col-span-1 text-center" min="1" value="1">
-                        <select id="sectorInput" class="input-pdv col-span-1">
-                            <option value="" disabled selected>Setor</option>
-                            <option value="Salão 1">Salão 1</option>
-                            <option value="Bar">Bar</option>
-                            <option value="Mezanino">Mezanino</option>
-                            <option value="Calçada">Calçada</option>
-                        </select>
+                        <select id="sectorInput" class="input-pdv col-span-1"> <option value="" disabled selected>Setor</option> <option value="Salão 1">Salão 1</option> <option value="Bar">Bar</option> <option value="Mezanino">Mezanino</option> <option value="Calçada">Calçada</option> </select>
                     </div>
-                    <button id="abrirMesaBtn" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg mt-3 hover:bg-green-700 transition disabled:opacity-50" disabled>
-                        <i class="fas fa-plus-circle"></i> Abrir e Iniciar Pedido
-                    </button>
+                    <button id="abrirMesaBtn" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg mt-3 hover:bg-green-700 transition disabled:opacity-50" disabled> <i class="fas fa-plus-circle"></i> Abrir e Iniciar Pedido </button>
                 </div>
                 <div class="content-card p-4 mb-4">
                     <h2 class="text-xl font-semibold mb-3 text-dark-text">Buscar Mesa Aberta</h2>
                     <div class="flex space-x-2">
                         <input type="number" id="searchTableInput" placeholder="Buscar por Nº da Mesa" class="input-pdv w-full">
-                        <button id="searchTableBtn" class="bg-pumpkin p-3 text-white rounded-lg hover:bg-pumpkin-dark transition w-14">
-                            <i class="fas fa-search"></i>
-                        </button>
+                        <button id="searchTableBtn" class="bg-pumpkin p-3 text-white rounded-lg hover:bg-pumpkin-dark transition w-14"> <i class="fas fa-search"></i> </button>
                     </div>
                 </div>
                 <h2 class="text-xl font-semibold my-3 text-dark-text">Setores (<span id="openTablesCount">0</span>)</h2>
-                <div id="sectorFilters" class="flex space-x-2 overflow-x-auto pb-3 mb-3">
-                    </div>
-                <div id="openTablesList" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                    </div>
+                <div id="sectorFilters" class="flex space-x-2 overflow-x-auto pb-3 mb-3"> </div>
+                <div id="openTablesList" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3"> </div>
             </div>
 
-            <div id="orderScreen" class="flex-shrink-0 bg-dark-bg text-dark-text">
-                 <div class="flex items-center justify-between mb-4 -mt-4">
-                    <div class="flex items-center text-green-400">
-                        <span id="order-screen-table-number" class="text-2xl font-semibold mr-3">Pedido</span> 
-                    </div>
-                    <button id="goToPaymentBtn" class="rounded-full bg-green-600 p-3 text-white shadow-lg hover:bg-green-700 transition w-12 h-12 flex items-center justify-center" title="Ver Conta" onclick="window.goToScreen('paymentScreen')">
-                        <i class="fas fa-receipt text-xl"></i>
-                    </button>
+            <div id="orderScreen" class="w-screen flex-shrink-0 bg-dark-bg text-dark-text p-4">
+                 <div class="flex items-center justify-between mb-4">
+                    <span id="order-screen-table-number" class="text-2xl font-semibold mr-3 text-green-400">Pedido</span>
+                    <button id="goToPaymentBtn" class="rounded-full bg-green-600 p-3 text-white shadow-lg hover:bg-green-700 transition w-12 h-12 flex items-center justify-center" title="Ver Conta" onclick="window.goToScreen('paymentScreen')"> <i class="fas fa-receipt text-xl"></i> </button>
                 </div>
                 <div id="orderingInputs" class="space-y-4">
                     <div class="p-4 content-card">
                         <div class="flex justify-between items-center mb-4">
                             <h2 class="text-xl font-semibold text-dark-text mr-2">Pedido Atual (<span id="openItemsCount">0</span>)</h2>
-                            <button id="sendSelectedItemsBtn" class="bg-green-600 text-white p-3 rounded-full shadow-lg hover:bg-green-700 transition duration-150 w-12 h-12 flex items-center justify-center text-xl disabled:opacity-50" title="Enviar Pedido para Produção">
-                                <i class="fas fa-paper-plane"></i> 
-                            </button>
+                            <button id="sendSelectedItemsBtn" class="bg-green-600 text-white p-3 rounded-full shadow-lg hover:bg-green-700 transition duration-150 w-12 h-12 flex items-center justify-center text-xl disabled:opacity-50" title="Enviar Pedido para Produção"> <i class="fas fa-paper-plane"></i> </button>
                         </div>
-                        <div id="openOrderList" class="space-y-3 mb-4">
-                            </div>
+                        <div id="openOrderList" class="space-y-3 mb-4"> </div>
                     </div>
                 </div>
                 <div id="menuContainer" class="mt-6">
-                    <div class="flex justify-between items-center mb-4 px-1">
+                    <div class="flex justify-between items-center mb-4">
                         <h2 class="text-xl font-bold text-dark-text">Cardápio</h2>
-                        <div class="relative">
-                            <input type="text" id="searchProductInput" placeholder="Buscar produtos..." class="pr-8 input-pdv text-sm" style="width: 150px;">
-                            <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-dark-placeholder"></i>
-                        </div>
+                        <div class="relative"> <input type="text" id="searchProductInput" placeholder="Buscar produtos..." class="pr-8 input-pdv text-sm w-40"> <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-dark-placeholder"></i> </div>
                     </div>
-                    <div id="categoryFilters" class="flex space-x-2 overflow-x-auto pb-2 mb-4 px-1">
-                        </div>
-                    <div id="menuItemsGrid" class="px-1 grid grid-cols-2 md:grid-cols-3 gap-4">
-                         </div>
+                    <div id="categoryFilters" class="flex space-x-2 overflow-x-auto pb-2 mb-4"> </div>
+                    <div id="menuItemsGrid" class="grid grid-cols-2 md:grid-cols-3 gap-4"> </div>
                 </div>
             </div>
-            
-            <div id="paymentScreen" class="flex-shrink-0 bg-dark-bg text-dark-text">
-                 <div class="flex items-center justify-between mb-4 -mt-4">
-                    <div class="flex items-center text-indigo-400">
-                        <button id="backToOrderFromPaymentBtn" class="mr-2 text-3xl p-2 hover:text-indigo-300 transition" title="Voltar para o Pedido" onclick="window.goToScreen('orderScreen')">
-                            <i class="fas fa-arrow-left"></i>
-                        </button>
-                        <span id="payment-table-number" class="text-2xl font-semibold mr-3">Mesa Selecionada</span>
-                    </div>
-                </div>
+
+            <div id="paymentScreen" class="w-screen flex-shrink-0 bg-dark-bg text-dark-text p-4">
+                 <div class="flex items-center justify-between mb-4">
+                    <button id="backToOrderFromPaymentBtn" class="mr-2 text-3xl p-2 text-indigo-400 hover:text-indigo-300 transition" title="Voltar para o Pedido" onclick="window.goToScreen('orderScreen')"> <i class="fas fa-arrow-left"></i> </button>
+                    <span id="payment-table-number" class="text-2xl font-semibold mr-3 text-indigo-400">Mesa Selecionada</span>
+                 </div>
 
                 <div class="content-card p-4 mb-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-xl font-semibold text-green-400">Resumo da Conta</h2>
+                    <h2 class="text-xl font-semibold text-green-400 mb-4">Resumo da Conta</h2>
+                    <div id="reviewItemsList" class="space-y-1 pt-2 max-h-60 overflow-y-auto"> </div>
+                    <div class="content-card bg-dark-bg border border-dark-border p-4 mb-6 mt-6 hidden">
+                        <div class="flex justify-between items-center mb-4"> <h2 class="text-lg font-semibold text-indigo-400">Divisão da Conta</h2> <button id="addSplitAccountBtn" class="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-bold"> + Dividir </button> </div>
+                        <div id="paymentSplitsContainer" class="space-y-3"> <p class="text-sm text-dark-placeholder italic">Nenhuma divisão criada.</p> </div>
                     </div>
-                    <div id="reviewItemsList" class="space-y-3 pt-2 max-h-60 overflow-y-auto"> 
-                         </div>
-                    
-                    <div class="content-card bg-dark-bg border border-dark-border p-4 mb-6 mt-6 hidden"> 
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-lg font-semibold text-indigo-400">Divisão da Conta</h2>
-                             <button id="addSplitAccountBtn" class="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-bold">
-                                + Dividir
-                            </button>
-                        </div>
-                        <div id="paymentSplitsContainer" class="space-y-3">
-                           <p class="text-sm text-dark-placeholder italic">Nenhuma divisão criada.</p> 
-                        </div>
-                    </div>
-                    
-                    <div class="flex justify-between items-center border-t border-dark-border pt-4 mt-4">
-                        <span class="text-lg font-bold text-dark-text">SUBTOTAL:</span> 
-                        <span class="text-xl font-bold text-indigo-400" id="orderSubtotalDisplayPayment">R$ 0,00</span> 
-                    </div>
-                    <div class="flex justify-between items-center border-b border-dark-border pb-2">
-                        <span class="text-base font-bold text-green-400">SERVIÇO (10%):</span> 
-                        <div class="flex items-center space-x-2">
-                            <span class="text-base font-bold text-green-400" id="orderServiceTaxDisplayPayment">R$ 0,00</span> 
-                            <button id="toggleServiceTaxBtn" class="px-2 py-1 text-xs rounded-full transition duration-150 bg-gray-400 text-white opacity-50" disabled>
-                                Aplicar
-                            </button>
-                        </div>
-                    </div>
-                    <div class="flex justify-between items-center border-b border-dark-border pb-2 pt-2">
-                        <span class="text-base font-bold text-indigo-400">VALOR POR PESSOA:</span> 
-                        <div class="flex items-center space-x-2">
-                            <span id="valuePerDinerDisplay" class="text-base font-bold text-indigo-400">R$ 0,00</span> 
-                            <button id="decreaseDinersBtn" class="p-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition w-8 h-8 flex items-center justify-center">
-                                <i class="fas fa-minus"></i>
-                            </button>
-                            <input type="number" id="dinersSplitInput" class="w-12 p-1 text-sm input-pdv text-center bg-dark-input" min="1" value="1" readonly> 
-                             <button id="increaseDinersBtn" class="p-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition w-8 h-8 flex items-center justify-center">
-                                <i class="fas fa-plus"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="flex justify-between items-center pt-2">
-                        <span class="text-xl font-bold text-dark-text">TOTAL GERAL:</span> 
-                        <span class="text-2xl font-extrabold text-indigo-400" id="orderTotalDisplayPayment">R$ 0,00</span> 
-                    </div>
-                     <div class="flex justify-between items-center pt-4 mt-4 border-t border-dark-border">
-                        <span class="text-xl font-bold text-pumpkin">RESTANTE A PAGAR:</span> 
-                        <span class="text-2xl font-extrabold text-pumpkin" id="remainingBalanceDisplay">R$ 0,00</span> 
+                    <div class="border-t border-dark-border mt-4 pt-4 space-y-2">
+                        <div class="flex justify-between items-center"> <span class="text-lg font-bold text-dark-text">SUBTOTAL:</span> <span class="text-xl font-bold text-indigo-400" id="orderSubtotalDisplayPayment">R$ 0,00</span> </div>
+                        <div class="flex justify-between items-center"> <span class="text-base font-bold text-green-400">SERVIÇO (10%):</span> <div class="flex items-center space-x-2"> <span class="text-base font-bold text-green-400" id="orderServiceTaxDisplayPayment">R$ 0,00</span> <button id="toggleServiceTaxBtn" class="px-2 py-1 text-xs rounded-full transition duration-150 bg-gray-500 text-white" disabled>Aplicar</button> </div> </div>
+                        <div class="flex justify-between items-center"> <span class="text-base font-bold text-indigo-400">VALOR POR PESSOA:</span> <div class="flex items-center space-x-2"> <span id="valuePerDinerDisplay" class="text-base font-bold text-indigo-400">R$ 0,00</span> <button id="decreaseDinersBtn" class="p-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition w-8 h-8 flex items-center justify-center"> <i class="fas fa-minus text-xs"></i> </button> <input type="number" id="dinersSplitInput" class="w-12 p-1 text-sm input-pdv text-center bg-dark-input appearance-none" min="1" value="1" readonly> <button id="increaseDinersBtn" class="p-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition w-8 h-8 flex items-center justify-center"> <i class="fas fa-plus text-xs"></i> </button> </div> </div>
+                        <div class="flex justify-between items-center"> <span class="text-xl font-bold text-dark-text">TOTAL GERAL:</span> <span class="text-2xl font-extrabold text-indigo-400" id="orderTotalDisplayPayment">R$ 0,00</span> </div>
+                        <div class="flex justify-between items-center pt-2 border-t border-dark-border mt-2"> <span class="text-xl font-bold text-pumpkin">RESTANTE A PAGAR:</span> <span class="text-2xl font-extrabold text-pumpkin" id="remainingBalanceDisplay">R$ 0,00</span> </div>
                     </div>
                 </div>
-                
+
                 <div id="chargeInputs" class="content-card p-4 mb-6">
-                    <h2 class="text-xl font-semibold text-pumpkin mb-4">Registrar Pagamento (Conta Principal)</h2> 
-                    <div id="paymentSummaryList" class="mb-4 p-3 rounded-lg bg-dark-bg border border-dark-border max-h-40 overflow-y-auto">
-                        </div>
-                    <div class="flex space-x-2 mb-3">
-                        <input type="text" id="customerSearchInput" placeholder="Buscar/Associar Cliente (CPF/Nome)" class="input-pdv w-full"> 
-                        <button id="openCustomerRegBtn" class="p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition w-14">
-                            <i class="fas fa-user-plus"></i>
-                        </button>
-                    </div>
-                    <div id="paymentMethodButtons" class="grid grid-cols-3 gap-2 mb-3">
-                        </div>
-                    <div class="flex space-x-2 mb-4">
-                        <input type="text" id="paymentValueInput" placeholder="Valor (Ex: 50,00)" class="input-pdv w-full text-lg">
-                        <button id="openCalculatorBtn" class="p-3 bg-gray-600 text-white rounded-lg hover:bg-gray-500 transition w-14">
-                            <i class="fas fa-calculator"></i>
-                        </button>
-                    </div>
-                    <button id="addPaymentBtn" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition disabled:opacity-50" disabled>
-                        <i class="fas fa-plus"></i> Adicionar Pagamento
-                    </button>
+                    <h2 class="text-xl font-semibold text-pumpkin mb-4">Registrar Pagamento (Conta Principal)</h2>
+                    <div id="paymentSummaryList" class="mb-4 p-3 rounded-lg bg-dark-bg border border-dark-border max-h-40 overflow-y-auto"> </div>
+                    <div class="flex space-x-2 mb-3"> <input type="text" id="customerSearchInput" placeholder="Buscar/Associar Cliente (CPF/Nome)" class="input-pdv w-full"> <button id="openCustomerRegBtn" class="p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition w-14"> <i class="fas fa-user-plus"></i> </button> </div>
+                    <div id="paymentMethodButtons" class="grid grid-cols-3 gap-2 mb-3"> </div>
+                    <div class="flex space-x-2 mb-4"> <input type="text" id="paymentValueInput" placeholder="Valor (Ex: 50,00)" class="input-pdv w-full text-lg"> <button id="openCalculatorBtn" class="p-3 bg-gray-600 text-white rounded-lg hover:bg-gray-500 transition w-14"> <i class="fas fa-calculator"></i> </button> </div>
+                    <button id="addPaymentBtn" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition disabled:opacity-50" disabled> <i class="fas fa-plus"></i> Adicionar Pagamento </button>
                 </div>
 
-                <div class="content-card p-4 pt-0 mt-6">
-                    <div class="flex space-x-2"> 
-                         <button id="openNfeModalBtn" class="w-1/2 bg-gray-600 text-white font-bold py-3 rounded-lg hover:bg-gray-500 transition" title="Emitir NF-e">
-                            <i class="fas fa-receipt"></i> NF-e
-                        </button>
-                        <button id="finalizeOrderBtn" class="w-1/2 bg-pumpkin text-white font-bold py-3 rounded-lg hover:bg-pumpkin-dark transition disabled:opacity-50" disabled>
-                            <i class="fas fa-check-circle"></i> FINALIZAR CONTA
-                        </button>
+                <div class="content-card p-4 pt-2 mt-6">
+                    <div class="flex space-x-2">
+                         <button id="openNfeModalBtn" class="w-1/2 bg-gray-600 text-white font-bold py-3 rounded-lg hover:bg-gray-500 transition" title="Emitir NF-e"> <i class="fas fa-receipt"></i> NF-e </button>
+                         <button id="finalizeOrderBtn" class="w-1/2 bg-pumpkin text-white font-bold py-3 rounded-lg hover:bg-pumpkin-dark transition disabled:opacity-50" disabled> <i class="fas fa-check-circle"></i> FINALIZAR CONTA </button>
                     </div>
-                    <p class="mt-4 text-sm text-dark-placeholder text-center">O fechamento da conta remove a mesa do painel.</p>
+                    <p class="mt-3 text-sm text-dark-placeholder text-center">O fechamento da conta remove a mesa do painel.</p>
                 </div>
             </div>
 
-            <div id="managerScreen" class="flex-shrink-0 bg-gray-900 text-dark-text">
-                 <div class="flex items-center mb-4 -mt-4">
-                     <button id="backToPanelFromManagerBtn" class="mr-2 text-3xl p-2 text-dark-placeholder hover:text-dark-text transition" title="Voltar para o Painel">
-                        <i class="fas fa-arrow-left"></i>
-                    </button>
-                    <h2 class="text-2xl font-bold text-pumpkin">Painel Gerencial</h2>
-                </div>
-                <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openProductManagement')"> <i class="fas fa-box-open text-3xl mb-2"></i> <h4 class="font-bold text-lg">Produtos</h4> <p class="text-xs">Gerenciar cardápio (WooCommerce)</p> </div>
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openCashManagement')"> <i class="fas fa-cash-register text-3xl mb-2 text-green-400"></i> <h4 class="font-bold text-lg">Gestão de Caixa</h4> <p class="text-xs">Abertura, fechamento, sangria</p> </div>
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="document.getElementById('reportsModal').style.display='flex'"> <i class="fas fa-chart-line text-3xl mb-2 text-indigo-400"></i> <h4 class="font-bold text-lg">Relatórios</h4> <p class="text-xs">Vendas, produtos, comissões</p> </div>
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openInventoryManagement')"> <i class="fas fa-boxes text-3xl mb-2"></i> <h4 class="font-bold text-lg">Estoque</h4> <p class="text-xs">(Em breve)</p> </div>
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openRecipesManagement')"> <i class="fas fa-book text-3xl mb-2"></i> <h4 class="font-bold text-lg">Ficha Técnica</h4> <p class="text-xs">(Em breve)</p> </div>
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openCustomerCRM')"> <i class="fas fa-users text-3xl mb-2 text-indigo-400"></i> <h4 class="font-bold text-lg">Clientes (CRM)</h4> <p class="text-xs">(Em breve)</p> </div>
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openWaiterReg')"> <i class="fas fa-user-shield text-3xl mb-2 text-red-400"></i> <h4 class="font-bold text-lg">Usuários</h4> <p class="text-xs">Cadastrar Garçons / Gerentes</p> </div>
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openWooSync')"> <i class="fas fa-sync text-3xl mb-2 text-gray-400"></i> <h4 class="font-bold text-lg">Sincronizar</h4> <p class="text-xs">Forçar sincronia com WooCommerce</p> </div>
-                </div>
+            <div id="managerScreen" class="w-screen flex-shrink-0 bg-gray-900 text-dark-text p-4">
+                 <div class="flex items-center mb-4"> <button id="backToPanelFromManagerBtn" class="mr-2 text-3xl p-2 text-dark-placeholder hover:text-dark-text transition" title="Voltar para o Painel"> <i class="fas fa-arrow-left"></i> </button> <h2 class="text-2xl font-bold text-pumpkin">Painel Gerencial</h2> </div>
+                 <div class="grid grid-cols-2 md:grid-cols-3 gap-4"> </div>
             </div>
-            
-        </div> 
+
+        </div>
     </main>
-    
-    <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm">
-            <h3 id="obsItemName" class="text-xl font-bold mb-4 text-indigo-400">Adicionar Observação</h3>
-            <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-4">
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="1 CP">1 CP</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="2 CP">2 CP</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="3 CP">3 CP</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Sem Gelo">Sem Gelo</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Gelo à Parte">Gelo à Parte</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Laranja">Laranja</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Limão">Limão</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Limão Espremido">Limão Espremido</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Natural">Natural</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Mal Passado">Mal Passado</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Ponto Menos">Ponto Menos</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Ao Ponto">Ao Ponto</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Ponto Mais">Ponto Mais</button>
-                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Bem Passado">Bem Passado</button>
-            </div>
-            <textarea id="obsInput" rows="3" placeholder="Ex: Sem cebola, Ponto da carne..." class="input-pdv w-full p-3 text-base" readonly></textarea>
-            <div class="flex items-center justify-between mt-3 mb-4">
-                 <span class="text-dark-text font-semibold">Item em Espera?</span>
-                 <label class="switch-obs">
-                     <input type="checkbox" id="esperaSwitch">
-                     <span class="slider-obs"></span>
-                 </label>
-            </div>
-            <div class="flex justify-end space-x-3 mt-4">
-                <button id="cancelObsBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-base">Cancelar</button>
-                <button id="saveObsBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base">Salvar</button>
-            </div>
-        </div>
-    </div>
-    
-    <div id="customAlertModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm text-center">
-            <h3 class="text-xl font-bold mb-4 text-red-400" id="customAlertTitle">Aviso</h3>
-            <p class="text-base mb-6 text-dark-text" id="customAlertMessage">Mensagem Padrão.</p>
-            <button id="customAlertOkBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition">
-                OK
-            </button>
-        </div>
-    </div>
-    
-    <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-        </div>
-    
-    <div id="calculatorModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-        <div class="bg-dark-card border border-dark-border p-4 rounded-xl shadow-2xl w-full max-w-xs relative">
-             <button id="closeCalcBtnX" class="absolute -top-2 -right-2 bg-red-600 text-white rounded-full h-8 w-8">&times;</button>
-             <input type="text" id="calcDisplay" class="input-pdv w-full text-right text-2xl mb-3" readonly>
-             <div class="grid grid-cols-4 gap-2">
-                <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">7</button>
-                <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">8</button>
-                <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">9</button>
-                <button class="p-4 bg-pumpkin rounded hover:bg-pumpkin-dark text-xl">C</button>
-                <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">4</button>
-                <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">5</button>
-                <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">6</button>
-                <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">&larr;</button>
-                <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">1</button>
-                <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">2</button>
-                <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">3</button>
-                <button class="p-4 bg-green-600 rounded hover:bg-green-700 text-xl row-span-2">OK</button>
-                <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl col-span-2">0</button>
-                <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">,</button>
-             </div>
-        </div>
-    </div>
-    
-    <div id="tableTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
-            <h3 class="text-xl font-bold mb-4 text-pumpkin">Transferir Itens (Mesa Inteira/Parcial)</h3>
-            <p class="text-sm text-dark-placeholder mb-3">Insira a mesa de destino para os itens selecionados.</p>
-            <input type="number" id="targetTableInput" placeholder="Nº Mesa Destino" class="input-pdv w-full text-center mb-3">
-            <div id="newTableDinersInput" class="hidden space-y-2 mb-3 p-3 bg-dark-bg rounded-lg border border-dark-border">
-                <p class="text-sm text-yellow-400">Mesa destino fechada. Preencha para abrir:</p>
-                <input type="number" id="newTableDiners" placeholder="Pessoas" class="input-pdv w-full text-center" min="1">
-                <select id="newTableSector" class="input-pdv w-full">
-                    <option value="" disabled selected>Setor</option>
-                    <option value="Salão 1">Salão 1</option>
-                    <option value="Bar">Bar</option>
-                    <option value="Mezanino">Mezanino</option>
-                    <option value="Calçada">Calçada</option>
-                </select>
-            </div>
-            <div id="transferStatus" class="text-green-400 text-sm mb-4 hidden"></div>
-            <div class="flex justify-end space-x-3 mt-4">
-                <button class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('tableTransferModal').style.display='none'">Cancelar</button>
-                <button id="confirmTableTransferBtn" class="px-4 py-3 bg-pumpkin text-white rounded-lg hover:bg-pumpkin-dark transition" disabled>Prosseguir</button>
-            </div>
-        </div>
-    </div>
-    
-    <div id="customerRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-lg">
-            <h3 class="text-xl font-bold mb-4 text-indigo-400">Buscar / Cadastrar Cliente</h3>
-            <div class="mb-4">
-                <label for="customerSearchCpf" class="block text-sm font-medium text-dark-placeholder mb-1">Buscar por CPF</label>
-                <div class="flex space-x-2">
-                    <input type="text" id="customerSearchCpf" placeholder="Digite o CPF" class="input-pdv w-full">
-                    <button id="searchCustomerByCpfBtn" class="p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition w-14">
-                        <i class="fas fa-search"></i>
-                    </button>
-                </div>
-            </div>
-             <div id="customerSearchResults" class="mb-4 p-3 rounded-lg bg-dark-bg border border-dark-border min-h-[50px]">
-                </div>
-             <hr class="border-gray-600 my-4">
-             <h4 class="text-lg font-semibold mb-3 text-dark-text">Dados do Cliente</h4>
-             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <div>
-                    <label for="customerName" class="block text-sm font-medium text-dark-placeholder mb-1">Nome Completo*</label>
-                    <input type="text" id="customerName" class="input-pdv w-full">
-                 </div>
-                 <div>
-                    <label for="customerCpf" class="block text-sm font-medium text-dark-placeholder mb-1">CPF*</label>
-                    <input type="text" id="customerCpf" placeholder="___.___.___-__" class="input-pdv w-full">
-                 </div>
-                 <div>
-                    <label for="customerPhone" class="block text-sm font-medium text-dark-placeholder mb-1">Telefone</label>
-                    <input type="tel" id="customerPhone" placeholder="(__) _____-____" class="input-pdv w-full">
-                 </div>
-                 <div>
-                    <label for="customerEmail" class="block text-sm font-medium text-dark-placeholder mb-1">E-mail</label>
-                    <input type="email" id="customerEmail" class="input-pdv w-full">
-                 </div>
-             </div>
-             <p class="text-xs text-dark-placeholder mt-1">* Campos obrigatórios</p>
-            <div class="flex justify-end space-x-3 mt-6">
-                <button id="closeCustomerRegModalBtn" class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition">Fechar</button>
-                <button id="saveCustomerBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50" disabled>Salvar Cliente</button>
-                <button id="linkCustomerToTableBtn" class="px-4 py-3 bg-pumpkin text-white rounded-lg hover:bg-pumpkin-dark transition disabled:opacity-50" disabled>Associar à Mesa</button>
-            </div>
-        </div>
-    </div>
-    
-    <div id="reportsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
-            <h3 class="text-xl font-bold mb-4 text-indigo-400">Relatórios</h3>
-            <p class="text-dark-text">Módulo de relatórios em desenvolvimento.</p>
-            <button class="w-full mt-4 px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('reportsModal').style.display='none'">Fechar</button>
-         </div>
-    </div>
 
+    <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"> <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm"> <h3 id="obsItemName" class="text-xl font-bold mb-4 text-indigo-400">Adicionar Observação</h3> <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-4"> <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="1 CP">1 CP</button> <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="2 CP">2 CP</button> <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Bem Passado">Bem Passado</button> </div> <textarea id="obsInput" rows="3" placeholder="Ex: Sem cebola..." class="input-pdv w-full p-3 text-base" readonly></textarea> <div class="flex items-center justify-between mt-3 mb-4"> <span class="text-dark-text font-semibold">Item em Espera?</span> <label class="switch-obs"> <input type="checkbox" id="esperaSwitch"> <span class="slider-obs"></span> </label> </div> <div class="flex justify-end space-x-3 mt-4"> <button id="cancelObsBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-base">Cancelar</button> <button id="saveObsBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-base">Salvar</button> </div> </div> </div>
+    <div id="customAlertModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"> <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm text-center"> <h3 class="text-xl font-bold mb-4 text-red-400" id="customAlertTitle">Aviso</h3> <p class="text-base mb-6 text-dark-text" id="customAlertMessage">Mensagem Padrão.</p> <button id="customAlertOkBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition"> OK </button> </div> </div>
+    <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"> </div>
+    <div id="calculatorModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"> <div class="bg-dark-card border border-dark-border p-4 rounded-xl shadow-2xl w-full max-w-xs relative"> <button id="closeCalcBtnX" class="absolute -top-2 -right-2 bg-red-600 text-white rounded-full h-8 w-8">&times;</button> <input type="text" id="calcDisplay" class="input-pdv w-full text-right text-2xl mb-3" readonly> <div class="grid grid-cols-4 gap-2"> <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">7</button> <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">8</button> <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">9</button> <button class="p-4 bg-pumpkin rounded hover:bg-pumpkin-dark text-xl">C</button> <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">4</button> <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">5</button> <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">6</button> <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">&larr;</button> <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">1</button> <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">2</button> <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">3</button> <button class="p-4 bg-green-600 rounded hover:bg-green-700 text-xl row-span-2">OK</button> <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl col-span-2">0</button> <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">,</button> </div> </div> </div>
+    <div id="tableTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"> <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md"> <h3 class="text-xl font-bold mb-4 text-pumpkin">Transferir Itens</h3> <p class="text-sm text-dark-placeholder mb-3">Insira a mesa de destino.</p> <input type="number" id="targetTableInput" placeholder="Nº Mesa Destino" class="input-pdv w-full text-center mb-3"> <div id="newTableDinersInput" class="hidden space-y-2 mb-3 p-3 bg-dark-bg rounded-lg border border-dark-border"> <p class="text-sm text-yellow-400">Mesa destino fechada. Preencha:</p> <input type="number" id="newTableDiners" placeholder="Pessoas" class="input-pdv w-full text-center" min="1"> <select id="newTableSector" class="input-pdv w-full"> <option value="" disabled selected>Setor</option> <option value="Salão 1">Salão 1</option> <option value="Bar">Bar</option> <option value="Mezanino">Mezanino</option> <option value="Calçada">Calçada</option> </select> </div> <div id="transferStatus" class="text-green-400 text-sm mb-4 hidden"></div> <div class="flex justify-end space-x-3 mt-4"> <button class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('tableTransferModal').style.display='none'">Cancelar</button> <button id="confirmTableTransferBtn" class="px-4 py-3 bg-pumpkin text-white rounded-lg hover:bg-pumpkin-dark transition" disabled>Prosseguir</button> </div> </div> </div>
+    <div id="customerRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"> <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-lg"> <h3 class="text-xl font-bold mb-4 text-indigo-400">Buscar / Cadastrar Cliente</h3> <div class="mb-4"> <label for="customerSearchCpf" class="block text-sm font-medium text-dark-placeholder mb-1">Buscar por CPF</label> <div class="flex space-x-2"> <input type="text" id="customerSearchCpf" placeholder="Digite o CPF" class="input-pdv w-full"> <button id="searchCustomerByCpfBtn" class="p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition w-14"> <i class="fas fa-search"></i> </button> </div> </div> <div id="customerSearchResults" class="mb-4 p-3 rounded-lg bg-dark-bg border border-dark-border min-h-[50px]"> </div> <hr class="border-gray-600 my-4"> <h4 class="text-lg font-semibold mb-3 text-dark-text">Dados do Cliente</h4> <div class="grid grid-cols-1 md:grid-cols-2 gap-4"> <div> <label for="customerName" class="block text-sm font-medium text-dark-placeholder mb-1">Nome Completo*</label> <input type="text" id="customerName" class="input-pdv w-full"> </div> <div> <label for="customerCpf" class="block text-sm font-medium text-dark-placeholder mb-1">CPF*</label> <input type="text" id="customerCpf" placeholder="Apenas números" class="input-pdv w-full"> </div> <div> <label for="customerPhone" class="block text-sm font-medium text-dark-placeholder mb-1">Telefone</label> <input type="tel" id="customerPhone" placeholder="(XX) XXXXX-XXXX" class="input-pdv w-full"> </div> <div> <label for="customerEmail" class="block text-sm font-medium text-dark-placeholder mb-1">E-mail</label> <input type="email" id="customerEmail" class="input-pdv w-full"> </div> </div> <p class="text-xs text-dark-placeholder mt-1">* Campos obrigatórios</p> <div class="flex justify-end space-x-3 mt-6"> <button id="closeCustomerRegModalBtn" class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition">Fechar</button> <button id="saveCustomerBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50" disabled>Salvar Cliente</button> <button id="linkCustomerToTableBtn" class="px-4 py-3 bg-pumpkin text-white rounded-lg hover:bg-pumpkin-dark transition disabled:opacity-50" disabled>Associar à Mesa</button> </div> </div> </div>
+    <div id="reportsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"> <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md"> <h3 class="text-xl font-bold mb-4 text-indigo-400">Relatórios</h3> <p class="text-dark-text">Módulo em desenvolvimento.</p> <button class="w-full mt-4 px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('reportsModal').style.display='none'">Fechar</button> </div> </div>
     <div id="waiterRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
     <div id="selectiveTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
     <div id="productManagementModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
-    
+
     <p class="mt-8 text-center text-xs text-dark-placeholder" id="user-id-display">Usuário ID: Carregando...</p>
-    
+
     <script>
+        // Placeholders Globais Essenciais (Redefinidos aqui para clareza)
         window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`);
-        window.activateItemSelection = () => {}; 
-        // Placeholders para funções onclick da divisão (agora escondida)
-        window.removeSplitAccount = (splitId) => { alert(`Remover Divisão ${splitId} (DEV)`)};
-        window.openPaymentModalForSplit = (splitId) => { alert(`Pagar Conta Dividida ${splitId} (DEV)`); };
-        window.openSplitTransferModal = (splitId, mode) => { alert(`Mover Itens Para/De ${splitId} (DEV)`); };
+        window.activateItemSelection = () => {}; // Será definida no paymentController
+        window.openNfeModal = () => { alert("Abrir modal NF-e (DEV)"); };
+        // Placeholders Divisão
+        window.removeSplitAccount = (splitId) => { alert("Divisão desativada.")};
+        window.openPaymentModalForSplit = (splitId) => { alert("Divisão desativada.")};
+        window.openSplitTransferModal = (splitId, mode) => { alert("Divisão desativada.")};
     </script>
-    
+
     <script type="module" src="app.js"></script>
 </body>
 </html>
