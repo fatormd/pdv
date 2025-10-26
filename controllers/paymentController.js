@@ -3,10 +3,10 @@ import { currentTableId, currentOrderSnapshot } from "/app.js";
 import { formatCurrency, calculateItemsValue, getNumericValueFromCurrency } from "/utils.js";
 import { getTableDocRef } from "/services/firebaseService.js";
 import { updateDoc, arrayUnion, arrayRemove, writeBatch, getFirestore, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-// REMOVIDO: import { openManagerAuthModal } from "./managerController.js"; // Quebra o ciclo
+// REMOVIDO: import { openManagerAuthModal } from "./managerController.js"; // <-- CAUSA DO ERRO
 import { handleTableTransferConfirmed } from "./panelController.js";
 
-// --- VARIÁVEIS DE ELEMENTOS (Declaradas aqui, atribuídas no Init) ---
+// --- VARIÁVEIS DE ELEMENTOS ---
 let paymentSplitsContainer, addSplitAccountBtn;
 let reviewItemsList;
 let orderSubtotalDisplay, orderServiceTaxDisplay, orderTotalDisplay, valuePerDinerDisplay, remainingBalanceDisplay;
@@ -76,38 +76,37 @@ export const deletePayment = async (timestamp) => {
 
 // --- FUNÇÕES DE RENDERIZAÇÃO ---
 const renderReviewItemsList = (orderSnapshot) => {
-    if (!reviewItemsList) return; // Se reviewItemsList ainda não foi mapeado, sai
+    if (!reviewItemsList) return;
     const groupedItems = groupMainAccountItems(orderSnapshot);
     const mainAccountItemsCount = Object.values(groupedItems).reduce((sum, group) => sum + group.totalCount, 0);
 
-    const transferBtn = document.getElementById('itemMassTransferBtn');
-    const deleteBtn = document.getElementById('itemMassDeleteBtn');
+    // REMOVIDO: Botões do título (agora estão abaixo)
+    // const transferBtn = document.getElementById('itemMassTransferBtn');
+    // const deleteBtn = document.getElementById('itemMassDeleteBtn');
     
-    // (Lógica de toggle/disable dos botões de ação em massa)
-    if(transferBtn) transferBtn.classList.toggle('text-yellow-400', isMassSelectionActive);
-    if(deleteBtn) deleteBtn.classList.toggle('text-red-400', isMassSelectionActive);
-    if(transferBtn) transferBtn.classList.toggle('text-gray-400', !isMassSelectionActive);
-    if(deleteBtn) deleteBtn.classList.toggle('text-gray-400', !isMassSelectionActive);
-
     if (mainAccountItemsCount === 0) {
         reviewItemsList.innerHTML = `<div class="text-sm text-dark-placeholder italic p-2">Nenhum item enviado para a conta ainda.</div>`;
-        if (transferBtn) transferBtn.disabled = true;
-        if (deleteBtn) deleteBtn.disabled = true;
+        // Desabilita botões da barra de ação se não houver itens
         const selectAll = document.getElementById('selectAllItems');
         if(selectAll) selectAll.disabled = true;
+        const massTransferBtn = document.getElementById('massTransferBtn');
+        if(massTransferBtn) massTransferBtn.disabled = true;
+        const massDeleteBtn = document.getElementById('massDeleteBtn');
+        if(massDeleteBtn) massDeleteBtn.disabled = true;
         return;
     } else {
-        if (transferBtn) transferBtn.disabled = false;
-        if (deleteBtn) deleteBtn.disabled = false;
+        // Habilita botões se houver itens
         const selectAll = document.getElementById('selectAllItems');
         if(selectAll) selectAll.disabled = false;
+        // (A habilitação dos botões de ação depende da seleção, não da contagem total)
     }
 
     const listHtml = Object.values(groupedItems).map(group => {
         const firstItem = group.items[0];
         const groupKey = group.groupKey;
         const massItemKeys = group.items.map(item => `${item.orderId}_${item.sentAt}`).join(',');
-        // **CORREÇÃO:** Checkboxes agora estão sempre habilitados (sem 'disabledAttr')
+        
+        // **CORREÇÃO:** Checkboxes agora estão sempre habilitados
         const existingCheckbox = document.querySelector(`.item-select-checkbox[data-group-key="${groupKey}"]`);
         const checkedAttr = (existingCheckbox && existingCheckbox.checked) ? 'checked' : '';
 
@@ -162,7 +161,8 @@ const renderRegisteredPayments = (payments) => {
             `;
             const deleteBtn = paymentDiv.querySelector('.delete-payment-btn');
             if (deleteBtn) {
-                deleteBtn.onclick = () => window.deletePayment(p.timestamp); // Chama a função global
+                // Chama a função GLOBAL (window.deletePayment)
+                deleteBtn.onclick = () => window.deletePayment(p.timestamp);
             }
             paymentSummaryList.appendChild(paymentDiv);
         });
@@ -243,41 +243,10 @@ export const renderPaymentSummary = (tableId, orderSnapshot) => {
 
 
 // --- LÓGICAS DE AÇÃO EM MASSA E TRANSFERÊNCIA ---
-// AÇÃO REAL (chamada pelo app.js)
-export function activateItemSelection(action) {
-    const checkboxes = document.querySelectorAll('.item-select-checkbox');
-    if (!checkboxes.length && !isMassSelectionActive) { alert("Não há itens para selecionar."); return; }
+// REMOVIDO: activateItemSelection (agora é fluxo direto)
+// export function activateItemSelection(action) { ... };
 
-    if (!isMassSelectionActive) {
-        isMassSelectionActive = true;
-        checkboxes.forEach(cb => { cb.disabled = false; cb.checked = false; });
-        alert(`SELEÇÃO ATIVA. Selecione os itens e clique em 'Excluir' ou 'Transferir' novamente para executar.`);
-    } else {
-        isMassSelectionActive = false;
-        const selectedGroups = Array.from(checkboxes).filter(cb => cb.checked).map(cb => ({ groupKey: cb.dataset.groupKey, itemKeys: cb.dataset.itemKeys.split(',') }));
-        checkboxes.forEach(cb => { cb.disabled = true; cb.checked = false; });
-
-        if (selectedGroups.length === 0) {
-            alert("Nenhum item selecionado. Modo desativado.");
-        } else if (action === 'transfer') {
-            const allItemKeys = selectedGroups.flatMap(group => group.itemKeys);
-            const itemsToTransferPayload = allItemKeys.map(key => {
-                const [orderId, sentAt] = key.split('_');
-                return currentOrderSnapshot?.sentItems?.find(item => item.orderId === orderId && String(item.sentAt) === sentAt);
-            }).filter(Boolean);
-            if (itemsToTransferPayload.length > 0) {
-                openTableTransferModal(itemsToTransferPayload);
-            } else {
-                alert("Erro ao encontrar itens selecionados.");
-            }
-        } else if (action === 'delete') {
-            handleMassDeleteConfirmed(selectedGroups);
-        }
-    }
-    renderReviewItemsList(currentOrderSnapshot);
-};
-
-// INICIA fluxo de senha (chamada pelo HTML)
+// INICIA fluxo de senha (chamada pelos botões com contador)
 export const handleMassActionRequest = (action) => {
     // **FLUXO OTIMIZADO:** Pede a senha e executa a ação
     const selectedCheckboxes = document.querySelectorAll('#reviewItemsList input[type="checkbox"].item-select-checkbox:checked');
