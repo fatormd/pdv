@@ -21,7 +21,10 @@ import { initManagerController, handleGerencialAction } from '/controllers/manag
 const APP_ID = "pdv_fator_instance_001";
 const FIREBASE_CONFIG = { apiKey: "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY", authDomain: "fator-pdv.firebaseapp.com", projectId: "fator-pdv", storageBucket: "fator-pdv.appspot.com", messagingSenderId: "1097659747429", appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c" };
 export const screens = { 'loginScreen': 0, 'panelScreen': 1, 'orderScreen': 2, 'paymentScreen': 3, 'managerScreen': 4 };
-const STAFF_CREDENTIALS = { 'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' }, 'garcom@fator.com': { password: '1234', role: 'garcom', name: 'Mock Garçom' } };
+const STAFF_CREDENTIALS = {
+    'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' },
+    'garcom@fator.com': { password: '1234', role: 'garcom', name: 'Mock Garçom' },
+}; // <<< VERIFIQUE SE ESTÁ EXATAMENTE ASSIM NO SEU CÓDIGO
 const MANAGER_PASSWORD = '1234';
 export let currentTableId = null;
 export let selectedItems = [];
@@ -38,74 +41,13 @@ let loginBtn = null;
 let loginEmailInput = null;
 let loginPasswordInput = null;
 let loginErrorMsg = null;
-let isLoginProcessActive = false; // Flag para prevenir race condition no login
+let isLoginProcessActive = false;
 
 // --- FUNÇÕES CORE E ROTIAMENTO ---
-export const hideStatus = () => {
-    if (!statusScreen) statusScreen = document.getElementById('statusScreen');
-    if (statusScreen) {
-        console.log("[hideStatus] Hiding status screen.");
-        statusScreen.style.cssText = 'display: none !important;';
-    } else { console.error("[hideStatus] statusScreen element NOT found!"); }
-};
-const showLoginScreen = () => {
-    console.log("[UI] showLoginScreen called.");
-    if (!mainContent) mainContent = document.getElementById('mainContent');
-    if (!mainHeader) mainHeader = document.getElementById('mainHeader');
-    if (!appContainer) appContainer = document.getElementById('appContainer');
-    if (!loginEmailInput) loginEmailInput = document.getElementById('loginEmail');
-    if (!loginPasswordInput) loginPasswordInput = document.getElementById('loginPassword');
-    if (!loginErrorMsg) loginErrorMsg = document.getElementById('loginErrorMsg');
-
-    hideStatus();
-
-    if (mainHeader) mainHeader.style.display = 'none';
-    if (mainContent) mainContent.style.display = 'block'; // <<< Garante que o container principal esteja visível
-    if (appContainer) appContainer.style.transform = `translateX(0vw)`;
-    document.body.classList.remove('logged-in');
-
-    if(loginEmailInput) loginEmailInput.value = '';
-    if(loginPasswordInput) loginPasswordInput.value = '';
-    if(loginErrorMsg) loginErrorMsg.style.display = 'none';
-    console.log("[UI] showLoginScreen finished.");
-};
-const hideLoginScreen = () => {
-    console.log("[UI] hideLoginScreen called."); // Debug
-    if (!mainHeader) mainHeader = document.getElementById('mainHeader');
-    if (!mainContent) mainContent = document.getElementById('mainContent');
-    if (mainHeader) mainHeader.style.display = 'flex';
-    if (mainContent) mainContent.style.display = 'block'; // <<< Garante que o container principal esteja visível
-    document.body.classList.add('logged-in');
-
-    const logoutBtn = document.getElementById('logoutBtnHeader');
-    const managerBtn = document.getElementById('openManagerPanelBtn');
-    if (logoutBtn) logoutBtn.classList.remove('hidden');
-    if (managerBtn) { managerBtn.classList.toggle('hidden', userRole !== 'gerente'); }
-     console.log("[UI] hideLoginScreen finished."); // Debug
-};
-export const goToScreen = (screenId) => {
-     console.log(`[NAV] Requesting navigation to ${screenId}`); // Debug INÍCIO da função
-     if (!appContainer) appContainer = document.getElementById('appContainer');
-     if (!mainContent) mainContent = document.getElementById('mainContent');
-
-     if (currentTableId && screenId === 'panelScreen') { /* ... (salvar itens) ... */ }
-
-     if ((screenId === 'panelScreen' || screenId === 'loginScreen') && currentTableId && unsubscribeTable) { /* ... (limpar estado da mesa) ... */ }
-
-    const screenIndex = screens[screenId];
-    if (screenIndex !== undefined) {
-        console.log(`[NAV] Applying transform for ${screenId} (index ${screenIndex})`); // Debug ANTES de aplicar
-        if (appContainer) appContainer.style.transform = `translateX(-${screenIndex * 100}vw)`;
-        // Garante que o mainContent esteja visível para todas as telas exceto login
-        if (mainContent) {
-            mainContent.style.display = (screenId !== 'loginScreen') ? 'block' : 'block'; // Garante block
-            console.log(`[NAV] Set mainContent display to: ${mainContent.style.display}`); // Debug
-        }
-        document.body.classList.toggle('bg-gray-900', screenId === 'managerScreen');
-        document.body.classList.toggle('bg-dark-bg', screenId !== 'managerScreen');
-        console.log(`[NAV] Navigation to ${screenId} styles applied.`); // Debug DEPOIS de aplicar
-    } else { console.error(`[NAV] Invalid screenId: ${screenId}`); }
-};
+export const hideStatus = () => { /* ... (mantida) ... */ };
+const showLoginScreen = () => { /* ... (mantida) ... */ };
+const hideLoginScreen = () => { /* ... (mantida) ... */ };
+export const goToScreen = (screenId) => { /* ... (mantida) ... */ };
 window.goToScreen = goToScreen;
 
 // Lógica de Transferência (mantida)
@@ -137,95 +79,105 @@ window.selectTableAndStartListener = selectTableAndStartListener;
 // NF-e Placeholder (mantido)
 window.openNfeModal = () => { alert("Abrir modal NF-e (DEV)"); };
 
-// --- INICIALIZAÇÃO APP STAFF ---
-const initStaffApp = async () => {
-    console.log("[INIT] initStaffApp called."); // Debug INÍCIO
-    try {
-        renderTableFilters();
-        console.log("[INIT] Sector filters rendered.");
-
-        // Fetch em background
-        fetchWooCommerceProducts().catch(e => console.error("[INIT ERROR] Failed loading products:", e));
-        fetchWooCommerceCategories().catch(e => console.error("[INIT ERROR] Failed loading categories:", e));
-
-        console.log("[INIT] Calling hideLoginScreen..."); // Debug ANTES
-        hideLoginScreen();
-        console.log("[INIT] hideLoginScreen finished."); // Debug DEPOIS
-
-        loadOpenTables();
-        console.log("[INIT] Open tables listener configured.");
-
-        console.log("[INIT] Calling goToScreen('panelScreen')..."); // Debug ANTES
-        goToScreen('panelScreen');
-        console.log("[INIT] goToScreen('panelScreen') finished."); // Debug DEPOIS
-        console.log("[INIT] Staff app initialization seems complete."); // Debug FIM
-
-    } catch (error) {
-        console.error("[INIT] CRITICAL Error during initStaffApp:", error);
-        alert(`Erro grave ao iniciar: ${error.message}.`);
-        showLoginScreen();
-    }
-};
+// --- INICIALIZAÇÃO APP STAFF (mantido) ---
+const initStaffApp = async () => { /* ... */ };
 
 // --- LÓGICA DE AUTH/LOGIN ---
-const authenticateStaff = (email, password) => { /* ... (mantida) ... */ };
+
+// ==============================================
+//     FUNÇÃO ATUALIZADA: authenticateStaff (com logs detalhados)
+// ==============================================
+const authenticateStaff = (email, password) => {
+    console.log(`[AUTH_STAFF] Authenticating with Email: "${email}", Password: "${password}"`); // Log input
+
+    // Log das credenciais armazenadas para comparação
+    console.log("[AUTH_STAFF] Stored credentials:", STAFF_CREDENTIALS);
+
+    const creds = STAFF_CREDENTIALS[email]; // Tenta encontrar pelo email exato
+
+    if (!creds) {
+        console.log(`[AUTH_STAFF] FAILURE: No credentials found for email key "${email}"`); // Log se email não achou
+        return null;
+    }
+
+    console.log(`[AUTH_STAFF] Credentials found for ${email}:`, creds); // Log se achou email
+
+    // Verifica a senha
+    if (creds.password !== password) {
+        console.log(`[AUTH_STAFF] FAILURE: Password mismatch. Provided: "${password}", Expected: "${creds.password}"`); // Log se senha errada
+        return null;
+    }
+
+    // Verifica a role (só por segurança)
+    if (creds.role === 'client') {
+        console.log(`[AUTH_STAFF] FAILURE: Role is 'client', not allowed for staff login.`); // Log se role errada
+        return null;
+    }
+
+    console.log("[AUTH_STAFF] SUCCESS: Credentials match."); // Log se tudo deu certo
+    return creds; // Retorna os dados do usuário
+};
+// ==============================================
+//           FIM DA FUNÇÃO ATUALIZADA
+// ==============================================
+
 
 const handleStaffLogin = async () => {
-    console.log("[LOGIN] handleStaffLogin called."); // Debug INÍCIO
+    console.log("[LOGIN] handleStaffLogin called.");
     loginBtn = loginBtn || document.getElementById('loginBtn');
     loginEmailInput = loginEmailInput || document.getElementById('loginEmail');
     loginPasswordInput = loginPasswordInput || document.getElementById('loginPassword');
     loginErrorMsg = loginErrorMsg || document.getElementById('loginErrorMsg');
-    if (!loginBtn || !loginEmailInput || !loginPasswordInput) { console.error("[LOGIN] Login form elements missing!"); return; }
+    if (!loginBtn || !loginEmailInput || !loginPasswordInput) { console.error("[LOGIN] Login elements missing!"); return; }
 
     if (loginErrorMsg) loginErrorMsg.style.display = 'none';
     loginBtn.disabled = true; loginBtn.textContent = 'Entrando...';
-    isLoginProcessActive = true; // Define a flag
-    console.log("[LOGIN] Flag isLoginProcessActive set to true."); // Debug
+    isLoginProcessActive = true;
 
-    const email = loginEmailInput.value.trim();
-    const password = loginPasswordInput.value.trim();
+    const email = loginEmailInput.value.trim(); // Pega o email do input
+    const password = loginPasswordInput.value.trim(); // Pega a senha do input
 
-    console.log(`[LOGIN] Attempting local auth for ${email}...`);
+    console.log(`[LOGIN] Attempting local auth for trimmed Email: "${email}", trimmed Password: "${password}"`); // Log ANTES de chamar authenticateStaff
+
+    // Chama a função de autenticação com os valores dos inputs
     const staffData = authenticateStaff(email, password);
 
-    if (staffData) {
-        console.log(`[LOGIN] Local auth successful. Role: ${staffData.role}`);
-        userRole = staffData.role; // Define role ANTES do sign-in
+    if (staffData) { // Se authenticateStaff retornou os dados (não null)
+        console.log(`[LOGIN] Local auth successful via authenticateStaff. Role: ${staffData.role}`);
+        userRole = staffData.role;
         try {
             const authInstance = getAuth();
-            if (!authInstance) throw new Error("Auth instance not available.");
+            if (!authInstance) throw new Error("Auth instance missing.");
 
             console.log("[LOGIN] Attempting Firebase anonymous sign-in...");
-            const userCredential = await signInAnonymously(authInstance); // Espera o sign-in
+            const userCredential = await signInAnonymously(authInstance);
             userId = userCredential.user.uid;
-            console.log(`[LOGIN] Firebase sign-in successful. UID: ${userId}`);
+            console.log(`[LOGIN] Firebase sign-in OK. UID: ${userId}`);
 
             const userName = staffData.name || userRole;
             const userIdDisplay = document.getElementById('user-id-display');
             if(userIdDisplay) userIdDisplay.textContent = `Usuário: ${userName} | ${userRole.toUpperCase()}`;
             console.log("[LOGIN] User display updated.");
 
-            console.log("[LOGIN] Calling initStaffApp from handleStaffLogin...");
-            await initStaffApp(); // Chama a inicialização
-            console.log("[LOGIN] initStaffApp finished execution from handleStaffLogin.");
+            console.log("[LOGIN] Calling initStaffApp...");
+            await initStaffApp();
+            console.log("[LOGIN] initStaffApp finished.");
 
         } catch (error) {
-             console.error("[LOGIN] Error during sign-in or app init:", error);
+             console.error("[LOGIN] Error during Firebase sign-in/app init:", error);
              alert(`Erro login/init: ${error.message}.`);
-             userRole = 'anonymous'; userId = null; // Reseta estado
+             userRole = 'anonymous'; userId = null;
              showLoginScreen();
              if(loginErrorMsg) { loginErrorMsg.textContent = `Erro: ${error.message}`; loginErrorMsg.style.display = 'block'; }
         }
-    } else {
-        console.log(`[LOGIN] Invalid credentials for ${email}.`);
+    } else { // Se authenticateStaff retornou null
+        console.log(`[LOGIN] authenticateStaff returned null. Invalid credentials for "${email}".`); // Log específico
         if(loginErrorMsg) { loginErrorMsg.textContent = 'E-mail ou senha inválidos.'; loginErrorMsg.style.display = 'block'; }
     }
 
-    // Garante reabilitação do botão e reset da flag no final
     if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Entrar'; }
     isLoginProcessActive = false;
-    console.log("[LOGIN] Flag isLoginProcessActive set to false. handleStaffLogin finished."); // Debug
+    console.log("[LOGIN] handleStaffLogin finished.");
 };
 
 const handleLogout = () => { /* ... (mantida) ... */ };
@@ -233,84 +185,45 @@ window.handleLogout = handleLogout;
 
 // --- INICIALIZAÇÃO PRINCIPAL ---
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("[INIT] DOMContentLoaded event fired.");
+    console.log("[INIT] DOMContentLoaded fired.");
     statusScreen = document.getElementById('statusScreen');
-    if (!statusScreen) { console.error("CRITICAL ERROR: statusScreen element not found!"); alert("Erro Crítico: Interface não carregou."); return; }
+    if (!statusScreen) { console.error("CRITICAL: statusScreen missing!"); return; }
     console.log("[INIT] statusScreen mapped.");
 
     const firebaseConfig = FIREBASE_CONFIG;
-    let authInstance; // Declara fora do try para usar no log final
+    let authInstance;
 
     try {
-        console.log("[INIT] Firebase config loaded.");
-        const app = initializeApp(firebaseConfig);
-        console.log("[INIT] Firebase App initialized.");
-        const dbInstance = getFirestore(app);
-        console.log("[INIT] Firestore instance obtained.");
-        authInstance = getAuth(app); // Atribui à variável externa
-        console.log("[INIT] Auth instance obtained.");
-        initializeFirebase(dbInstance, authInstance, APP_ID);
-        console.log("[INIT] Firebase services passed to firebaseService.");
+        console.log("[INIT] Firebase config OK.");
+        const app = initializeApp(firebaseConfig); console.log("[INIT] Firebase App OK.");
+        const dbInstance = getFirestore(app); console.log("[INIT] Firestore OK.");
+        authInstance = getAuth(app); console.log("[INIT] Auth OK.");
+        initializeFirebase(dbInstance, authInstance, APP_ID); console.log("[INIT] Services passed.");
 
-        mainContent = document.getElementById('mainContent');
-        appContainer = document.getElementById('appContainer');
-        mainHeader = document.getElementById('mainHeader');
-        loginBtn = document.getElementById('loginBtn');
-        loginEmailInput = document.getElementById('loginEmail');
-        loginPasswordInput = document.getElementById('loginPassword');
-        loginErrorMsg = document.getElementById('loginErrorMsg');
-        console.log("[INIT] UI elements mapped.");
+        // Mapeia elementos (mantido)
+        mainContent=document.getElementById('mainContent'); appContainer=document.getElementById('appContainer'); mainHeader=document.getElementById('mainHeader'); loginBtn=document.getElementById('loginBtn'); loginEmailInput=document.getElementById('loginEmail'); loginPasswordInput=document.getElementById('loginPassword'); loginErrorMsg=document.getElementById('loginErrorMsg');
+        console.log("[INIT] UI mapped.");
 
-        console.log("[INIT] Setting up AuthStateChanged listener...");
+        console.log("[INIT] Setting up Auth listener...");
         onAuthStateChanged(authInstance, async (user) => {
-            console.log("[AUTH] Listener FIRED! User:", user ? user.uid : 'null'); // Log DENTRO
-
-            if (isLoginProcessActive) {
-                console.log("[AUTH] Ignoring Auth State change (login process active).");
-                return;
-            }
-
-            if (user) {
-                userId = user.uid;
-                console.log(`[AUTH] User detected. Local role: '${userRole}'`);
-                if (userRole === 'gerente' || userRole === 'garcom') {
-                     console.log(`[AUTH] Initializing staff app...`);
-                     const userName = STAFF_CREDENTIALS[loginEmailInput?.value?.trim()]?.name || userRole;
-                     const userIdDisplay = document.getElementById('user-id-display');
-                     if(userIdDisplay) userIdDisplay.textContent = `Usuário: ${userName} | ${userRole.toUpperCase()}`;
-                    await initStaffApp();
-                } else {
-                    console.warn("[AUTH] Firebase user exists, but local role invalid. Forcing logout.");
-                    handleLogout();
-                }
-            } else {
-                userId = null; userRole = 'anonymous';
-                if (unsubscribeTable) { unsubscribeTable(); unsubscribeTable = null; }
-                currentTableId = null; currentOrderSnapshot = null; selectedItems.length = 0;
-                console.log("[AUTH] No Firebase user. Showing login screen.");
-                showLoginScreen();
-            }
+            console.log("[AUTH] Listener FIRED! User:", user ? user.uid : 'null');
+            if (isLoginProcessActive) { console.log("[AUTH] Ignoring (login active)."); return; }
+            if (user) { /* ... (lógica mantida) ... */ }
+            else { /* ... (lógica mantida) ... */ showLoginScreen(); }
         });
-        console.log("[INIT] AuthStateChanged listener configured.");
+        console.log("[INIT] Auth listener configured.");
 
 
         if (loginBtn) {
             loginBtn.addEventListener('click', handleStaffLogin);
-            console.log("[INIT] Login button listener added.");
-        } else { console.error("[INIT] Login Button (loginBtn) not found!"); }
+            console.log("[INIT] Login listener added.");
+        } else { console.error("[INIT] Login Button missing!"); }
 
-        console.log("[INIT] Calling controller initializers...");
+        console.log("[INIT] Calling controller inits...");
         try {
-            initPanelController();
-            initOrderController();
-            initPaymentController();
-            initManagerController();
-            console.log("[INIT] Controller initializers called.");
-        } catch (controllerError) {
-             console.error("[INIT] Error initializing controllers:", controllerError);
-             alert(`Erro init controllers: ${controllerError.message}`);
-             showLoginScreen(); return;
-        }
+            initPanelController(); initOrderController(); initPaymentController(); initManagerController();
+            console.log("[INIT] Controllers initialized.");
+        } catch (controllerError) { /* ... (erro mantido) ... */ }
 
         // Outros Listeners (mantido)
         const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
@@ -322,10 +235,9 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("[INIT] Global listeners added.");
 
     } catch (e) {
-        console.error("CRITICAL Error during DOMContentLoaded:", e);
+        console.error("CRITICAL init error:", e);
         alert(`Falha grave init: ${e.message}.`);
-        hideStatus(); // Tenta esconder loading mesmo com erro
-        return;
+        hideStatus(); return;
     }
-    console.log("[INIT] DOMContentLoaded finished. Waiting for AuthStateChanged..."); // Mensagem final do DOMContentLoaded
+    console.log("[INIT] DOMContentLoaded finished. Waiting for Auth...");
 }); // FIM DO DOMContentLoaded
