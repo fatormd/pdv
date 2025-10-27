@@ -2,12 +2,11 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapshot, writeBatch, arrayRemove, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-// NOVO IMPORT
+// Import Functions
 import { getFunctions } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
 
 
 // Importações dos Serviços e Utils
-// 'functions' será importado do firebaseService agora
 import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, auth, db, functions } from '/services/firebaseService.js';
 import { fetchWooCommerceProducts, fetchWooCommerceCategories } from '/services/wooCommerceService.js';
 import { formatCurrency, formatElapsedTime } from '/utils.js';
@@ -58,6 +57,8 @@ let loginBtn, loginEmailInput, loginPasswordInput, loginErrorMsg;
 
 
 // --- FUNÇÕES CORE E ROTIAMENTO ---
+// ... (NENHUMA MUDANÇA NAS FUNÇÕES: hideStatus, showLoginScreen, hideLoginScreen, goToScreen, handleTableTransferConfirmed, openManagerAuthModal, setTableListener, setCurrentTable, selectTableAndStartListener, openNfeModal, initStaffApp, authenticateStaff, handleStaffLogin, handleLogout) ...
+// (O código de todas as funções acima permanece o mesmo)
 export const hideStatus = () => {
     if (!statusScreen) statusScreen = document.getElementById('statusScreen');
     if (statusScreen) {
@@ -425,6 +426,7 @@ const initStaffApp = async () => {
         renderTableFilters();
         console.log("[INIT] Filtros de setor renderizados.");
 
+        // Chamadas agora usam o proxy (Cloud Function)
         fetchWooCommerceProducts().catch(e => console.error("[INIT ERROR] Falha ao carregar produtos:", e));
         fetchWooCommerceCategories().catch(e => console.error("[INIT ERROR] Falha ao carregar categorias:", e));
 
@@ -536,10 +538,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const app = initializeApp(firebaseConfig);
         const dbInstance = getFirestore(app);
         const authInstance = getAuth(app);
-        // ATUALIZADO: Inicializa o Functions
-        const functionsInstance = getFunctions(app);
+        // ATUALIZADO: Inicializa o Functions com a REGIÃO
+        const functionsInstance = getFunctions(app, 'us-central1'); // <--- ADICIONADO 'us-central1'
 
-        // ATUALIZADO: Passa o functionsInstance
+        // Passa o functionsInstance
         initializeFirebase(dbInstance, authInstance, APP_ID, functionsInstance);
         console.log("[INIT] Firebase App e Serviços (DB, Auth, Functions) inicializados.");
 
