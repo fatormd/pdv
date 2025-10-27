@@ -103,6 +103,24 @@
                   border-color: #ccc !important;
              }
         }
+
+        /* Opcional: Estilizar a barra de rolagem no modal de usuários */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px; /* Largura da barra */
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1f2937; /* Fundo da trilha (cor do card escuro) */
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #4b5563; /* Cor da barra (cinza mais escuro) */
+            border-radius: 10px;
+            border: 2px solid #1f2937; /* Espaço em volta da barra */
+        }
+         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background-color: #6b7280; /* Cor da barra ao passar o mouse */
+        }
+
     </style>
 </head>
 <body class="bg-dark-bg min-h-screen text-dark-text">
@@ -138,15 +156,15 @@
             <div id="loginScreen" class="w-screen flex-shrink-0 flex items-center justify-center p-4 bg-dark-bg print-hide">
                  <div class="content-card bg-dark-card p-8 rounded-xl shadow-2xl w-full max-w-sm text-center">
                     <h3 class="text-2xl font-bold text-pumpkin mb-6">Fator PDV - Staff</h3>
-                    
                     <form id="loginForm">
-                        <input type="email" id="loginEmail" placeholder="E-mail (Ex: agencia@fatormd.com)" class="input-pdv w-full p-4 mb-4 text-base">
-                        <input type="password" id="loginPassword" placeholder="Senha" class="input-pdv w-full p-4 mb-6 text-base">
+                        <input type="email" id="loginEmail" placeholder="E-mail (Ex: agencia@fatormd.com)" class="input-pdv w-full p-4 mb-4 text-base" autocomplete="username">
+                        <input type="password" id="loginPassword" placeholder="Senha" class="input-pdv w-full p-4 mb-6 text-base" autocomplete="current-password">
                         <div id="loginErrorMsg" class="text-red-400 text-sm mb-4" style="display: none;"></div>
                         <div class="flex space-x-3">
                             <button id="loginBtn" type="submit" class="w-full bg-pumpkin text-white font-bold py-4 rounded-lg hover:bg-pumpkin-dark transition text-lg disabled:opacity-50">Entrar</button>
                         </div>
-                    </form> <p class="mt-4 text-xs text-dark-placeholder">Use 'garcom@fator.com' | Senha: 1234</p>
+                    </form>
+                    <p class="mt-4 text-xs text-dark-placeholder">Use 'garcom@fator.com' | Senha: 1234</p>
                     <p class="mt-1 text-xs text-dark-placeholder">Use 'agencia@fatormd.com' | Senha: 1234 (Gerente)</p>
                 </div>
             </div>
@@ -238,13 +256,13 @@
                             <i class="fas fa-print text-lg"></i>
                         </button>
                     </div>
-                    <div id="reviewItemsList" class="space-y-3 pt-2 max-h-60 overflow-y-auto">
+                    <div id="reviewItemsList" class="space-y-3 pt-2 max-h-60 overflow-y-auto custom-scrollbar">
                          </div>
 
                     <div class="content-card bg-dark-bg border border-dark-border p-4 mb-6 mt-6 hidden print-hide">
                         <div class="flex justify-between items-center mb-4">
                             <h2 class="text-lg font-semibold text-indigo-400">Divisão da Conta</h2>
-                             <button id="addSplitAccountBtn" class="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-bold">
+                             <button id="addSplitAccountBtn" class="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-bold opacity-50 cursor-not-allowed" disabled>
                                 + Dividir
                             </button>
                         </div>
@@ -278,8 +296,7 @@
                                 <i class="fas fa-plus"></i>
                             </button>
                         </div>
-                        <span id="valuePerDinerDisplayPrint" class="text-base font-bold text-indigo-400 hidden print:block">R$ 0,00</span>
-                    </div>
+                        <span id="valuePerDinerDisplayPrint" class="text-base font-bold text-indigo-400 hidden print:block">R$ 0,00</span> </div>
                     <div class="flex justify-between items-center pt-2">
                         <span class="text-xl font-bold text-dark-text">TOTAL GERAL:</span>
                         <span class="text-2xl font-extrabold text-indigo-400" id="orderTotalDisplayPayment">R$ 0,00</span>
@@ -288,34 +305,30 @@
                         <span class="text-xl font-bold text-pumpkin">RESTANTE A PAGAR:</span>
                         <span class="text-2xl font-extrabold text-pumpkin" id="remainingBalanceDisplay">R$ 0,00</span>
                     </div>
-                </div>
-
-                <div id="chargeInputs" class="content-card p-4 mb-6 print-hide">
+                </div><div id="chargeInputs" class="content-card p-4 mb-6 print-hide">
                     <h2 class="text-xl font-semibold text-pumpkin mb-4">Registrar Pagamento (Conta Principal)</h2>
-                    <div id="paymentSummaryList" class="mb-4 p-3 rounded-lg bg-dark-bg border border-dark-border max-h-40 overflow-y-auto">
+                    <div id="paymentSummaryList" class="mb-4 p-3 rounded-lg bg-dark-bg border border-dark-border max-h-40 overflow-y-auto custom-scrollbar">
                         </div>
                     <div class="flex space-x-2 mb-3">
                         <input type="text" id="customerSearchInput" placeholder="Buscar/Associar Cliente (CPF/Nome)" class="input-pdv w-full">
-                        <button id="openCustomerRegBtn" class="p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition w-14">
+                        <button id="openCustomerRegBtn" class="p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition w-14" title="Buscar/Cadastrar Cliente">
                             <i class="fas fa-user-plus"></i>
                         </button>
                     </div>
                     <div id="paymentMethodButtons" class="grid grid-cols-3 gap-2 mb-3">
                         </div>
                     <div class="flex space-x-2 mb-4">
-                        <input type="text" id="paymentValueInput" placeholder="Valor (Ex: 50,00)" class="input-pdv w-full text-lg">
-                        <button id="openCalculatorBtn" class="p-3 bg-gray-600 text-white rounded-lg hover:bg-gray-500 transition w-14">
+                        <input type="text" id="paymentValueInput" placeholder="Valor (Ex: 50,00)" inputmode="decimal" class="input-pdv w-full text-lg">
+                        <button id="openCalculatorBtn" class="p-3 bg-gray-600 text-white rounded-lg hover:bg-gray-500 transition w-14" title="Abrir Calculadora">
                             <i class="fas fa-calculator"></i>
                         </button>
                     </div>
                     <button id="addPaymentBtn" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition disabled:opacity-50" disabled>
                         <i class="fas fa-plus"></i> Adicionar Pagamento
                     </button>
-                </div>
-
-                <div class="content-card p-4 pt-0 mt-6 print-hide">
+                </div><div class="content-card p-4 pt-0 mt-6 print-hide">
                     <div class="flex space-x-2">
-                         <button id="openNfeModalBtn" class="w-1/2 bg-gray-600 text-white font-bold py-3 rounded-lg hover:bg-gray-500 transition" title="Emitir NF-e">
+                         <button id="openNfeModalBtn" class="w-1/2 bg-gray-600 text-white font-bold py-3 rounded-lg hover:bg-gray-500 transition" title="Emitir NF-e (Simulação)">
                             <i class="fas fa-receipt"></i> NF-e
                         </button>
                         <button id="finalizeOrderBtn" class="w-1/2 bg-pumpkin text-white font-bold py-3 rounded-lg hover:bg-pumpkin-dark transition disabled:opacity-50" disabled>
@@ -323,10 +336,7 @@
                         </button>
                     </div>
                     <p class="mt-4 text-sm text-dark-placeholder text-center">O fechamento da conta remove a mesa do painel.</p>
-                </div>
-            </div>
-
-            <div id="managerScreen" class="flex-shrink-0 bg-gray-900 text-dark-text print-hide">
+                </div></div><div id="managerScreen" class="flex-shrink-0 bg-gray-900 text-dark-text print-hide">
                  <div class="flex items-center mb-4 -mt-4">
                      <button id="backToPanelFromManagerBtn" class="mr-2 text-3xl p-2 text-dark-placeholder hover:text-dark-text transition" title="Voltar para o Painel">
                         <i class="fas fa-arrow-left"></i>
@@ -334,21 +344,15 @@
                     <h2 class="text-2xl font-bold text-pumpkin">Painel Gerencial</h2>
                 </div>
                 <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openProductManagement')"> <i class="fas fa-box-open text-3xl mb-2"></i> <h4 class="font-bold text-lg">Produtos</h4> <p class="text-xs">Gerenciar cardápio (WooCommerce)</p> </div>
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openCashManagement')"> <i class="fas fa-cash-register text-3xl mb-2 text-green-400"></i> <h4 class="font-bold text-lg">Gestão de Caixa</h4> <p class="text-xs">Abertura, fechamento, sangria</p> </div>
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="document.getElementById('reportsModal').style.display='flex'"> <i class="fas fa-chart-line text-3xl mb-2 text-indigo-400"></i> <h4 class="font-bold text-lg">Relatórios</h4> <p class="text-xs">Vendas, produtos, comissões</p> </div>
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openInventoryManagement')"> <i class="fas fa-boxes text-3xl mb-2"></i> <h4 class="font-bold text-lg">Estoque</h4> <p class="text-xs">(Em breve)</p> </div>
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openRecipesManagement')"> <i class="fas fa-book text-3xl mb-2"></i> <h4 class="font-bold text-lg">Ficha Técnica</h4> <p class="text-xs">(Em breve)</p> </div>
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openCustomerCRM')"> <i class="fas fa-users text-3xl mb-2 text-indigo-400"></i> <h4 class="font-bold text-lg">Clientes (CRM)</h4> <p class="text-xs">(Em breve)</p> </div>
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openWaiterReg')"> <i class="fas fa-user-shield text-3xl mb-2 text-red-400"></i> <h4 class="font-bold text-lg">Usuários</h4> <p class="text-xs">Cadastrar Garçons / Gerentes</p> </div>
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openWooSync')"> <i class="fas fa-sync text-3xl mb-2 text-gray-400"></i> <h4 class="font-bold text-lg">Sincronizar</h4> <p class="text-xs">Forçar sincronia com WooCommerce</p> </div>
-                </div>
-            </div>
-
-        </div>
-    </main>
-
-    <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
+                    <div class="manager-card content-card p-4 text-center cursor-pointer"> <i class="fas fa-box-open text-3xl mb-2"></i> <h4 class="font-bold text-lg">Produtos</h4> <p class="text-xs">Gerenciar cardápio (WooCommerce)</p> </div>
+                    <div class="manager-card content-card p-4 text-center cursor-pointer"> <i class="fas fa-cash-register text-3xl mb-2 text-green-400"></i> <h4 class="font-bold text-lg">Gestão de Caixa</h4> <p class="text-xs">Abertura, fechamento, sangria</p> </div>
+                    <div class="manager-card content-card p-4 text-center cursor-pointer"> <i class="fas fa-chart-line text-3xl mb-2 text-indigo-400"></i> <h4 class="font-bold text-lg">Relatórios</h4> <p class="text-xs">Vendas, produtos, comissões</p> </div>
+                    <div class="manager-card content-card p-4 text-center cursor-pointer"> <i class="fas fa-boxes text-3xl mb-2"></i> <h4 class="font-bold text-lg">Estoque</h4> <p class="text-xs">(Em breve)</p> </div>
+                    <div class="manager-card content-card p-4 text-center cursor-pointer"> <i class="fas fa-book text-3xl mb-2"></i> <h4 class="font-bold text-lg">Ficha Técnica</h4> <p class="text-xs">(Em breve)</p> </div>
+                    <div class="manager-card content-card p-4 text-center cursor-pointer"> <i class="fas fa-users text-3xl mb-2 text-indigo-400"></i> <h4 class="font-bold text-lg">Clientes (CRM)</h4> <p class="text-xs">(Em breve)</p> </div>
+                    <div class="manager-card content-card p-4 text-center cursor-pointer"> <i class="fas fa-user-shield text-3xl mb-2 text-red-400"></i> <h4 class="font-bold text-lg">Usuários</h4> <p class="text-xs">Cadastrar Garçons / Gerentes</p> </div>
+                    <div class="manager-card content-card p-4 text-center cursor-pointer"> <i class="fas fa-sync text-3xl mb-2 text-gray-400"></i> <h4 class="font-bold text-lg">Sincronizar</h4> <p class="text-xs">Forçar sincronia com WooCommerce</p> </div>
+                </div></div></div></main><div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 id="obsItemName" class="text-xl font-bold mb-4 text-indigo-400">Adicionar Observação</h3>
             <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-4">
@@ -367,12 +371,11 @@
                  <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Ponto Mais">Ponto Mais</button>
                  <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Bem Passado">Bem Passado</button>
             </div>
-            <textarea id="obsInput" rows="3" placeholder="Ex: Sem cebola, Ponto da carne..." class="input-pdv w-full p-3 text-base" readonly></textarea>
-            <div class="flex items-center justify-between mt-3 mb-4">
+            <textarea id="obsInput" rows="3" placeholder="Ex: Sem cebola, Ponto da carne..." class="input-pdv w-full p-3 text-base"></textarea> <div class="flex items-center justify-between mt-3 mb-4">
                  <span class="text-dark-text font-semibold">Item em Espera?</span>
-                 <label class="switch-obs">
-                     <input type="checkbox" id="esperaSwitch">
-                     <span class="slider-obs"></span>
+                 <label class="relative inline-flex items-center cursor-pointer">
+                     <input type="checkbox" id="esperaSwitch" class="sr-only peer">
+                     <div class="w-11 h-6 bg-gray-600 rounded-full peer peer-focus:ring-2 peer-focus:ring-yellow-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-yellow-400"></div>
                  </label>
             </div>
             <div class="flex justify-end space-x-3 mt-4">
@@ -386,7 +389,7 @@
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm text-center">
             <h3 class="text-xl font-bold mb-4 text-red-400" id="customAlertTitle">Aviso</h3>
             <p class="text-base mb-6 text-dark-text" id="customAlertMessage">Mensagem Padrão.</p>
-            <button id="customAlertOkBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition">
+            <button id="customAlertOkBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition" onclick="this.closest('#customAlertModal').style.display='none'">
                 OK
             </button>
         </div>
@@ -397,33 +400,28 @@
 
     <div id="calculatorModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-4 rounded-xl shadow-2xl w-full max-w-xs relative">
-             <button id="closeCalcBtnX" class="absolute -top-2 -right-2 bg-red-600 text-white rounded-full h-8 w-8">&times;</button>
+             <button id="closeCalcBtnX" class="absolute -top-2 -right-2 bg-red-600 text-white rounded-full h-8 w-8 flex items-center justify-center leading-none" title="Fechar Calculadora">&times;</button>
              <input type="text" id="calcDisplay" class="input-pdv w-full text-right text-2xl mb-3" readonly value="0">
              <div class="grid grid-cols-4 gap-2 calculator-buttons">
-                <button class="calc-btn p-3 bg-pumpkin rounded hover:bg-pumpkin-dark text-xl" data-action="clear">C</button>
+                <button class="calc-btn p-3 bg-pumpkin rounded hover:bg-pumpkin-dark text-xl font-bold" data-action="clear">C</button>
                 <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="operator" data-value="%">%</button>
-                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="operator" data-value="/">/</button>
-                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="backspace">&larr;</button>
-
-                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="7">7</button>
-                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="8">8</button>
-                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="9">9</button>
-                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="operator" data-value="*">*</button>
-
-                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="4">4</button>
-                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="5">5</button>
-                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="6">6</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="operator" data-value="/">÷</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="backspace">←</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl font-semibold" data-action="number" data-value="7">7</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl font-semibold" data-action="number" data-value="8">8</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl font-semibold" data-action="number" data-value="9">9</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="operator" data-value="*">×</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl font-semibold" data-action="number" data-value="4">4</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl font-semibold" data-action="number" data-value="5">5</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl font-semibold" data-action="number" data-value="6">6</button>
                 <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="operator" data-value="-">-</button>
-
-                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="1">1</button>
-                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="2">2</button>
-                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="3">3</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl font-semibold" data-action="number" data-value="1">1</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl font-semibold" data-action="number" data-value="2">2</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl font-semibold" data-action="number" data-value="3">3</button>
                 <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="operator" data-value="+">+</button>
-
-                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl col-span-2" data-action="number" data-value="0">0</button>
-                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="decimal" data-value=",">,</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl font-semibold col-span-2" data-action="number" data-value="0">0</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl font-semibold" data-action="decimal" data-value=",">,</button>
                 <button class="calc-btn p-3 bg-green-600 rounded hover:bg-green-700 text-xl" data-action="calculate">=</button>
-
                 </div>
              <button id="confirmCalcBtn" class="w-full mt-3 p-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition">OK (Usar Valor)</button>
         </div>
@@ -431,8 +429,8 @@
 
     <div id="tableTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
-            <h3 class="text-xl font-bold mb-4 text-pumpkin">Transferir Itens (Mesa Inteira/Parcial)</h3>
-            <p class="text-sm text-dark-placeholder mb-3">Insira a mesa de destino para os itens selecionados.</p>
+            <h3 class="text-xl font-bold mb-4 text-pumpkin">Transferir Itens Selecionados</h3>
+            <p class="text-sm text-dark-placeholder mb-3">Insira a mesa de destino para os itens selecionados na lista de resumo.</p>
             <input type="number" id="targetTableInput" placeholder="Nº Mesa Destino" class="input-pdv w-full text-center mb-3">
             <div id="newTableDinersInput" class="hidden space-y-2 mb-3 p-3 bg-dark-bg rounded-lg border border-dark-border">
                 <p class="text-sm text-yellow-400">Mesa destino fechada. Preencha para abrir:</p>
@@ -445,28 +443,28 @@
                     <option value="Calçada">Calçada</option>
                 </select>
             </div>
-            <div id="transferStatus" class="text-green-400 text-sm mb-4 hidden"></div>
-            <div class="flex justify-end space-x-3 mt-4">
+            <div id="transferStatus" class="text-green-400 text-sm mb-4 hidden"></div> <div class="flex justify-end space-x-3 mt-4">
                 <button class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('tableTransferModal').style.display='none'">Cancelar</button>
-                <button id="confirmTableTransferBtn" class="px-4 py-3 bg-pumpkin text-white rounded-lg hover:bg-pumpkin-dark transition" disabled>Prosseguir</button>
+                <button id="confirmTableTransferBtn" class="px-4 py-3 bg-pumpkin text-white rounded-lg hover:bg-pumpkin-dark transition" disabled>Prosseguir Transferência</button>
             </div>
         </div>
     </div>
 
     <div id="customerRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
-        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <h3 class="text-xl font-bold mb-4 text-indigo-400">Buscar / Cadastrar Cliente</h3>
+        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <h3 class="text-xl font-bold mb-4 text-indigo-400">Buscar / Cadastrar Cliente</h3>
             <div class="mb-4">
                 <label for="customerSearchCpf" class="block text-sm font-medium text-dark-placeholder mb-1">Buscar por CPF / CNPJ</label>
                 <div class="flex space-x-2">
-                    <input type="text" id="customerSearchCpf" placeholder="Digite o CPF ou CNPJ" class="input-pdv w-full">
-                    <button id="searchCustomerByCpfBtn" class="p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition w-14">
+                    <input type="text" id="customerSearchCpf" placeholder="Digite o CPF ou CNPJ (apenas números)" inputmode="numeric" class="input-pdv w-full">
+                    <button id="searchCustomerByCpfBtn" class="p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition w-14" title="Buscar Cliente">
                         <i class="fas fa-search"></i>
                     </button>
                 </div>
             </div>
              <div id="customerSearchResults" class="mb-4 p-3 rounded-lg bg-dark-bg border border-dark-border min-h-[50px]">
-                </div>
+                 <p class="text-sm text-dark-placeholder italic">Digite um CPF ou CNPJ para buscar.</p>
+             </div>
              <hr class="border-gray-600 my-4">
              <h4 class="text-lg font-semibold mb-3 text-dark-text">Dados do Cliente</h4>
              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -476,7 +474,7 @@
                  </div>
                  <div>
                     <label for="customerCpf" class="block text-sm font-medium text-dark-placeholder mb-1">CPF / CNPJ*</label>
-                    <input type="text" id="customerCpf" placeholder="Documento (só números)" class="input-pdv w-full">
+                    <input type="text" id="customerCpf" placeholder="Documento (só números)" inputmode="numeric" class="input-pdv w-full">
                  </div>
                  <div>
                     <label for="customerPhone" class="block text-sm font-medium text-dark-placeholder mb-1">Telefone</label>
@@ -507,11 +505,9 @@
     <div id="nfeModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
             <h3 class="text-xl font-bold mb-4 text-indigo-400">Emissão de Nota Fiscal (NF-e/NFC-e)</h3>
-
             <div id="nfeError" class="hidden p-3 rounded-lg bg-red-900 border border-red-700 text-red-200 mb-4">
                 <p id="nfeErrorMessage" class="font-semibold">Erro aqui</p>
             </div>
-
             <div id="nfeDetails">
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-dark-placeholder mb-1">Cliente</label>
@@ -526,7 +522,6 @@
                     <p id="nfeTotalValue" class="text-2xl font-bold text-pumpkin">R$ 0,00</p>
                 </div>
             </div>
-
             <div class="flex justify-end space-x-3 mt-6">
                 <button class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('nfeModal').style.display='none'">Cancelar</button>
                 <button id="nfeConfirmBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
@@ -536,79 +531,77 @@
         </div>
     </div>
 
-    <div id="waiterRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"></div>
-    <div id="selectiveTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"></div>
-    <div id="productManagementModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"></div>
-
-    <p class="mt-8 text-center text-xs text-dark-placeholder print-hide" id="user-id-display">Usuário ID: Carregando...</p>
+    <div id="productManagementModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
+        </div>
 
     <div id="userManagementModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
-        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-bold text-red-400">Gerenciar Usuários do Sistema</h3>
+        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col"> <div class="flex justify-between items-center mb-4 flex-shrink-0"> <h3 class="text-xl font-bold text-red-400">Gerenciar Usuários do Sistema</h3>
                 <button class="px-4 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('userManagementModal').style.display='none'; document.getElementById('userForm').style.display='none';">
                     Fechar
                 </button>
             </div>
 
-            <div id="userListContainer" class="flex-grow overflow-y-auto mb-4 border border-gray-600 p-3 rounded-lg bg-dark-bg min-h-[200px]">
-                <p class="text-dark-placeholder italic">Carregando usuários...</p>
-                </div>
+            <div class="flex-grow overflow-y-auto mb-4 custom-scrollbar"> <div id="userListContainer" class="mb-4 border border-gray-600 p-3 rounded-lg bg-dark-bg min-h-[200px]">
+                    <p class="text-dark-placeholder italic">Carregando usuários...</p>
+                    </div>
 
-            <button id="showUserFormBtn" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition mb-4">
-                <i class="fas fa-plus"></i> Adicionar Novo Usuário
-            </button>
+                <button id="showUserFormBtn" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition mb-4">
+                    <i class="fas fa-plus"></i> Adicionar Novo Usuário
+                </button>
 
-            <form id="userForm" class="hidden p-4 border border-gray-600 rounded-lg bg-dark-input space-y-3">
-                <h4 id="userFormTitle" class="text-lg font-semibold text-pumpkin mb-2">Adicionar Novo Usuário</h4>
-                <input type="hidden" id="userIdInput"> <div>
-                    <label for="userNameInput" class="block text-sm font-medium text-dark-placeholder mb-1">Nome Completo*</label>
-                    <input type="text" id="userNameInput" placeholder="Nome do Usuário" class="input-pdv w-full" required>
-                </div>
-                <div>
-                    <label for="userEmailInput" class="block text-sm font-medium text-dark-placeholder mb-1">E-mail (Login)*</label>
-                    <input type="email" id="userEmailInput" placeholder="email@exemplo.com" class="input-pdv w-full" required>
-                </div>
-                 <div>
-                    <label for="userPasswordInput" class="block text-sm font-medium text-dark-placeholder mb-1">Senha*</label>
-                    <input type="password" id="userPasswordInput" placeholder="Senha" class="input-pdv w-full" required>
-                </div>
-                <div>
-                    <label for="userRoleSelect" class="block text-sm font-medium text-dark-placeholder mb-1">Função (Papel)*</label>
-                    <select id="userRoleSelect" class="input-pdv w-full" required>
-                        <option value="" disabled selected>Selecione a função</option>
-                        <option value="garcom">Garçom</option>
-                        <option value="caixa">Caixa</option>
-                        <option value="gerente">Gerente</option>
+                <form id="userForm" class="hidden p-4 border border-gray-600 rounded-lg bg-dark-input space-y-3">
+                    <h4 id="userFormTitle" class="text-lg font-semibold text-pumpkin mb-2">Adicionar Novo Usuário</h4>
+                    <input type="hidden" id="userIdInput"> <div>
+                        <label for="userNameInput" class="block text-sm font-medium text-dark-placeholder mb-1">Nome Completo*</label>
+                        <input type="text" id="userNameInput" placeholder="Nome do Usuário" class="input-pdv w-full" required>
+                    </div>
+                    <div>
+                        <label for="userEmailInput" class="block text-sm font-medium text-dark-placeholder mb-1">E-mail (Login)*</label>
+                        <input type="email" id="userEmailInput" placeholder="email@exemplo.com" class="input-pdv w-full" required autocomplete="username">
+                    </div>
+                     <div>
+                        <label for="userPasswordInput" class="block text-sm font-medium text-dark-placeholder mb-1">Senha*</label>
+                        <input type="password" id="userPasswordInput" placeholder="Senha" class="input-pdv w-full" required autocomplete="new-password">
+                    </div>
+                    <div>
+                        <label for="userRoleSelect" class="block text-sm font-medium text-dark-placeholder mb-1">Função (Papel)*</label>
+                        <select id="userRoleSelect" class="input-pdv w-full" required>
+                            <option value="" disabled selected>Selecione a função</option>
+                            <option value="garcom">Garçom</option>
+                            <option value="caixa">Caixa</option>
+                            <option value="gerente">Gerente</option>
                         </select>
-                </div>
-                 <div>
-                    <label for="userIsActiveCheckbox" class="flex items-center space-x-2 text-dark-text">
-                        <input type="checkbox" id="userIsActiveCheckbox" class="h-4 w-4 rounded text-pumpkin focus:ring-pumpkin" checked>
-                        <span>Usuário Ativo</span>
-                    </label>
-                </div>
+                    </div>
+                     <div>
+                        <label for="userIsActiveCheckbox" class="flex items-center space-x-2 text-dark-text">
+                            <input type="checkbox" id="userIsActiveCheckbox" class="h-4 w-4 rounded text-pumpkin focus:ring-pumpkin border-gray-600 bg-dark-input" checked>
+                            <span>Usuário Ativo</span>
+                        </label>
+                    </div>
 
-                <div class="flex justify-end space-x-3 pt-3">
-                    <button type="button" id="cancelUserFormBtn" class="px-4 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition">Cancelar</button>
-                    <button type="submit" id="saveUserBtn" class="px-4 py-2 bg-pumpkin text-white rounded-lg hover:bg-pumpkin-dark transition">Salvar Usuário</button>
-                </div>
-                <p id="userFormError" class="text-red-400 text-sm mt-2" style="display: none;"></p>
-            </form>
-        </div>
+                    <div class="flex justify-end space-x-3 pt-3">
+                        <button type="button" id="cancelUserFormBtn" class="px-4 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition">Cancelar</button>
+                        <button type="submit" id="saveUserBtn" class="px-4 py-2 bg-pumpkin text-white rounded-lg hover:bg-pumpkin-dark transition">Salvar Usuário</button>
+                    </div>
+                    <p id="userFormError" class="text-red-400 text-sm mt-2" style="display: none;"></p>
+                </form>
+
+            </div> </div>
     </div>
-     
+    <div id="waiterRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"></div>
+    <div id="selectiveTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"></div>
+
+
+    <p class="mt-8 text-center text-xs text-dark-placeholder print-hide" id="user-id-display">Usuário ID: Carregando...</p>
+
     <script>
-        window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`);
-        window.activateItemSelection = () => {};
-        // Placeholders para funções onclick da divisão (agora escondida)
+        // Placeholders para funções onclick de divisão (desativada)
         window.removeSplitAccount = (splitId) => { alert(`Remover Divisão ${splitId} (DEV)`)};
         window.openPaymentModalForSplit = (splitId) => { alert(`Pagar Conta Dividida ${splitId} (DEV)`); };
         window.openSplitTransferModal = (splitId, mode) => { alert(`Mover Itens Para/De ${splitId} (DEV)`); };
     </script>
 
     <script type="module" src="app.js"></script>
+
 </body>
 </html>
-
-
