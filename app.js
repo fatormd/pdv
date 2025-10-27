@@ -136,17 +136,24 @@ export const goToScreen = (screenId) => {
         if(paymentTableNumEl) paymentTableNumEl.textContent = `Mesa`;
         if(orderScreenTableNumEl) orderScreenTableNumEl.textContent = 'Pedido'; // Reseta para o padrão
         // --- FIM DA CORREÇÃO ---
+        
+        // --- CÓDIGO DE RESET REMOVIDO DAQUI ---
+    }
 
-        // --- CORREÇÃO ADICIONADA: Reseta o botão 'Finalizar Conta' ---
-        // Isso previne que ele fique preso em "Finalizando..." ao trocar de mesa
+    // --- CORREÇÃO DEFINITIVA ---
+    // Se a navegação é PARA o painel (de qualquer lugar, a qualquer momento),
+    // garante que o botão de finalizar seja resetado.
+    if (screenId === 'panelScreen') {
         const finalizeBtn = document.getElementById('finalizeOrderBtn');
-        if (finalizeBtn) {
+        // Só reseta se o botão existir E não estiver no estado padrão (para evitar trabalho desnecessário)
+        if (finalizeBtn && !finalizeBtn.innerHTML.includes('fa-check-circle')) {
+            console.log("[NAV] Resetando botão 'Finalizar Conta' ao voltar para o painel.");
             finalizeBtn.disabled = true;
             finalizeBtn.innerHTML = '<i class="fas fa-check-circle"></i> FINALIZAR CONTA';
             finalizeBtn.classList.add('opacity-50', 'cursor-not-allowed');
         }
-        // --- FIM DA CORREÇÃO ADICIONADA ---
     }
+    // --- FIM DA CORREÇÃO DEFINITIVA ---
 
     const screenIndex = screens[screenId];
     if (screenIndex !== undefined) {
