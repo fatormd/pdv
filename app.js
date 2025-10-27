@@ -2,11 +2,12 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapshot, writeBatch, arrayRemove, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-// Import Functions
+// NOVO IMPORT
 import { getFunctions } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
 
 
 // Importações dos Serviços e Utils
+// 'functions' será importado do firebaseService agora
 import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, auth, db, functions } from '/services/firebaseService.js';
 import { fetchWooCommerceProducts, fetchWooCommerceCategories } from '/services/wooCommerceService.js';
 import { formatCurrency, formatElapsedTime } from '/utils.js';
@@ -57,8 +58,6 @@ let loginBtn, loginEmailInput, loginPasswordInput, loginErrorMsg;
 
 
 // --- FUNÇÕES CORE E ROTIAMENTO ---
-// ... (NENHUMA MUDANÇA NAS FUNÇÕES: hideStatus, showLoginScreen, hideLoginScreen, goToScreen, handleTableTransferConfirmed, openManagerAuthModal, setTableListener, setCurrentTable, selectTableAndStartListener, openNfeModal, initStaffApp, authenticateStaff, handleStaffLogin, handleLogout) ...
-// (O código de todas as funções acima permanece o mesmo)
 export const hideStatus = () => {
     if (!statusScreen) statusScreen = document.getElementById('statusScreen');
     if (statusScreen) {
@@ -562,18 +561,26 @@ document.addEventListener('DOMContentLoaded', () => {
             if (user) {
                 userId = user.uid;
                 console.log(`[AUTH] Usuário Firebase ${userId} detectado.`);
+                // CORREÇÃO LÓGICA AUTH: Verifica a role ANTES de forçar logout
                 if (userRole === 'gerente' || userRole === 'garcom') {
-                    console.log(`[AUTH] Role ${userRole} já definida. Iniciando app...`);
+                     console.log(`[AUTH] Role ${userRole} já definida via login local. Iniciando app...`);
                      const userName = STAFF_CREDENTIALS[loginEmailInput?.value?.trim()]?.name || userRole;
                      document.getElementById('user-id-display').textContent = `Usuário: ${userName} | ${userRole.toUpperCase()}`;
-                    await initStaffApp();
-                } else {
-                    console.warn("[AUTH] Usuário Firebase existe, mas role local é 'anonymous'. Forçando logout.");
+                     await initStaffApp();
+                } else if (!window.location.pathname.includes('client.html')) { // Evita logout automático na tela do cliente
+                    // Se há um user Firebase mas a role local não é staff (e não estamos na client.html),
+                    // provavelmente é um estado inconsistente, força logout.
+                    console.warn("[AUTH] Usuário Firebase existe, mas role local é 'anonymous' na tela de staff. Forçando logout.");
                     handleLogout();
+                } else {
+                     console.log("[AUTH] Usuário Firebase existe na tela do cliente. (Ignorando para client.html)");
                 }
-            } else if (userRole !== 'gerente' && userRole !== 'garcom') {
-                 console.log("[AUTH] -> showLoginScreen()");
+            } else if (!window.location.pathname.includes('client.html')) { // Só mostra login se não for client.html
+                 console.log("[AUTH] Nenhum usuário Firebase logado. -> showLoginScreen()");
                  showLoginScreen();
+            } else {
+                 console.log("[AUTH] Nenhum usuário Firebase logado na tela do cliente. (Ignorando para client.html)");
+                 // Você pode querer adicionar lógica aqui para redirecionar ou mostrar erro na client.html se não houver user
             }
         });
         console.log("[INIT] Listener AuthStateChanged configurado.");
@@ -582,8 +589,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (loginBtn) {
             loginBtn.addEventListener('click', handleStaffLogin);
             console.log("[INIT] Listener do botão Login adicionado.");
-        } else {
-             console.error("[INIT] Botão de Login (loginBtn) não encontrado!");
+        } else if (!window.location.pathname.includes('client.html')) {
+             console.error("[INIT] Botão de Login (loginBtn) não encontrado na tela de staff!");
         }
 
         // Inicializa os Controllers
