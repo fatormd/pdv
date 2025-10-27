@@ -23,6 +23,7 @@ let customerNameInput, customerCpfInput, customerPhoneInput, customerEmailInput;
 let closeCustomerRegModalBtn, saveCustomerBtn, linkCustomerToTableBtn;
 let currentFoundCustomer = null;
 let decreaseDinersBtn, increaseDinersBtn;
+let printSummaryBtn; // <-- Novo botão
 
 // Estado local
 let isMassSelectionActive = false;
@@ -107,7 +108,7 @@ const renderRegisteredPayments = (payments) => {
             </div>
             <div class="flex items-center space-x-3">
                 <span class="font-bold text-lg text-dark-text">${p.value}</span>
-                <button class="p-2 text-red-500 hover:text-red-400 transition" 
+                <button class="p-2 text-red-500 hover:text-red-400 transition print-hide" 
                         title="Excluir Pagamento"
                         onclick="window.deletePayment(${p.timestamp})">
                     <i class="fas fa-trash-alt"></i>
@@ -153,6 +154,9 @@ export const renderPaymentSummary = (tableId, orderSnapshot) => {
     updateText('orderTotalDisplayPayment', formatCurrency(totalPrincipalAccount));
     updateText('valuePerDinerDisplay', formatCurrency(valuePerDiner));
     updateText('remainingBalanceDisplay', formatCurrency(remainingBalancePrincipal > 0 ? remainingBalancePrincipal : 0));
+    // Atualiza também o span que só aparece na impressão
+    updateText('valuePerDinerDisplayPrint', formatCurrency(valuePerDiner));
+
 
     if (toggleServiceTaxBtn) {
         toggleServiceTaxBtn.textContent = applyServiceTax ? 'Remover' : 'Aplicar';
@@ -162,12 +166,20 @@ export const renderPaymentSummary = (tableId, orderSnapshot) => {
         toggleServiceTaxBtn.style.opacity = '1';
     }
     
+    // ==============================================
+    //           INÍCIO DA CORREÇÃO (FINALIZE BTN)
+    // ==============================================
+    // Lógica para habilitar/desabilitar o botão Finalizar
     if (finalizeOrderBtn) {
+        // Habilita SE não houver itens E o restante for <= 0.01 (margem float)
         const canFinalize = sentItems.length === 0 && remainingBalancePrincipal <= 0.01;
         finalizeOrderBtn.disabled = !canFinalize;
         finalizeOrderBtn.classList.toggle('opacity-50', !canFinalize);
         finalizeOrderBtn.classList.toggle('cursor-not-allowed', !canFinalize);
     }
+    // ==============================================
+    //           FIM DA CORREÇÃO (FINALIZE BTN)
+    // ==============================================
     
     renderReviewItemsList(orderSnapshot);
     renderRegisteredPayments(payments); 
@@ -205,7 +217,7 @@ const renderReviewItemsList = (orderSnapshot) => {
         const itemData = JSON.stringify(group.originalItems).replace(/'/g, '&#39;');
         return `
         <div class="flex justify-between items-center py-2 border-b border-dark-border hover:bg-dark-input p-2 rounded-lg">
-            <div class="flex items-center flex-grow min-w-0 mr-2">
+            <div class="flex items-center flex-grow min-w-0 mr-2 print-hide"> 
                 <input type="checkbox"
                        class="item-select-checkbox mr-3 h-5 w-5 bg-dark-input border-gray-600 rounded text-pumpkin focus:ring-pumpkin"
                        data-items='${itemData}'
@@ -215,12 +227,16 @@ const renderReviewItemsList = (orderSnapshot) => {
                     <span class="text-xs text-dark-placeholder">${group.note || 'Sem observações'}</span>
                 </div>
             </div>
+             <div class="flex flex-col min-w-0 mr-2 hidden print:block">
+                 <span class="font-semibold text-dark-text truncate">${group.name} (${group.count}x)</span>
+                 <span class="text-xs text-dark-placeholder">${group.note || ''}</span>
+             </div>
             <span class="font-bold text-pumpkin flex-shrink-0">${formatCurrency(group.price * group.count)}</span>
         </div>
         `;
      }).join('');
     const actionBarHtml = `
-        <div id="reviewActionBar" class="flex justify-between items-center p-2 mt-4 bg-dark-input rounded-lg sticky bottom-0">
+        <div id="reviewActionBar" class="flex justify-between items-center p-2 mt-4 bg-dark-input rounded-lg sticky bottom-0 print-hide">
             <div class="flex items-center">
                 <input type="checkbox" id="selectAllItems" class="mr-2 h-4 w-4"
                        onchange="window.activateItemSelection('toggleAll')">
@@ -425,13 +441,39 @@ window.removeSplitAccount = (splitId) => { alert("Funcionalidade de divisão des
 window.openPaymentModalForSplit = (splitId) => { alert("Funcionalidade de divisão desativada.")};
 window.openSplitTransferModal = (splitId, mode) => { alert("Funcionalidade de divisão desativada.")};
 
-// Placeholder para Finalizar
-export const handleFinalizeOrder = () => { alert("Finalizar Conta (DEV)"); };
-
-
 // ==============================================
-//           INÍCIO DA CORREÇÃO (LÓGICA)
+//           INÍCIO DA CORREÇÃO (FINALIZE BTN)
 // ==============================================
+// Função para Finalizar/Fechar a Conta
+export const handleFinalizeOrder = async () => {
+    if (!currentTableId) return;
+
+    // Confirmação dupla
+    if (!confirm(`Tem certeza que deseja fechar a Mesa ${currentTableId}? Esta ação não pode ser desfeita.`)) {
+        return;
+    }
+
+    const tableRef = getTableDocRef(currentTableId);
+    try {
+        await updateDoc(tableRef, {
+            status: 'closed',
+            closedAt: serverTimestamp() // Adiciona timestamp de fechamento
+        });
+        
+        alert(`Mesa ${currentTableId} fechada com sucesso.`);
+        
+        // Navega de volta ao painel (a função goToScreen já limpa o estado)
+        window.goToScreen('panelScreen'); 
+        
+    } catch (e) {
+        console.error("Erro ao fechar a mesa:", e);
+        alert("Falha ao fechar a mesa.");
+    }
+};
+// ==============================================
+//           FIM DA CORREÇÃO (FINALIZE BTN)
+// ==============================================
+
 
 // --- FUNÇÕES GESTÃO DE CLIENTES (Implementadas) ---
 const openCustomerRegModal = () => {
@@ -565,10 +607,21 @@ const linkCustomerToTable = async () => {
         alert("Falha ao associar cliente.");
     }
 };
-// ==============================================
-//           FIM DA CORREÇÃO (LÓGICA)
-// ==============================================
 
+// ==============================================
+//           INÍCIO DA CORREÇÃO (PRINT BTN)
+// ==============================================
+// Função para acionar a impressão
+const handlePrintSummary = () => {
+    // Atualiza o valor por pessoa (caso tenha mudado) antes de imprimir
+    const valuePerDinerText = valuePerDinerDisplay ? valuePerDinerDisplay.textContent : 'R$ 0,00';
+    updateText('valuePerDinerDisplayPrint', valuePerDinerText);
+    
+    window.print(); // Chama a função de impressão do navegador
+};
+// ==============================================
+//           FIM DA CORREÇÃO (PRINT BTN)
+// ==============================================
 
 // --- INICIALIZAÇÃO DO CONTROLLER ---
 const attachReviewListListeners = () => { // Anexa listeners aos botões da barra de ação
@@ -619,6 +672,7 @@ export const initPaymentController = () => {
     calcButtons = calculatorModal?.querySelector('.grid');
     closeCalcBtnX = document.getElementById('closeCalcBtnX');
     tableTransferModal = document.getElementById('tableTransferModal');
+    printSummaryBtn = document.getElementById('printSummaryBtn'); // Mapeia o botão de imprimir
     
     // Mapeia os elementos do Modal de Cliente
     customerRegModal = document.getElementById('customerRegModal');
@@ -735,7 +789,7 @@ export const initPaymentController = () => {
             });
 
             paymentValueInput.value = '';
-            selectedMethodBtn.classList.remove('active');
+            if (selectedMethodBtn) selectedMethodBtn.classList.remove('active'); // Verifica se existe
             _validatePaymentInputs(); 
 
         } catch (e) {
@@ -744,7 +798,15 @@ export const initPaymentController = () => {
         }
     });
     
+    // ==============================================
+    //           INÍCIO DA CORREÇÃO (FINALIZE BTN)
+    // ==============================================
+    // Listener para Finalizar Conta
     if(finalizeOrderBtn) finalizeOrderBtn.addEventListener('click', handleFinalizeOrder);
+    // ==============================================
+    //           FIM DA CORREÇÃO (FINALIZE BTN)
+    // ==============================================
+
     if(openNfeModalBtn) openNfeModalBtn.addEventListener('click', window.openNfeModal);
     if(addSplitAccountBtn) { addSplitAccountBtn.addEventListener('click', handleAddSplitAccount); }
     else { console.warn("[PaymentController] Botão 'addSplitAccountBtn' (divisão) não encontrado ou desativado."); }
@@ -784,9 +846,6 @@ export const initPaymentController = () => {
         });
     }
 
-    // ==============================================
-    //           INÍCIO DA CORREÇÃO (LISTENERS)
-    // ==============================================
     // --- Listeners do Modal de Cliente ---
     if (openCustomerRegBtn) { openCustomerRegBtn.addEventListener('click', openCustomerRegModal); }
     else { console.error("[PaymentController] Botão 'openCustomerRegBtn' não encontrado."); }
@@ -814,8 +873,18 @@ export const initPaymentController = () => {
             }
         });
     });
+
     // ==============================================
-    //           FIM DA CORREÇÃO (LISTENERS)
+    //           INÍCIO DA CORREÇÃO (PRINT BTN)
+    // ==============================================
+    // Listener para o botão de Imprimir Resumo
+    if(printSummaryBtn) {
+        printSummaryBtn.addEventListener('click', handlePrintSummary);
+    } else {
+        console.warn("[PaymentController] Botão 'printSummaryBtn' não encontrado.");
+    }
+    // ==============================================
+    //           FIM DA CORREÇÃO (PRINT BTN)
     // ==============================================
 
     paymentInitialized = true;
