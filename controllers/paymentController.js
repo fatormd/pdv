@@ -32,8 +32,20 @@ const PAYMENT_METHODS = ['Dinheiro', 'Pix', 'Crédito', 'Débito', 'Ticket', 'Vo
 
 
 // --- FUNÇÕES DE CÁLCULO E UTILIDADE ---
-const calculateTotal = (subtotal, applyServiceTax) => { /* ... (mantida) ... */ };
-const updateText = (id, value) => { /* ... (mantida) ... */ };
+// ==============================================
+//           INÍCIO DA CORREÇÃO
+// ==============================================
+const calculateTotal = (subtotal, applyServiceTax) => {
+    const serviceTax = applyServiceTax ? subtotal * 0.10 : 0;
+    return subtotal + serviceTax;
+};
+const updateText = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+};
+// ==============================================
+//           FIM DA CORREÇÃO
+// ==============================================
 
 // --- FUNÇÕES DE AÇÃO ---
 export const executeDeletePayment = async (timestamp) => { /* ... (mantida) ... */ };
@@ -99,23 +111,50 @@ const renderReviewItemsList = (orderSnapshot) => { /* ... (mantida da versão an
 const renderRegisteredPayments = (payments) => { /* ... (mantida) ... */ };
 const renderPaymentSplits = (orderSnapshot) => { /* ... (mantida - vazia/comentada) ... */ };
 const renderPaymentMethodButtons = () => { /* ... (mantida) ... */ };
-export const renderPaymentSummary = (tableId, orderSnapshot) => { /* ... (mantida da versão anterior) ... */
-    if (!orderSnapshot || !paymentInitialized) return;
+
+// ==============================================
+//           INÍCIO DA CORREÇÃO
+// ==============================================
+// Esta função é chamada pelo app.js (onSnapshot) e pelos botões +/- de pessoas
+export const renderPaymentSummary = (tableId, orderSnapshot) => {
+    // Garante que os elementos foram inicializados
+    if (!paymentInitialized) return; 
+    
+    // Se não houver snapshot (ex: mesa acabou de fechar), não tenta renderizar
+    if (!orderSnapshot) return; 
+
     const payments = orderSnapshot.payments || [];
     const sentItems = orderSnapshot.sentItems || [];
+    
+    // 1. CALCULA SUBTOTAL
     const subtotal = calculateItemsValue(sentItems);
+    
+    // 2. CALCULA TAXA DE SERVIÇO
     const applyServiceTax = orderSnapshot.serviceTaxApplied ?? true;
     const serviceTax = applyServiceTax ? subtotal * 0.10 : 0;
+    
+    // 3. CALCULA TOTAL GERAL
     const totalPrincipalAccount = subtotal + serviceTax;
+    
+    // 4. CALCULA TOTAL PAGO
     const totalPaidPrincipal = payments.reduce((sum, p) => sum + getNumericValueFromCurrency(p.value), 0);
+    
+    // 5. CALCULA RESTANTE
     const remainingBalancePrincipal = totalPrincipalAccount - totalPaidPrincipal;
-    const diners = parseInt(dinersSplitInput?.value) || 1;
+    
+    // 6. CALCULA VALOR POR PESSOA
+    // Pega o valor do input, que é controlado pelos botões +/-
+    const diners = parseInt(dinersSplitInput?.value) || 1; 
     const valuePerDiner = totalPrincipalAccount / diners;
+
+    // 7. ATUALIZA A TELA (Usando a função updateText implementada)
     updateText('orderSubtotalDisplayPayment', formatCurrency(subtotal));
     updateText('orderServiceTaxDisplayPayment', formatCurrency(serviceTax));
     updateText('orderTotalDisplayPayment', formatCurrency(totalPrincipalAccount));
     updateText('valuePerDinerDisplay', formatCurrency(valuePerDiner));
     updateText('remainingBalanceDisplay', formatCurrency(remainingBalancePrincipal > 0 ? remainingBalancePrincipal : 0));
+
+    // Atualiza o estado do botão de taxa
     if (toggleServiceTaxBtn) {
         toggleServiceTaxBtn.textContent = applyServiceTax ? 'Remover' : 'Aplicar';
         toggleServiceTaxBtn.classList.toggle('bg-red-600', applyServiceTax);
@@ -123,17 +162,22 @@ export const renderPaymentSummary = (tableId, orderSnapshot) => { /* ... (mantid
         toggleServiceTaxBtn.disabled = false;
         toggleServiceTaxBtn.style.opacity = '1';
     }
+    
+    // Atualiza o estado do botão de finalizar
     if (finalizeOrderBtn) {
-        const totalRemaining = remainingBalancePrincipal;
-        // Só pode finalizar se não tiver itens E o restante for <= 0
-        const canFinalize = sentItems.length === 0 && totalRemaining <= 0.01;
+        // Só pode finalizar se não tiver itens E o restante for <= 0.01 (margem de segurança float)
+        const canFinalize = sentItems.length === 0 && remainingBalancePrincipal <= 0.01;
         finalizeOrderBtn.disabled = !canFinalize;
         finalizeOrderBtn.classList.toggle('opacity-50', !canFinalize);
         finalizeOrderBtn.classList.toggle('cursor-not-allowed', !canFinalize);
     }
+    
+    // Renderiza as sub-listas
     renderReviewItemsList(orderSnapshot);
     renderRegisteredPayments(payments);
-    renderPaymentSplits(orderSnapshot);
+    renderPaymentSplits(orderSnapshot); // (Atualmente desativado)
+    
+    // Atualiza o campo de cliente
     if (customerSearchInput && orderSnapshot?.clientName) {
         customerSearchInput.value = orderSnapshot.clientName;
         customerSearchInput.disabled = true;
@@ -142,6 +186,9 @@ export const renderPaymentSummary = (tableId, orderSnapshot) => { /* ... (mantid
         customerSearchInput.disabled = false;
     }
 };
+// ==============================================
+//           FIM DA CORREÇÃO
+// ==============================================
 
 
 // --- LÓGICAS DE AÇÃO EM MASSA E TRANSFERÊNCIA ---
@@ -310,10 +357,6 @@ export function openTableTransferModal() {
     if (targetInput) targetInput.focus(); // Foca no input da mesa de destino
 };
 
-// ==============================================
-//           INÍCIO DA CORREÇÃO
-// ==============================================
-// Esta função é chamada pelo botão 'Prosseguir'
 export function handleConfirmTableTransfer() {
     const targetTableId = document.getElementById('targetTableInput')?.value;
     const newDinersInput = document.getElementById('newTableDiners');
@@ -344,9 +387,6 @@ export function handleConfirmTableTransfer() {
     // Fecha o modal
     if (tableTransferModal) tableTransferModal.style.display = 'none';
 };
-// ==============================================
-//           FIM DA CORREÇÃO
-// ==============================================
 
 // Placeholders/Funções Desativadas para Divisão
 const handleAddSplitAccount = () => { alert("Funcionalidade de divisão desativada.")};
@@ -425,29 +465,67 @@ export const initPaymentController = () => {
     closeCustomerRegModalBtn = document.getElementById('closeCustomerRegModalBtn');
     saveCustomerBtn = document.getElementById('saveCustomerBtn');
     linkCustomerToTableBtn = document.getElementById('linkCustomerToTableBtn');
-    
-    // ==============================================
-    //           INÍCIO DA CORREÇÃO
-    // ==============================================
-    // Mapeia os elementos de dentro do modal de transferência
     if (tableTransferModal) {
         targetTableInput = document.getElementById('targetTableInput');
         confirmTransferBtn = document.getElementById('confirmTableTransferBtn');
         transferStatus = document.getElementById('transferStatus');
     }
-    // ==============================================
-    //           FIM DA CORREÇÃO
-    // ==============================================
-
     if(selectiveTransferModal) { /* ... (mapeamento mantido) ... */ }
     if (!reviewItemsList) { console.error("[PaymentController] Erro Fatal: 'reviewItemsList' não encontrado."); return; }
 
     renderPaymentMethodButtons();
 
-    // Adiciona Listeners Essenciais (Todos mantidos como na versão anterior)
-    if(toggleServiceTaxBtn) toggleServiceTaxBtn.addEventListener('click', async () => { /* ... */ });
-    if(decreaseDinersBtn && dinersSplitInput) { /* ... (listener mantido) ... */ }
-    if(increaseDinersBtn && dinersSplitInput) { /* ... (listener mantido) ... */ }
+    // ==============================================
+    //           INÍCIO DA CORREÇÃO
+    // ==============================================
+    
+    // Listener do Botão de Taxa de Serviço
+    if(toggleServiceTaxBtn) toggleServiceTaxBtn.addEventListener('click', async () => {
+        if (!currentTableId) return;
+        const tableRef = getTableDocRef(currentTableId);
+        // Usa o snapshot global para saber o status atual
+        const currentStatus = currentOrderSnapshot?.serviceTaxApplied ?? true;
+        try {
+            // Inverte o status no Firebase
+            await updateDoc(tableRef, {
+                serviceTaxApplied: !currentStatus
+            });
+            // O listener onSnapshot (app.js) vai pegar a mudança e chamar renderPaymentSummary
+            console.log(`[Payment] Taxa de serviço alterada para: ${!currentStatus}`);
+        } catch (e) {
+            console.error("Erro ao atualizar taxa de serviço:", e);
+            alert("Falha ao atualizar taxa de serviço.");
+        }
+    });
+
+    // Listener do Botão - (Menos Pessoas)
+    if(decreaseDinersBtn && dinersSplitInput) {
+        decreaseDinersBtn.addEventListener('click', () => {
+            let currentDiners = parseInt(dinersSplitInput.value) || 1;
+            if (currentDiners > 1) { // Não deixa ser menor que 1
+                currentDiners--;
+                dinersSplitInput.value = currentDiners;
+                // Re-renderiza o sumário para atualizar o 'Valor por Pessoa'
+                renderPaymentSummary(currentTableId, currentOrderSnapshot);
+            }
+        });
+    }
+
+    // Listener do Botão + (Mais Pessoas)
+    if(increaseDinersBtn && dinersSplitInput) {
+        increaseDinersBtn.addEventListener('click', () => {
+            let currentDiners = parseInt(dinersSplitInput.value) || 1;
+            currentDiners++;
+            dinersSplitInput.value = currentDiners;
+            // Re-renderiza o sumário para atualizar o 'Valor por Pessoa'
+            renderPaymentSummary(currentTableId, currentOrderSnapshot);
+        });
+    }
+    
+    // ==============================================
+    //           FIM DA CORREÇÃO
+    // ==============================================
+
     if(paymentMethodButtonsContainer) paymentMethodButtonsContainer.addEventListener('click', (e) => { /* ... */ });
     if(paymentValueInput) paymentValueInput.addEventListener('input', (e) => { /* ... */ });
     if(addPaymentBtn) addPaymentBtn.addEventListener('click', async () => { /* ... */ });
@@ -458,15 +536,9 @@ export const initPaymentController = () => {
     if (openCalculatorBtn) openCalculatorBtn.addEventListener('click', () => { if(calculatorModal) calculatorModal.style.display = 'flex'; });
     if (closeCalcBtnX) closeCalcBtnX.addEventListener('click', () => { if (calculatorModal) calculatorModal.style.display = 'none'; });
     if (calcButtons) calcButtons.addEventListener('click', (e) => { /* ... */ });
-    
-    // ==============================================
-    //           INÍCIO DA CORREÇÃO
-    // ==============================================
-    // Adiciona o listener para o botão de CONFIRMAR transferência
     if(confirmTransferBtn) {
         confirmTransferBtn.addEventListener('click', handleConfirmTableTransfer);
     }
-    // Adiciona o listener para o INPUT da mesa de destino (para habilitar o botão)
     if (targetTableInput) {
         targetTableInput.addEventListener('input', async () => {
             const targetTableId = targetTableInput.value.trim();
@@ -499,10 +571,6 @@ export const initPaymentController = () => {
             }
         });
     }
-    // ==============================================
-    //           FIM DA CORREÇÃO
-    // ==============================================
-
     if (openCustomerRegBtn) { openCustomerRegBtn.addEventListener('click', openCustomerRegModal); }
     else { console.error("[PaymentController] Botão 'openCustomerRegBtn' não encontrado."); }
     if (closeCustomerRegModalBtn) { closeCustomerRegModalBtn.addEventListener('click', () => { /* ... */ }); }
