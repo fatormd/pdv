@@ -6,6 +6,9 @@ import {
     updateDoc, arrayUnion, arrayRemove, writeBatch, getFirestore, getDoc, serverTimestamp,
     collection, query, where, getDocs, addDoc, setDoc, doc
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+// NOVO IMPORT
+import { createWooCommerceOrder } from "/services/wooCommerceService.js";
+
 
 // --- VARIÁVEIS DE ELEMENTOS ---
 // (Mantidas as declarações anteriores)
@@ -167,19 +170,23 @@ export const renderPaymentSummary = (tableId, orderSnapshot) => {
     }
     
     // ==============================================
-    //           INÍCIO DA CORREÇÃO (FINALIZE BTN)
+    //           INÍCIO DA CORREÇÃO (FINALIZE BTN - anterior)
     // ==============================================
     // Lógica para habilitar/desabilitar o botão Finalizar
     if (finalizeOrderBtn) {
         // Habilita SE o restante for <= 0.01 (margem float)
-        // Não importa se há itens, contanto que a conta esteja paga.
         const canFinalize = remainingBalancePrincipal <= 0.01;
-        finalizeOrderBtn.disabled = !canFinalize;
+        
+        // Só reabilita se NÃO estiver em estado de loading
+        if (!finalizeOrderBtn.innerHTML.includes('fa-spinner')) {
+            finalizeOrderBtn.disabled = !canFinalize;
+        }
+        
         finalizeOrderBtn.classList.toggle('opacity-50', !canFinalize);
         finalizeOrderBtn.classList.toggle('cursor-not-allowed', !canFinalize);
     }
     // ==============================================
-    //           FIM DA CORREÇÃO (FINALIZE BTN)
+    //           FIM DA CORREÇÃO (FINALIZE BTN - anterior)
     // ==============================================
     
     renderReviewItemsList(orderSnapshot);
@@ -443,36 +450,74 @@ window.openPaymentModalForSplit = (splitId) => { alert("Funcionalidade de divis�
 window.openSplitTransferModal = (splitId, mode) => { alert("Funcionalidade de divisão desativada.")};
 
 // ==============================================
-//           INÍCIO DA CORREÇÃO (FINALIZE BTN)
+//           INÍCIO DA FUNÇÃO ATUALIZADA (FINALIZE BTN + WOO)
 // ==============================================
 // Função para Finalizar/Fechar a Conta
 export const handleFinalizeOrder = async () => {
-    if (!currentTableId) return;
-
-    // Confirmação dupla
-    if (!confirm(`Tem certeza que deseja fechar a Mesa ${currentTableId}? Esta ação não pode ser desfeita.`)) {
+    if (!currentTableId || !currentOrderSnapshot) {
+        alert("Erro: Nenhuma mesa ou dados da mesa carregados.");
         return;
     }
 
-    const tableRef = getTableDocRef(currentTableId);
+    // Confirmação dupla
+    if (!confirm(`Tem certeza que deseja fechar a Mesa ${currentTableId}? Esta ação enviará o pedido ao WooCommerce e não pode ser desfeita.`)) {
+        return;
+    }
+
+    // Desabilita o botão para evitar cliques duplos
+    if(finalizeOrderBtn) finalizeOrderBtn.disabled = true;
+    
+    // Simulação de "loading"
+    const originalBtnText = finalizeOrderBtn.innerHTML;
+    finalizeOrderBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+
     try {
+        // 1. Tentar enviar ao WooCommerce PRIMEIRO
+        // Passamos o snapshot global que foi atualizado pelo listener do app.js
+        const wooOrder = await createWooCommerceOrder(currentOrderSnapshot);
+        
+        console.log(`[Payment] Pedido ${wooOrder.id} criado no WooCommerce.`);
+        alert(`Pedido enviado ao WooCommerce (ID: ${wooOrder.id}). Fechando a mesa local...`);
+
+        // 2. Se o envio ao Woo foi bem-sucedido, fechar a mesa no Firebase
+        const tableRef = getTableDocRef(currentTableId);
         await updateDoc(tableRef, {
             status: 'closed',
-            closedAt: serverTimestamp() // Adiciona timestamp de fechamento
+            closedAt: serverTimestamp(), // Adiciona timestamp de fechamento
+            wooCommerceOrderId: wooOrder.id // Salva o ID do Woo na mesa (opcional, mas bom)
         });
         
         alert(`Mesa ${currentTableId} fechada com sucesso.`);
         
-        // Navega de volta ao painel (a função goToScreen já limpa o estado)
+        // 3. Navegar de volta ao painel
         window.goToScreen('panelScreen'); 
-        
+    
     } catch (e) {
-        console.error("Erro ao fechar a mesa:", e);
-        alert("Falha ao fechar a mesa.");
+        console.error("Erro CRÍTICO ao finalizar conta:", e);
+        alert(`FALHA AO FINALIZAR: ${e.message}. A mesa NÃO foi fechada. Verifique o console e tente novamente.`);
+        
+        // Reabilita o botão e restaura o texto em caso de falha
+        if(finalizeOrderBtn) {
+            // Precisamos garantir que o botão "Finalizar" seja reabilitado
+            // A função renderPaymentSummary pode desabilitá-lo se o estado não for 'canFinalize'
+            // Mas em caso de erro, queremos que o usuário POSSA tentar de novo.
+            finalizeOrderBtn.disabled = false; 
+            finalizeOrderBtn.innerHTML = originalBtnText;
+            
+            // Força a re-habilitação caso o renderPaymentSummary rode
+            // e desabilite o botão por engano
+            setTimeout(() => {
+                 if(finalizeOrderBtn) {
+                     finalizeOrderBtn.disabled = false;
+                     finalizeOrderBtn.innerHTML = originalBtnText;
+                     finalizeOrderBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                 }
+            }, 500);
+        }
     }
 };
 // ==============================================
-//           FIM DA CORREÇÃO (FINALIZE BTN)
+//           FIM DA FUNÇÃO ATUALIZADA
 // ==============================================
 
 
