@@ -31,6 +31,21 @@
             }
         }
     </script>
+    <style>
+        /* Estilos específicos para impressão */
+        @media print {
+            body * { visibility: hidden; } /* Esconde tudo por padrão */
+            #paymentScreen .content-card, #paymentScreen .content-card * { visibility: visible; } /* Mostra o card de resumo */
+            #paymentScreen { position: absolute; left: 0; top: 0; width: 100%; } /* Ajusta posição */
+            header, #loginScreen, #panelScreen, #orderScreen, #managerScreen, #chargeInputs, /* Esconde outras telas e seções */
+            #paymentScreen > div:first-child, /* Esconde o header da tela de pagamento */
+            #paymentScreen > div:last-child, /* Esconde botões NF-e/Finalizar */
+            #reviewActionBar, /* Esconde barra de ação da lista */
+            #openCustomerRegBtn, #openCalculatorBtn, /* Esconde botões extras */
+            .print-hide { display: none !important; } /* Classe para esconder elementos específicos */
+            .content-card { border: none; box-shadow: none; }
+        }
+    </style>
 </head>
 <body class="bg-dark-bg min-h-screen text-dark-text"> 
 
@@ -42,7 +57,7 @@
         </div>
     </div>
 
-    <header id="mainHeader" class="header-bar flex items-center justify-between" style="display: none;">
+    <header id="mainHeader" class="header-bar flex items-center justify-between print-hide" style="display: none;">
         <div class="flex items-center">
             <button onclick="window.goToScreen('panelScreen')" class="px-3 py-1 text-2xl text-pumpkin hover:text-pumpkin-dark transition" title="Voltar ao Painel">
                 <i class="fas fa-th-large"></i>
@@ -60,7 +75,7 @@
     </header>
 
     <main id="mainContent" class="relative overflow-hidden" style="display: none;">
-        <div id="appContainer" class="flex transition-transform duration-300 ease-out" style="width: 500vw;">
+        <div id="appContainer" class="flex transition-transform duration-300 ease-out print-hide" style="width: 500vw;">
             
             <div id="loginScreen" class="w-screen flex-shrink-0 flex items-center justify-center p-4 bg-dark-bg">
                  <div class="content-card bg-dark-card p-8 rounded-xl shadow-2xl w-full max-w-sm text-center">
@@ -147,7 +162,7 @@
             </div>
             
             <div id="paymentScreen" class="flex-shrink-0 bg-dark-bg text-dark-text">
-                 <div class="flex items-center justify-between mb-4 -mt-4">
+                 <div class="flex items-center justify-between mb-4 -mt-4 print-hide">
                     <div class="flex items-center text-indigo-400">
                         <button id="backToOrderFromPaymentBtn" class="mr-2 text-3xl p-2 hover:text-indigo-300 transition" title="Voltar para o Pedido" onclick="window.goToScreen('orderScreen')">
                             <i class="fas fa-arrow-left"></i>
@@ -159,11 +174,14 @@
                 <div class="content-card p-4 mb-6">
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="text-xl font-semibold text-green-400">Resumo da Conta</h2>
+                        <button id="printSummaryBtn" class="p-2 text-indigo-400 hover:text-indigo-300 transition print-hide" title="Imprimir Resumo">
+                            <i class="fas fa-print text-lg"></i>
+                        </button>
                     </div>
                     <div id="reviewItemsList" class="space-y-3 pt-2 max-h-60 overflow-y-auto"> 
                          </div>
                     
-                    <div class="content-card bg-dark-bg border border-dark-border p-4 mb-6 mt-6 hidden"> 
+                    <div class="content-card bg-dark-bg border border-dark-border p-4 mb-6 mt-6 hidden print-hide"> 
                         <div class="flex justify-between items-center mb-4">
                             <h2 class="text-lg font-semibold text-indigo-400">Divisão da Conta</h2>
                              <button id="addSplitAccountBtn" class="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-bold">
@@ -183,14 +201,14 @@
                         <span class="text-base font-bold text-green-400">SERVIÇO (10%):</span> 
                         <div class="flex items-center space-x-2">
                             <span class="text-base font-bold text-green-400" id="orderServiceTaxDisplayPayment">R$ 0,00</span> 
-                            <button id="toggleServiceTaxBtn" class="px-2 py-1 text-xs rounded-full transition duration-150 bg-gray-400 text-white opacity-50" disabled>
+                            <button id="toggleServiceTaxBtn" class="px-2 py-1 text-xs rounded-full transition duration-150 bg-gray-400 text-white opacity-50 print-hide" disabled>
                                 Aplicar
                             </button>
                         </div>
                     </div>
                     <div class="flex justify-between items-center border-b border-dark-border pb-2 pt-2">
                         <span class="text-base font-bold text-indigo-400">VALOR POR PESSOA:</span> 
-                        <div class="flex items-center space-x-2">
+                        <div class="flex items-center space-x-2 print-hide">
                             <span id="valuePerDinerDisplay" class="text-base font-bold text-indigo-400">R$ 0,00</span> 
                             <button id="decreaseDinersBtn" class="p-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition w-8 h-8 flex items-center justify-center">
                                 <i class="fas fa-minus"></i>
@@ -200,6 +218,7 @@
                                 <i class="fas fa-plus"></i>
                             </button>
                         </div>
+                        <span id="valuePerDinerDisplayPrint" class="text-base font-bold text-indigo-400 hidden print:block">R$ 0,00</span>
                     </div>
                     <div class="flex justify-between items-center pt-2">
                         <span class="text-xl font-bold text-dark-text">TOTAL GERAL:</span> 
@@ -211,7 +230,7 @@
                     </div>
                 </div>
                 
-                <div id="chargeInputs" class="content-card p-4 mb-6">
+                <div id="chargeInputs" class="content-card p-4 mb-6 print-hide">
                     <h2 class="text-xl font-semibold text-pumpkin mb-4">Registrar Pagamento (Conta Principal)</h2> 
                     <div id="paymentSummaryList" class="mb-4 p-3 rounded-lg bg-dark-bg border border-dark-border max-h-40 overflow-y-auto">
                         </div>
@@ -234,7 +253,7 @@
                     </button>
                 </div>
 
-                <div class="content-card p-4 pt-0 mt-6">
+                <div class="content-card p-4 pt-0 mt-6 print-hide">
                     <div class="flex space-x-2"> 
                          <button id="openNfeModalBtn" class="w-1/2 bg-gray-600 text-white font-bold py-3 rounded-lg hover:bg-gray-500 transition" title="Emitir NF-e">
                             <i class="fas fa-receipt"></i> NF-e
@@ -269,7 +288,7 @@
         </div> 
     </main>
     
-    <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+    <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 id="obsItemName" class="text-xl font-bold mb-4 text-indigo-400">Adicionar Observação</h3>
             <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-4">
@@ -303,7 +322,7 @@
         </div>
     </div>
     
-    <div id="customAlertModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+    <div id="customAlertModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm text-center">
             <h3 class="text-xl font-bold mb-4 text-red-400" id="customAlertTitle">Aviso</h3>
             <p class="text-base mb-6 text-dark-text" id="customAlertMessage">Mensagem Padrão.</p>
@@ -313,10 +332,10 @@
         </div>
     </div>
     
-    <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+    <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         </div>
     
-    <div id="calculatorModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+    <div id="calculatorModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-4 rounded-xl shadow-2xl w-full max-w-xs relative">
              <button id="closeCalcBtnX" class="absolute -top-2 -right-2 bg-red-600 text-white rounded-full h-8 w-8">&times;</button>
              <input type="text" id="calcDisplay" class="input-pdv w-full text-right text-2xl mb-3" readonly>
@@ -339,7 +358,7 @@
         </div>
     </div>
     
-    <div id="tableTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+    <div id="tableTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
             <h3 class="text-xl font-bold mb-4 text-pumpkin">Transferir Itens (Mesa Inteira/Parcial)</h3>
             <p class="text-sm text-dark-placeholder mb-3">Insira a mesa de destino para os itens selecionados.</p>
@@ -363,7 +382,7 @@
         </div>
     </div>
     
-    <div id="customerRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+    <div id="customerRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-lg">
             <h3 class="text-xl font-bold mb-4 text-indigo-400">Buscar / Cadastrar Cliente</h3>
             <div class="mb-4">
@@ -406,7 +425,7 @@
         </div>
     </div>
     
-    <div id="reportsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+    <div id="reportsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
          <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
             <h3 class="text-xl font-bold mb-4 text-indigo-400">Relatórios</h3>
             <p class="text-dark-text">Módulo de relatórios em desenvolvimento.</p>
@@ -414,7 +433,7 @@
          </div>
     </div>
 
-    <div id="nfeModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+    <div id="nfeModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
             <h3 class="text-xl font-bold mb-4 text-indigo-400">Emissão de Nota Fiscal (NF-e/NFC-e)</h3>
             
@@ -445,11 +464,12 @@
             </div>
         </div>
     </div>
-    <div id="waiterRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
-    <div id="selectiveTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
-    <div id="productManagementModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
+
+    <div id="waiterRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"></div>
+    <div id="selectiveTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"></div>
+    <div id="productManagementModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"></div>
     
-    <p class="mt-8 text-center text-xs text-dark-placeholder" id="user-id-display">Usuário ID: Carregando...</p>
+    <p class="mt-8 text-center text-xs text-dark-placeholder print-hide" id="user-id-display">Usuário ID: Carregando...</p>
     
     <script>
         window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`);
