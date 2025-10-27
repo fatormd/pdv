@@ -342,15 +342,15 @@ export const setCurrentTable = (tableId) => {
     currentTableId = tableId;
     console.log(`[APP] Definindo mesa atual para ${tableId}`);
     
-    // --- INÍCIO DA CORREÇÃO ---
+    // --- INÍCIO DA CORREÇÃO (Aplicando a sugestão do header) ---
     // Atualiza os títulos nas telas relevantes
-    // const currentTableNumEl = document.getElementById('current-table-number'); // NÃO atualiza mais o header
+    const currentTableNumEl = document.getElementById('current-table-number'); // <-- LINHA ADICIONADA
     const paymentTableNumEl = document.getElementById('payment-table-number');
-    const orderScreenTableNumEl = document.getElementById('order-screen-table-number'); // Novo
+    const orderScreenTableNumEl = document.getElementById('order-screen-table-number'); 
 
-    // if(currentTableNumEl) currentTableNumEl.textContent = `Mesa ${tableId}`; // Linha removida
+    if(currentTableNumEl) currentTableNumEl.textContent = `Mesa ${tableId}`; // <-- LINHA ADICIONADA (Atualiza o header)
     if(paymentTableNumEl) paymentTableNumEl.textContent = `Mesa ${tableId}`;
-    if(orderScreenTableNumEl) orderScreenTableNumEl.textContent = `Mesa ${tableId}`; // Atualiza título da tela de pedido
+    if(orderScreenTableNumEl) orderScreenTableNumEl.textContent = `Mesa ${tableId}`; 
      // --- FIM DA CORREÇÃO ---
     
     // Inicia o listener (ou reinicia)
