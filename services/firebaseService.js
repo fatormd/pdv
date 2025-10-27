@@ -6,21 +6,24 @@ import { collection, doc, updateDoc, arrayUnion, serverTimestamp } from "https:/
 export let db = null;
 export let auth = null;
 export let appId = null;
+export let functions = null; // NOVO: Exporta o serviço do Functions
 
 // Exporta funções críticas do Firestore para uso no orderController.js (KDS)
-export { arrayUnion, serverTimestamp }; 
+export { arrayUnion, serverTimestamp };
 
-export const initializeFirebase = (database, authentication, appIdentifier) => {
+// ATUALIZADO: Recebe 'appFunctions'
+export const initializeFirebase = (database, authentication, appIdentifier, appFunctions) => {
     db = database;
     auth = authentication;
     appId = appIdentifier;
+    functions = appFunctions; // NOVO: Armazena a instância do Functions
 };
 
 // PATHS DE COLEÇÕES (Centralizados)
 export const getTablesCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'tables');
 export const getTableDocRef = (tableNumber) => doc(db, 'artifacts', appId, 'public', 'data', 'tables', tableNumber.toString());
 export const getKdsCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'kds_orders');
-export const getCustomersCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'customers'); 
+export const getCustomersCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'customers');
 
 
 // Funções básicas de persistência (serão usadas pelos Controllers)
