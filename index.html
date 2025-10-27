@@ -34,16 +34,51 @@
     <style>
         /* Estilos específicos para impressão */
         @media print {
-            body * { visibility: hidden; } /* Esconde tudo por padrão */
-            #paymentScreen .content-card, #paymentScreen .content-card * { visibility: visible; } /* Mostra o card de resumo */
-            #paymentScreen { position: absolute; left: 0; top: 0; width: 100%; } /* Ajusta posição */
-            header, #loginScreen, #panelScreen, #orderScreen, #managerScreen, #chargeInputs, /* Esconde outras telas e seções */
-            #paymentScreen > div:first-child, /* Esconde o header da tela de pagamento */
-            #paymentScreen > div:last-child, /* Esconde botões NF-e/Finalizar */
-            #reviewActionBar, /* Esconde barra de ação da lista */
-            #openCustomerRegBtn, #openCalculatorBtn, /* Esconde botões extras */
-            .print-hide { display: none !important; } /* Classe para esconder elementos específicos */
-            .content-card { border: none; box-shadow: none; }
+            body * {
+                visibility: hidden; /* Esconde tudo por padrão */
+            }
+            #paymentSummaryCard, #paymentSummaryCard * {
+                visibility: visible; /* Torna o card de resumo e SEU CONTEÚDO visíveis */
+            }
+            #paymentSummaryCard {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 95%; /* Ajusta a largura para caber melhor na página */
+                margin: 10px; /* Adiciona uma pequena margem */
+                border: none;
+                box-shadow: none;
+                background-color: white !important; /* Força fundo branco para impressão */
+                color: black !important; /* Força texto preto */
+            }
+            /* Força cores de texto específicas dentro do card para contraste na impressão */
+            #paymentSummaryCard span, #paymentSummaryCard p, #paymentSummaryCard div, #paymentSummaryCard h2, #paymentSummaryCard label {
+                color: black !important;
+            }
+            #paymentSummaryCard .text-pumpkin { /* Ajusta a cor laranja se necessário */
+                 color: #555 !important; 
+            }
+            #paymentSummaryCard .text-indigo-400 { /* Ajusta a cor índigo se necessário */
+                 color: #333 !important;
+            }
+             #paymentSummaryCard .text-green-400 { /* Ajusta a cor verde se necessário */
+                  color: #444 !important;
+             }
+             #paymentSummaryCard .text-dark-placeholder {
+                  color: #666 !important;
+             }
+             #paymentSummaryCard .border-dark-border, #paymentSummaryCard .border-b {
+                  border-color: #ccc !important; /* Linhas divisórias mais claras */
+             }
+
+            /* Garante que elementos escondidos com print-hide realmente sumam */
+            .print-hide, 
+            header, #loginScreen, #panelScreen, #orderScreen, #managerScreen, #chargeInputs, 
+            #paymentScreen > div:first-child, 
+            #paymentScreen > div:last-child, 
+            #reviewActionBar {
+                display: none !important;
+            }
         }
     </style>
 </head>
@@ -171,7 +206,7 @@
                     </div>
                 </div>
 
-                <div class="content-card p-4 mb-6">
+                <div id="paymentSummaryCard" class="content-card p-4 mb-6"> 
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="text-xl font-semibold text-green-400">Resumo da Conta</h2>
                         <button id="printSummaryBtn" class="p-2 text-indigo-400 hover:text-indigo-300 transition print-hide" title="Imprimir Resumo">
