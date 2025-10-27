@@ -17,7 +17,7 @@ let paymentSummaryList, chargeInputs, openCustomerRegBtn, customerSearchInput, p
 let finalizeOrderBtn, openNfeModalBtn;
 let calculatorModal, calcDisplay, calcButtons, closeCalcBtnX;
 let selectiveTransferModal, targetTableInput, checkTargetTableBtn, confirmTransferBtn, transferStatus, transferItemsList;
-let tableTransferModal; // <-- Modal que vamos exibir
+let tableTransferModal;
 let customerRegModal, customerSearchCpfInput, searchCustomerByCpfBtn, customerSearchResultsDiv;
 let customerNameInput, customerCpfInput, customerPhoneInput, customerEmailInput;
 let closeCustomerRegModalBtn, saveCustomerBtn, linkCustomerToTableBtn;
@@ -279,10 +279,6 @@ export const handleMassDeleteConfirmed = async () => {
 //           FIM DA FUNÇÃO ATUALIZADA
 // ==============================================
 
-// ==============================================
-//           INÍCIO DA CORREÇÃO
-// ==============================================
-// Esta é a função que estava vazia.
 export function openTableTransferModal() {
     if (!tableTransferModal) {
         console.error("[PaymentController] Modal 'tableTransferModal' não encontrado!");
@@ -313,11 +309,44 @@ export function openTableTransferModal() {
     tableTransferModal.style.display = 'flex';
     if (targetInput) targetInput.focus(); // Foca no input da mesa de destino
 };
+
+// ==============================================
+//           INÍCIO DA CORREÇÃO
+// ==============================================
+// Esta função é chamada pelo botão 'Prosseguir'
+export function handleConfirmTableTransfer() {
+    const targetTableId = document.getElementById('targetTableInput')?.value;
+    const newDinersInput = document.getElementById('newTableDiners');
+    const newSectorInput = document.getElementById('newTableSector');
+    const newTableDinersDiv = document.getElementById('newTableDinersInput');
+
+    if (!targetTableId || !window.itemsToTransfer || window.itemsToTransfer.length === 0) {
+        alert("Mesa de destino ou itens a transferir estão faltando.");
+        return;
+    }
+
+    let newDiners = 0;
+    let newSector = '';
+
+    // Se a div de nova mesa estiver visível, os dados são obrigatórios
+    if (newTableDinersDiv && newTableDinersDiv.style.display !== 'none') {
+        newDiners = parseInt(newDinersInput?.value) || 0;
+        newSector = newSectorInput?.value || '';
+        if (newDiners <= 0 || !newSector) {
+            alert("Para abrir uma nova mesa, 'Pessoas' e 'Setor' são obrigatórios.");
+            return;
+        }
+    }
+
+    // Chama a função global do app.js que executa a transferência
+    window.handleTableTransferConfirmed(currentTableId, targetTableId, window.itemsToTransfer, newDiners, newSector);
+
+    // Fecha o modal
+    if (tableTransferModal) tableTransferModal.style.display = 'none';
+};
 // ==============================================
 //           FIM DA CORREÇÃO
 // ==============================================
-
-export function handleConfirmTableTransfer() { /* ... (mantida) ... */ }; // A lógica de fechar mesa na transferência está no app.js
 
 // Placeholders/Funções Desativadas para Divisão
 const handleAddSplitAccount = () => { alert("Funcionalidade de divisão desativada.")};
@@ -396,7 +425,20 @@ export const initPaymentController = () => {
     closeCustomerRegModalBtn = document.getElementById('closeCustomerRegModalBtn');
     saveCustomerBtn = document.getElementById('saveCustomerBtn');
     linkCustomerToTableBtn = document.getElementById('linkCustomerToTableBtn');
-    if (tableTransferModal) { /* ... (mapeamento mantido) ... */ }
+    
+    // ==============================================
+    //           INÍCIO DA CORREÇÃO
+    // ==============================================
+    // Mapeia os elementos de dentro do modal de transferência
+    if (tableTransferModal) {
+        targetTableInput = document.getElementById('targetTableInput');
+        confirmTransferBtn = document.getElementById('confirmTableTransferBtn');
+        transferStatus = document.getElementById('transferStatus');
+    }
+    // ==============================================
+    //           FIM DA CORREÇÃO
+    // ==============================================
+
     if(selectiveTransferModal) { /* ... (mapeamento mantido) ... */ }
     if (!reviewItemsList) { console.error("[PaymentController] Erro Fatal: 'reviewItemsList' não encontrado."); return; }
 
@@ -416,8 +458,51 @@ export const initPaymentController = () => {
     if (openCalculatorBtn) openCalculatorBtn.addEventListener('click', () => { if(calculatorModal) calculatorModal.style.display = 'flex'; });
     if (closeCalcBtnX) closeCalcBtnX.addEventListener('click', () => { if (calculatorModal) calculatorModal.style.display = 'none'; });
     if (calcButtons) calcButtons.addEventListener('click', (e) => { /* ... */ });
-    if(confirmTransferBtn) { /* ... (listener mantido) ... */ }
-    if (targetTableInput) { /* ... (listener mantido) ... */ }
+    
+    // ==============================================
+    //           INÍCIO DA CORREÇÃO
+    // ==============================================
+    // Adiciona o listener para o botão de CONFIRMAR transferência
+    if(confirmTransferBtn) {
+        confirmTransferBtn.addEventListener('click', handleConfirmTableTransfer);
+    }
+    // Adiciona o listener para o INPUT da mesa de destino (para habilitar o botão)
+    if (targetTableInput) {
+        targetTableInput.addEventListener('input', async () => {
+            const targetTableId = targetTableInput.value.trim();
+            const newTableDinersDiv = document.getElementById('newTableDinersInput');
+            const confirmBtn = document.getElementById('confirmTableTransferBtn'); // Re-seleciona aqui
+
+            if (!targetTableId || targetTableId === currentTableId) {
+                if (confirmBtn) confirmBtn.disabled = true;
+                if (newTableDinersDiv) newTableDinersDiv.style.display = 'none';
+                return;
+            }
+
+            try {
+                // Verifica o status da mesa de destino no Firebase
+                const tableRef = getTableDocRef(targetTableId);
+                const docSnap = await getDoc(tableRef);
+
+                if (docSnap.exists() && docSnap.data().status?.toLowerCase() === 'open') {
+                    // Mesa de destino existe E está aberta
+                    if (newTableDinersDiv) newTableDinersDiv.style.display = 'none';
+                    if (confirmBtn) confirmBtn.disabled = false; // Habilita o botão
+                } else {
+                    // Mesa de destino não existe OU está fechada
+                    if (newTableDinersDiv) newTableDinersDiv.style.display = 'block'; // Mostra campos para abrir nova mesa
+                    if (confirmBtn) confirmBtn.disabled = false; // Habilita o botão (para prosseguir e abrir)
+                }
+            } catch (e) {
+                console.error("Erro ao verificar mesa de destino:", e);
+                if (confirmBtn) confirmBtn.disabled = true; // Desabilita em caso de erro
+            }
+        });
+    }
+    // ==============================================
+    //           FIM DA CORREÇÃO
+    // ==============================================
+
     if (openCustomerRegBtn) { openCustomerRegBtn.addEventListener('click', openCustomerRegModal); }
     else { console.error("[PaymentController] Botão 'openCustomerRegBtn' não encontrado."); }
     if (closeCustomerRegModalBtn) { closeCustomerRegModalBtn.addEventListener('click', () => { /* ... */ }); }
