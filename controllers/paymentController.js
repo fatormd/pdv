@@ -171,14 +171,7 @@ export const renderPaymentSummary = (tableId, orderSnapshot) => {
     
     renderReviewItemsList(orderSnapshot);
     renderRegisteredPayments(payments); 
-    
-    // ==============================================
-    //           INÍCIO DA CORREÇÃO
-    // ==============================================
-    // renderPaymentSplits(orderSnapshot); // <-- LINHA COMENTADA
-    // ==============================================
-    //           FIM DA CORREÇÃO
-    // ==============================================
+    // renderPaymentSplits(orderSnapshot); // (Comentado para evitar erro)
     
     if (customerSearchInput && orderSnapshot?.clientName) {
         customerSearchInput.value = orderSnapshot.clientName;
@@ -436,11 +429,143 @@ window.openSplitTransferModal = (splitId, mode) => { alert("Funcionalidade de di
 export const handleFinalizeOrder = () => { alert("Finalizar Conta (DEV)"); };
 
 
+// ==============================================
+//           INÍCIO DA CORREÇÃO
+// ==============================================
+
 // --- FUNÇÕES GESTÃO DE CLIENTES (Implementadas) ---
-const openCustomerRegModal = () => { /* ... (mantida) ... */ };
-const searchCustomer = async () => { /* ... (mantida) ... */ };
-const saveCustomer = async () => { /* ... (mantida) ... */ };
-const linkCustomerToTable = async () => { /* ... (mantida) ... */ };
+const openCustomerRegModal = () => {
+    if (!customerRegModal) return;
+    
+    // Reseta todos os campos e o estado
+    customerNameInput.value = '';
+    customerCpfInput.value = '';
+    customerPhoneInput.value = '';
+    customerEmailInput.value = '';
+    customerSearchCpfInput.value = '';
+    customerSearchResultsDiv.innerHTML = '<p class="text-sm text-dark-placeholder italic">Busque por um CPF para começar.</p>';
+    
+    currentFoundCustomer = null;
+    saveCustomerBtn.disabled = true;
+    linkCustomerToTableBtn.disabled = true;
+    
+    customerRegModal.style.display = 'flex';
+    customerSearchCpfInput.focus();
+};
+
+const searchCustomer = async () => {
+    const cpf = customerSearchCpfInput.value.replace(/\D/g, ''); // Remove máscara
+    if (cpf.length !== 11) {
+        customerSearchResultsDiv.innerHTML = `<p class="text-sm text-red-400">CPF inválido. Digite 11 números.</p>`;
+        return;
+    }
+    customerSearchResultsDiv.innerHTML = `<p class="text-sm text-yellow-400">Buscando...</p>`;
+
+    try {
+        const customersRef = getCustomersCollectionRef();
+        // Usamos o CPF como ID do documento, o que torna a busca mais rápida
+        const customerDocRef = doc(customersRef, cpf); 
+        const docSnap = await getDoc(customerDocRef);
+
+        if (docSnap.exists()) {
+            // Cliente ENCONTRADO
+            currentFoundCustomer = docSnap.data();
+            customerNameInput.value = currentFoundCustomer.name || '';
+            customerCpfInput.value = currentFoundCustomer.cpf || cpf;
+            customerPhoneInput.value = currentFoundCustomer.phone || '';
+            customerEmailInput.value = currentFoundCustomer.email || '';
+            
+            customerSearchResultsDiv.innerHTML = `<p class="text-sm text-green-400">Cliente encontrado: <strong>${currentFoundCustomer.name}</strong></p>`;
+            saveCustomerBtn.disabled = true; // Já existe, não precisa salvar
+            linkCustomerToTableBtn.disabled = false; // Habilita associação
+        } else {
+            // Cliente NÃO ENCONTRADO
+            currentFoundCustomer = null;
+            customerNameInput.value = '';
+            customerCpfInput.value = cpf; // Preenche o CPF para facilitar o cadastro
+            customerPhoneInput.value = '';
+            customerEmailInput.value = '';
+            
+            customerSearchResultsDiv.innerHTML = `<p class="text-sm text-yellow-400">Cliente não encontrado. Preencha os dados para cadastrar.</p>`;
+            saveCustomerBtn.disabled = true; // Desabilita até preencher o nome
+            linkCustomerToTableBtn.disabled = true;
+            customerNameInput.focus();
+        }
+    } catch (e) {
+        console.error("Erro ao buscar cliente:", e);
+        customerSearchResultsDiv.innerHTML = `<p class="text-sm text-red-400">Erro ao buscar no banco de dados.</p>`;
+    }
+};
+
+const saveCustomer = async () => {
+    const name = customerNameInput.value.trim();
+    const cpf = customerCpfInput.value.replace(/\D/g, '');
+    const phone = customerPhoneInput.value.trim();
+    const email = customerEmailInput.value.trim().toLowerCase();
+
+    if (!name || !cpf || cpf.length !== 11) {
+        alert("Nome e CPF (11 dígitos) são obrigatórios.");
+        return;
+    }
+
+    // Prepara o objeto de dados do cliente
+    const customerData = { 
+        name, 
+        cpf, 
+        phone, 
+        email, 
+        createdAt: serverTimestamp(), // Adiciona data de criação
+        lastVisit: serverTimestamp()  // Adiciona data de última visita
+    };
+    
+    try {
+        const customersRef = getCustomersCollectionRef();
+        const customerDocRef = doc(customersRef, cpf); // CPF como ID
+
+        // Salva (ou sobrescreve/atualiza) o cliente usando o CPF como ID
+        await setDoc(customerDocRef, customerData, { merge: true }); // merge: true atualiza se já existir
+
+        currentFoundCustomer = customerData; // Define o cliente salvo como o cliente atual
+        customerSearchResultsDiv.innerHTML = `<p class="text-sm text-green-400">Cliente salvo/atualizado: <strong>${name}</strong></p>`;
+        saveCustomerBtn.disabled = true; // Desabilita pois acabou de salvar
+        linkCustomerToTableBtn.disabled = false; // Habilita para associar
+        
+    } catch (e) {
+        console.error("Erro ao salvar cliente:", e);
+        alert("Falha ao salvar cliente.");
+    }
+};
+
+const linkCustomerToTable = async () => {
+    if (!currentFoundCustomer || !currentTableId) {
+        alert("Nenhum cliente selecionado ou mesa ativa.");
+        return;
+    }
+
+    const tableRef = getTableDocRef(currentTableId);
+    try {
+        // Atualiza a mesa no Firebase com os dados do cliente
+        await updateDoc(tableRef, {
+            clientId: currentFoundCustomer.cpf,
+            clientName: currentFoundCustomer.name
+        });
+
+        // Atualiza o input principal (fora do modal) e fecha o modal
+        if (customerSearchInput) {
+            customerSearchInput.value = currentFoundCustomer.name;
+            customerSearchInput.disabled = true;
+        }
+        customerRegModal.style.display = 'none';
+        currentFoundCustomer = null; // Limpa estado
+
+    } catch (e) {
+        console.error("Erro ao associar cliente à mesa:", e);
+        alert("Falha ao associar cliente.");
+    }
+};
+// ==============================================
+//           FIM DA CORREÇÃO
+// ==============================================
 
 
 // --- INICIALIZAÇÃO DO CONTROLLER ---
@@ -492,6 +617,11 @@ export const initPaymentController = () => {
     calcButtons = calculatorModal?.querySelector('.grid');
     closeCalcBtnX = document.getElementById('closeCalcBtnX');
     tableTransferModal = document.getElementById('tableTransferModal');
+    
+    // ==============================================
+    //           INÍCIO DA CORREÇÃO
+    // ==============================================
+    // Mapeia os elementos do Modal de Cliente
     customerRegModal = document.getElementById('customerRegModal');
     customerSearchCpfInput = document.getElementById('customerSearchCpf');
     searchCustomerByCpfBtn = document.getElementById('searchCustomerByCpfBtn');
@@ -503,6 +633,10 @@ export const initPaymentController = () => {
     closeCustomerRegModalBtn = document.getElementById('closeCustomerRegModalBtn');
     saveCustomerBtn = document.getElementById('saveCustomerBtn');
     linkCustomerToTableBtn = document.getElementById('linkCustomerToTableBtn');
+    // ==============================================
+    //           FIM DA CORREÇÃO
+    // ==============================================
+
     if (tableTransferModal) {
         targetTableInput = document.getElementById('targetTableInput');
         confirmTransferBtn = document.getElementById('confirmTableTransferBtn');
@@ -653,13 +787,40 @@ export const initPaymentController = () => {
             }
         });
     }
+
+    // ==============================================
+    //           INÍCIO DA CORREÇÃO
+    // ==============================================
+    // --- Listeners do Modal de Cliente ---
     if (openCustomerRegBtn) { openCustomerRegBtn.addEventListener('click', openCustomerRegModal); }
     else { console.error("[PaymentController] Botão 'openCustomerRegBtn' não encontrado."); }
-    if (closeCustomerRegModalBtn) { closeCustomerRegModalBtn.addEventListener('click', () => { /* ... */ }); }
+    
+    if (closeCustomerRegModalBtn) { 
+        closeCustomerRegModalBtn.addEventListener('click', () => {
+            if(customerRegModal) customerRegModal.style.display = 'none';
+            currentFoundCustomer = null; // Limpa o estado
+        }); 
+    }
     if (searchCustomerByCpfBtn) { searchCustomerByCpfBtn.addEventListener('click', searchCustomer); }
     if (saveCustomerBtn) { saveCustomerBtn.addEventListener('click', saveCustomer); }
     if (linkCustomerToTableBtn) { linkCustomerToTableBtn.addEventListener('click', linkCustomerToTable); }
-    [customerNameInput, customerCpfInput].forEach(input => { /* ... (listener mantido) ... */ });
+    
+    // Listener para habilitar o botão 'Salvar Cliente'
+    [customerNameInput, customerCpfInput].forEach(input => {
+        input?.addEventListener('input', () => {
+            const name = customerNameInput.value.trim();
+            const cpf = customerCpfInput.value.replace(/\D/g, '');
+            // Só habilita salvar se o cliente não foi encontrado E os campos estão preenchidos
+            if (!currentFoundCustomer && name && cpf.length === 11) {
+                saveCustomerBtn.disabled = false;
+            } else {
+                saveCustomerBtn.disabled = true;
+            }
+        });
+    });
+    // ==============================================
+    //           FIM DA CORREÇÃO
+    // ==============================================
 
     paymentInitialized = true;
     console.log("[PaymentController] Inicializado.");
