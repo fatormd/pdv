@@ -42,10 +42,6 @@ const updateText = (id, value) => {
     if (el) el.textContent = value;
 };
 
-// ==============================================
-//           INÍCIO DA CORREÇÃO
-// ==============================================
-
 // --- FUNÇÕES DE AÇÃO (PAGAMENTO) ---
 
 // Esta função é chamada pelo auth modal (app.js) após a senha ser validada
@@ -78,6 +74,8 @@ export const deletePayment = async (timestamp) => {
     // Chama o modal de autenticação ANTES de executar a exclusão
     window.openManagerAuthModal('deletePayment', timestamp);
 };
+// Disponibiliza no escopo global para o HTML
+window.deletePayment = deletePayment;
 
 // Validador interno para habilitar/desabilitar o botão de adicionar
 const _validatePaymentInputs = () => {
@@ -129,9 +127,9 @@ const renderPaymentMethodButtons = () => {
         </button>
     `).join('');
 };
-// ==============================================
-//           FIM DA CORREÇÃO
-// ==============================================
+
+// Função "vazia" para a divisão de contas (para evitar o erro)
+const renderPaymentSplits = (orderSnapshot) => { /* ... (mantida - vazia/comentada) ... */ };
 
 // Renderiza o Resumo da Conta (Subtotal, Taxa, Total, etc.)
 export const renderPaymentSummary = (tableId, orderSnapshot) => {
@@ -171,13 +169,13 @@ export const renderPaymentSummary = (tableId, orderSnapshot) => {
         finalizeOrderBtn.classList.toggle('cursor-not-allowed', !canFinalize);
     }
     
+    renderReviewItemsList(orderSnapshot);
+    renderRegisteredPayments(payments); 
+    
     // ==============================================
     //           INÍCIO DA CORREÇÃO
     // ==============================================
-    // Chama as funções de renderização que estavam faltando
-    renderReviewItemsList(orderSnapshot);
-    renderRegisteredPayments(payments); // <-- Renderiza a lista de pagamentos
-    renderPaymentSplits(orderSnapshot); // (Atualmente desativado)
+    // renderPaymentSplits(orderSnapshot); // <-- LINHA COMENTADA
     // ==============================================
     //           FIM DA CORREÇÃO
     // ==============================================
@@ -192,7 +190,7 @@ export const renderPaymentSummary = (tableId, orderSnapshot) => {
 };
 
 // Renderiza a lista de itens para revisão (com checkboxes)
-const renderReviewItemsList = (orderSnapshot) => { /* ... (lógica mantida) ... */
+const renderReviewItemsList = (orderSnapshot) => { 
     if (!reviewItemsList) return;
     const items = orderSnapshot?.sentItems || [];
     const oldActionBar = document.getElementById('reviewActionBar');
@@ -201,7 +199,7 @@ const renderReviewItemsList = (orderSnapshot) => { /* ... (lógica mantida) ... 
         reviewItemsList.innerHTML = `<div class="text-sm text-dark-placeholder italic p-2">Nenhum item na conta principal para revisão.</div>`;
         return;
     }
-    const groupedItems = items.reduce((acc, item) => { /* ... (lógica de agrupar mantida) ... */
+    const groupedItems = items.reduce((acc, item) => { 
         const key = `${item.id}-${item.note || ''}`;
         if (!acc[key]) {
             acc[key] = { ...item, count: 0, originalItems: [] };
@@ -210,7 +208,7 @@ const renderReviewItemsList = (orderSnapshot) => { /* ... (lógica mantida) ... 
         acc[key].originalItems.push(item);
         return acc;
      }, {});
-    let itemsHtml = Object.values(groupedItems).map(group => { /* ... (lógica de gerar HTML mantida) ... */
+    let itemsHtml = Object.values(groupedItems).map(group => { 
         const itemData = JSON.stringify(group.originalItems).replace(/'/g, '&#39;');
         return `
         <div class="flex justify-between items-center py-2 border-b border-dark-border hover:bg-dark-input p-2 rounded-lg">
@@ -513,14 +511,7 @@ export const initPaymentController = () => {
     if(selectiveTransferModal) { /* ... (mapeamento mantido) ... */ }
     if (!reviewItemsList) { console.error("[PaymentController] Erro Fatal: 'reviewItemsList' não encontrado."); return; }
 
-    // ==============================================
-    //           INÍCIO DA CORREÇÃO
-    // ==============================================
-    // Chama a função que renderiza os botões de pagamento
     renderPaymentMethodButtons();
-    // ==============================================
-    //           FIM DA CORREÇÃO
-    // ==============================================
 
     // Adiciona Listeners Essenciais
     if(toggleServiceTaxBtn) toggleServiceTaxBtn.addEventListener('click', async () => {
@@ -556,35 +547,26 @@ export const initPaymentController = () => {
         });
     }
     
-    // ==============================================
-    //           INÍCIO DA CORREÇÃO
-    // ==============================================
-    
     // Listener para selecionar o Método de Pagamento
     if(paymentMethodButtonsContainer) paymentMethodButtonsContainer.addEventListener('click', (e) => {
         const btn = e.target.closest('.payment-method-btn');
         if (btn) {
-            // Remove 'active' de todos
             paymentMethodButtonsContainer.querySelectorAll('.payment-method-btn').forEach(b => b.classList.remove('active'));
-            // Adiciona 'active' ao clicado
             btn.classList.add('active');
             
-            // Se for 'Dinheiro', sugere o valor restante (para troco)
             const remaining = getNumericValueFromCurrency(remainingBalanceDisplay.textContent);
             if (btn.dataset.method === 'Dinheiro' && remaining > 0) {
-                 // Formata como "50,00" (sem R$) para o input
                  paymentValueInput.value = remaining.toFixed(2).replace('.', ','); 
             }
             
-            _validatePaymentInputs(); // Valida para habilitar o botão de adicionar
+            _validatePaymentInputs(); 
         }
     });
 
     // Listener para o Input de Valor
     if(paymentValueInput) paymentValueInput.addEventListener('input', (e) => {
-        // Formatação de máscara (simples, apenas para números e vírgula)
         e.target.value = e.target.value.replace(/[^0-9,]/g, '');
-        _validatePaymentInputs(); // Valida para habilitar o botão
+        _validatePaymentInputs(); 
     });
 
     // Listener para Adicionar Pagamento
@@ -601,7 +583,6 @@ export const initPaymentController = () => {
             return;
         }
 
-        // Se o valor for maior que o restante (com uma pequena margem), pergunta sobre troco
         if (numericValue > (remainingBalance + 0.01)) { 
             const formattedValue = formatCurrency(numericValue);
             const formattedRemaining = formatCurrency(remainingBalance);
@@ -610,34 +591,28 @@ export const initPaymentController = () => {
             }
         }
 
-        // Cria o objeto de pagamento
         const paymentObject = {
             method: method,
-            value: formatCurrency(numericValue), // Salva formatado
+            value: formatCurrency(numericValue), 
             timestamp: Date.now(),
-            userId: userId || 'unknown' // Adiciona quem registrou
+            userId: userId || 'unknown' 
         };
 
         const tableRef = getTableDocRef(currentTableId);
         try {
-            // Adiciona o pagamento ao array 'payments' no Firebase
             await updateDoc(tableRef, {
                 payments: arrayUnion(paymentObject)
             });
 
-            // Limpa os campos após o sucesso
             paymentValueInput.value = '';
             selectedMethodBtn.classList.remove('active');
-            _validatePaymentInputs(); // Desabilita o botão
+            _validatePaymentInputs(); 
 
         } catch (e) {
             console.error("Erro ao adicionar pagamento:", e);
             alert("Falha ao registrar o pagamento.");
         }
     });
-    // ==============================================
-    //           FIM DA CORREÇÃO
-    // ==============================================
     
     if(finalizeOrderBtn) finalizeOrderBtn.addEventListener('click', handleFinalizeOrder);
     if(openNfeModalBtn) openNfeModalBtn.addEventListener('click', window.openNfeModal);
