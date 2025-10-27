@@ -17,7 +17,7 @@ let paymentSummaryList, chargeInputs, openCustomerRegBtn, customerSearchInput, p
 let finalizeOrderBtn, openNfeModalBtn;
 let calculatorModal, calcDisplay, calcButtons, closeCalcBtnX;
 let selectiveTransferModal, targetTableInput, checkTargetTableBtn, confirmTransferBtn, transferStatus, transferItemsList;
-let tableTransferModal;
+let tableTransferModal; // <-- Modal que vamos exibir
 let customerRegModal, customerSearchCpfInput, searchCustomerByCpfBtn, customerSearchResultsDiv;
 let customerNameInput, customerCpfInput, customerPhoneInput, customerEmailInput;
 let closeCustomerRegModalBtn, saveCustomerBtn, linkCustomerToTableBtn;
@@ -279,7 +279,44 @@ export const handleMassDeleteConfirmed = async () => {
 //           FIM DA FUNÇÃO ATUALIZADA
 // ==============================================
 
-export function openTableTransferModal() { /* ... (mantida) ... */ };
+// ==============================================
+//           INÍCIO DA CORREÇÃO
+// ==============================================
+// Esta é a função que estava vazia.
+export function openTableTransferModal() {
+    if (!tableTransferModal) {
+        console.error("[PaymentController] Modal 'tableTransferModal' não encontrado!");
+        alert("Erro: Modal de transferência não foi inicializado.");
+        return;
+    }
+
+    // Reseta o estado do modal para uma nova transferência
+    const targetInput = document.getElementById('targetTableInput');
+    const newTableDinersDiv = document.getElementById('newTableDinersInput');
+    const newTableDinersInput = document.getElementById('newTableDiners');
+    const newTableSectorInput = document.getElementById('newTableSector');
+    const statusDiv = document.getElementById('transferStatus');
+    const confirmBtn = document.getElementById('confirmTableTransferBtn');
+
+    if (targetInput) targetInput.value = '';
+    if (newTableDinersDiv) newTableDinersDiv.style.display = 'none'; // Esconde campos de nova mesa
+    if (newTableDinersInput) newTableDinersInput.value = '1';
+    if (newTableSectorInput) newTableSectorInput.value = '';
+    if (statusDiv) {
+        statusDiv.style.display = 'none';
+        statusDiv.textContent = '';
+    }
+    // Desabilita o botão de confirmação até que uma mesa de destino seja validada
+    if (confirmBtn) confirmBtn.disabled = true; 
+
+    // Exibe o modal
+    tableTransferModal.style.display = 'flex';
+    if (targetInput) targetInput.focus(); // Foca no input da mesa de destino
+};
+// ==============================================
+//           FIM DA CORREÇÃO
+// ==============================================
+
 export function handleConfirmTableTransfer() { /* ... (mantida) ... */ }; // A lógica de fechar mesa na transferência está no app.js
 
 // Placeholders/Funções Desativadas para Divisão
