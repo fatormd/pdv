@@ -242,7 +242,41 @@ export const handleFinalizeOrder = async () => { /* ... (código mantido igual) 
 
 
 // --- FUNÇÕES GESTÃO DE CLIENTES ---
-const openCustomerRegModal = () => { /* ... (código mantido igual) ... */ };
+
+// --- CORREÇÃO 1: Função de abrir modal de cliente ---
+// Esta função estava vazia (era um stub). Agora ela abre o modal.
+const openCustomerRegModal = () => {
+    if (!customerRegModal) {
+        console.error("[Payment] Modal de Registro de Cliente (customerRegModal) não encontrado.");
+        alert("Erro: Modal de cliente não encontrado.");
+        return;
+    }
+
+    // Reseta o modal para um estado limpo
+    currentFoundCustomer = null;
+    if (customerSearchCpfInput) customerSearchCpfInput.value = '';
+    if (customerSearchResultsDiv) customerSearchResultsDiv.innerHTML = '<p class="text-sm text-dark-placeholder italic">Digite um CPF ou CNPJ para buscar.</p>';
+    if (customerNameInput) customerNameInput.value = '';
+    if (customerCpfInput) customerCpfInput.value = '';
+    if (customerPhoneInput) customerPhoneInput.value = '';
+    if (customerEmailInput) customerEmailInput.value = '';
+
+    // Garante que os botões de ação estejam no estado inicial (desabilitados)
+    if (saveCustomerBtn) {
+        saveCustomerBtn.disabled = true;
+        saveCustomerBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+    if (linkCustomerToTableBtn) {
+        linkCustomerToTableBtn.disabled = true;
+        linkCustomerToTableBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+
+    // Exibe o modal
+    customerRegModal.style.display = 'flex';
+    if (customerSearchCpfInput) customerSearchCpfInput.focus();
+};
+// --- FIM DA CORREÇÃO 1 ---
+
 const searchCustomer = async () => { /* ... (código mantido igual, incluindo classes opacity) ... */
     if (!customerSearchCpfInput || !customerSearchResultsDiv) return;
 
@@ -371,7 +405,14 @@ const linkCustomerToTable = async () => { /* ... (código mantido igual, com cor
     }
 };
 
-const handlePrintSummary = () => { /* ... (código mantido igual) ... */ };
+// --- CORREÇÃO 2: Função de impressão ---
+// Esta função estava vazia (era um stub). Agora ela chama o window.print().
+const handlePrintSummary = () => {
+    console.log("[Payment] Acionando impressão do resumo...");
+    window.print();
+};
+// --- FIM DA CORREÇÃO 2 ---
+
 
 // --- INICIALIZAÇÃO DO CONTROLLER ---
 const attachReviewListListeners = () => { /* ... (código mantido igual) ... */ };
@@ -407,9 +448,9 @@ export const initPaymentController = () => {
     tableTransferModal = document.getElementById('tableTransferModal');
     printSummaryBtn = document.getElementById('printSummaryBtn');
 
-    // --- CORREÇÃO: Adiciona o mapeamento dos elementos do modal de transferência ---
+    // Mapeamento dos elementos que faltavam (das correções anteriores)
     targetTableInput = document.getElementById('targetTableInput');
-    confirmTransferBtn = document.getElementById('confirmTableTransferBtn'); // ID real é 'confirmTableTransferBtn'
+    confirmTransferBtn = document.getElementById('confirmTableTransferBtn');
 
     // Mapeamento da Calculadora
     calculatorModal = document.getElementById('calculatorModal');
@@ -573,21 +614,17 @@ export const initPaymentController = () => {
          addSplitAccountBtn.addEventListener('click', handleAddSplitAccount);
     } else { console.warn("[PaymentController] Botão 'addSplitAccountBtn' (divisão) não encontrado ou desativado."); }
 
-    // --- CORREÇÃO: A verificação agora funciona pois confirmTransferBtn foi mapeado ---
     if (confirmTransferBtn && tableTransferModal) {
         confirmTransferBtn.addEventListener('click', handleConfirmTableTransfer);
     } else if (tableTransferModal) { // Só loga erro se o modal existe mas o botão não
         console.error("[PaymentController] Botão 'confirmTableTransferBtn' não encontrado dentro do modal de transferência.");
     }
 
-    // --- CORREÇÃO: A verificação agora funciona pois targetTableInput foi mapeado ---
     if (targetTableInput && tableTransferModal) {
         targetTableInput.addEventListener('input', async () => {
              const targetTableId = targetTableInput.value.trim();
              const newTableDinersDiv = document.getElementById('newTableDinersInput');
-             
-             // --- CORREÇÃO: Busca o botão pelo ID correto ---
-             const confirmBtn = document.getElementById('confirmTableTransferBtn'); // ID real é 'confirmTableTransferBtn'
+             const confirmBtn = document.getElementById('confirmTableTransferBtn');
 
              if (!targetTableId || targetTableId === currentTableId) {
                  if (confirmBtn) confirmBtn.disabled = true;
@@ -615,6 +652,7 @@ export const initPaymentController = () => {
          console.error("[PaymentController] Input 'targetTableInput' não encontrado dentro do modal de transferência.");
     }
 
+    // O listener para 'printSummaryBtn' é adicionado aqui e chama a função corrigida
     if(printSummaryBtn) {
         printSummaryBtn.addEventListener('click', handlePrintSummary);
     } else { console.warn("[PaymentController] Botão 'printSummaryBtn' não encontrado."); }
@@ -698,7 +736,8 @@ export const initPaymentController = () => {
 
 
     // --- LISTENERS DO MODAL DE CLIENTE ---
-    // (Código mantido igual, com verificações e adição/remoção de classes opacity)
+    
+    // O listener para 'openCustomerRegBtn' é adicionado aqui e chama a função corrigida
     if (openCustomerRegBtn) openCustomerRegBtn.addEventListener('click', openCustomerRegModal);
     else console.error("[PaymentController] Botão 'openCustomerRegBtn' não encontrado.");
 
