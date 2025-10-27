@@ -171,8 +171,9 @@ export const renderPaymentSummary = (tableId, orderSnapshot) => {
     // ==============================================
     // Lógica para habilitar/desabilitar o botão Finalizar
     if (finalizeOrderBtn) {
-        // Habilita SE não houver itens E o restante for <= 0.01 (margem float)
-        const canFinalize = sentItems.length === 0 && remainingBalancePrincipal <= 0.01;
+        // Habilita SE o restante for <= 0.01 (margem float)
+        // Não importa se há itens, contanto que a conta esteja paga.
+        const canFinalize = remainingBalancePrincipal <= 0.01;
         finalizeOrderBtn.disabled = !canFinalize;
         finalizeOrderBtn.classList.toggle('opacity-50', !canFinalize);
         finalizeOrderBtn.classList.toggle('cursor-not-allowed', !canFinalize);
