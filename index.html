@@ -34,15 +34,22 @@
     <style>
         /* Estilos específicos para impressão */
         @media print {
-            /* * CORREÇÃO: Removemos a regra 'body * { visibility: hidden; }' 
-             * que escondia #mainContent e impedia a impressão.
-             * Agora, confiamos apenas na classe .print-hide 
-             * para esconder o que não deve ser impresso.
-             */
             
-            /* * CORREÇÃO: Removemos a regra '#paymentSummaryCard, #paymentSummaryCard *'
-             * pois ela não é mais necessária.
-             */
+            /* --- INÍCIO DA NOVA CORREÇÃO --- */
+            /* * Reseta o layout do corpo e containers para impressão.
+             * Remove 'overflow: hidden' e alturas fixas dos pais,
+             * que estavam "cortando" o card reposicionado.
+            */
+            body, #mainContent, #appContainer, #paymentScreen {
+                overflow: visible !important; /* Remove todo overflow hidden/auto */
+                height: auto !important;     /* Permite que o conteúdo defina a altura */
+                width: auto !important;      /* Reseta larguras baseadas em viewport */
+                display: block !important;   /* Remove flex que pode atrapalhar */
+                position: static !important; /* Garante que não sejam 'positioned' */
+                min-height: initial !important; /* Reseta min-height */
+            }
+            /* --- FIM DA NOVA CORREÇÃO --- */
+
 
             /* Posiciona o card de resumo para impressão */
             #paymentSummaryCard {
@@ -77,11 +84,9 @@
                   border-color: #ccc !important; /* Linhas divisórias mais claras */
              }
 
-            /* * Garante que elementos escondidos com .print-hide realmente sumam.
-             * Esta é a regra principal agora.
-             */
+            /* Garante que elementos escondidos com .print-hide realmente sumam. */
             .print-hide, 
-            header, /* (redundante se #mainHeader tem a classe, mas seguro) */
+            header,
             #reviewActionBar {
                 display: none !important;
             }
