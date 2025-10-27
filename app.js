@@ -2,9 +2,13 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapshot, writeBatch, arrayRemove, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+// NOVO IMPORT
+import { getFunctions } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
+
 
 // Importações dos Serviços e Utils
-import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, auth, db } from '/services/firebaseService.js'; // Importa 'db'
+// 'functions' será importado do firebaseService agora
+import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, auth, db, functions } from '/services/firebaseService.js';
 import { fetchWooCommerceProducts, fetchWooCommerceCategories } from '/services/wooCommerceService.js';
 import { formatCurrency, formatElapsedTime } from '/utils.js';
 
@@ -12,7 +16,7 @@ import { formatCurrency, formatElapsedTime } from '/utils.js';
 import { loadOpenTables, renderTableFilters, handleAbrirMesa, handleSearchTable, initPanelController } from '/controllers/panelController.js';
 import { renderMenu, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity, openObsModalForGroup, initOrderController, handleSendSelectedItems } from '/controllers/orderController.js';
 import {
-    renderPaymentSummary, deletePayment, handleMassActionRequest, 
+    renderPaymentSummary, deletePayment, handleMassActionRequest,
     initPaymentController, handleFinalizeOrder,
     handleMassDeleteConfirmed, executeDeletePayment, // Funções de ação
     openTableTransferModal, handleConfirmTableTransfer // Funções de UI
@@ -54,7 +58,6 @@ let loginBtn, loginEmailInput, loginPasswordInput, loginErrorMsg;
 
 
 // --- FUNÇÕES CORE E ROTIAMENTO ---
-
 export const hideStatus = () => {
     if (!statusScreen) statusScreen = document.getElementById('statusScreen');
     if (statusScreen) {
@@ -103,9 +106,6 @@ const hideLoginScreen = () => {
     }
 };
 
-// ==================================================================
-//               FUNÇÃO CORRIGIDA / ATUALIZADA
-// ==================================================================
 export const goToScreen = (screenId) => {
     if (!appContainer) appContainer = document.getElementById('appContainer');
     if (!mainContent) mainContent = document.getElementById('mainContent');
@@ -125,13 +125,13 @@ export const goToScreen = (screenId) => {
         console.log(`[NAV] Desinscrevendo do listener da mesa ${currentTableId}`);
         unsubscribeTable(); unsubscribeTable = null;
         currentTableId = null; currentOrderSnapshot = null; selectedItems.length = 0; // Limpa o array local
-        
+
         // --- INÍCIO DA CORREÇÃO ---
         // Reseta os títulos ao sair da mesa
         const currentTableNumEl = document.getElementById('current-table-number');
         const paymentTableNumEl = document.getElementById('payment-table-number');
         const orderScreenTableNumEl = document.getElementById('order-screen-table-number'); // Novo
-        
+
         if(currentTableNumEl) currentTableNumEl.textContent = 'Fator MD'; // Reseta para o nome do sistema
         if(paymentTableNumEl) paymentTableNumEl.textContent = `Mesa`;
         if(orderScreenTableNumEl) orderScreenTableNumEl.textContent = 'Pedido'; // Reseta para o padrão
@@ -149,9 +149,6 @@ export const goToScreen = (screenId) => {
         console.error(`[NAV] Tentativa de navegar para tela inválida: ${screenId}`);
     }
 };
-// ==================================================================
-//                  FIM DA FUNÇÃO CORRIGIDA
-// ==================================================================
 window.goToScreen = goToScreen;
 
 export const handleTableTransferConfirmed = async (originTableId, targetTableId, itemsToTransfer, newDiners = 0, newSector = '') => {
@@ -162,7 +159,7 @@ export const handleTableTransferConfirmed = async (originTableId, targetTableId,
 
     const originTableRef = getTableDocRef(originTableId);
     const targetTableRef = getTableDocRef(targetTableId);
-    
+
     const dbInstance = db; // Usa o 'db' importado do firebaseService
     if (!dbInstance) {
         console.error("DB não inicializado!");
@@ -213,11 +210,9 @@ export const handleTableTransferConfirmed = async (originTableId, targetTableId,
         alert("Falha na transferência dos itens.");
     }
 };
-// Expor globalmente para o paymentController
 window.handleTableTransferConfirmed = handleTableTransferConfirmed;
 
 
-// MODAL DE AUTENTICAÇÃO GLOBAL
 window.openManagerAuthModal = (action, payload = null) => {
     const managerModal = document.getElementById('managerModal');
     if (!managerModal) { console.error("Modal Gerente não encontrado!"); return; }
@@ -243,27 +238,27 @@ window.openManagerAuthModal = (action, payload = null) => {
         const handleAuthClick = () => {
             if (input.value === MANAGER_PASSWORD) {
                 managerModal.style.display = 'none';
-                
+
                 console.log(`[AUTH MODAL] Ação '${action}' autorizada.`);
                 switch (action) {
                     // Ações do PaymentController
-                    case 'executeMassDelete': 
-                        handleMassDeleteConfirmed(); 
+                    case 'executeMassDelete':
+                        handleMassDeleteConfirmed();
                         break;
-                    case 'executeMassTransfer': 
-                        openTableTransferModal(); 
+                    case 'executeMassTransfer':
+                        openTableTransferModal();
                         break;
                     case 'deletePayment':
-                        executeDeletePayment(payload); 
+                        executeDeletePayment(payload);
                         break;
-                    
+
                     // Ações do ManagerController
                     case 'goToManagerPanel':
                     case 'openProductManagement':
                     case 'openCategoryManagement':
                     case 'openInventoryManagement':
                     case 'openRecipesManagement':
-                        handleGerencialAction(action, payload); 
+                        handleGerencialAction(action, payload);
                         break;
 
                     default:
@@ -275,24 +270,21 @@ window.openManagerAuthModal = (action, payload = null) => {
                 input.focus();
             }
         };
-        
+
         authBtn.onclick = handleAuthClick;
         input.onkeydown = (e) => { if (e.key === 'Enter') handleAuthClick(); };
     }
 };
 
-// Expor funções globais necessárias dos controllers
 window.deletePayment = deletePayment;
 window.handleMassActionRequest = handleMassActionRequest;
 window.openTableTransferModal = openTableTransferModal;
 window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`);
-// Funções de item/obs
 window.increaseLocalItemQuantity = increaseLocalItemQuantity;
 window.decreaseLocalItemQuantity = decreaseLocalItemQuantity;
 window.openObsModalForGroup = openObsModalForGroup;
 
 
-// Listener da Mesa
 export const setTableListener = (tableId) => {
     if (unsubscribeTable) unsubscribeTable();
     console.log(`[APP] Configurando listener para mesa ${tableId}`);
@@ -302,11 +294,11 @@ export const setTableListener = (tableId) => {
             console.log(`[APP] Snapshot recebido para mesa ${tableId}`);
             currentOrderSnapshot = docSnapshot.data();
             const firebaseSelectedItems = currentOrderSnapshot.selectedItems || [];
-            
+
             if (JSON.stringify(firebaseSelectedItems) !== JSON.stringify(selectedItems)) {
                  console.log("[APP] Sincronizando 'selectedItems' local com dados do Firebase.");
-                 selectedItems.length = 0; 
-                 selectedItems.push(...firebaseSelectedItems); 
+                 selectedItems.length = 0;
+                 selectedItems.push(...firebaseSelectedItems);
             }
 
             renderOrderScreen(currentOrderSnapshot);
@@ -330,43 +322,36 @@ export const setTableListener = (tableId) => {
 };
 
 
-// ==================================================================
-//               FUNÇÃO CORRIGIDA / ATUALIZADA
-// ==================================================================
-// Define a mesa atual e inicia o listener
 export const setCurrentTable = (tableId) => {
     if (currentTableId === tableId && unsubscribeTable) {
         console.log(`[APP] Listener para mesa ${tableId} já ativo.`);
     }
-    
+
     currentTableId = tableId;
     console.log(`[APP] Definindo mesa atual para ${tableId}`);
-    
+
     // --- INÍCIO DA CORREÇÃO (Aplicando a sugestão do header) ---
     // Atualiza os títulos nas telas relevantes
     const currentTableNumEl = document.getElementById('current-table-number'); // <-- LINHA ADICIONADA
     const paymentTableNumEl = document.getElementById('payment-table-number');
-    const orderScreenTableNumEl = document.getElementById('order-screen-table-number'); 
+    const orderScreenTableNumEl = document.getElementById('order-screen-table-number');
 
     if(currentTableNumEl) currentTableNumEl.textContent = `Mesa ${tableId}`; // <-- LINHA ADICIONADA (Atualiza o header)
     if(paymentTableNumEl) paymentTableNumEl.textContent = `Mesa ${tableId}`;
-    if(orderScreenTableNumEl) orderScreenTableNumEl.textContent = `Mesa ${tableId}`; 
+    if(orderScreenTableNumEl) orderScreenTableNumEl.textContent = `Mesa ${tableId}`;
      // --- FIM DA CORREÇÃO ---
-    
+
     // Inicia o listener (ou reinicia)
     setTableListener(tableId);
 };
-// ==================================================================
-//                  FIM DA FUNÇÃO CORRIGIDA
-// ==================================================================
 
-// Seleciona a mesa e inicia o listener
+
 export const selectTableAndStartListener = async (tableId) => {
     console.log(`[APP] Selecionando mesa ${tableId} e iniciando listener.`);
     try {
-        await fetchWooCommerceProducts(/* Callback opcional */); 
-        setCurrentTable(tableId); 
-        goToScreen('orderScreen'); 
+        await fetchWooCommerceProducts(/* Callback opcional */);
+        setCurrentTable(tableId);
+        goToScreen('orderScreen');
     } catch (error) {
         console.error(`[APP] Erro ao selecionar mesa ${tableId}:`, error);
         alert("Erro ao abrir a mesa. Verifique a conexão.");
@@ -374,10 +359,7 @@ export const selectTableAndStartListener = async (tableId) => {
 };
 window.selectTableAndStartListener = selectTableAndStartListener;
 
-// ==================================================================
-//           INÍCIO DA CORREÇÃO (NF-e)
-// ==================================================================
-// Função NF-e (Agora funcional)
+
 window.openNfeModal = () => {
     const modal = document.getElementById('nfeModal');
     if (!modal || !currentOrderSnapshot) {
@@ -403,11 +385,11 @@ window.openNfeModal = () => {
         // Cliente ENCONTRADO
         nfeCustomerName.textContent = currentOrderSnapshot.clientName;
         nfeCustomerDoc.textContent = currentOrderSnapshot.clientId; // (CPF ou CNPJ)
-        
+
         // Pega o valor total da tela de pagamento
         const totalValueEl = document.getElementById('orderTotalDisplayPayment');
         nfeTotalValue.textContent = totalValueEl ? totalValueEl.textContent : 'R$ 0,00';
-        
+
         // Remove listener antigo e adiciona um novo
         const newConfirmBtn = nfeConfirmBtn.cloneNode(true);
         nfeConfirmBtn.parentNode.replaceChild(newConfirmBtn, nfeConfirmBtn);
@@ -419,7 +401,7 @@ window.openNfeModal = () => {
             console.log("Valor:", nfeTotalValue.textContent);
             console.log("Itens:", currentOrderSnapshot.sentItems);
             console.log("Pagamentos:", currentOrderSnapshot.payments);
-            
+
             alert("Simulação: Dados da NF-e enviados para o backend. (Verifique o console)");
             modal.style.display = 'none';
         });
@@ -428,19 +410,15 @@ window.openNfeModal = () => {
         // Cliente NÃO ENCONTRADO
         nfeDetails.style.display = 'none'; // Esconde os detalhes
         nfeConfirmBtn.style.display = 'none'; // Esconde o botão de emitir
-        
+
         nfeError.style.display = 'block'; // Mostra o erro
         nfeErrorMessage.textContent = "Nenhum cliente (CPF/CNPJ) associado a esta mesa. Associe um cliente antes de emitir a NF-e.";
     }
 
     modal.style.display = 'flex';
 };
-// ==================================================================
-//           FIM DA CORREÇÃO (NF-e)
-// ==================================================================
 
 
-// --- INICIALIZAÇÃO APP STAFF ---
 const initStaffApp = async () => {
     console.log("[INIT] Iniciando app para Staff...");
     try {
@@ -467,7 +445,6 @@ const initStaffApp = async () => {
     }
 };
 
-// --- LÓGICA DE AUTH/LOGIN ---
 const authenticateStaff = (email, password) => {
     const creds = STAFF_CREDENTIALS[email];
     return (creds && creds.password === password && creds.role !== 'client') ? creds : null;
@@ -504,7 +481,7 @@ const handleStaffLogin = async () => {
                 console.warn("[LOGIN] Login Firebase falhou. Usando Mock ID.", authError);
                 userId = `mock_${userRole}_${Date.now()}`;
             }
-            
+
             const userName = staffData.name || userRole;
             document.getElementById('user-id-display').textContent = `Usuário: ${userName} | ${userRole.toUpperCase()}`;
             console.log("[LOGIN] User info display atualizado.");
@@ -549,9 +526,9 @@ window.handleLogout = handleLogout;
 // --- INICIALIZAÇÃO PRINCIPAL ---
 document.addEventListener('DOMContentLoaded', () => {
     console.log("[INIT] DOMContentLoaded.");
-    
+
     const firebaseConfig = FIREBASE_CONFIG;
-    
+
     try {
         console.log("[INIT] Config Firebase carregada do módulo.");
 
@@ -559,8 +536,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const app = initializeApp(firebaseConfig);
         const dbInstance = getFirestore(app);
         const authInstance = getAuth(app);
-        initializeFirebase(dbInstance, authInstance, APP_ID); 
-        console.log("[INIT] Firebase App e Serviços inicializados.");
+        // ATUALIZADO: Inicializa o Functions
+        const functionsInstance = getFunctions(app);
+
+        // ATUALIZADO: Passa o functionsInstance
+        initializeFirebase(dbInstance, authInstance, APP_ID, functionsInstance);
+        console.log("[INIT] Firebase App e Serviços (DB, Auth, Functions) inicializados.");
 
         // Mapeia elementos Globais e de Login
         statusScreen = document.getElementById('statusScreen');
