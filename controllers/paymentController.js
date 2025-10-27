@@ -406,11 +406,19 @@ export const initPaymentController = () => {
     openNfeModalBtn = document.getElementById('openNfeModalBtn');
     tableTransferModal = document.getElementById('tableTransferModal');
     printSummaryBtn = document.getElementById('printSummaryBtn');
+
+    // --- CORREÇÃO: Adiciona o mapeamento dos elementos do modal de transferência ---
+    targetTableInput = document.getElementById('targetTableInput');
+    confirmTransferBtn = document.getElementById('confirmTableTransferBtn'); // ID real é 'confirmTableTransferBtn'
+
+    // Mapeamento da Calculadora
     calculatorModal = document.getElementById('calculatorModal');
     calcDisplay = document.getElementById('calcDisplay');
     calcButtonsContainer = calculatorModal?.querySelector('.calculator-buttons');
     closeCalcBtnX = document.getElementById('closeCalcBtnX');
     confirmCalcBtn = document.getElementById('confirmCalcBtn');
+    
+    // Mapeamento Modal Cliente
     customerRegModal = document.getElementById('customerRegModal');
     customerSearchCpfInput = document.getElementById('customerSearchCpf');
     searchCustomerByCpfBtn = document.getElementById('searchCustomerByCpfBtn');
@@ -422,6 +430,7 @@ export const initPaymentController = () => {
     closeCustomerRegModalBtn = document.getElementById('closeCustomerRegModalBtn');
     saveCustomerBtn = document.getElementById('saveCustomerBtn');
     linkCustomerToTableBtn = document.getElementById('linkCustomerToTableBtn');
+    
     if (tableTransferModal) { /* ... */ }
     if (!reviewItemsList) { console.error("[PaymentController] Erro Fatal: 'reviewItemsList' não encontrado."); return; }
 
@@ -564,17 +573,21 @@ export const initPaymentController = () => {
          addSplitAccountBtn.addEventListener('click', handleAddSplitAccount);
     } else { console.warn("[PaymentController] Botão 'addSplitAccountBtn' (divisão) não encontrado ou desativado."); }
 
+    // --- CORREÇÃO: A verificação agora funciona pois confirmTransferBtn foi mapeado ---
     if (confirmTransferBtn && tableTransferModal) {
         confirmTransferBtn.addEventListener('click', handleConfirmTableTransfer);
     } else if (tableTransferModal) { // Só loga erro se o modal existe mas o botão não
-        console.error("[PaymentController] Botão 'confirmTransferBtn' não encontrado dentro do modal de transferência.");
+        console.error("[PaymentController] Botão 'confirmTableTransferBtn' não encontrado dentro do modal de transferência.");
     }
 
+    // --- CORREÇÃO: A verificação agora funciona pois targetTableInput foi mapeado ---
     if (targetTableInput && tableTransferModal) {
         targetTableInput.addEventListener('input', async () => {
              const targetTableId = targetTableInput.value.trim();
              const newTableDinersDiv = document.getElementById('newTableDinersInput');
-             const confirmBtn = document.getElementById('confirmTableTransferBtn');
+             
+             // --- CORREÇÃO: Busca o botão pelo ID correto ---
+             const confirmBtn = document.getElementById('confirmTableTransferBtn'); // ID real é 'confirmTableTransferBtn'
 
              if (!targetTableId || targetTableId === currentTableId) {
                  if (confirmBtn) confirmBtn.disabled = true;
