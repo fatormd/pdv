@@ -405,6 +405,7 @@
             </div>
         </div>
     </div>
+    
     <div id="reportsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
          <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
             <h3 class="text-xl font-bold mb-4 text-indigo-400">Relatórios</h3>
@@ -413,6 +414,37 @@
          </div>
     </div>
 
+    <div id="nfeModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
+            <h3 class="text-xl font-bold mb-4 text-indigo-400">Emissão de Nota Fiscal (NF-e/NFC-e)</h3>
+            
+            <div id="nfeError" class="hidden p-3 rounded-lg bg-red-900 border border-red-700 text-red-200 mb-4">
+                <p id="nfeErrorMessage" class="font-semibold">Erro aqui</p>
+            </div>
+            
+            <div id="nfeDetails">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-dark-placeholder mb-1">Cliente</label>
+                    <p id="nfeCustomerName" class="text-lg font-semibold text-dark-text">Carregando...</p>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-dark-placeholder mb-1">Documento (CPF/CNPJ)</label>
+                    <p id="nfeCustomerDoc" class="text-lg font-semibold text-dark-text">Carregando...</p>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-dark-placeholder mb-1">Valor Total da Venda</label>
+                    <p id="nfeTotalValue" class="text-2xl font-bold text-pumpkin">R$ 0,00</p>
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-3 mt-6">
+                <button class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('nfeModal').style.display='none'">Cancelar</button>
+                <button id="nfeConfirmBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                    <i class="fas fa-check-circle"></i> Emitir (Simulação)
+                </button>
+            </div>
+        </div>
+    </div>
     <div id="waiterRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
     <div id="selectiveTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
     <div id="productManagementModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
