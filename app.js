@@ -585,6 +585,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         console.log("[INIT] Listener AuthStateChanged configurado.");
 
+        // --- CORREÇÃO: Adiciona Listener ao Formulário de Login (para 'submit') ---
+        const loginForm = document.getElementById('loginForm');
+        if (loginForm) {
+            loginForm.addEventListener('submit', (e) => {
+                e.preventDefault(); // Impede o recarregamento da página
+                handleStaffLogin(); // Chama a função de login existente
+            });
+            console.log("[INIT] Listener do form Login adicionado.");
+        } else if (!window.location.pathname.includes('client.html')) {
+            console.error("[INIT] Form de Login (loginForm) não encontrado na tela de staff!");
+        }
+        
+        /* COMENTADO/REMOVIDO o listener antigo
         // Adiciona Listener ao Botão de Login
         if (loginBtn) {
             loginBtn.addEventListener('click', handleStaffLogin);
@@ -592,6 +605,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (!window.location.pathname.includes('client.html')) {
              console.error("[INIT] Botão de Login (loginBtn) não encontrado na tela de staff!");
         }
+        */
 
         // Inicializa os Controllers
         console.log("[INIT] Chamando inicializadores dos controllers...");
