@@ -374,8 +374,70 @@ export const selectTableAndStartListener = async (tableId) => {
 };
 window.selectTableAndStartListener = selectTableAndStartListener;
 
-// Função NF-e (Placeholder global)
-window.openNfeModal = () => { alert("Abrir modal NF-e (DEV)"); };
+// ==================================================================
+//           INÍCIO DA CORREÇÃO (NF-e)
+// ==================================================================
+// Função NF-e (Agora funcional)
+window.openNfeModal = () => {
+    const modal = document.getElementById('nfeModal');
+    if (!modal || !currentOrderSnapshot) {
+        alert("Erro: Modal NF-e não encontrado ou nenhuma mesa selecionada.");
+        return;
+    }
+
+    const nfeError = document.getElementById('nfeError');
+    const nfeErrorMessage = document.getElementById('nfeErrorMessage');
+    const nfeDetails = document.getElementById('nfeDetails');
+    const nfeCustomerName = document.getElementById('nfeCustomerName');
+    const nfeCustomerDoc = document.getElementById('nfeCustomerDoc');
+    const nfeTotalValue = document.getElementById('nfeTotalValue');
+    const nfeConfirmBtn = document.getElementById('nfeConfirmBtn');
+
+    // Reseta o estado
+    nfeError.style.display = 'none';
+    nfeDetails.style.display = 'block';
+    nfeConfirmBtn.style.display = 'block';
+
+    // Verifica se há um cliente associado (que salvamos no snapshot)
+    if (currentOrderSnapshot.clientId && currentOrderSnapshot.clientName) {
+        // Cliente ENCONTRADO
+        nfeCustomerName.textContent = currentOrderSnapshot.clientName;
+        nfeCustomerDoc.textContent = currentOrderSnapshot.clientId; // (CPF ou CNPJ)
+        
+        // Pega o valor total da tela de pagamento
+        const totalValueEl = document.getElementById('orderTotalDisplayPayment');
+        nfeTotalValue.textContent = totalValueEl ? totalValueEl.textContent : 'R$ 0,00';
+        
+        // Remove listener antigo e adiciona um novo
+        const newConfirmBtn = nfeConfirmBtn.cloneNode(true);
+        nfeConfirmBtn.parentNode.replaceChild(newConfirmBtn, nfeConfirmBtn);
+        newConfirmBtn.addEventListener('click', () => {
+            // Aqui é onde os dados seriam enviados para o backend
+            console.log("--- DADOS PARA NF-e (SIMULAÇÃO) ---");
+            console.log("Cliente:", currentOrderSnapshot.clientName);
+            console.log("Documento:", currentOrderSnapshot.clientId);
+            console.log("Valor:", nfeTotalValue.textContent);
+            console.log("Itens:", currentOrderSnapshot.sentItems);
+            console.log("Pagamentos:", currentOrderSnapshot.payments);
+            
+            alert("Simulação: Dados da NF-e enviados para o backend. (Verifique o console)");
+            modal.style.display = 'none';
+        });
+
+    } else {
+        // Cliente NÃO ENCONTRADO
+        nfeDetails.style.display = 'none'; // Esconde os detalhes
+        nfeConfirmBtn.style.display = 'none'; // Esconde o botão de emitir
+        
+        nfeError.style.display = 'block'; // Mostra o erro
+        nfeErrorMessage.textContent = "Nenhum cliente (CPF/CNPJ) associado a esta mesa. Associe um cliente antes de emitir a NF-e.";
+    }
+
+    modal.style.display = 'flex';
+};
+// ==================================================================
+//           FIM DA CORREÇÃO (NF-e)
+// ==================================================================
 
 
 // --- INICIALIZAÇÃO APP STAFF ---
@@ -556,7 +618,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (openManagerPanelBtn) openManagerPanelBtn.addEventListener('click', () => { window.openManagerAuthModal('goToManagerPanel'); });
         if (logoutBtnHeader) logoutBtnHeader.addEventListener('click', handleLogout);
-        if (openNfeModalBtn) openNfeModalBtn.addEventListener('click', window.openNfeModal); // Continua funcionando
+        if (openNfeModalBtn) openNfeModalBtn.addEventListener('click', window.openNfeModal); // <-- Este agora chama a função corrigida
 
         console.log("[INIT] Listeners restantes adicionados.");
 
