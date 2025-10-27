@@ -430,7 +430,7 @@ export const handleFinalizeOrder = () => { alert("Finalizar Conta (DEV)"); };
 
 
 // ==============================================
-//           INÍCIO DA CORREÇÃO
+//           INÍCIO DA CORREÇÃO (LÓGICA)
 // ==============================================
 
 // --- FUNÇÕES GESTÃO DE CLIENTES (Implementadas) ---
@@ -443,7 +443,7 @@ const openCustomerRegModal = () => {
     customerPhoneInput.value = '';
     customerEmailInput.value = '';
     customerSearchCpfInput.value = '';
-    customerSearchResultsDiv.innerHTML = '<p class="text-sm text-dark-placeholder italic">Busque por um CPF para começar.</p>';
+    customerSearchResultsDiv.innerHTML = '<p class="text-sm text-dark-placeholder italic">Busque por um CPF ou CNPJ para começar.</p>';
     
     currentFoundCustomer = null;
     saveCustomerBtn.disabled = true;
@@ -454,35 +454,35 @@ const openCustomerRegModal = () => {
 };
 
 const searchCustomer = async () => {
-    const cpf = customerSearchCpfInput.value.replace(/\D/g, ''); // Remove máscara
-    if (cpf.length !== 11) {
-        customerSearchResultsDiv.innerHTML = `<p class="text-sm text-red-400">CPF inválido. Digite 11 números.</p>`;
+    const docNumber = customerSearchCpfInput.value.replace(/\D/g, ''); // Remove máscara
+    if (docNumber.length !== 11 && docNumber.length !== 14) {
+        customerSearchResultsDiv.innerHTML = `<p class="text-sm text-red-400">Documento inválido. Digite 11 (CPF) ou 14 (CNPJ) números.</p>`;
         return;
     }
     customerSearchResultsDiv.innerHTML = `<p class="text-sm text-yellow-400">Buscando...</p>`;
 
     try {
         const customersRef = getCustomersCollectionRef();
-        // Usamos o CPF como ID do documento, o que torna a busca mais rápida
-        const customerDocRef = doc(customersRef, cpf); 
+        // Usamos o Documento (CPF ou CNPJ) como ID do documento
+        const customerDocRef = doc(customersRef, docNumber); 
         const docSnap = await getDoc(customerDocRef);
 
         if (docSnap.exists()) {
             // Cliente ENCONTRADO
             currentFoundCustomer = docSnap.data();
             customerNameInput.value = currentFoundCustomer.name || '';
-            customerCpfInput.value = currentFoundCustomer.cpf || cpf;
+            customerCpfInput.value = currentFoundCustomer.cpf || docNumber; // 'cpf' é o nome do campo no DB
             customerPhoneInput.value = currentFoundCustomer.phone || '';
             customerEmailInput.value = currentFoundCustomer.email || '';
             
             customerSearchResultsDiv.innerHTML = `<p class="text-sm text-green-400">Cliente encontrado: <strong>${currentFoundCustomer.name}</strong></p>`;
-            saveCustomerBtn.disabled = true; // Já existe, não precisa salvar
+            saveCustomerBtn.disabled = true; // Já existe, não precisa salvar (a menos que edite)
             linkCustomerToTableBtn.disabled = false; // Habilita associação
         } else {
             // Cliente NÃO ENCONTRADO
             currentFoundCustomer = null;
             customerNameInput.value = '';
-            customerCpfInput.value = cpf; // Preenche o CPF para facilitar o cadastro
+            customerCpfInput.value = docNumber; // Preenche o doc para facilitar o cadastro
             customerPhoneInput.value = '';
             customerEmailInput.value = '';
             
@@ -499,19 +499,20 @@ const searchCustomer = async () => {
 
 const saveCustomer = async () => {
     const name = customerNameInput.value.trim();
-    const cpf = customerCpfInput.value.replace(/\D/g, '');
+    const documentNumber = customerCpfInput.value.replace(/\D/g, ''); // Campo 'customerCpf' agora aceita CNPJ
     const phone = customerPhoneInput.value.trim();
     const email = customerEmailInput.value.trim().toLowerCase();
 
-    if (!name || !cpf || cpf.length !== 11) {
-        alert("Nome e CPF (11 dígitos) são obrigatórios.");
+    if (!name || (documentNumber.length !== 11 && documentNumber.length !== 14)) {
+        alert("Nome e Documento (CPF de 11 ou CNPJ de 14 dígitos) são obrigatórios.");
         return;
     }
 
     // Prepara o objeto de dados do cliente
     const customerData = { 
         name, 
-        cpf, 
+        cpf: documentNumber, // Mantemos o nome do campo 'cpf' para consistência, mas ele guarda o CNPJ
+        documentType: documentNumber.length === 11 ? 'cpf' : 'cnpj', // Novo campo
         phone, 
         email, 
         createdAt: serverTimestamp(), // Adiciona data de criação
@@ -520,9 +521,9 @@ const saveCustomer = async () => {
     
     try {
         const customersRef = getCustomersCollectionRef();
-        const customerDocRef = doc(customersRef, cpf); // CPF como ID
+        const customerDocRef = doc(customersRef, documentNumber); // CPF ou CNPJ como ID
 
-        // Salva (ou sobrescreve/atualiza) o cliente usando o CPF como ID
+        // Salva (ou sobrescreve/atualiza) o cliente usando o doc como ID
         await setDoc(customerDocRef, customerData, { merge: true }); // merge: true atualiza se já existir
 
         currentFoundCustomer = customerData; // Define o cliente salvo como o cliente atual
@@ -546,8 +547,9 @@ const linkCustomerToTable = async () => {
     try {
         // Atualiza a mesa no Firebase com os dados do cliente
         await updateDoc(tableRef, {
-            clientId: currentFoundCustomer.cpf,
-            clientName: currentFoundCustomer.name
+            clientId: currentFoundCustomer.cpf, // O campo 'cpf' do cliente agora guarda o CPF ou CNPJ
+            clientName: currentFoundCustomer.name,
+            clientDocType: currentFoundCustomer.documentType // Salva o tipo na mesa
         });
 
         // Atualiza o input principal (fora do modal) e fecha o modal
@@ -564,7 +566,7 @@ const linkCustomerToTable = async () => {
     }
 };
 // ==============================================
-//           FIM DA CORREÇÃO
+//           FIM DA CORREÇÃO (LÓGICA)
 // ==============================================
 
 
@@ -618,9 +620,6 @@ export const initPaymentController = () => {
     closeCalcBtnX = document.getElementById('closeCalcBtnX');
     tableTransferModal = document.getElementById('tableTransferModal');
     
-    // ==============================================
-    //           INÍCIO DA CORREÇÃO
-    // ==============================================
     // Mapeia os elementos do Modal de Cliente
     customerRegModal = document.getElementById('customerRegModal');
     customerSearchCpfInput = document.getElementById('customerSearchCpf');
@@ -633,9 +632,6 @@ export const initPaymentController = () => {
     closeCustomerRegModalBtn = document.getElementById('closeCustomerRegModalBtn');
     saveCustomerBtn = document.getElementById('saveCustomerBtn');
     linkCustomerToTableBtn = document.getElementById('linkCustomerToTableBtn');
-    // ==============================================
-    //           FIM DA CORREÇÃO
-    // ==============================================
 
     if (tableTransferModal) {
         targetTableInput = document.getElementById('targetTableInput');
@@ -789,7 +785,7 @@ export const initPaymentController = () => {
     }
 
     // ==============================================
-    //           INÍCIO DA CORREÇÃO
+    //           INÍCIO DA CORREÇÃO (LISTENERS)
     // ==============================================
     // --- Listeners do Modal de Cliente ---
     if (openCustomerRegBtn) { openCustomerRegBtn.addEventListener('click', openCustomerRegModal); }
@@ -809,9 +805,9 @@ export const initPaymentController = () => {
     [customerNameInput, customerCpfInput].forEach(input => {
         input?.addEventListener('input', () => {
             const name = customerNameInput.value.trim();
-            const cpf = customerCpfInput.value.replace(/\D/g, '');
+            const doc = customerCpfInput.value.replace(/\D/g, '');
             // Só habilita salvar se o cliente não foi encontrado E os campos estão preenchidos
-            if (!currentFoundCustomer && name && cpf.length === 11) {
+            if (!currentFoundCustomer && name && (doc.length === 11 || doc.length === 14)) {
                 saveCustomerBtn.disabled = false;
             } else {
                 saveCustomerBtn.disabled = true;
@@ -819,7 +815,7 @@ export const initPaymentController = () => {
         });
     });
     // ==============================================
-    //           FIM DA CORREÇÃO
+    //           FIM DA CORREÇÃO (LISTENERS)
     // ==============================================
 
     paymentInitialized = true;
