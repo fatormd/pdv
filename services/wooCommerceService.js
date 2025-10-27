@@ -24,6 +24,10 @@ const callWooProxy = async (data) => {
     try {
         // ATUALIZADO: Inicializa a referência para a Cloud Function AQUI DENTRO
         // O nome 'proxyWooCommerce' DEVE ser idêntico ao 'exports.proxyWooCommerce' no seu functions/index.js
+        // Garantimos que 'functions' (importado do firebaseService) não seja nulo antes de chamar
+        if (!functions) {
+            throw new Error("Serviço Firebase Functions não inicializado.");
+        }
         const callWooApi = httpsCallable(functions, 'proxyWooCommerce');
 
         console.log(`[WooProxy] Chamando função com:`, data);
