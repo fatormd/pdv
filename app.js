@@ -136,6 +136,16 @@ export const goToScreen = (screenId) => {
         if(paymentTableNumEl) paymentTableNumEl.textContent = `Mesa`;
         if(orderScreenTableNumEl) orderScreenTableNumEl.textContent = 'Pedido'; // Reseta para o padrão
         // --- FIM DA CORREÇÃO ---
+
+        // --- CORREÇÃO ADICIONADA: Reseta o botão 'Finalizar Conta' ---
+        // Isso previne que ele fique preso em "Finalizando..." ao trocar de mesa
+        const finalizeBtn = document.getElementById('finalizeOrderBtn');
+        if (finalizeBtn) {
+            finalizeBtn.disabled = true;
+            finalizeBtn.innerHTML = '<i class="fas fa-check-circle"></i> FINALIZAR CONTA';
+            finalizeBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+        // --- FIM DA CORREÇÃO ADICIONADA ---
     }
 
     const screenIndex = screens[screenId];
