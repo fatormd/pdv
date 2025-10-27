@@ -1,25 +1,27 @@
-// --- CONTROLLERS/MANAGERCONTROLLER.JS (Painel 4) ---
+// --- CONTROLLERS/MANAGERCONTROLLER.JS (com data-action e logs) ---
 import { goToScreen } from "/app.js";
 import { getProducts } from "/services/wooCommerceService.js";
-import { formatCurrency } from "/utils.js";
-// IMPORTAÇÃO DA NOVA FUNÇÃO DO USER CONTROLLER
-import { openUserManagementModal } from "/controllers/userManagementController.js";
+// Removida importação de formatCurrency (não usada aqui)
+// Removida importação de userManagementController (agora tratado no app.js)
 
 // Estado
 let managerInitialized = false;
 let productManagementModal; // Mapeado no init
 
-// --- FUNÇÕES DE GESTÃO (Placeholders) ---
+// --- FUNÇÕES DE GESTÃO (Placeholders/Lógica) ---
+
+// Renderiza o modal de gestão de produtos (exemplo)
 const renderProductManagement = () => {
-    if (!productManagementModal) {
-         productManagementModal = document.getElementById('productManagementModal'); // Tenta mapear se falhou
+    // Implementação mantida como antes...
+     if (!productManagementModal) {
+         productManagementModal = document.getElementById('productManagementModal');
          if (!productManagementModal) {
              alert("Módulo de Gestão de Produtos em desenvolvimento.");
              return;
          }
     }
-
-    const products = getProducts();
+    // Adiciona lógica para buscar produtos e renderizar HTML aqui...
+    const products = getProducts(); // Exemplo
     let listHtml = products.map(p => `
         <div class="flex justify-between items-center py-2 border-b border-gray-600">
             <div class="flex flex-col">
@@ -37,7 +39,7 @@ const renderProductManagement = () => {
         </div>
     `).join('');
 
-    productManagementModal.innerHTML = `
+     productManagementModal.innerHTML = `
         <div class="bg-dark-card border border-gray-600 p-6 rounded-xl shadow-2xl w-full max-w-xl max-h-screen overflow-y-auto">
             <h3 class="text-xl font-bold mb-4 text-pumpkin">Gestão de Produtos (WooCommerce)</h3>
             <div class="flex justify-between mb-4">
@@ -48,33 +50,40 @@ const renderProductManagement = () => {
                     Fechar
                  </button>
             </div>
-            <div class="border border-gray-600 p-3 rounded-lg max-h-96 overflow-y-auto bg-dark-bg">
+            <div class="border border-gray-600 p-3 rounded-lg max-h-96 overflow-y-auto bg-dark-bg custom-scrollbar">
                 ${listHtml || '<p class="text-dark-placeholder italic">Nenhum produto carregado.</p>'}
             </div>
         </div>
     `;
+    // ... resto da lógica de renderização ...
     productManagementModal.style.display = 'flex';
 };
 
-// Esta função agora é chamada pelo app.js (openManagerAuthModal)
+/**
+ * Função chamada pelo app.js (via openManagerAuthModal) após autenticação.
+ * Direciona a ação para a função correta.
+ * @param {string} action - O nome da ação (vindo do data-action).
+ * @param {*} payload - Dados adicionais (geralmente null aqui).
+ */
 export const handleGerencialAction = (action, payload) => {
-    console.log(`[Manager] Executando ação gerencial: ${action}`);
+    console.log(`[Manager] handleGerencialAction recebida: ${action}`); // DEBUG LOG
+
     switch (action) {
-        // Ações de PaymentController são tratadas no app.js
-        case 'goToManagerPanel':
-             goToScreen('managerScreen');
-             break;
+        // Ações tratadas DIRETAMENTE aqui (ou que abrem modais específicos)
         case 'openProductManagement':
-        case 'openCategoryManagement':
+        case 'openCategoryManagement': // Assumindo que usa o mesmo modal/lógica
             renderProductManagement();
             break;
-
-        // --- CORREÇÃO: Chama a função importada para abrir o modal de usuários ---
-        case 'openWaiterReg': // Mantemos o nome da ação antigo por enquanto
-            openUserManagementModal(); // Chama a função exportada do userManagementController
+        case 'openReportsModal':
+            const modal = document.getElementById('reportsModal');
+            if(modal) modal.style.display = 'flex';
+            else {
+                console.error("[Manager] Modal de relatórios não encontrado.");
+                alert("Modal de relatórios não encontrado.");
+            }
             break;
-        // --- FIM DA CORREÇÃO ---
 
+        // Ações que são apenas placeholders por enquanto
         case 'openInventoryManagement':
             alert("Módulo de ESTOQUE (DEV).");
             break;
@@ -87,63 +96,86 @@ export const handleGerencialAction = (action, payload) => {
         case 'openCustomerCRM':
             alert("Módulo de CRM (DEV).");
             break;
-        // Removido 'openWaiterReg' daqui
         case 'openRecipesManagement':
             alert("Módulo de FICHA TÉCNICA (DEV).");
             break;
         case 'openWooSync':
             alert("Ação de SINCRONIZAÇÃO (DEV).");
             break;
-        // REMOVIDO: 'deleteMass', 'openSelectiveTransfer' (tratados pelo app.js)
+
+        // Ação 'openWaiterReg' é tratada no app.js para chamar openUserManagementModal
+
+        // Ação 'goToManagerPanel' é tratada no app.js chamando goToScreen
+
         default:
+             console.warn(`[Manager] Ação Gerencial não reconhecida explicitamente: ${action}.`);
              alert(`Ação Gerencial não reconhecida: ${action}.`);
     }
 };
 
 // --- INICIALIZAÇÃO DO CONTROLLER ---
 export const initManagerController = () => {
-    if(managerInitialized) return;
+    // Previne reinicialização
+    if (managerInitialized) {
+        console.log("[ManagerController] Já inicializado.");
+        return;
+    }
     console.log("[ManagerController] Inicializando...");
 
-    productManagementModal = document.getElementById('productManagementModal');
-    const managerCards = document.querySelectorAll('#managerScreen .manager-card');
+    // Mapeia elementos específicos desta tela/módulo
+    productManagementModal = document.getElementById('productManagementModal'); // Para a função renderProductManagement
+    const managerScreen = document.getElementById('managerScreen'); // Seleciona a tela
+    if (!managerScreen) {
+        console.error("[ManagerController] Erro Fatal: Elemento #managerScreen não encontrado.");
+        return;
+    }
+    const managerCards = managerScreen.querySelectorAll('.manager-card'); // Seleciona os cards DENTRO da tela
+    console.log(`[ManagerController] Encontrados ${managerCards.length} cards gerenciais.`);
 
-    managerCards.forEach(card => {
-        const onclickAttr = card.getAttribute('onclick');
-        if (onclickAttr) {
-            card.removeAttribute('onclick'); // Remove onclick inline
+    // --- LÓGICA DE ANEXAÇÃO DE LISTENERS (REVISADA) ---
+    managerCards.forEach((card, index) => {
+        // 1. Limpa qualquer listener antigo clonando o nó (garantia extra)
+        const newCard = card.cloneNode(true);
+        card.parentNode.replaceChild(newCard, card);
 
-            const matchAuth = onclickAttr.match(/openManagerAuthModal\('([^']+)'/);
-            const matchReports = onclickAttr.includes("document.getElementById('reportsModal')");
+        // 2. Pega a ação do atributo data-action
+        const action = newCard.dataset.action;
+        console.log(`[ManagerController] Card ${index}: Configurando para data-action = ${action}`);
 
-            if (matchAuth && matchAuth[1]) {
-                const action = matchAuth[1];
+        if (action) {
+            // 3. Adiciona o listener de clique ao *novo* nó clonado
+            newCard.addEventListener('click', () => {
+                // LOG DENTRO DO LISTENER para confirmar que o clique dispara
+                console.log(`[ManagerController] Card clicado! Ação detectada: ${action}`);
                 const payload = null; // Payload não usado para essas ações por enquanto
-                card.addEventListener('click', () => {
-                    // Chama a função GLOBAL do app.js
-                    window.openManagerAuthModal(action, payload);
-                });
-            } else if (matchReports) {
-                 card.addEventListener('click', () => {
-                     const modal = document.getElementById('reportsModal');
-                     if(modal) modal.style.display = 'flex';
-                     else alert("Modal de relatórios não encontrado.");
-                 });
-            } else {
-                 console.warn("Não foi possível parsear onclick para card:", card.outerHTML);
-                 card.addEventListener('click', () => {
-                    try { eval(onclickAttr); } catch(e) { console.error("Erro ao executar onclick antigo:", e); }
-                 });
-            }
+
+                // Chama a função global openManagerAuthModal (definida no app.js)
+                // passando a ação lida do data-action.
+                // Exceto para o modal de relatórios que não precisa de senha.
+                if (action === 'openReportsModal') {
+                    handleGerencialAction(action, payload); // Chama a lógica direta
+                } else {
+                    window.openManagerAuthModal(action, payload); // Chama o modal de senha
+                }
+            });
+            console.log(`[ManagerController] Listener adicionado com sucesso para ação: ${action}`);
+        } else {
+             console.warn(`[ManagerController] Card ${index} encontrado sem data-action:`, newCard.outerHTML);
         }
     });
+    // --- FIM DA LÓGICA DE ANEXAÇÃO ---
 
+    // Listener para o botão de voltar
     const backBtn = document.getElementById('backToPanelFromManagerBtn');
     if (backBtn) {
-        backBtn.removeAttribute('onclick');
-        backBtn.addEventListener('click', () => window.goToScreen('panelScreen'));
+        // Limpa listener antigo (se houver) e adiciona o novo
+        const newBackBtn = backBtn.cloneNode(true);
+        backBtn.parentNode.replaceChild(newBackBtn, backBtn);
+        newBackBtn.addEventListener('click', () => window.goToScreen('panelScreen'));
+    } else {
+        console.warn("[ManagerController] Botão 'backToPanelFromManagerBtn' não encontrado.");
     }
 
-    managerInitialized = true;
-    console.log("[ManagerController] Inicializado.");
+    managerInitialized = true; // Marca como inicializado
+    console.log("[ManagerController] Inicializado com sucesso.");
 };
