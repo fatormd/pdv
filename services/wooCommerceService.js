@@ -14,9 +14,7 @@ import { httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebas
 //               NOVA FUNÇÃO PROXY
 // ==================================================================
 
-// Inicializa a referência para a Cloud Function que criamos
-// O nome 'proxyWooCommerce' DEVE ser idêntico ao 'exports.proxyWooCommerce' no seu functions/index.js
-const callWooApi = httpsCallable(functions, 'proxyWooCommerce');
+// REMOVIDO: const callWooApi = httpsCallable(functions, 'proxyWooCommerce');
 
 /**
  * Helper genérico para chamar a Cloud Function.
@@ -24,6 +22,10 @@ const callWooApi = httpsCallable(functions, 'proxyWooCommerce');
  */
 const callWooProxy = async (data) => {
     try {
+        // ATUALIZADO: Inicializa a referência para a Cloud Function AQUI DENTRO
+        // O nome 'proxyWooCommerce' DEVE ser idêntico ao 'exports.proxyWooCommerce' no seu functions/index.js
+        const callWooApi = httpsCallable(functions, 'proxyWooCommerce');
+
         console.log(`[WooProxy] Chamando função com:`, data);
         const result = await callWooApi(data);
         // A Cloud Function retorna um objeto { data: ... }
@@ -95,7 +97,7 @@ export const createWooCommerceOrder = async (orderSnapshot) => {
         set_paid: true,
         status: "completed",
         // Correção: Usar o total PAGO, não necessariamente o total da conta (caso haja troco ou erro)
-        total: totalPaid.toFixed(2).toString(), 
+        total: totalPaid.toFixed(2).toString(),
         line_items: line_items,
         ...customerData,
         customer_note: `Pedido do PDV - Mesa ${orderSnapshot.tableNumber || 'N/A'}.`
@@ -117,7 +119,7 @@ export const createWooCommerceOrder = async (orderSnapshot) => {
     } catch (error) {
         console.error("[Woo] Falha ao criar pedido (via proxy):", error.message);
         // Propaga o erro para o paymentController tratar
-        throw new Error(`Falha no WooCommerce (via proxy): ${error.message}`); 
+        throw new Error(`Falha no WooCommerce (via proxy): ${error.message}`);
     }
 };
 
