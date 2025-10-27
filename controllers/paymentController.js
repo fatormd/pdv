@@ -1,5 +1,5 @@
 // --- CONTROLLERS/PAYMENTCONTROLLER.JS (Painel 3) ---
-import { currentTableId, currentOrderSnapshot } from "/app.js";
+import { currentTableId, currentOrderSnapshot, userId } from "/app.js"; // Importa userId
 import { formatCurrency, calculateItemsValue, getNumericValueFromCurrency } from "/utils.js";
 import { getTableDocRef, getCustomersCollectionRef, db } from "/services/firebaseService.js";
 import {
@@ -28,13 +28,11 @@ let decreaseDinersBtn, increaseDinersBtn;
 let isMassSelectionActive = false;
 let paymentInitialized = false;
 
+// Constante de métodos de pagamento
 const PAYMENT_METHODS = ['Dinheiro', 'Pix', 'Crédito', 'Débito', 'Ticket', 'Voucher'];
 
 
 // --- FUNÇÕES DE CÁLCULO E UTILIDADE ---
-// ==============================================
-//           INÍCIO DA CORREÇÃO
-// ==============================================
 const calculateTotal = (subtotal, applyServiceTax) => {
     const serviceTax = applyServiceTax ? subtotal * 0.10 : 0;
     return subtotal + serviceTax;
@@ -43,16 +41,158 @@ const updateText = (id, value) => {
     const el = document.getElementById(id);
     if (el) el.textContent = value;
 };
+
+// ==============================================
+//           INÍCIO DA CORREÇÃO
+// ==============================================
+
+// --- FUNÇÕES DE AÇÃO (PAGAMENTO) ---
+
+// Esta função é chamada pelo auth modal (app.js) após a senha ser validada
+export const executeDeletePayment = async (timestamp) => {
+    if (!currentTableId || !timestamp) return;
+
+    const tableRef = getTableDocRef(currentTableId);
+    // Encontra o pagamento exato no snapshot atual para usar no arrayRemove
+    const paymentToDelete = currentOrderSnapshot?.payments.find(p => p.timestamp === timestamp);
+
+    if (!paymentToDelete) {
+        alert("Erro: Pagamento não encontrado para excluir.");
+        return;
+    }
+
+    try {
+        await updateDoc(tableRef, {
+            payments: arrayRemove(paymentToDelete)
+        });
+        alert("Pagamento removido com sucesso.");
+        // O listener onSnapshot vai atualizar a UI
+    } catch (e) {
+        console.error("Erro ao remover pagamento:", e);
+        alert("Falha ao remover pagamento.");
+    }
+};
+
+// Esta função é chamada pelo 'onclick' do botão de lixeira
+export const deletePayment = async (timestamp) => {
+    // Chama o modal de autenticação ANTES de executar a exclusão
+    window.openManagerAuthModal('deletePayment', timestamp);
+};
+
+// Validador interno para habilitar/desabilitar o botão de adicionar
+const _validatePaymentInputs = () => {
+    if (!addPaymentBtn) return;
+
+    const selectedMethod = paymentMethodButtonsContainer?.querySelector('.active');
+    const numericValue = getNumericValueFromCurrency(paymentValueInput?.value || '0');
+
+    const isValid = selectedMethod && numericValue > 0;
+    addPaymentBtn.disabled = !isValid;
+};
+
+// --- FUNÇÕES DE RENDERIZAÇÃO (PAGAMENTO) ---
+
+// Renderiza a lista de pagamentos já efetuados
+const renderRegisteredPayments = (payments) => {
+    if (!paymentSummaryList) return;
+
+    if (!payments || payments.length === 0) {
+        paymentSummaryList.innerHTML = `<p class="text-sm text-dark-placeholder italic p-1">Nenhum pagamento registrado.</p>`;
+        return;
+    }
+
+    paymentSummaryList.innerHTML = payments.map(p => `
+        <div class="flex justify-between items-center py-2 border-b border-dark-border last:border-b-0">
+            <div class="flex items-center space-x-2">
+                <i class="fas ${p.method === 'Dinheiro' ? 'fa-money-bill-wave' : p.method === 'Pix' ? 'fa-qrcode' : 'fa-credit-card'} text-green-400"></i>
+                <span class="font-semibold text-dark-text">${p.method}</span>
+            </div>
+            <div class="flex items-center space-x-3">
+                <span class="font-bold text-lg text-dark-text">${p.value}</span>
+                <button class="p-2 text-red-500 hover:text-red-400 transition" 
+                        title="Excluir Pagamento"
+                        onclick="window.deletePayment(${p.timestamp})">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+            </div>
+        </div>
+    `).join('');
+};
+
+// Renderiza os botões de método de pagamento
+const renderPaymentMethodButtons = () => {
+    if (!paymentMethodButtonsContainer) return;
+    
+    paymentMethodButtonsContainer.innerHTML = PAYMENT_METHODS.map(method => `
+        <button class="payment-method-btn" data-method="${method}">
+            ${method}
+        </button>
+    `).join('');
+};
 // ==============================================
 //           FIM DA CORREÇÃO
 // ==============================================
 
-// --- FUNÇÕES DE AÇÃO ---
-export const executeDeletePayment = async (timestamp) => { /* ... (mantida) ... */ };
-export const deletePayment = async (timestamp) => { /* ... (mantida) ... */ };
+// Renderiza o Resumo da Conta (Subtotal, Taxa, Total, etc.)
+export const renderPaymentSummary = (tableId, orderSnapshot) => {
+    if (!paymentInitialized) return; 
+    if (!orderSnapshot) return; 
 
-// --- FUNÇÕES DE RENDERIZAÇÃO ---
-const renderReviewItemsList = (orderSnapshot) => { /* ... (mantida da versão anterior, que desenha a lista) ... */
+    const payments = orderSnapshot.payments || [];
+    const sentItems = orderSnapshot.sentItems || [];
+    
+    const subtotal = calculateItemsValue(sentItems);
+    const applyServiceTax = orderSnapshot.serviceTaxApplied ?? true;
+    const serviceTax = applyServiceTax ? subtotal * 0.10 : 0;
+    const totalPrincipalAccount = subtotal + serviceTax;
+    const totalPaidPrincipal = payments.reduce((sum, p) => sum + getNumericValueFromCurrency(p.value), 0);
+    const remainingBalancePrincipal = totalPrincipalAccount - totalPaidPrincipal;
+    const diners = parseInt(dinersSplitInput?.value) || 1; 
+    const valuePerDiner = totalPrincipalAccount / diners;
+
+    updateText('orderSubtotalDisplayPayment', formatCurrency(subtotal));
+    updateText('orderServiceTaxDisplayPayment', formatCurrency(serviceTax));
+    updateText('orderTotalDisplayPayment', formatCurrency(totalPrincipalAccount));
+    updateText('valuePerDinerDisplay', formatCurrency(valuePerDiner));
+    updateText('remainingBalanceDisplay', formatCurrency(remainingBalancePrincipal > 0 ? remainingBalancePrincipal : 0));
+
+    if (toggleServiceTaxBtn) {
+        toggleServiceTaxBtn.textContent = applyServiceTax ? 'Remover' : 'Aplicar';
+        toggleServiceTaxBtn.classList.toggle('bg-red-600', applyServiceTax);
+        toggleServiceTaxBtn.classList.toggle('bg-green-600', !applyServiceTax);
+        toggleServiceTaxBtn.disabled = false;
+        toggleServiceTaxBtn.style.opacity = '1';
+    }
+    
+    if (finalizeOrderBtn) {
+        const canFinalize = sentItems.length === 0 && remainingBalancePrincipal <= 0.01;
+        finalizeOrderBtn.disabled = !canFinalize;
+        finalizeOrderBtn.classList.toggle('opacity-50', !canFinalize);
+        finalizeOrderBtn.classList.toggle('cursor-not-allowed', !canFinalize);
+    }
+    
+    // ==============================================
+    //           INÍCIO DA CORREÇÃO
+    // ==============================================
+    // Chama as funções de renderização que estavam faltando
+    renderReviewItemsList(orderSnapshot);
+    renderRegisteredPayments(payments); // <-- Renderiza a lista de pagamentos
+    renderPaymentSplits(orderSnapshot); // (Atualmente desativado)
+    // ==============================================
+    //           FIM DA CORREÇÃO
+    // ==============================================
+    
+    if (customerSearchInput && orderSnapshot?.clientName) {
+        customerSearchInput.value = orderSnapshot.clientName;
+        customerSearchInput.disabled = true;
+    } else if (customerSearchInput) {
+        customerSearchInput.value = '';
+        customerSearchInput.disabled = false;
+    }
+};
+
+// Renderiza a lista de itens para revisão (com checkboxes)
+const renderReviewItemsList = (orderSnapshot) => { /* ... (lógica mantida) ... */
     if (!reviewItemsList) return;
     const items = orderSnapshot?.sentItems || [];
     const oldActionBar = document.getElementById('reviewActionBar');
@@ -108,87 +248,6 @@ const renderReviewItemsList = (orderSnapshot) => { /* ... (mantida da versão an
     reviewItemsList.innerHTML = itemsHtml + actionBarHtml;
     attachReviewListListeners();
 };
-const renderRegisteredPayments = (payments) => { /* ... (mantida) ... */ };
-const renderPaymentSplits = (orderSnapshot) => { /* ... (mantida - vazia/comentada) ... */ };
-const renderPaymentMethodButtons = () => { /* ... (mantida) ... */ };
-
-// ==============================================
-//           INÍCIO DA CORREÇÃO
-// ==============================================
-// Esta função é chamada pelo app.js (onSnapshot) e pelos botões +/- de pessoas
-export const renderPaymentSummary = (tableId, orderSnapshot) => {
-    // Garante que os elementos foram inicializados
-    if (!paymentInitialized) return; 
-    
-    // Se não houver snapshot (ex: mesa acabou de fechar), não tenta renderizar
-    if (!orderSnapshot) return; 
-
-    const payments = orderSnapshot.payments || [];
-    const sentItems = orderSnapshot.sentItems || [];
-    
-    // 1. CALCULA SUBTOTAL
-    const subtotal = calculateItemsValue(sentItems);
-    
-    // 2. CALCULA TAXA DE SERVIÇO
-    const applyServiceTax = orderSnapshot.serviceTaxApplied ?? true;
-    const serviceTax = applyServiceTax ? subtotal * 0.10 : 0;
-    
-    // 3. CALCULA TOTAL GERAL
-    const totalPrincipalAccount = subtotal + serviceTax;
-    
-    // 4. CALCULA TOTAL PAGO
-    const totalPaidPrincipal = payments.reduce((sum, p) => sum + getNumericValueFromCurrency(p.value), 0);
-    
-    // 5. CALCULA RESTANTE
-    const remainingBalancePrincipal = totalPrincipalAccount - totalPaidPrincipal;
-    
-    // 6. CALCULA VALOR POR PESSOA
-    // Pega o valor do input, que é controlado pelos botões +/-
-    const diners = parseInt(dinersSplitInput?.value) || 1; 
-    const valuePerDiner = totalPrincipalAccount / diners;
-
-    // 7. ATUALIZA A TELA (Usando a função updateText implementada)
-    updateText('orderSubtotalDisplayPayment', formatCurrency(subtotal));
-    updateText('orderServiceTaxDisplayPayment', formatCurrency(serviceTax));
-    updateText('orderTotalDisplayPayment', formatCurrency(totalPrincipalAccount));
-    updateText('valuePerDinerDisplay', formatCurrency(valuePerDiner));
-    updateText('remainingBalanceDisplay', formatCurrency(remainingBalancePrincipal > 0 ? remainingBalancePrincipal : 0));
-
-    // Atualiza o estado do botão de taxa
-    if (toggleServiceTaxBtn) {
-        toggleServiceTaxBtn.textContent = applyServiceTax ? 'Remover' : 'Aplicar';
-        toggleServiceTaxBtn.classList.toggle('bg-red-600', applyServiceTax);
-        toggleServiceTaxBtn.classList.toggle('bg-green-600', !applyServiceTax);
-        toggleServiceTaxBtn.disabled = false;
-        toggleServiceTaxBtn.style.opacity = '1';
-    }
-    
-    // Atualiza o estado do botão de finalizar
-    if (finalizeOrderBtn) {
-        // Só pode finalizar se não tiver itens E o restante for <= 0.01 (margem de segurança float)
-        const canFinalize = sentItems.length === 0 && remainingBalancePrincipal <= 0.01;
-        finalizeOrderBtn.disabled = !canFinalize;
-        finalizeOrderBtn.classList.toggle('opacity-50', !canFinalize);
-        finalizeOrderBtn.classList.toggle('cursor-not-allowed', !canFinalize);
-    }
-    
-    // Renderiza as sub-listas
-    renderReviewItemsList(orderSnapshot);
-    renderRegisteredPayments(payments);
-    renderPaymentSplits(orderSnapshot); // (Atualmente desativado)
-    
-    // Atualiza o campo de cliente
-    if (customerSearchInput && orderSnapshot?.clientName) {
-        customerSearchInput.value = orderSnapshot.clientName;
-        customerSearchInput.disabled = true;
-    } else if (customerSearchInput) {
-        customerSearchInput.value = '';
-        customerSearchInput.disabled = false;
-    }
-};
-// ==============================================
-//           FIM DA CORREÇÃO
-// ==============================================
 
 
 // --- LÓGICAS DE AÇÃO EM MASSA E TRANSFERÊNCIA ---
@@ -196,16 +255,13 @@ export const renderPaymentSummary = (tableId, orderSnapshot) => {
 // ==============================================
 //     FUNÇÃO RESTAURADA: activateItemSelection
 // ==============================================
-// Agora definida aqui e exposta globalmente
 window.activateItemSelection = (mode = null) => {
     const allCheckboxes = document.querySelectorAll('#reviewItemsList input[type="checkbox"].item-select-checkbox');
     const selectAllBox = document.getElementById('selectAllItems');
     const deleteBtn = document.getElementById('massDeleteBtn');
     const transferBtn = document.getElementById('massTransferBtn');
 
-    // Verifica se os elementos da barra de ação existem
     if (!deleteBtn || !transferBtn || !selectAllBox) {
-        // console.warn("Barra de ação não encontrada para ativar seleção.");
         return;
     }
 
@@ -218,46 +274,41 @@ window.activateItemSelection = (mode = null) => {
 
     isMassSelectionActive = count > 0;
 
-    // Atualiza contadores
     const deleteCountSpan = document.getElementById('deleteCount');
     const transferCountSpan = document.getElementById('transferCount');
     if (deleteCountSpan) deleteCountSpan.textContent = count;
     if (transferCountSpan) transferCountSpan.textContent = count;
 
-    // Habilita/Desabilita botões de ação em massa
     [deleteBtn, transferBtn].forEach(btn => {
         btn.disabled = !isMassSelectionActive;
         btn.classList.toggle('opacity-50', !isMassSelectionActive);
         btn.classList.toggle('cursor-not-allowed', !isMassSelectionActive);
     });
 
-    // Atualiza "Selecionar Todos"
     if (count === allCheckboxes.length && allCheckboxes.length > 0) {
         selectAllBox.checked = true;
     } else {
         selectAllBox.checked = false;
     }
 
-    // Coleta itens para transferência/exclusão
-    window.itemsToTransfer = []; // Reinicia a lista global
+    window.itemsToTransfer = []; 
     selectedCheckboxes.forEach(box => {
         try {
             const items = JSON.parse(box.dataset.items);
-            window.itemsToTransfer.push(...items); // Adiciona os itens originais do checkbox selecionado
+            window.itemsToTransfer.push(...items); 
         } catch(e) { console.error("Erro ao ler dados de item para seleção:", e); }
     });
-     console.log("Itens selecionados para ação:", window.itemsToTransfer); // Debug
+     console.log("Itens selecionados para ação:", window.itemsToTransfer);
 };
 // ==============================================
 //           FIM DA FUNÇÃO RESTAURADA
 // ==============================================
 
 export const handleMassActionRequest = (action) => {
-    if (!window.itemsToTransfer || window.itemsToTransfer.length === 0) { // Usa a variável global
+    if (!window.itemsToTransfer || window.itemsToTransfer.length === 0) { 
         alert("Nenhum item selecionado.");
         return;
     }
-    // Chama a função GLOBAL do app.js
     if (action === 'delete') {
         window.openManagerAuthModal('executeMassDelete', null);
     } else if (action === 'transfer') {
@@ -278,7 +329,6 @@ export const handleMassDeleteConfirmed = async () => {
     const tableRef = getTableDocRef(currentTableId);
     const currentSentItems = currentOrderSnapshot?.sentItems || [];
 
-    // Verifica se TODOS os itens da conta serão excluídos
     const allItemsWillBeDeleted = currentSentItems.length === itemsToDelete.length && currentSentItems.every(sentItem => itemsToDelete.some(deleteItem => JSON.stringify(sentItem) === JSON.stringify(deleteItem)));
 
     let closeTableConfirmed = false;
@@ -286,10 +336,9 @@ export const handleMassDeleteConfirmed = async () => {
         closeTableConfirmed = confirm("Todos os itens serão removidos desta mesa. Deseja FECHAR a mesa após a exclusão?");
     }
 
-    // Calcula o valor a ser removido do total
     const valueToDecrease = itemsToDelete.reduce((sum, item) => sum + (item.price || 0), 0);
     const currentTotal = currentOrderSnapshot?.total || 0;
-    const newTotal = Math.max(0, currentTotal - valueToDecrease); // Evita total negativo
+    const newTotal = Math.max(0, currentTotal - valueToDecrease); 
 
     try {
         const batch = writeBatch(getFirestore());
@@ -300,7 +349,6 @@ export const handleMassDeleteConfirmed = async () => {
 
         batch.update(tableRef, { total: newTotal });
 
-        // Adiciona a atualização de status se confirmado
         if (closeTableConfirmed) {
             batch.update(tableRef, { status: 'closed' });
             console.log("[Payment] Mesa será fechada após exclusão de todos os itens.");
@@ -309,13 +357,11 @@ export const handleMassDeleteConfirmed = async () => {
         await batch.commit();
 
         alert(`${itemsToDelete.length} item(s) removidos da conta.${closeTableConfirmed ? ' A mesa foi fechada.' : ''}`);
-        window.itemsToTransfer = []; // Limpa seleção global
+        window.itemsToTransfer = []; 
 
-        // Se a mesa foi fechada, navega de volta ao painel
         if (closeTableConfirmed && window.goToScreen) {
             window.goToScreen('panelScreen');
         }
-        // Se não, o listener do app.js vai atualizar a UI da mesa atual
 
     } catch (e) {
         console.error("Erro ao excluir itens em massa:", e);
@@ -333,7 +379,6 @@ export function openTableTransferModal() {
         return;
     }
 
-    // Reseta o estado do modal para uma nova transferência
     const targetInput = document.getElementById('targetTableInput');
     const newTableDinersDiv = document.getElementById('newTableDinersInput');
     const newTableDinersInput = document.getElementById('newTableDiners');
@@ -342,19 +387,17 @@ export function openTableTransferModal() {
     const confirmBtn = document.getElementById('confirmTableTransferBtn');
 
     if (targetInput) targetInput.value = '';
-    if (newTableDinersDiv) newTableDinersDiv.style.display = 'none'; // Esconde campos de nova mesa
+    if (newTableDinersDiv) newTableDinersDiv.style.display = 'none'; 
     if (newTableDinersInput) newTableDinersInput.value = '1';
     if (newTableSectorInput) newTableSectorInput.value = '';
     if (statusDiv) {
         statusDiv.style.display = 'none';
         statusDiv.textContent = '';
     }
-    // Desabilita o botão de confirmação até que uma mesa de destino seja validada
     if (confirmBtn) confirmBtn.disabled = true; 
 
-    // Exibe o modal
     tableTransferModal.style.display = 'flex';
-    if (targetInput) targetInput.focus(); // Foca no input da mesa de destino
+    if (targetInput) targetInput.focus(); 
 };
 
 export function handleConfirmTableTransfer() {
@@ -371,7 +414,6 @@ export function handleConfirmTableTransfer() {
     let newDiners = 0;
     let newSector = '';
 
-    // Se a div de nova mesa estiver visível, os dados são obrigatórios
     if (newTableDinersDiv && newTableDinersDiv.style.display !== 'none') {
         newDiners = parseInt(newDinersInput?.value) || 0;
         newSector = newSectorInput?.value || '';
@@ -381,10 +423,8 @@ export function handleConfirmTableTransfer() {
         }
     }
 
-    // Chama a função global do app.js que executa a transferência
     window.handleTableTransferConfirmed(currentTableId, targetTableId, window.itemsToTransfer, newDiners, newSector);
 
-    // Fecha o modal
     if (tableTransferModal) tableTransferModal.style.display = 'none';
 };
 
@@ -413,12 +453,12 @@ const attachReviewListListeners = () => { // Anexa listeners aos botões da barr
     if (massDeleteBtn) {
          const newDeleteBtn = massDeleteBtn.cloneNode(true);
          massDeleteBtn.parentNode.replaceChild(newDeleteBtn, massDeleteBtn);
-         newDeleteBtn.addEventListener('click', () => handleMassActionRequest('delete')); // Chama a função local que chama o modal global
+         newDeleteBtn.addEventListener('click', () => handleMassActionRequest('delete')); 
     }
      if (massTransferBtn) {
          const newTransferBtn = massTransferBtn.cloneNode(true);
          massTransferBtn.parentNode.replaceChild(newTransferBtn, massTransferBtn);
-         newTransferBtn.addEventListener('click', () => handleMassActionRequest('transfer')); // Chama a função local que chama o modal global
+         newTransferBtn.addEventListener('click', () => handleMassActionRequest('transfer')); 
     }
 };
 
@@ -426,7 +466,7 @@ export const initPaymentController = () => {
     if(paymentInitialized) return;
     console.log("[PaymentController] Inicializando...");
 
-    // Mapeia Elementos Principais e Modais (tudo mantido como antes)
+    // Mapeia Elementos Principais e Modais
     reviewItemsList = document.getElementById('reviewItemsList');
     paymentSplitsContainer = document.getElementById('paymentSplitsContainer');
     addSplitAccountBtn = document.getElementById('addSplitAccountBtn');
@@ -473,62 +513,132 @@ export const initPaymentController = () => {
     if(selectiveTransferModal) { /* ... (mapeamento mantido) ... */ }
     if (!reviewItemsList) { console.error("[PaymentController] Erro Fatal: 'reviewItemsList' não encontrado."); return; }
 
-    renderPaymentMethodButtons();
-
     // ==============================================
     //           INÍCIO DA CORREÇÃO
     // ==============================================
-    
-    // Listener do Botão de Taxa de Serviço
+    // Chama a função que renderiza os botões de pagamento
+    renderPaymentMethodButtons();
+    // ==============================================
+    //           FIM DA CORREÇÃO
+    // ==============================================
+
+    // Adiciona Listeners Essenciais
     if(toggleServiceTaxBtn) toggleServiceTaxBtn.addEventListener('click', async () => {
         if (!currentTableId) return;
         const tableRef = getTableDocRef(currentTableId);
-        // Usa o snapshot global para saber o status atual
         const currentStatus = currentOrderSnapshot?.serviceTaxApplied ?? true;
         try {
-            // Inverte o status no Firebase
             await updateDoc(tableRef, {
                 serviceTaxApplied: !currentStatus
             });
-            // O listener onSnapshot (app.js) vai pegar a mudança e chamar renderPaymentSummary
             console.log(`[Payment] Taxa de serviço alterada para: ${!currentStatus}`);
         } catch (e) {
             console.error("Erro ao atualizar taxa de serviço:", e);
             alert("Falha ao atualizar taxa de serviço.");
         }
     });
-
-    // Listener do Botão - (Menos Pessoas)
     if(decreaseDinersBtn && dinersSplitInput) {
         decreaseDinersBtn.addEventListener('click', () => {
             let currentDiners = parseInt(dinersSplitInput.value) || 1;
-            if (currentDiners > 1) { // Não deixa ser menor que 1
+            if (currentDiners > 1) { 
                 currentDiners--;
                 dinersSplitInput.value = currentDiners;
-                // Re-renderiza o sumário para atualizar o 'Valor por Pessoa'
                 renderPaymentSummary(currentTableId, currentOrderSnapshot);
             }
         });
     }
-
-    // Listener do Botão + (Mais Pessoas)
     if(increaseDinersBtn && dinersSplitInput) {
         increaseDinersBtn.addEventListener('click', () => {
             let currentDiners = parseInt(dinersSplitInput.value) || 1;
             currentDiners++;
             dinersSplitInput.value = currentDiners;
-            // Re-renderiza o sumário para atualizar o 'Valor por Pessoa'
             renderPaymentSummary(currentTableId, currentOrderSnapshot);
         });
     }
     
     // ==============================================
+    //           INÍCIO DA CORREÇÃO
+    // ==============================================
+    
+    // Listener para selecionar o Método de Pagamento
+    if(paymentMethodButtonsContainer) paymentMethodButtonsContainer.addEventListener('click', (e) => {
+        const btn = e.target.closest('.payment-method-btn');
+        if (btn) {
+            // Remove 'active' de todos
+            paymentMethodButtonsContainer.querySelectorAll('.payment-method-btn').forEach(b => b.classList.remove('active'));
+            // Adiciona 'active' ao clicado
+            btn.classList.add('active');
+            
+            // Se for 'Dinheiro', sugere o valor restante (para troco)
+            const remaining = getNumericValueFromCurrency(remainingBalanceDisplay.textContent);
+            if (btn.dataset.method === 'Dinheiro' && remaining > 0) {
+                 // Formata como "50,00" (sem R$) para o input
+                 paymentValueInput.value = remaining.toFixed(2).replace('.', ','); 
+            }
+            
+            _validatePaymentInputs(); // Valida para habilitar o botão de adicionar
+        }
+    });
+
+    // Listener para o Input de Valor
+    if(paymentValueInput) paymentValueInput.addEventListener('input', (e) => {
+        // Formatação de máscara (simples, apenas para números e vírgula)
+        e.target.value = e.target.value.replace(/[^0-9,]/g, '');
+        _validatePaymentInputs(); // Valida para habilitar o botão
+    });
+
+    // Listener para Adicionar Pagamento
+    if(addPaymentBtn) addPaymentBtn.addEventListener('click', async () => {
+        if (!currentTableId) return;
+
+        const selectedMethodBtn = paymentMethodButtonsContainer.querySelector('.payment-method-btn.active');
+        const method = selectedMethodBtn?.dataset.method;
+        const numericValue = getNumericValueFromCurrency(paymentValueInput.value);
+        const remainingBalance = getNumericValueFromCurrency(remainingBalanceDisplay.textContent);
+
+        if (!method || numericValue <= 0) {
+            alert("Selecione um método de pagamento e insira um valor válido.");
+            return;
+        }
+
+        // Se o valor for maior que o restante (com uma pequena margem), pergunta sobre troco
+        if (numericValue > (remainingBalance + 0.01)) { 
+            const formattedValue = formatCurrency(numericValue);
+            const formattedRemaining = formatCurrency(remainingBalance);
+            if (!confirm(`O valor ${formattedValue} é MAIOR que o restante (${formattedRemaining}). Deseja registrar mesmo assim (para troco)?`)) {
+                return;
+            }
+        }
+
+        // Cria o objeto de pagamento
+        const paymentObject = {
+            method: method,
+            value: formatCurrency(numericValue), // Salva formatado
+            timestamp: Date.now(),
+            userId: userId || 'unknown' // Adiciona quem registrou
+        };
+
+        const tableRef = getTableDocRef(currentTableId);
+        try {
+            // Adiciona o pagamento ao array 'payments' no Firebase
+            await updateDoc(tableRef, {
+                payments: arrayUnion(paymentObject)
+            });
+
+            // Limpa os campos após o sucesso
+            paymentValueInput.value = '';
+            selectedMethodBtn.classList.remove('active');
+            _validatePaymentInputs(); // Desabilita o botão
+
+        } catch (e) {
+            console.error("Erro ao adicionar pagamento:", e);
+            alert("Falha ao registrar o pagamento.");
+        }
+    });
+    // ==============================================
     //           FIM DA CORREÇÃO
     // ==============================================
-
-    if(paymentMethodButtonsContainer) paymentMethodButtonsContainer.addEventListener('click', (e) => { /* ... */ });
-    if(paymentValueInput) paymentValueInput.addEventListener('input', (e) => { /* ... */ });
-    if(addPaymentBtn) addPaymentBtn.addEventListener('click', async () => { /* ... */ });
+    
     if(finalizeOrderBtn) finalizeOrderBtn.addEventListener('click', handleFinalizeOrder);
     if(openNfeModalBtn) openNfeModalBtn.addEventListener('click', window.openNfeModal);
     if(addSplitAccountBtn) { addSplitAccountBtn.addEventListener('click', handleAddSplitAccount); }
@@ -543,7 +653,7 @@ export const initPaymentController = () => {
         targetTableInput.addEventListener('input', async () => {
             const targetTableId = targetTableInput.value.trim();
             const newTableDinersDiv = document.getElementById('newTableDinersInput');
-            const confirmBtn = document.getElementById('confirmTableTransferBtn'); // Re-seleciona aqui
+            const confirmBtn = document.getElementById('confirmTableTransferBtn'); 
 
             if (!targetTableId || targetTableId === currentTableId) {
                 if (confirmBtn) confirmBtn.disabled = true;
@@ -552,22 +662,19 @@ export const initPaymentController = () => {
             }
 
             try {
-                // Verifica o status da mesa de destino no Firebase
                 const tableRef = getTableDocRef(targetTableId);
                 const docSnap = await getDoc(tableRef);
 
                 if (docSnap.exists() && docSnap.data().status?.toLowerCase() === 'open') {
-                    // Mesa de destino existe E está aberta
                     if (newTableDinersDiv) newTableDinersDiv.style.display = 'none';
-                    if (confirmBtn) confirmBtn.disabled = false; // Habilita o botão
+                    if (confirmBtn) confirmBtn.disabled = false; 
                 } else {
-                    // Mesa de destino não existe OU está fechada
-                    if (newTableDinersDiv) newTableDinersDiv.style.display = 'block'; // Mostra campos para abrir nova mesa
-                    if (confirmBtn) confirmBtn.disabled = false; // Habilita o botão (para prosseguir e abrir)
+                    if (newTableDinersDiv) newTableDinersDiv.style.display = 'block'; 
+                    if (confirmBtn) confirmBtn.disabled = false; 
                 }
             } catch (e) {
                 console.error("Erro ao verificar mesa de destino:", e);
-                if (confirmBtn) confirmBtn.disabled = true; // Desabilita em caso de erro
+                if (confirmBtn) confirmBtn.disabled = true; 
             }
         });
     }
