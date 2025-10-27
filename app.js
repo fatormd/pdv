@@ -528,71 +528,84 @@ const initStaffApp = async () => {
         // Carrega dados do WooCommerce
         fetchWooCommerceProducts().catch(e => console.error("[INIT ERROR] Falha ao carregar produtos:", e));
         fetchWooCommerceCategories().catch(e => console.error("[INIT ERROR] Falha ao carregar categorias:", e));
+// Cole esta função inteira substituindo a existente no seu app.js
 
-        hideStatus();
-        hideLoginScreen(); // Mostra header/main
-        console.log("[INIT] UI principal visível.");
-
-        // Configura listener das mesas
-        if (globalPanelFunctions.loadOpenTables) globalPanelFunctions.loadOpenTables();
-         else console.error("loadOpenTables não disponível.");
-        console.log("[INIT] Listener de mesas configurado.");
-
-        // Navega para o painel (sem carregar módulo, já foi feito)
-        await goToScreen('panelScreen'); // Usa await se goToScreen for async
-        console.log("[INIT] Navegação inicial para panelScreen.");
-
-    } catch (error) {
-        console.error("[INIT] Erro CRÍTICO durante initStaffApp:", error);
-        alert("Erro grave ao iniciar. Verifique o console.");
-        showLoginScreen();
-    }
-};
-
-const authenticateStaff = (email, password) => { // Lógica mantida
-    const creds = STAFF_CREDENTIALS[email];
-    return (creds && creds.password === password && creds.role !== 'client') ? creds : null;
-};
-
-const handleStaffLogin = async () => { // Lógica mantida
+const handleStaffLogin = async () => {
+    // Garante que os elementos sejam buscados novamente dentro da função
     loginBtn = document.getElementById('loginBtn');
     loginEmailInput = document.getElementById('loginEmail');
-    // ... (resto igual)
-    const staffData = authenticateStaff(email, password);
+    loginPasswordInput = document.getElementById('loginPassword');
+    loginErrorMsg = document.getElementById('loginErrorMsg');
+
+    // Validação inicial dos elementos
+    if (!loginBtn || !loginEmailInput || !loginPasswordInput) {
+        console.error("[LOGIN] Erro Fatal: Elementos do formulário de login não encontrados.");
+        if(loginErrorMsg) {
+            loginErrorMsg.textContent = 'Erro interno: Elementos do formulário não encontrados.';
+            loginErrorMsg.style.display = 'block';
+        }
+        // Habilita o botão se ele existir, para não travar a UI
+        if(loginBtn) loginBtn.disabled = false;
+        return;
+    }
+
+    if (loginErrorMsg) loginErrorMsg.style.display = 'none';
+    loginBtn.disabled = true; loginBtn.textContent = 'Entrando...';
+
+    // Definição correta das variáveis email e password
+    const email = loginEmailInput.value.trim();
+    const password = loginPasswordInput.value.trim();
+
+    console.log(`[LOGIN] Tentando autenticar ${email}...`);
+    const staffData = authenticateStaff(email, password); // Usa email corretamente
+
     if (staffData) {
-        userRole = staffData.role;
+        console.log(`[LOGIN] Autenticação local OK. Role: ${staffData.role}`);
+        userRole = staffData.role; // Define a role ANTES de tentar o login Firebase
         try {
-            // ... (login anônimo Firebase)
-            // ... (atualiza UI com nome)
-            await initStaffApp(); // Chama a função atualizada
-        } catch (error) { /* ... (erro) ... */ }
-    } else { /* ... (erro credenciais) ... */ }
-    // ... (reseta botão)
+            const authInstance = auth;
+            if (!authInstance) throw new Error("Firebase Auth não inicializado.");
+            console.log("[LOGIN] Tentando login anônimo Firebase...");
+            try {
+                // Tenta fazer login anônimo (pode falhar devido ao erro 403)
+                const userCredential = await signInAnonymously(authInstance);
+                userId = userCredential.user.uid;
+                console.log(`[LOGIN] Login Firebase OK. UID: ${userId}`);
+            } catch (authError) {
+                console.warn("[LOGIN] Login anônimo Firebase falhou. Usando Mock ID.", authError);
+                // Define um userId mock se o login anônimo falhar
+                userId = `mock_${userRole}_${Date.now()}`;
+            }
+
+            // Define userName DEPOIS de definir userRole e userId
+            const userName = staffData.name || userRole;
+            // Atualiza o display do usuário
+            const userIdDisplay = document.getElementById('user-id-display');
+            if(userIdDisplay) userIdDisplay.textContent = `Usuário: ${userName} | ${userRole.toUpperCase()}`;
+            console.log("[LOGIN] User info display atualizado.");
+
+            console.log("[LOGIN] Chamando initStaffApp...");
+            await initStaffApp(); // Chama a função que carrega o panelController etc.
+            console.log("[LOGIN] initStaffApp concluído.");
+
+        } catch (error) {
+             console.error("[LOGIN] Erro pós-autenticação local:", error);
+             alert(`Erro ao iniciar sessão: ${error.message}.`);
+             showLoginScreen(); // Volta para o login em caso de erro
+             if(loginErrorMsg) { loginErrorMsg.textContent = `Erro: ${error.message}`; loginErrorMsg.style.display = 'block'; }
+        }
+    } else {
+        console.log(`[LOGIN] Credenciais inválidas para ${email}.`); // Usa email corretamente
+        if(loginErrorMsg) { loginErrorMsg.textContent = 'E-mail ou senha inválidos.'; loginErrorMsg.style.display = 'block'; }
+    }
+
+    // Garante que o botão seja reabilitado, mesmo se houver erro
+    if (loginBtn) {
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Entrar';
+    }
+    console.log("[LOGIN] Fim do handleStaffLogin.");
 };
-
-const handleLogout = () => { // Lógica mantida
-    console.log("[LOGOUT] Iniciando...");
-    // ... (signOut Firebase)
-    userId = null; currentTableId = null; selectedItems.length = 0; userRole = 'anonymous'; currentOrderSnapshot = null;
-    if (unsubscribeTable) { unsubscribeTable(); unsubscribeTable = null; }
-    // Limpa o cache de módulos inicializados para forçar recarga no próximo login
-    initializedModules.clear();
-    globalOrderFunctions = {};
-    globalPaymentFunctions = {};
-    globalManagerFunctions = {};
-    globalUserManagementFunctions = {};
-    globalPanelFunctions = {};
-    showLoginScreen();
-    // ... (reseta display user id)
-    console.log("[LOGOUT] Concluído.");
-};
-window.handleLogout = handleLogout;
-
-
-// --- INICIALIZAÇÃO PRINCIPAL (DOMContentLoaded) ---
-document.addEventListener('DOMContentLoaded', () => {
-    console.log("[INIT] DOMContentLoaded.");
-
     const firebaseConfig = FIREBASE_CONFIG;
 
     try {
