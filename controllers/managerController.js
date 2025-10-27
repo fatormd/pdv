@@ -2,7 +2,8 @@
 import { goToScreen } from "/app.js";
 import { getProducts } from "/services/wooCommerceService.js";
 import { formatCurrency } from "/utils.js";
-// REMOVIDO: Importação do paymentController
+// IMPORTAÇÃO DA NOVA FUNÇÃO DO USER CONTROLLER
+import { openUserManagementModal } from "/controllers/userManagementController.js";
 
 // Estado
 let managerInitialized = false;
@@ -17,15 +18,22 @@ const renderProductManagement = () => {
              return;
          }
     }
-    
+
     const products = getProducts();
     let listHtml = products.map(p => `
         <div class="flex justify-between items-center py-2 border-b border-gray-600">
             <div class="flex flex-col">
                 <span class="font-semibold text-dark-text">${p.name}</span>
-                <span class="text-xs text-dark-placeholder">ID: ${p.id} | Setor: ${p.sector}</span>
+                <span class="text-xs text-dark-placeholder">ID: ${p.id} | Cat: ${p.category}</span>
             </div>
-            {/* ... (botões editar/excluir) ... */}
+             <div class="space-x-2 print-hide">
+                <button class="p-2 text-indigo-400 hover:text-indigo-300 transition" title="Editar Produto">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="p-2 text-red-500 hover:text-red-400 transition" title="Excluir Produto">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+            </div>
         </div>
     `).join('');
 
@@ -60,6 +68,13 @@ export const handleGerencialAction = (action, payload) => {
         case 'openCategoryManagement':
             renderProductManagement();
             break;
+
+        // --- CORREÇÃO: Chama a função importada para abrir o modal de usuários ---
+        case 'openWaiterReg': // Mantemos o nome da ação antigo por enquanto
+            openUserManagementModal(); // Chama a função exportada do userManagementController
+            break;
+        // --- FIM DA CORREÇÃO ---
+
         case 'openInventoryManagement':
             alert("Módulo de ESTOQUE (DEV).");
             break;
@@ -72,9 +87,7 @@ export const handleGerencialAction = (action, payload) => {
         case 'openCustomerCRM':
             alert("Módulo de CRM (DEV).");
             break;
-        case 'openWaiterReg':
-            alert("Módulo de Cadastro de Usuários (DEV).");
-            break;
+        // Removido 'openWaiterReg' daqui
         case 'openRecipesManagement':
             alert("Módulo de FICHA TÉCNICA (DEV).");
             break;
@@ -83,12 +96,9 @@ export const handleGerencialAction = (action, payload) => {
             break;
         // REMOVIDO: 'deleteMass', 'openSelectiveTransfer' (tratados pelo app.js)
         default:
-             alert(`Módulo Gerencial não reconhecido: ${action}.`);
+             alert(`Ação Gerencial não reconhecida: ${action}.`);
     }
 };
-
-// REMOVIDO: export const openManagerAuthModal = (...) => { ... }; (Movido para app.js)
-
 
 // --- INICIALIZAÇÃO DO CONTROLLER ---
 export const initManagerController = () => {
@@ -103,29 +113,24 @@ export const initManagerController = () => {
         if (onclickAttr) {
             card.removeAttribute('onclick'); // Remove onclick inline
 
-            // Tenta extrair a ação do openManagerAuthModal
             const matchAuth = onclickAttr.match(/openManagerAuthModal\('([^']+)'/);
-            // CORREÇÃO: Trata o caso do modal de Relatórios
             const matchReports = onclickAttr.includes("document.getElementById('reportsModal')");
 
             if (matchAuth && matchAuth[1]) {
                 const action = matchAuth[1];
-                const payload = null;
+                const payload = null; // Payload não usado para essas ações por enquanto
                 card.addEventListener('click', () => {
                     // Chama a função GLOBAL do app.js
                     window.openManagerAuthModal(action, payload);
                 });
             } else if (matchReports) {
-                 // Trata o botão de Relatórios especificamente
                  card.addEventListener('click', () => {
                      const modal = document.getElementById('reportsModal');
-                     // (O modal de relatórios também precisa de estilo dark)
                      if(modal) modal.style.display = 'flex';
                      else alert("Modal de relatórios não encontrado.");
                  });
             } else {
                  console.warn("Não foi possível parsear onclick para card:", card.outerHTML);
-                 // Adiciona um listener de fallback
                  card.addEventListener('click', () => {
                     try { eval(onclickAttr); } catch(e) { console.error("Erro ao executar onclick antigo:", e); }
                  });
@@ -133,10 +138,8 @@ export const initManagerController = () => {
         }
     });
 
-    // Mapeia e adiciona listener para o botão de voltar
     const backBtn = document.getElementById('backToPanelFromManagerBtn');
     if (backBtn) {
-        // Remove onclick inline se existir
         backBtn.removeAttribute('onclick');
         backBtn.addEventListener('click', () => window.goToScreen('panelScreen'));
     }
