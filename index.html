@@ -34,12 +34,17 @@
     <style>
         /* Estilos específicos para impressão */
         @media print {
-            body * {
-                visibility: hidden; /* Esconde tudo por padrão */
-            }
-            #paymentSummaryCard, #paymentSummaryCard * {
-                visibility: visible; /* Torna o card de resumo e SEU CONTEÚDO visíveis */
-            }
+            /* * CORREÇÃO: Removemos a regra 'body * { visibility: hidden; }' 
+             * que escondia #mainContent e impedia a impressão.
+             * Agora, confiamos apenas na classe .print-hide 
+             * para esconder o que não deve ser impresso.
+             */
+            
+            /* * CORREÇÃO: Removemos a regra '#paymentSummaryCard, #paymentSummaryCard *'
+             * pois ela não é mais necessária.
+             */
+
+            /* Posiciona o card de resumo para impressão */
             #paymentSummaryCard {
                 position: absolute;
                 left: 0;
@@ -51,6 +56,7 @@
                 background-color: white !important; /* Força fundo branco para impressão */
                 color: black !important; /* Força texto preto */
             }
+            
             /* Força cores de texto específicas dentro do card para contraste na impressão */
             #paymentSummaryCard span, #paymentSummaryCard p, #paymentSummaryCard div, #paymentSummaryCard h2, #paymentSummaryCard label {
                 color: black !important;
@@ -71,11 +77,11 @@
                   border-color: #ccc !important; /* Linhas divisórias mais claras */
              }
 
-            /* Garante que elementos escondidos com print-hide realmente sumam */
+            /* * Garante que elementos escondidos com .print-hide realmente sumam.
+             * Esta é a regra principal agora.
+             */
             .print-hide, 
-            header, #loginScreen, #panelScreen, #orderScreen, #managerScreen, #chargeInputs, 
-            #paymentScreen > div:first-child, 
-            #paymentScreen > div:last-child, 
+            header, /* (redundante se #mainHeader tem a classe, mas seguro) */
             #reviewActionBar {
                 display: none !important;
             }
@@ -84,7 +90,7 @@
 </head>
 <body class="bg-dark-bg min-h-screen text-dark-text"> 
 
-    <div id="statusScreen" class="absolute inset-0 bg-dark-bg z-50 flex items-center justify-center p-6" style="display: flex;">
+    <div id="statusScreen" class="absolute inset-0 bg-dark-bg z-50 flex items-center justify-center p-6 print-hide" style="display: flex;">
         <div class="flex flex-col items-center p-8 max-w-sm w-full text-center">
             <i class="fas fa-spinner fa-spin text-4xl text-pumpkin mb-4"></i>
             <h2 class="text-xl font-bold mb-2 text-dark-text">Iniciando PDV...</h2>
@@ -110,9 +116,9 @@
     </header>
 
     <main id="mainContent" class="relative overflow-hidden" style="display: none;">
-        <div id="appContainer" class="flex transition-transform duration-300 ease-out print-hide" style="width: 500vw;">
+        <div id="appContainer" class="flex transition-transform duration-300 ease-out" style="width: 500vw;">
             
-            <div id="loginScreen" class="w-screen flex-shrink-0 flex items-center justify-center p-4 bg-dark-bg">
+            <div id="loginScreen" class="w-screen flex-shrink-0 flex items-center justify-center p-4 bg-dark-bg print-hide">
                  <div class="content-card bg-dark-card p-8 rounded-xl shadow-2xl w-full max-w-sm text-center">
                     <h3 class="text-2xl font-bold text-pumpkin mb-6">Fator PDV - Staff</h3>
                     <input type="email" id="loginEmail" placeholder="E-mail (Ex: agencia@fatormd.com)" class="input-pdv w-full p-4 mb-4 text-base">
@@ -126,7 +132,7 @@
                 </div>
             </div>
 
-            <div id="panelScreen" class="flex-shrink-0 bg-dark-bg text-dark-text">
+            <div id="panelScreen" class="flex-shrink-0 bg-dark-bg text-dark-text print-hide">
                  <div class="content-card p-4 mb-4">
                     <h2 class="text-xl font-semibold mb-3 text-dark-text">Abrir Nova Mesa</h2>
                     <div class="grid grid-cols-3 gap-3">
@@ -160,7 +166,7 @@
                     </div>
             </div>
 
-            <div id="orderScreen" class="flex-shrink-0 bg-dark-bg text-dark-text">
+            <div id="orderScreen" class="flex-shrink-0 bg-dark-bg text-dark-text print-hide">
                  <div class="flex items-center justify-between mb-4 -mt-4">
                     <div class="flex items-center text-green-400">
                         <span id="order-screen-table-number" class="text-2xl font-semibold mr-3">Pedido</span> 
@@ -301,7 +307,7 @@
                 </div>
             </div>
 
-            <div id="managerScreen" class="flex-shrink-0 bg-gray-900 text-dark-text">
+            <div id="managerScreen" class="flex-shrink-0 bg-gray-900 text-dark-text print-hide">
                  <div class="flex items-center mb-4 -mt-4">
                      <button id="backToPanelFromManagerBtn" class="mr-2 text-3xl p-2 text-dark-placeholder hover:text-dark-text transition" title="Voltar para o Painel">
                         <i class="fas fa-arrow-left"></i>
