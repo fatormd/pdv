@@ -34,62 +34,74 @@
     <style>
         /* Estilos específicos para impressão */
         @media print {
+
+            /* --- INÍCIO DA CORREÇÃO DEFINITIVA --- */
             
-            /* --- INÍCIO DA NOVA CORREÇÃO --- */
-            /* * Reseta o layout do corpo e containers para impressão.
-             * Remove 'overflow: hidden' e alturas fixas dos pais,
-             * que estavam "cortando" o card reposicionado.
-            */
-            body, #mainContent, #appContainer, #paymentScreen {
-                overflow: visible !important; /* Remove todo overflow hidden/auto */
-                height: auto !important;     /* Permite que o conteúdo defina a altura */
-                width: auto !important;      /* Reseta larguras baseadas em viewport */
-                display: block !important;   /* Remove flex que pode atrapalhar */
-                position: static !important; /* Garante que não sejam 'positioned' */
-                min-height: initial !important; /* Reseta min-height */
-            }
-            /* --- FIM DA NOVA CORREÇÃO --- */
-
-
-            /* Posiciona o card de resumo para impressão */
-            #paymentSummaryCard {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 95%; /* Ajusta a largura para caber melhor na página */
-                margin: 10px; /* Adiciona uma pequena margem */
-                border: none;
-                box-shadow: none;
-                background-color: white !important; /* Força fundo branco para impressão */
-                color: black !important; /* Força texto preto */
-            }
-            
-            /* Força cores de texto específicas dentro do card para contraste na impressão */
-            #paymentSummaryCard span, #paymentSummaryCard p, #paymentSummaryCard div, #paymentSummaryCard h2, #paymentSummaryCard label {
-                color: black !important;
-            }
-            #paymentSummaryCard .text-pumpkin { /* Ajusta a cor laranja se necessário */
-                 color: #555 !important; 
-            }
-            #paymentSummaryCard .text-indigo-400 { /* Ajusta a cor índigo se necessário */
-                 color: #333 !important;
-            }
-             #paymentSummaryCard .text-green-400 { /* Ajusta a cor verde se necessário */
-                  color: #444 !important;
-             }
-             #paymentSummaryCard .text-dark-placeholder {
-                  color: #666 !important;
-             }
-             #paymentSummaryCard .border-dark-border, #paymentSummaryCard .border-b {
-                  border-color: #ccc !important; /* Linhas divisórias mais claras */
-             }
-
-            /* Garante que elementos escondidos com .print-hide realmente sumam. */
+            /* 1. Esconde tudo que tem a classe .print-hide */
             .print-hide, 
             header,
             #reviewActionBar {
                 display: none !important;
             }
+
+            /* 2. Força TODOS os ancestrais do card a se comportarem
+                  como blocos estáticos simples, removendo qualquer
+                  layout, transformação ou corte. */
+            body, #mainContent, #appContainer, #paymentScreen {
+                display: block !important;     /* Reseta flex */
+                overflow: visible !important;  /* CRÍTICO: Reseta overflow: hidden e overflow-x: hidden */
+                overflow-x: visible !important;
+                overflow-y: visible !important;
+                height: auto !important;       /* CRÍTICO: Reseta height: 100% e 100vh */
+                width: auto !important;        /* CRÍTICO: Reseta width: 100vw e 400vw */
+                min-height: initial !important;
+                position: static !important;   /* CRÍTICO: Reseta position: relative */
+                transform: none !important;    /* CRÍTICO: Reseta transform: translateX(...) */
+                background: none !important;   /* Limpa o fundo dark */
+                color: black !important;       /* Garante texto preto base */
+                padding: 0 !important;
+                margin: 0 !important;
+                /* Reseta a transição que pode bugar a impressão */
+                transition: none !important; 
+            }
+            /* --- FIM DA CORREÇÃO DEFINITIVA --- */
+
+
+            /* 3. Posiciona o card de resumo para impressão */
+            #paymentSummaryCard {
+                position: absolute;
+                left: 10px; /* Margem da página */
+                top: 10px;  /* Margem da página */
+                width: 95%; /* Ocupa a largura da página */
+                margin: 0;
+                padding: 1rem; /* Restaura o padding interno do card */
+                border: 1px solid #ccc !important; /* Borda simples para impressão */
+                box-shadow: none !important;
+                background-color: white !important;
+                color: black !important;
+                display: block !important; /* Garante que esteja visível */
+                visibility: visible !important;
+            }
+            
+            /* 4. Força cores de texto específicas dentro do card */
+            #paymentSummaryCard span, #paymentSummaryCard p, #paymentSummaryCard div, #paymentSummaryCard h2, #paymentSummaryCard label {
+                color: black !important;
+            }
+            #paymentSummaryCard .text-pumpkin {
+                 color: #333 !important; 
+            }
+            #paymentSummaryCard .text-indigo-400 {
+                 color: #333 !important;
+            }
+             #paymentSummaryCard .text-green-400 {
+                  color: #333 !important;
+             }
+             #paymentSummaryCard .text-dark-placeholder {
+                  color: #555 !important;
+             }
+             #paymentSummaryCard .border-dark-border, #paymentSummaryCard .border-b {
+                  border-color: #ccc !important;
+             }
         }
     </style>
 </head>
