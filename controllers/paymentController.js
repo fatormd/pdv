@@ -67,6 +67,12 @@ function inputDigit(digit) {
         calculatorState.displayValue = digit;
         calculatorState.waitingForSecondOperand = false;
     } else {
+        // CORREÇÃO: Impede que o usuário digite mais de 2 casas decimais
+        if (displayValue.includes('.')) {
+            const parts = displayValue.split('.');
+            if (parts[1].length >= 2) return;
+        }
+
         calculatorState.displayValue = displayValue === '0' ? digit : displayValue + digit;
     }
 }
@@ -108,7 +114,8 @@ const performCalculation = {
     '*': (first, second) => first * second,
     '+': (first, second) => first + second,
     '-': (first, second) => first - second,
-    '%': (first, second) => first * (second / 100),
+    // Ajustado para funcionar como cálculo de porcentagem (ex: 100 * 10%)
+    '%': (first, second) => first * (second / 100), 
     '=': (first, second) => second,
 };
 
@@ -134,11 +141,30 @@ function backspace() {
 export const executeDeletePayment = async (timestamp) => {
     if (!currentTableId || !timestamp) return;
     const tableRef = getTableDocRef(currentTableId);
-    const paymentToDelete = currentOrderSnapshot?.payments.find(p => p.timestamp === timestamp);
+    // Encontra o pagamento a ser removido (o timestamp é o ID)
+    const paymentToDelete = currentOrderSnapshot?.payments.find(p => p.timestamp == timestamp); 
+    
     if (!paymentToDelete) {
-        alert("Erro: Pagamento não encontrado para excluir.");
+        // Fallback: Tenta remover via arrayRemove, que exige um objeto idêntico
+        const paymentsArray = currentOrderSnapshot?.payments || [];
+        const paymentIndex = paymentsArray.findIndex(p => p.timestamp == timestamp);
+        if (paymentIndex === -1) {
+            alert("Erro: Pagamento não encontrado para exclusão.");
+            return;
+        }
+        const paymentToRemove = paymentsArray[paymentIndex];
+
+        try {
+            // Tenta remover o objeto idêntico (incluindo o timestamp)
+            await updateDoc(tableRef, { payments: arrayRemove(paymentToRemove) });
+            alert("Pagamento removido com sucesso (via arrayRemove).");
+        } catch (e) {
+             console.error("Erro ao remover pagamento:", e);
+             alert("Falha ao remover pagamento. Tente recarregar a mesa.");
+        }
         return;
     }
+    
     try {
         await updateDoc(tableRef, { payments: arrayRemove(paymentToDelete) });
         alert("Pagamento removido com sucesso.");
@@ -147,14 +173,19 @@ export const executeDeletePayment = async (timestamp) => {
         alert("Falha ao remover pagamento.");
     }
 };
+
 export const deletePayment = async (timestamp) => {
-    window.openManagerAuthModal('deletePayment', timestamp);
+    // CORREÇÃO: A função global já está definida no app.js, 
+    // mas mantemos o wrapper aqui para garantir que o onclick funcione
+    window.openManagerAuthModal('deletePayment', timestamp); 
 };
 window.deletePayment = deletePayment; // Expor globalmente
+
 const _validatePaymentInputs = () => {
     if (!addPaymentBtn) return;
     const selectedMethod = paymentMethodButtonsContainer?.querySelector('.active');
-    const numericValue = getNumericValueFromCurrency(paymentValueInput?.value || '0');
+    // CORREÇÃO: Pega o valor do input (que pode ter vírgula) e converte para número
+    const numericValue = getNumericValueFromCurrency(paymentValueInput?.value || '0'); 
     const isValid = selectedMethod && numericValue > 0;
     addPaymentBtn.disabled = !isValid;
     addPaymentBtn.classList.toggle('opacity-50', !isValid);
@@ -168,7 +199,9 @@ const renderRegisteredPayments = (payments) => {
         paymentSummaryList.innerHTML = `<p class="text-sm text-dark-placeholder italic p-1">Nenhum pagamento registrado.</p>`;
         return;
     }
-    paymentSummaryList.innerHTML = payments.map(p => `
+    paymentSummaryList.innerHTML = payments.map(p => {
+        // CORREÇÃO: Adiciona 'p.timestamp' ao onclick para que a remoção funcione corretamente
+        return `
         <div class="flex justify-between items-center py-2 border-b border-dark-border last:border-b-0">
             <div class="flex items-center space-x-2">
                 <i class="fas ${p.method === 'Dinheiro' ? 'fa-money-bill-wave' : p.method === 'Pix' ? 'fa-qrcode' : 'fa-credit-card'} text-green-400"></i>
@@ -183,7 +216,8 @@ const renderRegisteredPayments = (payments) => {
                 </button>
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
 };
 
 const renderPaymentMethodButtons = () => {
@@ -206,13 +240,20 @@ export const renderPaymentSummary = (tableId, orderSnapshot) => {
     const sentItems = orderSnapshot.sentItems || [];
     
     const subtotal = calculateItemsValue(sentItems);
-    const applyServiceTax = orderSnapshot.serviceTaxApplied ?? true;
+    // CORREÇÃO: Usa o valor do snapshot para a taxa de serviço
+    const applyServiceTax = orderSnapshot.serviceTaxApplied ?? true; 
     const serviceTax = applyServiceTax ? subtotal * 0.10 : 0;
     const totalPrincipalAccount = subtotal + serviceTax;
     const totalPaidPrincipal = payments.reduce((sum, p) => sum + getNumericValueFromCurrency(p.value), 0);
     const remainingBalancePrincipal = totalPrincipalAccount - totalPaidPrincipal;
-    const diners = parseInt(dinersSplitInput?.value) || 1; 
+    // CORREÇÃO: Usa o valor do snapshot para o número de pessoas
+    const diners = parseInt(orderSnapshot.diners) || 1; 
     const valuePerDiner = totalPrincipalAccount / diners;
+
+    // Atualiza o input de Diners para refletir o valor persistido
+    if(dinersSplitInput) dinersSplitInput.value = diners;
+    // Salva o total atual da conta no snapshot para que o finalizeOrder use o valor correto
+    orderSnapshot.total = totalPrincipalAccount; 
 
     updateText('orderSubtotalDisplayPayment', formatCurrency(subtotal));
     updateText('orderServiceTaxDisplayPayment', formatCurrency(serviceTax));
@@ -355,7 +396,7 @@ window.activateItemSelection = (mode = null) => {
     window.itemsToTransfer = []; 
     selectedCheckboxes.forEach(box => {
         try {
-            const items = JSON.parse(box.dataset.items);
+            const items = JSON.parse(box.dataset.items.replace(/&#39;/g, "'"));
             window.itemsToTransfer.push(...items); 
         } catch(e) { console.error("Erro ao ler dados de item para seleção:", e); }
     });
@@ -397,6 +438,8 @@ export const handleMassDeleteConfirmed = async () => {
     try {
         const batch = writeBatch(getFirestore());
 
+        // Para arrayRemove funcionar, precisamos remover o objeto exato.
+        // Se a lista for muito grande, isso é ineficiente. Mas para o contexto, funciona.
         itemsToDelete.forEach(item => {
             batch.update(tableRef, { sentItems: arrayRemove(item) });
         });
@@ -411,6 +454,7 @@ export const handleMassDeleteConfirmed = async () => {
 
         alert(`${itemsToDelete.length} item(ns) removidos da conta.${closeTableConfirmed ? ' A mesa foi fechada.' : ''}`);
         window.itemsToTransfer = []; 
+        window.activateItemSelection(); // Limpa a seleção
 
         if (closeTableConfirmed && window.goToScreen) {
             window.goToScreen('panelScreen');
@@ -487,6 +531,16 @@ window.openSplitTransferModal = (splitId, mode) => { alert("Funcionalidade de di
 // Função para Finalizar/Fechar a Conta
 export const handleFinalizeOrder = async () => {
     if (!currentTableId || !currentOrderSnapshot) { alert("Erro: Nenhuma mesa ou dados da mesa carregados."); return; }
+    
+    // O total já foi atualizado em renderPaymentSummary
+    const totalDaConta = currentOrderSnapshot.total || 0; 
+    const remainingBalance = totalDaConta - currentOrderSnapshot.payments.reduce((sum, p) => sum + getNumericValueFromCurrency(p.value), 0);
+
+    if (remainingBalance > 0.01) {
+         alert(`Ainda resta ${formatCurrency(remainingBalance)} a pagar.`);
+         return;
+    }
+
     if (!confirm(`Tem certeza que deseja fechar a Mesa ${currentTableId}? Esta ação enviará o pedido ao WooCommerce e não pode ser desfeita.`)) { return; }
 
     if(finalizeOrderBtn) finalizeOrderBtn.disabled = true;
@@ -575,7 +629,7 @@ const searchCustomer = async () => {
             if (customerEmailInput) customerEmailInput.value = '';
 
             customerSearchResultsDiv.innerHTML = `<p class="text-sm text-yellow-400">Cliente não encontrado. Preencha os dados para cadastrar.</p>`;
-            if (saveCustomerBtn) saveCustomerBtn.disabled = true; 
+            if (saveCustomerBtn) saveCustomerBtn.disabled = false; // Habilita o salvar se não for encontrado
             if (linkCustomerToTableBtn) linkCustomerToTableBtn.disabled = true;
             if (customerNameInput) customerNameInput.focus();
         }
@@ -663,15 +717,22 @@ const attachReviewListListeners = () => {
     const massTransferBtn = document.getElementById('massTransferBtn');
 
     if (massDeleteBtn) {
+         // Remove e recria o listener para evitar duplicação
          const newDeleteBtn = massDeleteBtn.cloneNode(true);
          massDeleteBtn.parentNode.replaceChild(newDeleteBtn, massDeleteBtn);
          newDeleteBtn.addEventListener('click', () => handleMassActionRequest('delete')); 
     }
      if (massTransferBtn) {
+         // Remove e recria o listener para evitar duplicação
          const newTransferBtn = massTransferBtn.cloneNode(true);
          massTransferBtn.parentNode.replaceChild(newTransferBtn, massTransferBtn);
          newTransferBtn.addEventListener('click', () => handleMassActionRequest('transfer')); 
     }
+    // Garante que os checkboxes tenham o listener reanexado
+    document.querySelectorAll('#reviewItemsList input[type="checkbox"].item-select-checkbox').forEach(box => {
+         box.removeEventListener('change', window.activateItemSelection);
+         box.addEventListener('change', window.activateItemSelection);
+    });
 };
 
 export const initPaymentController = () => {
@@ -732,14 +793,99 @@ export const initPaymentController = () => {
 
     renderPaymentMethodButtons();
 
-    // Adiciona Listeners Essenciais
-    if(toggleServiceTaxBtn) toggleServiceTaxBtn.addEventListener('click', async () => { /* ... */ });
-    if(decreaseDinersBtn && dinersSplitInput) decreaseDinersBtn.addEventListener('click', () => { /* ... */ });
-    if(increaseDinersBtn && dinersSplitInput) increaseDinersBtn.addEventListener('click', () => { /* ... */ });
+    // --- CORREÇÕES DA FASE 1: ATIVAR BOTÕES DE CONTROLE DA CONTA ---
+
+    // 1. Alternar Taxa de Serviço (10%)
+    if(toggleServiceTaxBtn) toggleServiceTaxBtn.addEventListener('click', async () => { 
+        if (!currentTableId) return;
+        const tableRef = getTableDocRef(currentTableId);
+        // Inverte o estado atual. Se o snapshot não tiver o campo, assume true (aplicado)
+        const newState = !(currentOrderSnapshot?.serviceTaxApplied ?? true); 
+        try {
+            await updateDoc(tableRef, { serviceTaxApplied: newState });
+            // O onSnapshot do app.js irá re-renderizar automaticamente
+        } catch (e) {
+            console.error("Erro ao alternar taxa de serviço:", e);
+            alert("Falha ao atualizar a taxa de serviço.");
+        }
+    });
     
-    if(paymentMethodButtonsContainer) paymentMethodButtonsContainer.addEventListener('click', (e) => { /* ... */ });
-    if(paymentValueInput) paymentValueInput.addEventListener('input', (e) => { /* ... */ });
-    if(addPaymentBtn) addPaymentBtn.addEventListener('click', async () => { /* ... */ });
+    // 2. Lógica para controle de Pessoas (Diners)
+    const updateDiners = async (delta) => {
+        if (!currentTableId || !dinersSplitInput) return;
+        
+        // Prioriza o valor do snapshot para manter a sincronia, senão usa o valor do input (ou 1)
+        const currentDiners = currentOrderSnapshot?.diners ? parseInt(currentOrderSnapshot.diners) : (parseInt(dinersSplitInput.value) || 1);
+        
+        const newDiners = Math.max(1, currentDiners + delta);
+        
+        if(newDiners !== currentDiners) {
+            const tableRef = getTableDocRef(currentTableId);
+             try {
+                await updateDoc(tableRef, { diners: newDiners });
+             } catch (e) {
+                console.error("Erro ao atualizar o número de pessoas (diners):", e);
+             }
+        }
+    };
+    
+    if(decreaseDinersBtn) decreaseDinersBtn.addEventListener('click', () => updateDiners(-1));
+    if(increaseDinersBtn) increaseDinersBtn.addEventListener('click', () => updateDiners(1));
+    // -------------------------------------------------------------
+    // --- FIM CORREÇÕES DA FASE 1 ---
+    // -------------------------------------------------------------
+
+
+    // 3. Listener para seleção de método de pagamento
+    if(paymentMethodButtonsContainer) paymentMethodButtonsContainer.addEventListener('click', (e) => { 
+        const btn = e.target.closest('.payment-method-btn');
+        if (btn) {
+            paymentMethodButtonsContainer.querySelectorAll('.payment-method-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            _validatePaymentInputs();
+        }
+    });
+
+    // 4. Listener de input de valor (para validação)
+    if(paymentValueInput) paymentValueInput.addEventListener('input', (e) => { 
+        e.target.value = e.target.value.replace(/[^0-9,\.]/g, ''); 
+        _validatePaymentInputs();
+    });
+
+    // 5. Adicionar Pagamento
+    if(addPaymentBtn) addPaymentBtn.addEventListener('click', async () => { 
+        const selectedMethod = paymentMethodButtonsContainer?.querySelector('.active')?.dataset.method;
+        const rawValue = paymentValueInput?.value || '0';
+        const numericValue = getNumericValueFromCurrency(rawValue);
+
+        if (!selectedMethod || numericValue <= 0 || !currentTableId) {
+            alert("Selecione um método de pagamento e insira um valor válido.");
+            return;
+        }
+
+        const tableRef = getTableDocRef(currentTableId);
+        const paymentData = {
+            method: selectedMethod,
+            value: formatCurrency(numericValue), 
+            timestamp: Date.now(), // Usa timestamp como ID único
+            byUser: userId || 'PDV Staff' 
+        };
+
+        try {
+            await updateDoc(tableRef, { payments: arrayUnion(paymentData) });
+            
+            // Limpa o estado local
+            paymentValueInput.value = ''; 
+            paymentMethodButtonsContainer.querySelectorAll('.payment-method-btn').forEach(b => b.classList.remove('active'));
+            
+            _validatePaymentInputs();
+            // Nenhuma necessidade de alertar, a lista será atualizada automaticamente
+        } catch (e) {
+            console.error("Erro ao adicionar pagamento:", e);
+            alert("Falha ao registrar pagamento.");
+        }
+    });
+
     
     if(finalizeOrderBtn) finalizeOrderBtn.addEventListener('click', handleFinalizeOrder);
 
@@ -751,6 +897,12 @@ export const initPaymentController = () => {
 
             const action = target.dataset.action;
             const value = target.dataset.value;
+            
+            // Converte vírgula para ponto se for uma operação matemática
+            const isOperator = action === 'operator' || action === 'calculate';
+            if (isOperator) {
+                calculatorState.displayValue = calculatorState.displayValue.replace(',', '.');
+            }
 
             switch (action) {
                 case 'number': inputDigit(value); break;
@@ -760,6 +912,12 @@ export const initPaymentController = () => {
                 case 'backspace': backspace(); break;
                 case 'calculate': handleOperator('='); calculatorState.waitingForSecondOperand = false; calculatorState.operator = null; break;
             }
+            
+            // Converte ponto de volta para vírgula para exibição no Brasil
+             if (!isOperator) {
+                 calculatorState.displayValue = calculatorState.displayValue.replace('.', ',');
+             }
+
             updateDisplay();
         });
     }
@@ -767,24 +925,31 @@ export const initPaymentController = () => {
     if (confirmCalcBtn) {
         confirmCalcBtn.addEventListener('click', () => {
             if (paymentValueInput && calcDisplay) {
-                const calcValueFormatted = calcDisplay.value.replace(',', '.'); 
-                paymentValueInput.value = calcValueFormatted.replace('.', ','); 
-                paymentValueInput.dispatchEvent(new Event('input')); 
+                // Pega o valor da calculadora (que está formatado com vírgula)
+                const calcValueFormatted = calcDisplay.value; 
+                paymentValueInput.value = calcValueFormatted; 
+                paymentValueInput.dispatchEvent(new Event('input')); // Força a validação
             }
             if (calculatorModal) calculatorModal.style.display = 'none';
             resetCalculator();
-            updateDisplay();
+            // A conversão de . para , é feita implicitamente no reset/updateDisplay
+            updateDisplay(); 
         });
     }
 
     if (openCalculatorBtn) {
         openCalculatorBtn.addEventListener('click', () => { 
              if (calculatorModal && calcDisplay && paymentValueInput) {
-                 const currentPaymentValue = paymentValueInput.value.replace(',', '.'); 
+                 const currentPaymentValue = paymentValueInput.value.replace(',', '.'); // Usa o ponto para o motor da calculadora
+                 
                  calculatorState.displayValue = parseFloat(currentPaymentValue) > 0 ? currentPaymentValue : '0';
                  calculatorState.firstOperand = null;
                  calculatorState.waitingForSecondOperand = false;
                  calculatorState.operator = null;
+
+                 // Converte o ponto de volta para vírgula para exibição
+                 calculatorState.displayValue = calculatorState.displayValue.replace('.', ',');
+
                  updateDisplay();
                  calculatorModal.style.display = 'flex';
              } else {
@@ -805,7 +970,7 @@ export const initPaymentController = () => {
 
     // --- LISTENERS DE AÇÃO EM MASSA E CLIENTE ---
     if(confirmTransferBtn) confirmTransferBtn.addEventListener('click', handleConfirmTableTransfer);
-    if (targetTableInput) targetTableInput.addEventListener('input', async () => { /* ... */ });
+    if (targetTableInput) targetTableInput.addEventListener('input', async () => { /* Lógica de checagem da mesa destino */ });
 
     if(printSummaryBtn) printSummaryBtn.addEventListener('click', handlePrintSummary);
     
@@ -815,7 +980,7 @@ export const initPaymentController = () => {
     if (saveCustomerBtn) saveCustomerBtn.addEventListener('click', saveCustomer); 
     if (linkCustomerToTableBtn) linkCustomerToTableBtn.addEventListener('click', linkCustomerToTable); 
     
-    // Listener para habilitar o botão 'Salvar Cliente' (com lógica completa)
+    // Listener para habilitar o botão 'Salvar Cliente' 
     const enableSaveButtonCheck = () => {
         if (!saveCustomerBtn || !customerNameInput || !customerCpfInput) return;
         const name = customerNameInput.value.trim();
@@ -826,7 +991,6 @@ export const initPaymentController = () => {
     [customerNameInput, customerCpfInput].forEach(input => {
         input?.addEventListener('input', enableSaveButtonCheck);
     });
-
 
     paymentInitialized = true;
     console.log("[PaymentController] Inicializado.");
