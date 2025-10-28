@@ -163,18 +163,31 @@ export const handleTableTransferConfirmed = async (originTableId, targetTableId,
 
         if (!targetTableIsOpen) {
             if (!newDiners || !newSector) { /* ... */ return; }
-            batch.set(targetTableRef, { /* ... */ });
+            // CORREÇÃO: Usa 'set' para criar a nova mesa, copiando a estrutura inicial de abrir mesa
+            batch.set(targetTableRef, {
+                 tableNumber: parseInt(targetTableId), diners: newDiners, sector: newSector, 
+                 status: 'open', createdAt: serverTimestamp(),
+                 total: 0, sentItems: [], payments: [], serviceTaxApplied: true, selectedItems: []
+            });
         }
 
         const transferValue = itemsToTransfer.reduce((sum, item) => sum + (item.price || 0), 0);
+        // Tenta buscar o total da mesa de origem do snapshot global, ou faz um fetch para garantir.
         const originCurrentTotal = currentOrderSnapshot?.tableNumber == originTableId ? (currentOrderSnapshot.total || 0) : (await getDoc(originTableRef)).data()?.total || 0;
         const originNewTotal = Math.max(0, originCurrentTotal - transferValue);
+        
+        // Remove os itens da mesa de origem
         itemsToTransfer.forEach(item => { batch.update(originTableRef, { sentItems: arrayRemove(item) }); });
         batch.update(originTableRef, { total: originNewTotal });
 
-        const targetData = targetTableIsOpen ? targetSnap.data() : { total: 0 };
+        // Adiciona os itens à mesa de destino
+        const targetData = targetTableIsOpen ? targetSnap.data() : { total: 0, sentItems: [] };
         const targetNewTotal = (targetData.total || 0) + transferValue;
-        batch.update(targetTableRef, { sentItems: arrayUnion(...itemsToTransfer), total: targetNewTotal });
+        
+        batch.update(targetTableRef, { 
+             sentItems: arrayUnion(...itemsToTransfer), 
+             total: targetNewTotal 
+        });
 
         await batch.commit();
         goToScreen('panelScreen');
@@ -263,6 +276,7 @@ export const setTableListener = (tableId) => {
             currentOrderSnapshot = docSnapshot.data();
             const firebaseSelectedItems = currentOrderSnapshot.selectedItems || [];
 
+            // Apenas atualiza o array 'selectedItems' se ele for diferente do Firebase
             if (JSON.stringify(firebaseSelectedItems) !== JSON.stringify(selectedItems)) {
                  selectedItems.length = 0;
                  selectedItems.push(...firebaseSelectedItems);
@@ -272,6 +286,7 @@ export const setTableListener = (tableId) => {
             renderPaymentSummary(currentTableId, currentOrderSnapshot);
 
         } else {
+             // Ação de limpeza se a mesa for fechada
              if (currentTableId === tableId) {
                  alert(`Mesa ${tableId} foi fechada ou removida.`);
                  if (unsubscribeTable) unsubscribeTable(); unsubscribeTable = null;
@@ -290,7 +305,7 @@ export const setTableListener = (tableId) => {
 export const setCurrentTable = (tableId) => {
     if (currentTableId === tableId && unsubscribeTable) {
         if(currentOrderSnapshot){
-             // Re-renderiza a tela atual
+             // Re-renderiza a tela atual se já estivermos nela
              renderOrderScreen(currentOrderSnapshot);
              renderPaymentSummary(currentTableId, currentOrderSnapshot);
         }
@@ -338,7 +353,8 @@ const handleStaffLogin = async () => {
         try {
             const authInstance = auth;
             if (!authInstance) throw new Error("Firebase Auth não inicializado.");
-            const userCredential = await signInAnonymously(authInstance);
+            // Usamos signInAnonymously após a verificação no Firestore para obter um UID para segurança
+            const userCredential = await signInAnonymously(authInstance); 
             userId = userCredential.user.uid;
             
             const userName = staffData.name || userRole;
@@ -401,12 +417,18 @@ const initStaffApp = async () => {
 // --- DOMContentLoaded (Ponto de entrada) ---
 document.addEventListener('DOMContentLoaded', () => {
     try {
-        const firebaseConfig = FIREBASE_CONFIG;
+        // CORREÇÃO: Usa a configuração do window.__firebase_config
+        const firebaseConfigRaw = typeof window.__firebase_config !== 'undefined' ? window.__firebase_config : null;
+        const firebaseConfig = firebaseConfigRaw ? JSON.parse(firebaseConfigRaw) : FIREBASE_CONFIG;
+        const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : "pdv_fator_instance_001";
+
         const app = initializeApp(firebaseConfig);
         const dbInstance = getFirestore(app);
         const authInstance = getAuth(app);
         const functionsInstance = getFunctions(app, 'us-central1');
-        initializeFirebase(dbInstance, authInstance, "pdv_fator_instance_001", functionsInstance); 
+        
+        // Inicializa o serviço central do Firebase
+        initializeFirebase(dbInstance, authInstance, appId, functionsInstance); 
         
         // Mapeamento UI
         statusScreen = document.getElementById('statusScreen');
@@ -418,25 +440,37 @@ document.addEventListener('DOMContentLoaded', () => {
         loginPasswordInput = document.getElementById('loginPassword');
         loginErrorMsg = document.getElementById('loginErrorMsg');
 
+        // Listener de estado de autenticação (global)
         onAuthStateChanged(authInstance, async (user) => {
+            // Se for a página do cliente, ignora o login do staff.
+            if (window.location.pathname.includes('client.html')) {
+                 // A lógica do cliente será carregada pelo clientOrderController.js
+                 // Garante que o usuário anônimo está logado
+                 if (!user) { await signInAnonymously(authInstance); }
+                 return;
+            }
+
             if (user) {
+                // Se já estiver logado (e não for cliente), inicializa o app staff
                 userId = user.uid; 
                 if (userRole !== 'anonymous') { 
                      await initStaffApp(); 
-                } else if (!window.location.pathname.includes('client.html')) {
-                    showLoginScreen();
+                } else {
+                     // Se o usuário está autenticado anonimamente mas ainda não tem ROLE, mostra o login
+                     showLoginScreen();
                 }
-            } else if (!window.location.pathname.includes('client.html')) {
+            } else { 
+                 // Não autenticado: mostra a tela de login
                  showLoginScreen();
             }
         });
 
-        const loginForm = document.getElementById('loginForm');
-        // O HTML NÃO TEM O FORM, mas tem o botão. Usamos o botão como fallback
+        // Adiciona listener de login ao botão
         if (loginBtn) {
              loginBtn.addEventListener('click', handleStaffLogin);
         }
         
+        // Adiciona listeners dos botões do cabeçalho
         const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
         const logoutBtnHeader = document.getElementById('logoutBtnHeader');
         if (openManagerPanelBtn) openManagerPanelBtn.addEventListener('click', () => { window.openManagerAuthModal('goToManagerPanel'); });
