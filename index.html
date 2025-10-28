@@ -156,7 +156,7 @@
             <div id="loginScreen" class="w-screen flex-shrink-0 flex items-center justify-center p-4 bg-dark-bg print-hide">
                  <div class="content-card bg-dark-card p-8 rounded-xl shadow-2xl w-full max-w-sm text-center">
                     <h3 class="text-2xl font-bold text-pumpkin mb-6">Fator PDV - Staff</h3>
-                    <form id="loginForm"> 
+                    <form id="loginForm">
                         <input type="email" id="loginEmail" placeholder="E-mail (Ex: agencia@fatormd.com)" class="input-pdv w-full p-4 mb-4 text-base" autocomplete="username">
                         <input type="password" id="loginPassword" placeholder="Senha" class="input-pdv w-full p-4 mb-6 text-base" autocomplete="current-password">
                         <div id="loginErrorMsg" class="text-red-400 text-sm mb-4" style="display: none;"></div>
@@ -362,10 +362,10 @@
                     <div class="manager-card content-card p-4 text-center cursor-pointer" data-action="openWooSync"> <i class="fas fa-sync text-3xl mb-2 text-gray-400"></i> <h4 class="font-bold text-lg">Sincronizar</h4> <p class="text-xs">Forçar sincronia com WooCommerce</p> </div>
                 </div>
             </div>
-            
-        </div> 
+
+        </div>
     </main>
-    
+
     <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 id="obsItemName" class="text-xl font-bold mb-4 text-indigo-400">Adicionar Observação</h3>
@@ -385,7 +385,7 @@
                  <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Ponto Mais">Ponto Mais</button>
                  <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Bem Passado">Bem Passado</button>
             </div>
-            <textarea id="obsInput" rows="3" placeholder="Ex: Sem cebola, Ponto da carne..." class="input-pdv w-full p-3 text-base" readonly></textarea>
+            <textarea id="obsInput" rows="3" placeholder="Ex: Sem cebola, Ponto da carne..." class="input-pdv w-full p-3 text-base"></textarea>
             <div class="flex items-center justify-between mt-3 mb-4">
                  <span class="text-dark-text font-semibold">Item em Espera?</span>
                  <label class="switch-obs">
@@ -399,7 +399,7 @@
             </div>
         </div>
     </div>
-    
+
     <div id="customAlertModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm text-center">
             <h3 class="text-xl font-bold mb-4 text-red-400" id="customAlertTitle">Aviso</h3>
@@ -409,33 +409,44 @@
             </button>
         </div>
     </div>
-    
+
     <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         </div>
-    
+
     <div id="calculatorModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-4 rounded-xl shadow-2xl w-full max-w-xs relative">
              <button id="closeCalcBtnX" class="absolute -top-2 -right-2 bg-red-600 text-white rounded-full h-8 w-8">&times;</button>
-             <input type="text" id="calcDisplay" class="input-pdv w-full text-right text-2xl mb-3" readonly>
-             <div class="grid grid-cols-4 gap-2">
-                <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">7</button>
-                <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">8</button>
-                <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">9</button>
-                <button class="p-4 bg-pumpkin rounded hover:bg-pumpkin-dark text-xl">C</button>
-                <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">4</button>
-                <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">5</button>
-                <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">6</button>
-                <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">&larr;</button>
-                <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">1</button>
-                <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">2</button>
-                <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">3</button>
-                <button class="p-4 bg-green-600 rounded hover:bg-green-700 text-xl row-span-2">OK</button>
-                <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl col-span-2">0</button>
-                <button class="p-4 bg-dark-input rounded hover:bg-gray-600 text-xl">,</button>
-             </div>
+             <input type="text" id="calcDisplay" class="input-pdv w-full text-right text-2xl mb-3" readonly value="0">
+             <div class="grid grid-cols-4 gap-2 calculator-buttons">
+                <button class="calc-btn p-3 bg-pumpkin rounded hover:bg-pumpkin-dark text-xl" data-action="clear">C</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="operator" data-value="%">%</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="operator" data-value="/">/</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="backspace">&larr;</button>
+
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="7">7</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="8">8</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="9">9</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="operator" data-value="*">*</button>
+
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="4">4</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="5">5</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="6">6</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="operator" data-value="-">-</button>
+
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="1">1</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="2">2</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="3">3</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="operator" data-value="+">+</button>
+
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl col-span-2" data-action="number" data-value="0">0</button>
+                <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="decimal" data-value=",">,</button>
+                <button class="calc-btn p-3 bg-green-600 rounded hover:bg-green-700 text-xl" data-action="calculate">=</button>
+
+                </div>
+             <button id="confirmCalcBtn" class="w-full mt-3 p-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition">OK (Usar Valor)</button>
         </div>
     </div>
-    
+
     <div id="tableTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
             <h3 class="text-xl font-bold mb-4 text-pumpkin">Transferir Itens (Mesa Inteira/Parcial)</h3>
@@ -459,10 +470,10 @@
             </div>
         </div>
     </div>
-    
+
     <div id="customerRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-lg">
-            <h3 class="text-xl font-bold mb-4 text-indigo-400">Buscar / Cadastrar Cliente</h3>
+        <h3 class="text-xl font-bold mb-4 text-indigo-400">Buscar / Cadastrar Cliente</h3>
             <div class="mb-4">
                 <label for="customerSearchCpf" class="block text-sm font-medium text-dark-placeholder mb-1">Buscar por CPF / CNPJ</label>
                 <div class="flex space-x-2">
@@ -502,7 +513,7 @@
             </div>
         </div>
     </div>
-    
+
     <div id="reportsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
          <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
             <h3 class="text-xl font-bold mb-4 text-indigo-400">Relatórios</h3>
@@ -514,11 +525,11 @@
     <div id="nfeModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
             <h3 class="text-xl font-bold mb-4 text-indigo-400">Emissão de Nota Fiscal (NF-e/NFC-e)</h3>
-            
+
             <div id="nfeError" class="hidden p-3 rounded-lg bg-red-900 border border-red-700 text-red-200 mb-4">
                 <p id="nfeErrorMessage" class="font-semibold">Erro aqui</p>
             </div>
-            
+
             <div id="nfeDetails">
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-dark-placeholder mb-1">Cliente</label>
@@ -543,21 +554,83 @@
         </div>
     </div>
 
+    <div id="userManagementModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
+        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4 flex-shrink-0">
+                <h3 class="text-xl font-bold text-red-400">Gerenciar Usuários do Sistema</h3>
+                <button class="px-4 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('userManagementModal').style.display='none'; document.getElementById('userForm').style.display='none';">
+                    Fechar
+                </button>
+            </div>
+
+            <div class="flex-grow overflow-y-auto mb-4 custom-scrollbar">
+
+                <div id="userListContainer" class="mb-4 border border-gray-600 p-3 rounded-lg bg-dark-bg min-h-[200px]">
+                    <p class="text-dark-placeholder italic">Carregando usuários...</p>
+                </div>
+
+                <button id="showUserFormBtn" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition mb-4">
+                    <i class="fas fa-plus"></i> Adicionar Novo Usuário
+                </button>
+
+                <form id="userForm" class="hidden p-4 border border-gray-600 rounded-lg bg-dark-input space-y-3">
+                    <h4 id="userFormTitle" class="text-lg font-semibold text-pumpkin mb-2">Adicionar Novo Usuário</h4>
+                    <input type="hidden" id="userIdInput">
+
+                    <div>
+                        <label for="userNameInput" class="block text-sm font-medium text-dark-placeholder mb-1">Nome Completo*</label>
+                        <input type="text" id="userNameInput" placeholder="Nome do Usuário" class="input-pdv w-full" required>
+                    </div>
+                    <div>
+                        <label for="userEmailInput" class="block text-sm font-medium text-dark-placeholder mb-1">E-mail (Login)*</label>
+                        <input type="email" id="userEmailInput" placeholder="email@exemplo.com" class="input-pdv w-full" required autocomplete="username">
+                    </div>
+                     <div>
+                        <label for="userPasswordInput" class="block text-sm font-medium text-dark-placeholder mb-1">Senha*</label>
+                        <input type="password" id="userPasswordInput" placeholder="Senha" class="input-pdv w-full" required autocomplete="new-password">
+                    </div>
+                    <div>
+                        <label for="userRoleSelect" class="block text-sm font-medium text-dark-placeholder mb-1">Função (Papel)*</label>
+                        <select id="userRoleSelect" class="input-pdv w-full" required>
+                            <option value="" disabled selected>Selecione a função</option>
+                            <option value="garcom">Garçom</option>
+                            <option value="caixa">Caixa</option>
+                            <option value="gerente">Gerente</option>
+                        </select>
+                    </div>
+                     <div>
+                        <label for="userIsActiveCheckbox" class="flex items-center space-x-2 text-dark-text">
+                            <input type="checkbox" id="userIsActiveCheckbox" class="h-4 w-4 rounded text-pumpkin focus:ring-pumpkin border-gray-600 bg-dark-input" checked>
+                            <span>Usuário Ativo</span>
+                        </label>
+                    </div>
+
+                    <div class="flex justify-end space-x-3 pt-3">
+                        <button type="button" id="cancelUserFormBtn" class="px-4 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition">Cancelar</button>
+                        <button type="submit" id="saveUserBtn" class="px-4 py-2 bg-pumpkin text-white rounded-lg hover:bg-pumpkin-dark transition">Salvar Usuário</button>
+                    </div>
+                    <p id="userFormError" class="text-red-400 text-sm mt-2" style="display: none;"></p>
+                </form>
+
+            </div> </div>
+    </div>
+
     <div id="waiterRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"></div>
     <div id="selectiveTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"></div>
     <div id="productManagementModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"></div>
-    
+
+
     <p class="mt-8 text-center text-xs text-dark-placeholder print-hide" id="user-id-display">Usuário ID: Carregando...</p>
-    
+
     <script>
         window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`);
-        window.activateItemSelection = () => {}; 
+        window.activateItemSelection = () => {};
         // Placeholders para funções onclick da divisão (agora escondida)
         window.removeSplitAccount = (splitId) => { alert(`Remover Divisão ${splitId} (DEV)`)};
-        window.openPaymentModalForSplit = (splitId) => { alert(`Pagar Conta Dividida ${splitId} (DEV)`)};
-        window.openSplitTransferModal = (splitId, mode) => { alert(`Mover Itens Para/De ${splitId} (DEV)`)};
+        window.openPaymentModalForSplit = (splitId) => { alert(`Pagar Conta Dividida ${splitId} (DEV)`); };
+        window.openSplitTransferModal = (splitId, mode) => { alert(`Mover Itens Para/De ${splitId} (DEV)`); };
     </script>
-    
+
     <script type="module" src="app.js"></script>
 </body>
 </html>
