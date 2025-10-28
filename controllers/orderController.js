@@ -1,12 +1,11 @@
-// --- CONTROLLERS/ORDERCONTROLLER.JS (Painel 2) ---
+// --- CONTROLLERS/ORDERCONTROLLER.JS (Painel 2 - Atualizado com Aprovação Cliente) ---
 import { getProducts, getCategories } from "/services/wooCommerceService.js";
 import { formatCurrency } from "/utils.js";
 import { saveSelectedItemsToFirebase } from "/services/firebaseService.js";
-// CORREÇÃO 1: Importa 'screens' do app.js
 import { currentTableId, selectedItems, userRole, currentOrderSnapshot, screens } from "/app.js"; 
-import { arrayUnion, serverTimestamp, doc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { arrayUnion, serverTimestamp, doc, setDoc, updateDoc, arrayRemove } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { getKdsCollectionRef, getTableDocRef } from "/services/firebaseService.js";
-import { goToScreen } from "/app.js"; // Importar explicitamente
+import { goToScreen } from "/app.js"; 
 
 
 // --- VARIÁVEIS DE ELEMENTOS (Definidas na função init) ---
@@ -14,6 +13,7 @@ let obsModal, obsItemName, obsInput, saveObsBtn, cancelObsBtn, esperaSwitch;
 let searchProductInput, categoryFiltersContainer, menuItemsGrid;
 let openOrderList, openItemsCount, sendSelectedItemsBtn;
 let quickObsButtons;
+let clientPendingOrdersContainer; // NOVO: Container para pedidos pendentes do cliente
 
 // Estado local do módulo
 let currentSearch = '';
@@ -23,22 +23,33 @@ let orderInitialized = false;
 
 // --- FUNÇÕES DE AÇÃO GERAL ---
 
+// Função mantida (aumenta item no carrinho do GARÇOM)
 export const increaseLocalItemQuantity = (itemId, noteKey) => {
-    const itemToCopy = selectedItems.find(item =>
+    const itemToCopy = selectedItems.findLast(item =>
         item.id == itemId && (item.note || '') === noteKey
     );
 
     if (itemToCopy) {
-        selectedItems.push({ ...itemToCopy, note: noteKey }); // MUTATE (OK)
-        renderOrderScreen(); // Re-renderiza a lista de itens selecionados
+        selectedItems.push({ ...itemToCopy }); // MUTATE (OK)
+        renderOrderScreen(currentOrderSnapshot); // Re-renderiza tudo
         saveSelectedItemsToFirebase(currentTableId, selectedItems); // Salva no Firebase
+    } else {
+        // Se não encontrar, adiciona um novo (caso raro)
+        const products = getProducts();
+        const product = products.find(p => p.id == itemId);
+        if (product) {
+            const newItem = { id: product.id, name: product.name, price: product.price, sector: product.sector || 'cozinha', category: product.category || 'uncategorized', note: noteKey };
+            selectedItems.push(newItem);
+            renderOrderScreen(currentOrderSnapshot);
+            saveSelectedItemsToFirebase(currentTableId, selectedItems);
+        }
     }
 };
 window.increaseLocalItemQuantity = increaseLocalItemQuantity;
 
 
+// Função mantida (diminui item no carrinho do GARÇOM)
 export const decreaseLocalItemQuantity = (itemId, noteKey) => {
-    // Encontra o ÍNDICE do último item correspondente
     let indexToRemove = -1;
     for (let i = selectedItems.length - 1; i >= 0; i--) {
         if (selectedItems[i].id == itemId && (selectedItems[i].note || '') === noteKey) {
@@ -49,7 +60,7 @@ export const decreaseLocalItemQuantity = (itemId, noteKey) => {
 
     if (indexToRemove > -1) {
         selectedItems.splice(indexToRemove, 1); // MUTATE (OK)
-        renderOrderScreen(); // Re-renderiza a lista de itens selecionados
+        renderOrderScreen(currentOrderSnapshot); // Re-renderiza tudo
         saveSelectedItemsToFirebase(currentTableId, selectedItems); // Salva no Firebase
     }
 };
@@ -60,7 +71,6 @@ window.decreaseLocalItemQuantity = decreaseLocalItemQuantity;
 
 export const renderMenu = () => {
     if (!menuItemsGrid || !categoryFiltersContainer) {
-        // console.warn("[Order] Elementos do menu não encontrados para renderizar.");
         return;
     }
 
@@ -116,12 +126,10 @@ export const renderMenu = () => {
     }
 };
 
-// Renderiza a lista de itens selecionados (Painel 2)
-// Esta função usa o array GLOBAL 'selectedItems'
+// Renderiza a lista de itens selecionados (Carrinho do Garçom)
 const _renderSelectedItemsList = () => {
     if (!openOrderList || !openItemsCount || !sendSelectedItemsBtn) return;
 
-    // Usa o array global 'selectedItems', que foi atualizado pelo app.js
     const openItemsCountValue = selectedItems.length;
     openItemsCount.textContent = openItemsCountValue;
     sendSelectedItemsBtn.disabled = openItemsCountValue === 0;
@@ -145,11 +153,11 @@ const _renderSelectedItemsList = () => {
                     </span>
                 </div>
                 <div class="flex items-center space-x-2 flex-shrink-0">
-                    <button class="qty-btn bg-red-600 text-white rounded-full text-lg hover:bg-red-700 transition duration-150"
+                    <button class="qty-btn bg-red-600 text-white rounded-full h-8 w-8 flex items-center justify-center text-lg hover:bg-red-700 transition duration-150"
                             data-item-id="${group.id}" data-item-note-key="${group.note || ''}" data-action="decrease">
                         <i class="fas fa-minus pointer-events-none"></i>
                     </button>
-                    <button class="qty-btn bg-green-600 text-white rounded-full text-lg hover:bg-green-700 transition duration-150"
+                    <button class="qty-btn bg-green-600 text-white rounded-full h-8 w-8 flex items-center justify-center text-lg hover:bg-green-700 transition duration-150"
                             data-item-id="${group.id}" data-item-note-key="${group.note || ''}" data-action="increase">
                         <i class="fas fa-plus pointer-events-none"></i>
                     </button>
@@ -160,23 +168,174 @@ const _renderSelectedItemsList = () => {
 };
 
 // ==================================================================
-//               FUNÇÃO CORRIGIDA / ATUALIZADA
+//               NOVA FUNÇÃO: RENDERIZAR PEDIDOS PENDENTES DO CLIENTE
 // ==================================================================
-// Função principal para renderizar toda a tela de pedido
-export const renderOrderScreen = (orderSnapshot) => {
-    // CORREÇÃO: A lógica de atualização do array 'selectedItems'
-    // foi movida para o listener 'onSnapshot' no app.js.
-    
-    // Esta função agora apenas RENDERIZA o estado atual do array 'selectedItems',
-    // que já foi atualizado pelo app.js.
-    
-    _renderSelectedItemsList();
-    renderMenu(); 
-};
-// ==================================================================
-//                  FIM DA FUNÇÃO CORRIGIDA
-// ==================================================================
+const _renderPendingClientOrders = (requestedOrders = []) => {
+    if (!clientPendingOrdersContainer) return;
 
+    if (!requestedOrders || requestedOrders.length === 0) {
+        clientPendingOrdersContainer.innerHTML = ''; // Limpa se não houver pedidos
+        clientPendingOrdersContainer.classList.add('hidden'); // Esconde o container
+        return;
+    }
+
+    clientPendingOrdersContainer.classList.remove('hidden'); // Mostra o container
+
+    clientPendingOrdersContainer.innerHTML = `
+        <h3 class="text-lg font-semibold text-yellow-400 mb-2 flex items-center">
+            <i class="fas fa-bell mr-2 animate-pulse"></i> Pedidos Pendentes do Cliente
+        </h3>
+        <div class="space-y-3">
+            ${requestedOrders.map((order, index) => `
+                <div class="bg-indigo-900 border border-indigo-700 p-3 rounded-lg shadow-md">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm text-indigo-300">Cliente: ${order.clientInfo?.name || 'Cliente'} (${order.clientInfo?.phone || 'N/A'})</span>
+                        <span class="text-xs text-gray-400">${new Date(order.requestedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    <ul class="list-disc list-inside space-y-1 pl-2 mb-3">
+                        ${order.items.map(item => `
+                            <li class="text-base text-white">
+                                ${item.name} ${item.note ? `(${item.note})` : ''}
+                            </li>
+                        `).join('')}
+                    </ul>
+                    <div class="flex justify-end space-x-2">
+                        <button class="reject-client-order-btn px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 transition text-sm font-semibold" data-order-index="${index}" data-order-id="${order.orderId}">
+                            <i class="fas fa-times"></i> Rejeitar
+                        </button>
+                        <button class="approve-client-order-btn px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 transition text-sm font-semibold" data-order-index="${index}" data-order-id="${order.orderId}">
+                            <i class="fas fa-check"></i> Aprovar e Adicionar
+                        </button>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+
+    // Reanexa listeners para os botões de aprovar/rejeitar
+    _attachPendingOrderListeners();
+};
+
+// ==================================================================
+//               FUNÇÃO PRINCIPAL DE RENDERIZAÇÃO (ATUALIZADA)
+// ==================================================================
+export const renderOrderScreen = (orderSnapshot) => {
+    // A lógica de atualização do array 'selectedItems' está no app.js.
+    // Esta função RENDERIZA o estado atual + os pedidos pendentes.
+    
+    _renderSelectedItemsList(); // Renderiza o carrinho do Garçom
+    _renderPendingClientOrders(orderSnapshot?.requestedOrders); // Renderiza os pedidos pendentes do cliente
+    renderMenu(); // Renderiza o cardápio
+};
+
+// ==================================================================
+//               NOVAS FUNÇÕES: APROVAR/REJEITAR PEDIDO CLIENTE
+// ==================================================================
+export const handleApproveClientOrder = async (orderId) => {
+    if (!currentTableId || !currentOrderSnapshot || !orderId) return;
+
+    const requestedOrders = currentOrderSnapshot.requestedOrders || [];
+    const orderToApprove = requestedOrders.find(o => o.orderId === orderId);
+
+    if (!orderToApprove) {
+        alert("Erro: Pedido do cliente não encontrado para aprovar.");
+        return;
+    }
+
+    const itemsToAdd = orderToApprove.items || [];
+    if (itemsToAdd.length === 0) {
+        alert("Erro: Pedido do cliente está vazio.");
+        return; // Ou apenas rejeita
+    }
+    
+    try {
+        const tableRef = getTableDocRef(currentTableId);
+        
+        // Adiciona os itens aprovados ao carrinho do Garçom (selectedItems)
+        // Usa arrayUnion para garantir que não haja duplicatas exatas, 
+        // mas permite adicionar itens iguais com notas diferentes ou do mesmo tipo.
+        // A lógica de soma será feita no envio para KDS.
+        await updateDoc(tableRef, {
+            selectedItems: arrayUnion(...itemsToAdd), 
+            requestedOrders: arrayRemove(orderToApprove), // Remove o pedido pendente
+            // Se não houver mais pedidos pendentes, limpa a flag de alerta
+            clientOrderPending: requestedOrders.length > 1, 
+            waiterNotification: null // Limpa a notificação (opcional)
+        });
+
+        // O listener onSnapshot no app.js atualizará 'selectedItems' localmente
+        // e chamará renderOrderScreen para atualizar a UI.
+        
+        alert(`Pedido do cliente aprovado e ${itemsToAdd.length} item(ns) adicionados ao carrinho.`);
+
+    } catch (e) {
+        console.error("Erro ao aprovar pedido do cliente:", e);
+        alert("Falha ao aprovar o pedido do cliente.");
+    }
+};
+window.handleApproveClientOrder = handleApproveClientOrder; // Expor globalmente
+
+
+export const handleRejectClientOrder = async (orderId) => {
+    if (!currentTableId || !currentOrderSnapshot || !orderId) return;
+
+    const requestedOrders = currentOrderSnapshot.requestedOrders || [];
+    const orderToReject = requestedOrders.find(o => o.orderId === orderId);
+
+    if (!orderToReject) {
+        alert("Erro: Pedido do cliente não encontrado para rejeitar.");
+        return;
+    }
+    
+    if (!confirm("Tem certeza que deseja rejeitar este pedido do cliente? Os itens não serão adicionados.")) {
+        return;
+    }
+
+    try {
+        const tableRef = getTableDocRef(currentTableId);
+        
+        await updateDoc(tableRef, {
+            requestedOrders: arrayRemove(orderToReject), // Remove o pedido pendente
+            // Se não houver mais pedidos pendentes, limpa a flag de alerta
+            clientOrderPending: requestedOrders.length > 1, 
+            waiterNotification: null // Limpa a notificação (opcional)
+        });
+
+        // O listener onSnapshot no app.js atualizará 'requestedOrders' localmente
+        // e chamará renderOrderScreen para atualizar a UI.
+        
+        alert("Pedido do cliente rejeitado.");
+
+    } catch (e) {
+        console.error("Erro ao rejeitar pedido do cliente:", e);
+        alert("Falha ao rejeitar o pedido do cliente.");
+    }
+};
+window.handleRejectClientOrder = handleRejectClientOrder; // Expor globalmente
+
+
+// Função auxiliar para reanexar listeners dos botões de aprovação/rejeição
+const _attachPendingOrderListeners = () => {
+     clientPendingOrdersContainer?.querySelectorAll('.approve-client-order-btn').forEach(btn => {
+         const orderId = btn.dataset.orderId;
+         // Remove listener antigo e adiciona novo para evitar duplicação
+         const newBtn = btn.cloneNode(true);
+         btn.parentNode.replaceChild(newBtn, btn);
+         newBtn.addEventListener('click', () => handleApproveClientOrder(orderId));
+     });
+     clientPendingOrdersContainer?.querySelectorAll('.reject-client-order-btn').forEach(btn => {
+         const orderId = btn.dataset.orderId;
+         // Remove listener antigo e adiciona novo para evitar duplicação
+         const newBtn = btn.cloneNode(true);
+         btn.parentNode.replaceChild(newBtn, btn);
+         newBtn.addEventListener('click', () => handleRejectClientOrder(orderId));
+     });
+};
+
+
+// ==================================================================
+//               FUNÇÕES RESTANTES (OBS, ADD ITEM, ENVIO KDS)
+// ==================================================================
 
 // Abertura do Modal de Observações (Apenas Staff)
 export const openObsModalForGroup = (itemId, noteKey) => {
@@ -228,7 +387,7 @@ export const addItemToSelection = (product) => {
 
     selectedItems.push(newItem); // MUTATE (OK)
 
-    renderOrderScreen(); // Atualiza a UI
+    renderOrderScreen(currentOrderSnapshot); // Atualiza a UI
     saveSelectedItemsToFirebase(currentTableId, selectedItems); // Salva no Firebase
 
     openObsModalForGroup(product.id, ''); // Abre modal para o item recém-adicionado
@@ -245,7 +404,6 @@ export const handleSendSelectedItems = async () => {
     const itemsToHold = selectedItems.filter(item => item.note && item.note.toLowerCase().includes('espera'));
 
     if (itemsToSend.length === 0) {
-        // Se NADA for enviado, mas houver itens em espera, apenas salva o estado
         if (itemsToHold.length > 0) {
              alert("Nenhum item pronto para envio (todos estão marcados como 'Em Espera'). Os itens foram salvos na mesa.");
              saveSelectedItemsToFirebase(currentTableId, itemsToHold);
@@ -255,9 +413,8 @@ export const handleSendSelectedItems = async () => {
         return;
     }
 
-    // **CORREÇÃO 2:** Calcula o valor a ser adicionado ao total
     const itemsToSendValue = itemsToSend.reduce((sum, item) => sum + (item.price || 0), 0);
-    const kdsOrderRef = doc(getKdsCollectionRef()); // Cria referência para novo doc KDS
+    const kdsOrderRef = doc(getKdsCollectionRef()); 
 
     const itemsForFirebase = itemsToSend.map(item => ({
         id: item.id,
@@ -266,7 +423,7 @@ export const handleSendSelectedItems = async () => {
         category: item.category,
         sector: item.sector,
         note: item.note || '',
-        sentAt: Date.now(), // Timestamp JS
+        sentAt: Date.now(), 
         orderId: kdsOrderRef.id,
     }));
 
@@ -276,7 +433,7 @@ export const handleSendSelectedItems = async () => {
         await setDoc(kdsOrderRef, {
             orderId: kdsOrderRef.id,
             tableNumber: parseInt(currentTableId),
-            sentAt: serverTimestamp(), // Timestamp do servidor
+            sentAt: serverTimestamp(), 
             sectors: itemsForFirebase.reduce((acc, item) => {
                 const sector = item.sector || 'cozinha';
                 acc[sector] = acc[sector] || [];
@@ -291,33 +448,32 @@ export const handleSendSelectedItems = async () => {
         const tableRef = getTableDocRef(currentTableId);
         console.log("[Order] Atualizando mesa:", currentTableId);
 
-        // **CORREÇÃO 2:** Pega o total atual do snapshot e soma o novo valor
         const currentTotal = currentOrderSnapshot?.total || 0;
         const newTotal = currentTotal + itemsToSendValue;
 
         await updateDoc(tableRef, {
             sentItems: arrayUnion(...itemsForFirebase), // Adiciona itens enviados
             selectedItems: itemsToHold,                // Atualiza selecionados (só os em espera)
-            total: newTotal,                           // <-- ATUALIZA O TOTAL
+            total: newTotal,                           // ATUALIZA O TOTAL
             lastKdsSentAt: serverTimestamp()           // Atualiza timestamp do último envio
         });
         console.log("[Order] Mesa atualizada com sucesso.");
 
-        // 3. Sucesso: Atualiza o estado local e UI
+        // Sucesso: Atualiza o estado local e UI
         selectedItems.length = 0;
         selectedItems.push(...itemsToHold);
         
-        renderOrderScreen(); // Re-renderiza
+        renderOrderScreen(currentOrderSnapshot); // Re-renderiza
 
         alert(`Pedido enviado! ${itemsToHold.length > 0 ? `(${itemsToHold.length} itens retidos em espera)` : ''}`);
 
     } catch (e) {
         console.error("Erro ao enviar pedido:", e);
         alert("Falha ao enviar pedido ao KDS/Firebase. Tente novamente.");
-        // Restaura selectedItems em caso de falha (mutando)
+        // Restaura selectedItems em caso de falha
         selectedItems.length = 0;
         selectedItems.push(...itemsToSend, ...itemsToHold);
-        renderOrderScreen();
+        renderOrderScreen(currentOrderSnapshot);
     }
 };
 
@@ -333,6 +489,7 @@ export const initOrderController = () => {
     openOrderList = document.getElementById('openOrderList');
     openItemsCount = document.getElementById('openItemsCount');
     sendSelectedItemsBtn = document.getElementById('sendSelectedItemsBtn');
+    clientPendingOrdersContainer = document.getElementById('clientPendingOrders'); // NOVO CONTAINER
 
     // Mapeia elementos do modal OBS
     obsModal = document.getElementById('obsModal');
@@ -343,79 +500,64 @@ export const initOrderController = () => {
     esperaSwitch = document.getElementById('esperaSwitch');
     quickObsButtons = document.getElementById('quickObsButtons');
 
-    // Listener para busca de produto
-    if (searchProductInput) {
-        searchProductInput.addEventListener('input', (e) => {
-            currentSearch = e.target.value;
-            renderMenu(); // Re-renderiza o menu com o novo termo de busca
-        });
-    } else {
-         console.error("[OrderController] Input 'searchProductInput' não encontrado.");
+    // Validação de elementos essenciais
+    if (!searchProductInput || !categoryFiltersContainer || !menuItemsGrid || !openOrderList || !sendSelectedItemsBtn || !obsModal || !clientPendingOrdersContainer) {
+         console.error("[OrderController] Erro Fatal: Elementos críticos não encontrados. Abortando inicialização.");
+         return; 
     }
+
+    // Listener para busca de produto
+    searchProductInput.addEventListener('input', (e) => {
+        currentSearch = e.target.value;
+        renderMenu(); // Re-renderiza o menu com o novo termo de busca
+    });
 
     // Listener para filtros de categoria (delegação de evento)
-    if (categoryFiltersContainer) {
-        categoryFiltersContainer.addEventListener('click', (e) => {
-            const btn = e.target.closest('.category-btn');
-            if (btn) {
-                currentCategoryFilter = btn.dataset.category;
-                renderMenu(); // Re-renderiza o menu com o novo filtro
-            }
-        });
-    } else {
-         console.error("[OrderController] Container 'categoryFilters' não encontrado.");
-    }
+    categoryFiltersContainer.addEventListener('click', (e) => {
+        const btn = e.target.closest('.category-btn');
+        if (btn) {
+            currentCategoryFilter = btn.dataset.category;
+            renderMenu(); // Re-renderiza o menu com o novo filtro
+        }
+    });
 
     // Listener para botões +/-/obs na lista de itens selecionados (delegação)
-    if (openOrderList) {
-        openOrderList.addEventListener('click', (e) => {
-            const target = e.target;
-            const qtyBtn = target.closest('.qty-btn'); 
-            const obsSpan = target.closest('span[data-item-id]'); // Clica na observação
+    openOrderList.addEventListener('click', (e) => {
+        const target = e.target;
+        const qtyBtn = target.closest('.qty-btn'); 
+        const obsSpan = target.closest('span[data-item-id]'); // Clica na observação
 
-            if (qtyBtn) {
-                const itemId = qtyBtn.dataset.itemId;
-                const noteKey = qtyBtn.dataset.itemNoteKey;
-                const action = qtyBtn.dataset.action;
-                if (action === 'increase') {
-                    increaseLocalItemQuantity(itemId, noteKey);
-                } else if (action === 'decrease') {
-                    decreaseLocalItemQuantity(itemId, noteKey);
-                }
-            } else if (obsSpan) {
-                const itemId = obsSpan.dataset.itemId;
-                const noteKey = obsSpan.dataset.itemNoteKey;
-                openObsModalForGroup(itemId, noteKey);
+        if (qtyBtn) {
+            const itemId = qtyBtn.dataset.itemId;
+            const noteKey = qtyBtn.dataset.itemNoteKey;
+            const action = qtyBtn.dataset.action;
+            if (action === 'increase') {
+                increaseLocalItemQuantity(itemId, noteKey);
+            } else if (action === 'decrease') {
+                decreaseLocalItemQuantity(itemId, noteKey);
             }
-        });
-    } else {
-        console.error("[OrderController] Lista 'openOrderList' não encontrada.");
-    }
+        } else if (obsSpan) {
+            const itemId = obsSpan.dataset.itemId;
+            const noteKey = obsSpan.dataset.itemNoteKey;
+            openObsModalForGroup(itemId, noteKey);
+        }
+    });
 
      // Listener para adicionar item (delegação no menuItemsGrid)
-     if (menuItemsGrid) {
-        menuItemsGrid.addEventListener('click', (e) => {
-            const addBtn = e.target.closest('.add-item-btn');
-            if (addBtn && addBtn.dataset.product) {
-                try {
-                    const productData = JSON.parse(addBtn.dataset.product.replace(/&#39;/g, "'"));
-                    addItemToSelection(productData);
-                } catch (err) {
-                    console.error("Erro ao parsear dados do produto:", err);
-                }
+     menuItemsGrid.addEventListener('click', (e) => {
+        const addBtn = e.target.closest('.add-item-btn');
+        if (addBtn && addBtn.dataset.product) {
+            try {
+                const productData = JSON.parse(addBtn.dataset.product.replace(/&#39;/g, "'"));
+                addItemToSelection(productData);
+            } catch (err) {
+                console.error("Erro ao parsear dados do produto:", err);
             }
-        });
-    } else {
-         console.error("[OrderController] Grid 'menuItemsGrid' não encontrado.");
-    }
-
+        }
+    });
 
     // Listener para botão de enviar pedido
-    if (sendSelectedItemsBtn) {
-        sendSelectedItemsBtn.addEventListener('click', handleSendSelectedItems);
-    } else {
-         console.error("[OrderController] Botão 'sendSelectedItemsBtn' não encontrado.");
-    }
+    sendSelectedItemsBtn.addEventListener('click', handleSendSelectedItems);
 
     // Listeners do Modal OBS
     if (saveObsBtn) {
@@ -438,6 +580,7 @@ export const initOrderController = () => {
             let updated = false;
             // Cria um novo array temporário com as atualizações
             const updatedItems = selectedItems.map(item => {
+                // Atualiza TODAS as ocorrências com a nota original para a nova nota
                 if (item.id == itemId && (item.note || '') === originalNoteKey) {
                     updated = true;
                     return { ...item, note: newNote };
@@ -451,15 +594,13 @@ export const initOrderController = () => {
 
             if (updated) {
                 obsModal.style.display = 'none';
-                renderOrderScreen();
+                renderOrderScreen(currentOrderSnapshot);
                 saveSelectedItemsToFirebase(currentTableId, selectedItems);
             } else {
                 console.warn("Nenhum item encontrado para atualizar a observação.");
                 obsModal.style.display = 'none';
             }
         });
-    } else {
-        console.error("[OrderController] Botão 'saveObsBtn' não encontrado.");
     }
 
     if (cancelObsBtn) {
@@ -485,11 +626,9 @@ export const initOrderController = () => {
             }
 
             obsModal.style.display = 'none';
-            renderOrderScreen(); // Re-renderiza
+            renderOrderScreen(currentOrderSnapshot); // Re-renderiza
             saveSelectedItemsToFirebase(currentTableId, selectedItems); // Salva
         });
-    } else {
-        console.error("[OrderController] Botão 'cancelObsBtn' não encontrado.");
     }
 
     if (quickObsButtons) {
@@ -506,8 +645,6 @@ export const initOrderController = () => {
                  obsInput.value = (currentValue + obsText).trim();
              }
         });
-    } else {
-        console.error("[OrderController] Container 'quickObsButtons' não encontrado.");
     }
 
     orderInitialized = true;
