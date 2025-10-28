@@ -187,7 +187,7 @@ window.handleTableTransferConfirmed = handleTableTransferConfirmed;
  * Abre o modal de autenticação para ações gerenciais e delega a ação.
  */
 window.openManagerAuthModal = (action, payload = null) => {
-    // Ação de Usuários é tratada diretamente
+    // Ação de Usuários é tratada diretamente para simplificar o fluxo de cadastro
     if (action === 'openWaiterReg') {
         openUserManagementModal();
         return;
@@ -222,6 +222,12 @@ window.openManagerAuthModal = (action, payload = null) => {
                     case 'executeMassTransfer': openTableTransferModal(); break;
                     case 'deletePayment': executeDeletePayment(payload); break;
                     case 'goToManagerPanel': await goToScreen('managerScreen'); break;
+                    case 'openProductManagement': handleGerencialAction(action); break;
+                    case 'openCashManagement': handleGerencialAction(action); break;
+                    case 'openInventoryManagement': handleGerencialAction(action); break;
+                    case 'openRecipesManagement': handleGerencialAction(action); break;
+                    case 'openCustomerCRM': handleGerencialAction(action); break;
+                    case 'openWooSync': handleGerencialAction(action); break;
                     default: handleGerencialAction(action, payload); break;
                 }
             } else {
@@ -325,7 +331,6 @@ const handleStaffLogin = async () => {
     const email = loginEmailInput.value.trim().toLowerCase();
     const password = loginPasswordInput.value.trim();
 
-    // --- CORREÇÃO: Autenticação via Firestore ---
     const staffData = await authenticateUserFromFirestore(email, password);
 
     if (staffData) {
@@ -387,7 +392,7 @@ const initStaffApp = async () => {
         await goToScreen('panelScreen');
 
     } catch (error) { 
-        console.error("[INIT] Erro CRÍTICO durante initStaffApp:", error); 
+        console.error("Erro CRÍTICO durante initStaffApp:", error); 
         alert(`Erro grave na inicialização: ${error.message}. Verifique o console.`); 
         showLoginScreen(); 
     }
@@ -401,7 +406,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const dbInstance = getFirestore(app);
         const authInstance = getAuth(app);
         const functionsInstance = getFunctions(app, 'us-central1');
-        // Define o APP_ID customizado
         initializeFirebase(dbInstance, authInstance, "pdv_fator_instance_001", functionsInstance); 
         
         // Mapeamento UI
@@ -414,7 +418,6 @@ document.addEventListener('DOMContentLoaded', () => {
         loginPasswordInput = document.getElementById('loginPassword');
         loginErrorMsg = document.getElementById('loginErrorMsg');
 
-        // Listener de Autenticação Firebase
         onAuthStateChanged(authInstance, async (user) => {
             if (user) {
                 userId = user.uid; 
@@ -429,10 +432,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         const loginForm = document.getElementById('loginForm');
-        // --- CORREÇÃO: O Botão 'Entrar' não está dentro do FORM no HTML fornecido, então o listener do FORM não dispara.
-        // A lógica do FORM/Button deve ser corrigida no HTML. Usamos o listener do botão como fallback seguro.
+        // O HTML NÃO TEM O FORM, mas tem o botão. Usamos o botão como fallback
         if (loginBtn) {
-            loginBtn.addEventListener('click', handleStaffLogin);
+             loginBtn.addEventListener('click', handleStaffLogin);
         }
         
         const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
