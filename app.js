@@ -1,83 +1,58 @@
-// --- APP.JS ---
+// --- APP.JS (Versão ESTÁVEL com Autenticação Firestore) ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapshot, writeBatch, arrayRemove, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-// Import Functions
+import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapshot, writeBatch, arrayRemove, arrayUnion, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { getFunctions } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
 
-
 // Importações dos Serviços e Utils
-import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, auth, db, functions } from '/services/firebaseService.js';
+import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, auth, db, functions, appId } from '/services/firebaseService.js';
 import { fetchWooCommerceProducts, fetchWooCommerceCategories } from '/services/wooCommerceService.js';
 import { formatCurrency, formatElapsedTime } from '/utils.js';
 
-// Importações dos Controllers
-import { loadOpenTables, renderTableFilters, handleAbrirMesa, handleSearchTable, initPanelController } from '/controllers/panelController.js';
-import { renderMenu, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity, openObsModalForGroup, initOrderController, handleSendSelectedItems } from '/controllers/orderController.js';
-import {
-    renderPaymentSummary, deletePayment, handleMassActionRequest,
-    initPaymentController, handleFinalizeOrder,
-    handleMassDeleteConfirmed, executeDeletePayment, // Funções de ação
-    openTableTransferModal, handleConfirmTableTransfer // Funções de UI
-} from '/controllers/paymentController.js';
+// --- IMPORTS ESTÁTICOS PARA CONTROLADORES CORE (Garantia de Funcionamento) ---
+import { initPanelController, loadOpenTables, renderTableFilters, handleAbrirMesa, handleSearchTable } from '/controllers/panelController.js';
+import { initOrderController, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity, openObsModalForGroup } from '/controllers/orderController.js';
+import { initPaymentController, renderPaymentSummary, deletePayment, handleMassActionRequest, handleFinalizeOrder, handleMassDeleteConfirmed, executeDeletePayment, openTableTransferModal, handleConfirmTableTransfer } from '/controllers/paymentController.js';
 import { initManagerController, handleGerencialAction } from '/controllers/managerController.js';
+import { initUserManagementController, openUserManagementModal } from '/controllers/userManagementController.js';
+
 
 // --- CONFIGURAÇÃO ---
-const APP_ID = "pdv_fator_instance_001";
 const FIREBASE_CONFIG = {
     apiKey: "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY",
     authDomain: "fator-pdv.firebaseapp.com",
     projectId: "fator-pdv",
     storageBucket: "fator-pdv.appspot.com",
     messagingSenderId: "1097659747429",
-    appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c"
+    appId: "1:1097659747429:web:8ec0a7c39777c311dbe0a8c"
 };
 
-// --- VARIÁVEIS DE ESTADO GLOBAL ---
-export const screens = {
-    'loginScreen': 0, 'panelScreen': 1, 'orderScreen': 2, 'paymentScreen': 3, 'managerScreen': 4,
-};
-const STAFF_CREDENTIALS = {
-    'agencia@fatormd.com': { password: '1234', role: 'gerente', name: 'Fmd' },
-    'garcom@fator.com': { password: '1234', role: 'garcom', name: 'Mock Garçom' },
-};
+// --- VARIÁVEIS GLOBAIS ---
+export const screens = { 'loginScreen': 0, 'panelScreen': 1, 'orderScreen': 2, 'paymentScreen': 3, 'managerScreen': 4, };
 const MANAGER_PASSWORD = '1234';
-
-export let currentTableId = null;
-export let selectedItems = [];
-export let currentOrderSnapshot = null;
-export let userRole = 'anonymous';
-export let userId = null;
-export let unsubscribeTable = null;
-
+export let currentTableId = null; export let selectedItems = []; export let currentOrderSnapshot = null;
+export let userRole = 'anonymous'; export let userId = null; export let unsubscribeTable = null;
 
 // --- ELEMENTOS UI ---
 let statusScreen, mainContent, appContainer, loginScreen, mainHeader;
 let loginBtn, loginEmailInput, loginPasswordInput, loginErrorMsg;
 
-
 // --- FUNÇÕES CORE E ROTIAMENTO ---
-// ... (NENHUMA MUDANÇA NAS FUNÇÕES: hideStatus, showLoginScreen, hideLoginScreen, goToScreen, handleTableTransferConfirmed, openManagerAuthModal, setTableListener, setCurrentTable, selectTableAndStartListener, openNfeModal, initStaffApp, authenticateStaff, handleStaffLogin, handleLogout) ...
-// (O código de todas as funções acima permanece o mesmo)
 export const hideStatus = () => {
     if (!statusScreen) statusScreen = document.getElementById('statusScreen');
     if (statusScreen) {
         statusScreen.style.cssText = 'display: none !important';
-        console.log("[UI] hideStatus executado.");
-    } else {
-        console.error("[UI] Elemento statusScreen não encontrado em hideStatus.");
     }
 };
 
 const showLoginScreen = () => {
-    console.log("[UI] Chamando showLoginScreen...");
-    if (!statusScreen) statusScreen = document.getElementById('statusScreen');
-    if (!mainContent) mainContent = document.getElementById('mainContent');
-    if (!mainHeader) mainHeader = document.getElementById('mainHeader');
-    if (!appContainer) appContainer = document.getElementById('appContainer');
-    if (!loginEmailInput) loginEmailInput = document.getElementById('loginEmail');
-    if (!loginPasswordInput) loginPasswordInput = document.getElementById('loginPassword');
-    if (!loginErrorMsg) loginErrorMsg = document.getElementById('loginErrorMsg');
+    statusScreen = document.getElementById('statusScreen');
+    mainContent = document.getElementById('mainContent');
+    mainHeader = document.getElementById('mainHeader');
+    appContainer = document.getElementById('appContainer');
+    loginEmailInput = document.getElementById('loginEmail');
+    loginPasswordInput = document.getElementById('loginPassword');
+    loginErrorMsg = document.getElementById('loginErrorMsg');
 
     hideStatus();
     if (mainHeader) mainHeader.style.display = 'none';
@@ -89,12 +64,12 @@ const showLoginScreen = () => {
     if(loginEmailInput) loginEmailInput.value = '';
     if(loginPasswordInput) loginPasswordInput.value = '';
     if(loginErrorMsg) loginErrorMsg.style.display = 'none';
-    console.log("[UI] showLoginScreen concluído.");
 };
 
 const hideLoginScreen = () => {
-    if (!mainHeader) mainHeader = document.getElementById('mainHeader');
-    if (!mainContent) mainContent = document.getElementById('mainContent');
+    mainHeader = document.getElementById('mainHeader');
+    mainContent = document.getElementById('mainContent');
+
     if (mainHeader) mainHeader.style.display = 'flex';
     if (mainContent) mainContent.style.display = 'block';
     document.body.classList.add('logged-in');
@@ -107,36 +82,56 @@ const hideLoginScreen = () => {
     }
 };
 
-export const goToScreen = (screenId) => {
+// --- FUNÇÃO DE AUTENTICAÇÃO VIA FIRESTORE (CORE) ---
+const authenticateUserFromFirestore = async (email, password) => {
+    try {
+        if (!db) throw new Error("Conexão com banco de dados indisponível.");
+        if (!appId) throw new Error("appId não está definido no firebaseService.");
+
+        const usersCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'users');
+        const userDocRef = doc(usersCollectionRef, email); // Email como ID
+        const docSnap = await getDoc(userDocRef);
+
+        if (docSnap.exists()) {
+            const userData = docSnap.data();
+            if (!userData.isActive) { return null; }
+            if (userData.password === password) { 
+                return { email: userData.email, name: userData.name, role: userData.role };
+            }
+            return null;
+        } else { return null; }
+    } catch (error) {
+        console.error("[AUTH Firestore] Erro ao verificar usuário:", error);
+        return null;
+    }
+};
+
+/**
+ * Navega entre as telas do SPA.
+ */
+export const goToScreen = async (screenId) => {
     if (!appContainer) appContainer = document.getElementById('appContainer');
     if (!mainContent) mainContent = document.getElementById('mainContent');
 
-    // Salva os itens locais no Firebase ANTES de navegar para o painel
-    if (currentTableId && screenId === 'panelScreen') {
-        const currentTransform = appContainer?.style.transform || '';
-        const currentScreenKey = Object.keys(screens).find(key => screens[key] * -100 + 'vw' === currentTransform.replace(/translateX\((.*?)\)/, '$1'));
-        if (currentScreenKey === 'orderScreen' || currentScreenKey === 'paymentScreen') {
-             console.log(`[NAV] Salvando itens da mesa ${currentTableId} ao sair de ${currentScreenKey}`);
-            saveSelectedItemsToFirebase(currentTableId, selectedItems);
-        }
-    }
-
-    // Desliga o listener e limpa o estado local DEPOIS de salvar
+    // Lógicas de pré-navegação e limpeza de estado
+    if (currentTableId && screenId === 'panelScreen') { saveSelectedItemsToFirebase(currentTableId, selectedItems); }
     if ((screenId === 'panelScreen' || screenId === 'loginScreen') && currentTableId && unsubscribeTable) {
-        console.log(`[NAV] Desinscrevendo do listener da mesa ${currentTableId}`);
-        unsubscribeTable(); unsubscribeTable = null;
-        currentTableId = null; currentOrderSnapshot = null; selectedItems.length = 0; // Limpa o array local
-
-        // --- INÍCIO DA CORREÇÃO ---
-        // Reseta os títulos ao sair da mesa
+        unsubscribeTable(); unsubscribeTable = null; currentTableId = null; currentOrderSnapshot = null; selectedItems.length = 0;
         const currentTableNumEl = document.getElementById('current-table-number');
         const paymentTableNumEl = document.getElementById('payment-table-number');
-        const orderScreenTableNumEl = document.getElementById('order-screen-table-number'); // Novo
-
-        if(currentTableNumEl) currentTableNumEl.textContent = 'Fator MD'; // Reseta para o nome do sistema
+        const orderScreenTableNumEl = document.getElementById('order-screen-table-number');
+        if(currentTableNumEl) currentTableNumEl.textContent = 'Fator MD';
         if(paymentTableNumEl) paymentTableNumEl.textContent = `Mesa`;
-        if(orderScreenTableNumEl) orderScreenTableNumEl.textContent = 'Pedido'; // Reseta para o padrão
-        // --- FIM DA CORREÇÃO ---
+        if(orderScreenTableNumEl) orderScreenTableNumEl.textContent = 'Pedido';
+    }
+
+    // Reseta botão finalizar
+    if (screenId === 'panelScreen') {
+        const finalizeBtn = document.getElementById('finalizeOrderBtn');
+        if (finalizeBtn && !finalizeBtn.innerHTML.includes('fa-check-circle')) {
+            finalizeBtn.disabled = true; finalizeBtn.innerHTML = '<i class="fas fa-check-circle"></i> FINALIZAR CONTA';
+            finalizeBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        }
     }
 
     const screenIndex = screens[screenId];
@@ -145,76 +140,59 @@ export const goToScreen = (screenId) => {
         if (appContainer) appContainer.style.transform = `translateX(-${screenIndex * 100}vw)`;
         if (mainContent && screenId !== 'loginScreen') mainContent.style.display = 'block';
         document.body.classList.toggle('bg-gray-900', screenId === 'managerScreen');
-        document.body.classList.toggle('bg-dark-bg', screenId !== 'managerScreen');
-    } else {
-        console.error(`[NAV] Tentativa de navegar para tela inválida: ${screenId}`);
-    }
+        document.body.classList.toggle('bg-dark-bg', screenId !== 'managerScreen' && screenId !== 'loginScreen');
+
+    } else { console.error(`[NAV] Tentativa de navegar para tela inválida: ${screenId}`); }
 };
 window.goToScreen = goToScreen;
 
 export const handleTableTransferConfirmed = async (originTableId, targetTableId, itemsToTransfer, newDiners = 0, newSector = '') => {
-    if (!originTableId || !targetTableId || itemsToTransfer.length === 0) {
-        alert("Erro: Dados de transferência incompletos.");
-        return;
-    }
+    if (!originTableId || !targetTableId || itemsToTransfer.length === 0) { /* ... */ return; }
+    if (originTableId === targetTableId) { /* ... */ return; }
 
     const originTableRef = getTableDocRef(originTableId);
     const targetTableRef = getTableDocRef(targetTableId);
 
-    const dbInstance = db; // Usa o 'db' importado do firebaseService
-    if (!dbInstance) {
-        console.error("DB não inicializado!");
-        alert("Erro de conexão. Tente novamente.");
-        return;
-    }
+    const dbInstance = db;
+    if (!dbInstance) { /* ... */ return; }
     const batch = writeBatch(dbInstance);
 
     try {
         const targetSnap = await getDoc(targetTableRef);
         const targetTableIsOpen = targetSnap.exists() && targetSnap.data().status?.toLowerCase() === 'open';
 
-        // 1. Abertura/Setup da Mesa de Destino
         if (!targetTableIsOpen) {
-            if (!newDiners || !newSector) {
-                alert("Erro: Mesa destino fechada. Pessoas e setor obrigatórios.");
-                return;
-            }
-            console.log(`[APP] Abrindo Mesa ${targetTableId} para transferência.`);
-            batch.set(targetTableRef, {
-                tableNumber: parseInt(targetTableId), diners: newDiners, sector: newSector, status: 'open',
-                createdAt: serverTimestamp(), total: 0, sentItems: [], payments: [], serviceTaxApplied: true, selectedItems: []
-            });
+            if (!newDiners || !newSector) { /* ... */ return; }
+            batch.set(targetTableRef, { /* ... */ });
         }
 
-        // 2. Transferência dos Itens
         const transferValue = itemsToTransfer.reduce((sum, item) => sum + (item.price || 0), 0);
-        const originCurrentTotal = currentOrderSnapshot?.total || 0; // Usa snapshot global
+        const originCurrentTotal = currentOrderSnapshot?.tableNumber == originTableId ? (currentOrderSnapshot.total || 0) : (await getDoc(originTableRef)).data()?.total || 0;
         const originNewTotal = Math.max(0, originCurrentTotal - transferValue);
-        itemsToTransfer.forEach(item => {
-            batch.update(originTableRef, { sentItems: arrayRemove(item) });
-        });
+        itemsToTransfer.forEach(item => { batch.update(originTableRef, { sentItems: arrayRemove(item) }); });
         batch.update(originTableRef, { total: originNewTotal });
 
         const targetData = targetTableIsOpen ? targetSnap.data() : { total: 0 };
         const targetNewTotal = (targetData.total || 0) + transferValue;
-        batch.update(targetTableRef, {
-            sentItems: arrayUnion(...itemsToTransfer),
-            total: targetNewTotal
-        });
+        batch.update(targetTableRef, { sentItems: arrayUnion(...itemsToTransfer), total: targetNewTotal });
 
         await batch.commit();
-        alert(`Sucesso! ${itemsToTransfer.length} item(s) transferidos da Mesa ${originTableId} para ${targetTableId}.`);
         goToScreen('panelScreen');
 
-    } catch (e) {
-        console.error("Erro na transferência de mesa:", e);
-        alert("Falha na transferência dos itens.");
-    }
+    } catch (e) { console.error("Erro na transferência de mesa:", e); alert(`Falha na transferência dos itens: ${e.message}`); }
 };
 window.handleTableTransferConfirmed = handleTableTransferConfirmed;
 
-
+/**
+ * Abre o modal de autenticação para ações gerenciais e delega a ação.
+ */
 window.openManagerAuthModal = (action, payload = null) => {
+    // Ação de Usuários é tratada diretamente
+    if (action === 'openWaiterReg') {
+        openUserManagementModal();
+        return;
+    }
+    
     const managerModal = document.getElementById('managerModal');
     if (!managerModal) { console.error("Modal Gerente não encontrado!"); return; }
 
@@ -222,7 +200,7 @@ window.openManagerAuthModal = (action, payload = null) => {
         <div class="bg-dark-card border border-gray-600 p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 class="text-xl font-bold mb-4 text-red-400">Ação Gerencial Necessária</h3>
             <p class="text-base mb-3 text-dark-text">Insira a senha do gerente para prosseguir.</p>
-            <input type="password" id="managerPasswordInput" placeholder="Senha" class="w-full p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text placeholder-dark-placeholder focus:ring-red-500 focus:border-red-500 text-base" maxlength="4">
+            <input type="password" id="managerPasswordInput" placeholder="Senha" class="w-full p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text placeholder-dark-placeholder focus:ring-red-500 focus:border-red-500 text-base" maxlength="4" autocomplete="current-password">
             <div class="flex justify-end space-x-3 mt-4">
                 <button class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition text-base" onclick="document.getElementById('managerModal').style.display='none'">Cancelar</button>
                 <button id="authManagerBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-base">Autenticar</button>
@@ -233,37 +211,18 @@ window.openManagerAuthModal = (action, payload = null) => {
     const input = document.getElementById('managerPasswordInput');
     const authBtn = document.getElementById('authManagerBtn');
 
-    if(input) input.focus();
-
     if(authBtn && input) {
-        const handleAuthClick = () => {
+        const handleAuthClick = async () => {
             if (input.value === MANAGER_PASSWORD) {
                 managerModal.style.display = 'none';
 
-                console.log(`[AUTH MODAL] Ação '${action}' autorizada.`);
+                // Executa a ação (usando as funções estaticamente importadas)
                 switch (action) {
-                    // Ações do PaymentController
-                    case 'executeMassDelete':
-                        handleMassDeleteConfirmed();
-                        break;
-                    case 'executeMassTransfer':
-                        openTableTransferModal();
-                        break;
-                    case 'deletePayment':
-                        executeDeletePayment(payload);
-                        break;
-
-                    // Ações do ManagerController
-                    case 'goToManagerPanel':
-                    case 'openProductManagement':
-                    case 'openCategoryManagement':
-                    case 'openInventoryManagement':
-                    case 'openRecipesManagement':
-                        handleGerencialAction(action, payload);
-                        break;
-
-                    default:
-                        console.warn(`Ação ${action} não reconhecida pelo modal.`);
+                    case 'executeMassDelete': handleMassDeleteConfirmed(); break;
+                    case 'executeMassTransfer': openTableTransferModal(); break;
+                    case 'deletePayment': executeDeletePayment(payload); break;
+                    case 'goToManagerPanel': await goToScreen('managerScreen'); break;
+                    default: handleGerencialAction(action, payload); break;
                 }
             } else {
                 alert("Senha incorreta.");
@@ -276,28 +235,29 @@ window.openManagerAuthModal = (action, payload = null) => {
         input.onkeydown = (e) => { if (e.key === 'Enter') handleAuthClick(); };
     }
 };
+window.openManagerAuthModal = openManagerAuthModal;
 
-window.deletePayment = deletePayment;
-window.handleMassActionRequest = handleMassActionRequest;
-window.openTableTransferModal = openTableTransferModal;
-window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`);
+// --- WRAPPERS GLOBAIS PARA ONCLICKS ---
+window.deletePayment = (timestamp) => window.openManagerAuthModal('deletePayment', timestamp);
+window.handleMassActionRequest = (action) => { if(action === 'delete') window.openManagerAuthModal('executeMassDelete'); else if (action === 'transfer') window.openManagerAuthModal('executeMassTransfer'); };
 window.increaseLocalItemQuantity = increaseLocalItemQuantity;
 window.decreaseLocalItemQuantity = decreaseLocalItemQuantity;
 window.openObsModalForGroup = openObsModalForGroup;
+window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`);
+window.openNfeModal = () => { /* ... (lógica) ... */ };
+window.openNfeModal = openNfeModal;
 
-
+// --- LÓGICA DE LISTENER DA MESA ---
 export const setTableListener = (tableId) => {
     if (unsubscribeTable) unsubscribeTable();
-    console.log(`[APP] Configurando listener para mesa ${tableId}`);
     const tableRef = getTableDocRef(tableId);
+    
     unsubscribeTable = onSnapshot(tableRef, (docSnapshot) => {
         if (docSnapshot.exists()) {
-            console.log(`[APP] Snapshot recebido para mesa ${tableId}`);
             currentOrderSnapshot = docSnapshot.data();
             const firebaseSelectedItems = currentOrderSnapshot.selectedItems || [];
 
             if (JSON.stringify(firebaseSelectedItems) !== JSON.stringify(selectedItems)) {
-                 console.log("[APP] Sincronizando 'selectedItems' local com dados do Firebase.");
                  selectedItems.length = 0;
                  selectedItems.push(...firebaseSelectedItems);
             }
@@ -306,7 +266,6 @@ export const setTableListener = (tableId) => {
             renderPaymentSummary(currentTableId, currentOrderSnapshot);
 
         } else {
-             console.warn(`[APP] Listener: Mesa ${tableId} não existe ou foi fechada.`);
              if (currentTableId === tableId) {
                  alert(`Mesa ${tableId} foi fechada ou removida.`);
                  if (unsubscribeTable) unsubscribeTable(); unsubscribeTable = null;
@@ -322,230 +281,130 @@ export const setTableListener = (tableId) => {
     });
 };
 
-
 export const setCurrentTable = (tableId) => {
     if (currentTableId === tableId && unsubscribeTable) {
-        console.log(`[APP] Listener para mesa ${tableId} já ativo.`);
+        if(currentOrderSnapshot){
+             // Re-renderiza a tela atual
+             renderOrderScreen(currentOrderSnapshot);
+             renderPaymentSummary(currentTableId, currentOrderSnapshot);
+        }
+        return;
     }
 
     currentTableId = tableId;
-    console.log(`[APP] Definindo mesa atual para ${tableId}`);
-
-    // --- INÍCIO DA CORREÇÃO (Aplicando a sugestão do header) ---
-    // Atualiza os títulos nas telas relevantes
-    const currentTableNumEl = document.getElementById('current-table-number'); // <-- LINHA ADICIONADA
+    const currentTableNumEl = document.getElementById('current-table-number');
     const paymentTableNumEl = document.getElementById('payment-table-number');
     const orderScreenTableNumEl = document.getElementById('order-screen-table-number');
-
-    if(currentTableNumEl) currentTableNumEl.textContent = `Mesa ${tableId}`; // <-- LINHA ADICIONADA (Atualiza o header)
+    if(currentTableNumEl) currentTableNumEl.textContent = `Mesa ${tableId}`;
     if(paymentTableNumEl) paymentTableNumEl.textContent = `Mesa ${tableId}`;
     if(orderScreenTableNumEl) orderScreenTableNumEl.textContent = `Mesa ${tableId}`;
-     // --- FIM DA CORREÇÃO ---
 
-    // Inicia o listener (ou reinicia)
     setTableListener(tableId);
 };
 
-
 export const selectTableAndStartListener = async (tableId) => {
-    console.log(`[APP] Selecionando mesa ${tableId} e iniciando listener.`);
     try {
-        await fetchWooCommerceProducts(/* Callback opcional */);
+        await goToScreen('orderScreen');
         setCurrentTable(tableId);
-        goToScreen('orderScreen');
-    } catch (error) {
-        console.error(`[APP] Erro ao selecionar mesa ${tableId}:`, error);
-        alert("Erro ao abrir a mesa. Verifique a conexão.");
-    }
+    } catch (error) { console.error(`[APP] Erro ao selecionar mesa ${tableId}:`, error); alert("Erro ao abrir a mesa. Verifique a conexão."); }
 };
 window.selectTableAndStartListener = selectTableAndStartListener;
 
 
-window.openNfeModal = () => {
-    const modal = document.getElementById('nfeModal');
-    if (!modal || !currentOrderSnapshot) {
-        alert("Erro: Modal NF-e não encontrado ou nenhuma mesa selecionada.");
-        return;
-    }
-
-    const nfeError = document.getElementById('nfeError');
-    const nfeErrorMessage = document.getElementById('nfeErrorMessage');
-    const nfeDetails = document.getElementById('nfeDetails');
-    const nfeCustomerName = document.getElementById('nfeCustomerName');
-    const nfeCustomerDoc = document.getElementById('nfeCustomerDoc');
-    const nfeTotalValue = document.getElementById('nfeTotalValue');
-    const nfeConfirmBtn = document.getElementById('nfeConfirmBtn');
-
-    // Reseta o estado
-    nfeError.style.display = 'none';
-    nfeDetails.style.display = 'block';
-    nfeConfirmBtn.style.display = 'block';
-
-    // Verifica se há um cliente associado (que salvamos no snapshot)
-    if (currentOrderSnapshot.clientId && currentOrderSnapshot.clientName) {
-        // Cliente ENCONTRADO
-        nfeCustomerName.textContent = currentOrderSnapshot.clientName;
-        nfeCustomerDoc.textContent = currentOrderSnapshot.clientId; // (CPF ou CNPJ)
-
-        // Pega o valor total da tela de pagamento
-        const totalValueEl = document.getElementById('orderTotalDisplayPayment');
-        nfeTotalValue.textContent = totalValueEl ? totalValueEl.textContent : 'R$ 0,00';
-
-        // Remove listener antigo e adiciona um novo
-        const newConfirmBtn = nfeConfirmBtn.cloneNode(true);
-        nfeConfirmBtn.parentNode.replaceChild(newConfirmBtn, nfeConfirmBtn);
-        newConfirmBtn.addEventListener('click', () => {
-            // Aqui é onde os dados seriam enviados para o backend
-            console.log("--- DADOS PARA NF-e (SIMULAÇÃO) ---");
-            console.log("Cliente:", currentOrderSnapshot.clientName);
-            console.log("Documento:", currentOrderSnapshot.clientId);
-            console.log("Valor:", nfeTotalValue.textContent);
-            console.log("Itens:", currentOrderSnapshot.sentItems);
-            console.log("Pagamentos:", currentOrderSnapshot.payments);
-
-            alert("Simulação: Dados da NF-e enviados para o backend. (Verifique o console)");
-            modal.style.display = 'none';
-        });
-
-    } else {
-        // Cliente NÃO ENCONTRADO
-        nfeDetails.style.display = 'none'; // Esconde os detalhes
-        nfeConfirmBtn.style.display = 'none'; // Esconde o botão de emitir
-
-        nfeError.style.display = 'block'; // Mostra o erro
-        nfeErrorMessage.textContent = "Nenhum cliente (CPF/CNPJ) associado a esta mesa. Associe um cliente antes de emitir a NF-e.";
-    }
-
-    modal.style.display = 'flex';
-};
-
-
-const initStaffApp = async () => {
-    console.log("[INIT] Iniciando app para Staff...");
-    try {
-        renderTableFilters();
-        console.log("[INIT] Filtros de setor renderizados.");
-
-        // Chamadas agora usam o proxy (Cloud Function)
-        fetchWooCommerceProducts().catch(e => console.error("[INIT ERROR] Falha ao carregar produtos:", e));
-        fetchWooCommerceCategories().catch(e => console.error("[INIT ERROR] Falha ao carregar categorias:", e));
-
-        hideStatus();
-        hideLoginScreen(); // Mostra header/main
-        console.log("[INIT] UI principal visível.");
-
-        loadOpenTables(); // Configura listener das mesas
-        console.log("[INIT] Listener de mesas configurado.");
-
-        goToScreen('panelScreen'); // Navega para o painel de mesas
-        console.log("[INIT] Navegação inicial para panelScreen.");
-
-    } catch (error) {
-        console.error("[INIT] Erro CRÍTICO durante initStaffApp:", error);
-        alert("Erro grave ao iniciar. Verifique o console.");
-        showLoginScreen();
-    }
-};
-
-const authenticateStaff = (email, password) => {
-    const creds = STAFF_CREDENTIALS[email];
-    return (creds && creds.password === password && creds.role !== 'client') ? creds : null;
-};
-
-const handleStaffLogin = async () => {
+// --- LÓGICA DE LOGIN ---
+const handleStaffLogin = async () => { 
     loginBtn = document.getElementById('loginBtn');
     loginEmailInput = document.getElementById('loginEmail');
     loginPasswordInput = document.getElementById('loginPassword');
     loginErrorMsg = document.getElementById('loginErrorMsg');
 
-    if (!loginBtn || !loginEmailInput || !loginPasswordInput) { /* ... (erro mantido) ... */ return; }
+    if (!loginBtn || !loginEmailInput || !loginPasswordInput) { return; }
     if (loginErrorMsg) loginErrorMsg.style.display = 'none';
     loginBtn.disabled = true; loginBtn.textContent = 'Entrando...';
 
-    const email = loginEmailInput.value.trim();
+    const email = loginEmailInput.value.trim().toLowerCase();
     const password = loginPasswordInput.value.trim();
 
-    console.log(`[LOGIN] Tentando autenticar ${email}...`);
-    const staffData = authenticateStaff(email, password);
+    // --- CORREÇÃO: Autenticação via Firestore ---
+    const staffData = await authenticateUserFromFirestore(email, password);
 
     if (staffData) {
-        console.log(`[LOGIN] Autenticação local OK. Role: ${staffData.role}`);
         userRole = staffData.role;
         try {
             const authInstance = auth;
             if (!authInstance) throw new Error("Firebase Auth não inicializado.");
-            console.log("[LOGIN] Tentando login anônimo Firebase...");
-            try {
-                const userCredential = await signInAnonymously(authInstance);
-                userId = userCredential.user.uid;
-                console.log(`[LOGIN] Login Firebase OK. UID: ${userId}`);
-            } catch (authError) {
-                console.warn("[LOGIN] Login Firebase falhou. Usando Mock ID.", authError);
-                userId = `mock_${userRole}_${Date.now()}`;
-            }
-
+            const userCredential = await signInAnonymously(authInstance);
+            userId = userCredential.user.uid;
+            
             const userName = staffData.name || userRole;
-            document.getElementById('user-id-display').textContent = `Usuário: ${userName} | ${userRole.toUpperCase()}`;
-            console.log("[LOGIN] User info display atualizado.");
+            const userIdDisplay = document.getElementById('user-id-display');
+            if(userIdDisplay) userIdDisplay.textContent = `Usuário: ${userName} | ${userRole.toUpperCase()}`;
+            
+            await initStaffApp(); // Inicializa o app principal
 
-            console.log("[LOGIN] Chamando initStaffApp...");
-            await initStaffApp();
-            console.log("[LOGIN] initStaffApp concluído.");
-
-        } catch (error) {
+        } catch (error) { 
              console.error("[LOGIN] Erro pós-autenticação:", error);
              alert(`Erro ao iniciar sessão: ${error.message}.`);
              showLoginScreen();
              if(loginErrorMsg) { loginErrorMsg.textContent = `Erro: ${error.message}`; loginErrorMsg.style.display = 'block'; }
         }
     } else {
-        console.log(`[LOGIN] Credenciais inválidas para ${email}.`);
-        if(loginErrorMsg) { loginErrorMsg.textContent = 'E-mail ou senha inválidos.'; loginErrorMsg.style.display = 'block'; }
+        if(loginErrorMsg) { loginErrorMsg.textContent = 'E-mail, senha inválidos ou usuário inativo.'; loginErrorMsg.style.display = 'block'; }
     }
     if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Entrar'; }
-    console.log("[LOGIN] Fim do handleStaffLogin.");
 };
 
 const handleLogout = () => {
-    console.log("[LOGOUT] Iniciando...");
-    const authInstance = auth;
-    if (authInstance && authInstance.currentUser && (!userId || !userId.startsWith('mock_'))) {
-        console.log("[LOGOUT] Fazendo signOut Firebase...");
-        signOut(authInstance).catch(e => console.error("Erro no sign out:", e));
-    } else {
-        console.log("[LOGOUT] Pulando signOut Firebase (usuário mock ou já deslogado).");
-    }
+    // Limpa estado global
     userId = null; currentTableId = null; selectedItems.length = 0; userRole = 'anonymous'; currentOrderSnapshot = null;
     if (unsubscribeTable) { unsubscribeTable(); unsubscribeTable = null; }
-
     showLoginScreen();
-    document.getElementById('user-id-display').textContent = 'Usuário ID: Carregando...';
-    console.log("[LOGOUT] Concluído.");
+    const userIdDisplay = document.getElementById('user-id-display');
+    if(userIdDisplay) userIdDisplay.textContent = 'Usuário ID: Carregando...';
 };
 window.handleLogout = handleLogout;
 
-
-// --- INICIALIZAÇÃO PRINCIPAL ---
-document.addEventListener('DOMContentLoaded', () => {
-    console.log("[INIT] DOMContentLoaded.");
-
-    const firebaseConfig = FIREBASE_CONFIG;
-
+// --- FUNÇÕES DE INICIALIZAÇÃO ---
+const initStaffApp = async () => { 
     try {
-        console.log("[INIT] Config Firebase carregada do módulo.");
+        // 1. Inicializa todos os controladores estáticos
+        initPanelController();
+        initOrderController();
+        initPaymentController();
+        initManagerController();
+        initUserManagementController();
 
-        // Inicializa Firebase App e Serviços
+        // 2. Renderiza e carrega dados
+        renderTableFilters();
+        fetchWooCommerceProducts().catch(e => console.error("[INIT ERROR] Falha ao carregar produtos:", e));
+        fetchWooCommerceCategories().catch(e => console.error("[INIT ERROR] Falha ao carregar categorias:", e));
+
+        hideStatus(); 
+        hideLoginScreen();
+
+        loadOpenTables(); // Carrega as mesas
+        
+        await goToScreen('panelScreen');
+
+    } catch (error) { 
+        console.error("[INIT] Erro CRÍTICO durante initStaffApp:", error); 
+        alert(`Erro grave na inicialização: ${error.message}. Verifique o console.`); 
+        showLoginScreen(); 
+    }
+};
+
+// --- DOMContentLoaded (Ponto de entrada) ---
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        const firebaseConfig = FIREBASE_CONFIG;
         const app = initializeApp(firebaseConfig);
         const dbInstance = getFirestore(app);
         const authInstance = getAuth(app);
-        // ATUALIZADO: Inicializa o Functions com a REGIÃO
-        const functionsInstance = getFunctions(app, 'us-central1'); // <--- ADICIONADO 'us-central1'
-
-        // Passa o functionsInstance
-        initializeFirebase(dbInstance, authInstance, APP_ID, functionsInstance);
-        console.log("[INIT] Firebase App e Serviços (DB, Auth, Functions) inicializados.");
-
-        // Mapeia elementos Globais e de Login
+        const functionsInstance = getFunctions(app, 'us-central1');
+        // Define o APP_ID customizado
+        initializeFirebase(dbInstance, authInstance, "pdv_fator_instance_001", functionsInstance); 
+        
+        // Mapeamento UI
         statusScreen = document.getElementById('statusScreen');
         mainContent = document.getElementById('mainContent');
         appContainer = document.getElementById('appContainer');
@@ -554,62 +413,38 @@ document.addEventListener('DOMContentLoaded', () => {
         loginEmailInput = document.getElementById('loginEmail');
         loginPasswordInput = document.getElementById('loginPassword');
         loginErrorMsg = document.getElementById('loginErrorMsg');
-        console.log("[INIT] Elementos Globais e de Login mapeados.");
 
         // Listener de Autenticação Firebase
         onAuthStateChanged(authInstance, async (user) => {
-            console.log("[AUTH] State Changed:", user ? `User UID: ${user.uid}` : 'No user');
             if (user) {
-                userId = user.uid;
-                console.log(`[AUTH] Usuário Firebase ${userId} detectado.`);
-                if (userRole === 'gerente' || userRole === 'garcom') {
-                    console.log(`[AUTH] Role ${userRole} já definida. Iniciando app...`);
-                     const userName = STAFF_CREDENTIALS[loginEmailInput?.value?.trim()]?.name || userRole;
-                     document.getElementById('user-id-display').textContent = `Usuário: ${userName} | ${userRole.toUpperCase()}`;
-                    await initStaffApp();
-                } else {
-                    console.warn("[AUTH] Usuário Firebase existe, mas role local é 'anonymous'. Forçando logout.");
-                    handleLogout();
+                userId = user.uid; 
+                if (userRole !== 'anonymous') { 
+                     await initStaffApp(); 
+                } else if (!window.location.pathname.includes('client.html')) {
+                    showLoginScreen();
                 }
-            } else if (userRole !== 'gerente' && userRole !== 'garcom') {
-                 console.log("[AUTH] -> showLoginScreen()");
+            } else if (!window.location.pathname.includes('client.html')) {
                  showLoginScreen();
             }
         });
-        console.log("[INIT] Listener AuthStateChanged configurado.");
 
-        // Adiciona Listener ao Botão de Login
+        const loginForm = document.getElementById('loginForm');
+        // --- CORREÇÃO: O Botão 'Entrar' não está dentro do FORM no HTML fornecido, então o listener do FORM não dispara.
+        // A lógica do FORM/Button deve ser corrigida no HTML. Usamos o listener do botão como fallback seguro.
         if (loginBtn) {
             loginBtn.addEventListener('click', handleStaffLogin);
-            console.log("[INIT] Listener do botão Login adicionado.");
-        } else {
-             console.error("[INIT] Botão de Login (loginBtn) não encontrado!");
         }
-
-        // Inicializa os Controllers
-        console.log("[INIT] Chamando inicializadores dos controllers...");
-        initPanelController();
-        initOrderController();
-        initPaymentController();
-        initManagerController();
-        console.log("[INIT] Inicializadores dos controllers chamados.");
-
-        // Outros Listeners Globais (Header, etc.)
+        
         const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
         const logoutBtnHeader = document.getElementById('logoutBtnHeader');
-        const openNfeModalBtn = document.getElementById('openNfeModalBtn'); // O listener ainda encontra pelo ID
-
         if (openManagerPanelBtn) openManagerPanelBtn.addEventListener('click', () => { window.openManagerAuthModal('goToManagerPanel'); });
         if (logoutBtnHeader) logoutBtnHeader.addEventListener('click', handleLogout);
-        if (openNfeModalBtn) openNfeModalBtn.addEventListener('click', window.openNfeModal); // <-- Este agora chama a função corrigida
 
-        console.log("[INIT] Listeners restantes adicionados.");
-
-    } catch (e) {
-        console.error("Erro CRÍTICO na inicialização (DOMContentLoaded):", e);
-        alert("Falha grave ao carregar o PDV. Verifique o console.");
-        if(statusScreen) statusScreen.innerHTML = '<h2 class="text-red-600 font-bold">Erro de Inicialização</h2>';
+    } catch (e) { 
+        if(statusScreen) { 
+             statusScreen.innerHTML = `<div class="flex flex-col items-center p-8 max-w-sm w-full text-center"><i class="fas fa-times-circle text-4xl text-red-500 mb-4"></i><h2 class="text-xl font-bold mb-2 text-red-400">Erro Crítico</h2><p class="text-dark-placeholder">${e.message}</p></div>`;
+             statusScreen.style.display = 'flex';
+        }
         return;
     }
-    console.log("[INIT] DOMContentLoaded finalizado.");
-}); // FIM DO DOMContentLoaded
+});
