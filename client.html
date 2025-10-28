@@ -2,7 +2,6 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <!-- Viewport essencial para Mobile-First -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fator PDV - Cliente (Comanda Digital)</title>
 
@@ -59,8 +58,12 @@
         /* Adaptações gerais para o tema claro do cliente */
         .client-mode .content-card {
             background-color: theme('colors.client-card');
-            border-color: theme('colors.client-border');
-            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1); /* Sombra sutil */
+            border: 1px solid theme('colors.client-border'); /* Adiciona borda sutil */
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+        }
+        /* CORREÇÃO: Força fundo branco no card "Seu Pedido" */
+        .client-mode #orderingInputsClient .content-card {
+             background-color: theme('colors.client-card') !important;
         }
         .client-mode .input-pdv {
              background-color: theme('colors.client-input-bg');
@@ -80,7 +83,7 @@
             border-color: theme('colors.client-border');
         }
         .client-mode .category-btn:hover {
-             background-color: theme('colors.gray.200'); /* Um pouco mais escuro no hover */
+             background-color: theme('colors.gray.200');
         }
         .client-mode .category-btn.bg-indigo-700 { /* Classe de ativo */
             background-color: theme('colors.primary') !important;
@@ -102,40 +105,49 @@
         .client-mode #openOrderListClient span.font-semibold { color: theme('colors.client-text');}
         .client-mode #openOrderListClient span.cursor-pointer { color: theme('colors.primary');}
 
-        /* Garante scroll suave na horizontal para categorias */
+        /* Scroll suave na horizontal para categorias */
         #categoryFiltersClient::-webkit-scrollbar { height: 4px; }
         #categoryFiltersClient::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
 
+        /* Ajuste para centralizar container em telas maiores (opcional) */
+        @media (min-width: 1024px) { /* lg breakpoint */
+             #mainContent > div { /* Target #appContainer */
+                /* max-width: 1280px; /* Define uma largura máxima */
+                /* margin: 0 auto; /* Centraliza */
+             }
+             /* Pode adicionar mais ajustes específicos para desktop aqui */
+        }
 
     </style>
 </head>
 <body class="bg-client-bg min-h-screen client-mode">
 
-    <main id="mainContent" class="relative overflow-hidden">
+    <main id="mainContent" class="relative overflow-hidden lg:max-w-7xl lg:mx-auto"> {/* Adiciona max-width e centraliza em large screens */}
         <div id="appContainer" class="flex transition-transform duration-300 ease-out">
 
-            <!-- TELA DE PEDIDO DO CLIENTE (Mobile First) -->
-            <div id="clientOrderScreen" class="w-screen flex-shrink-0 p-3 md:p-4"> {/* Padding menor no mobile */}
+            {/* TELA DE PEDIDO DO CLIENTE (Mobile First) */}
+            <div id="clientOrderScreen" class="w-screen flex-shrink-0 p-3 md:p-6 lg:p-8"> {/* Aumenta padding em telas maiores */}
                 {/* Cabeçalho da Tela */}
-                <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center justify-between mb-4 md:mb-6">
                     <div class="flex items-center text-green-700">
                         <span class="text-xl md:text-2xl font-semibold mr-3" id="client-table-number">Cardápio Digital</span>
                     </div>
-                    <button id="goToPaymentBtnClient" class="rounded-full bg-green-600 p-2 md:p-3 text-white shadow-lg hover:bg-green-700 transition duration-150 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center" title="Ver Conta" onclick="window.goToScreen('clientPaymentScreen')"> {/* Corrigido para clientPaymentScreen */}
+                    <button id="goToPaymentBtnClient" class="rounded-full bg-green-600 p-2 md:p-3 text-white shadow-lg hover:bg-green-700 transition duration-150 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center" title="Ver Conta" onclick="window.goToScreen('clientPaymentScreen')">
                         <i class="fas fa-receipt text-lg md:text-xl"></i>
                     </button>
                 </div>
 
                 {/* Seção "Seu Pedido" */}
-                <div id="orderingInputsClient" class="mb-6">
-                    <div class="p-3 md:p-4 content-card">
+                <div id="orderingInputsClient" class="mb-6 md:mb-8">
+                    {/* Aplica a classe content-card aqui */}
+                    <div class="p-3 md:p-4 content-card rounded-lg">
                         <div class="flex justify-between items-center mb-3 md:mb-4">
                             <h2 class="text-lg md:text-xl font-semibold text-client-text mr-2">Seu Pedido (<span id="openItemsCountClient">0</span>)</h2>
                             <button id="sendClientOrderBtn" class="bg-green-600 text-white p-2 md:p-3 rounded-full shadow-lg hover:bg-green-700 transition duration-150 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center text-lg md:text-xl disabled:opacity-50" title="Enviar Pedido para Confirmação">
                                 <i class="fas fa-check-circle"></i>
                             </button>
                         </div>
-                        <div id="openOrderListClient" class="space-y-2 md:space-y-3">
+                        <div id="openOrderListClient" class="space-y-2 md:space-y-3 max-h-48 overflow-y-auto pr-2"> {/* Limita altura e adiciona scroll */}
                             <div class="text-sm md:text-base text-client-text-secondary italic p-2">Nenhum item selecionado.</div>
                         </div>
                     </div>
@@ -146,7 +158,7 @@
                     <div class="flex justify-between items-center mb-3 md:mb-4 px-1">
                         <h2 class="text-lg md:text-xl font-bold text-client-text">Cardápio</h2>
                         <div class="relative">
-                            <input type="text" id="searchProductInputClient" placeholder="Buscar..." class="pr-8 input-pdv text-sm w-32 md:w-40"> {/* Input menor */}
+                            <input type="text" id="searchProductInputClient" placeholder="Buscar..." class="pr-8 input-pdv text-sm w-32 md:w-48 lg:w-64"> {/* Aumenta input em telas maiores */}
                             <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-client-text-secondary"></i>
                         </div>
                     </div>
@@ -157,20 +169,16 @@
                     </div>
 
                     {/* Grid de Itens (Responsivo - CORRIGIDO) */}
-                    {/* Inicia com 2 colunas, 3 em md, 4 em lg */}
                     <div id="menuItemsGridClient" class="px-1 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-                         {/* Itens serão injetados aqui */}
                          <div class="col-span-full text-center p-6 text-gray-500 italic">Carregando cardápio...</div>
                     </div>
                 </div>
             </div>
 
-            <!-- TELA DE PAGAMENTO/RESUMO (Mobile First) -->
-            {/* ID Corrigido para corresponder ao goToScreen */}
-            <div id="clientPaymentScreen" class="w-screen flex-shrink-0 p-3 md:p-4">
-                 <div class="flex items-center justify-between mb-4">
+            {/* TELA DE PAGAMENTO/RESUMO (Mobile First) */}
+            <div id="clientPaymentScreen" class="w-screen flex-shrink-0 p-3 md:p-6 lg:p-8">
+                 <div class="flex items-center justify-between mb-4 md:mb-6">
                     <div class="flex items-center text-indigo-700">
-                         {/* Corrigido para clientOrderScreen */}
                         <button id="backToOrderFromPaymentBtn" class="mr-2 text-2xl md:text-3xl p-2 hover:text-indigo-900 transition duration-150" title="Voltar para o Pedido" onclick="window.goToScreen('clientOrderScreen')">
                             <i class="fas fa-arrow-left"></i>
                         </button>
@@ -179,18 +187,12 @@
                 </div>
 
                 {/* Card de Resumo da Conta */}
-                <div class="content-card p-3 md:p-4 mb-6">
+                <div class="content-card p-3 md:p-4 mb-6 rounded-lg">
                     <h2 class="text-lg md:text-xl font-semibold text-green-700 mb-3 md:mb-4">Resumo da Conta</h2>
 
-                    {/* Lista de Itens (Simplificada) */}
-                    <div id="reviewItemsList" class="space-y-2 md:space-y-3 pt-2 mb-4 max-h-60 overflow-y-auto">
+                    {/* Lista de Itens */}
+                    <div id="reviewItemsList" class="space-y-2 md:space-y-3 pt-2 mb-4 max-h-72 overflow-y-auto pr-2"> {/* Aumenta altura max */}
                          <div class="text-sm md:text-base text-client-text-secondary italic p-2">Nenhum item na conta para revisão.</div>
-                    </div>
-
-                    {/* Seção de Divisão (Oculta ou Simplificada no Cliente) */}
-                    <div class="hidden"> {/* Mantendo oculto por enquanto */}
-                        <h2 class="text-lg md:text-xl font-semibold text-indigo-700 mb-4">Divisão da Conta</h2>
-                        {/* ... */}
                     </div>
 
                     {/* Totais */}
@@ -202,7 +204,6 @@
                         <div class="flex justify-between items-center">
                             <div class="flex items-center">
                                 <span class="text-sm md:text-base font-bold text-green-700 mr-2">SERVIÇO (10%):</span>
-                                {/* Botão Taxa (Desabilitado no cliente) */}
                                 <button id="toggleServiceTaxBtn" class="px-2 py-0.5 text-xs rounded-full bg-gray-400 text-white opacity-50 cursor-not-allowed" disabled>
                                     Aplicado
                                 </button>
@@ -213,7 +214,6 @@
                             <span class="text-sm md:text-base font-bold text-indigo-700">VALOR POR PESSOA:</span>
                              <div class="flex items-center space-x-1">
                                 <span id="valuePerDinerDisplay" class="text-sm md:text-base font-bold text-indigo-700">R$ 0,00</span>
-                                {/* Input Diners (Apenas Leitura no Cliente) */}
                                 <input type="number" id="dinersSplitInput" class="w-12 p-1 text-xs md:text-sm border border-client-border rounded-lg text-center bg-client-input-bg opacity-70" min="1" value="1" readonly>
                              </div>
                         </div>
@@ -225,7 +225,7 @@
                 </div>
 
                 {/* Botão de Solicitar Fechamento */}
-                <div class="content-card p-3 md:p-4 mt-6">
+                <div class="content-card p-3 md:p-4 mt-6 rounded-lg">
                     <button id="requestBillBtn" class="w-full bg-pumpkin text-white font-bold py-3 rounded-lg hover:bg-pumpkin-dark transition duration-150 text-base md:text-lg">
                         <i class="fas fa-cash-register"></i> SOLICITAR FECHAMENTO DE CONTA
                     </button>
@@ -236,11 +236,12 @@
         </div>
     </main>
 
-    <!-- MODAL DE OBSERVAÇÃO (Layout Mobile) -->
+    {/* --- MODAIS --- */}
+    {/* (Código dos modais permanece o mesmo, apenas ajustado visualmente pela folha de estilo e classes base) */}
+
     <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         <div class="bg-client-card p-4 md:p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 id="obsItemName" class="text-lg md:text-xl font-bold mb-4 text-indigo-700">Adicionar Observação</h3>
-
             <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-4">
                  {/* Botões rápidos */}
                  <button class="quick-obs-btn text-xs px-3 py-1 bg-client-input-bg text-client-text-secondary rounded-full hover:bg-gray-200 transition" data-obs="1 CP">1 CP</button>
@@ -258,18 +259,11 @@
                  <button class="quick-obs-btn text-xs px-3 py-1 bg-client-input-bg text-client-text-secondary rounded-full hover:bg-gray-200 transition" data-obs="Ponto Mais">Ponto Mais</button>
                  <button class="quick-obs-btn text-xs px-3 py-1 bg-client-input-bg text-client-text-secondary rounded-full hover:bg-gray-200 transition" data-obs="Bem Passado">Bem Passado</button>
             </div>
-
             <textarea id="obsInput" rows="2" placeholder="Apenas botões rápidos permitidos." class="w-full p-3 input-pdv text-sm md:text-base" readonly></textarea>
-
-            {/* Switch Espera (Oculto/Desabilitado no Cliente) */}
             <div class="flex items-center justify-between mt-3 mb-4 opacity-50 hidden">
                  <span class="text-client-text font-semibold">Item em Espera?</span>
-                 <label class="switch-obs">
-                     <input type="checkbox" id="esperaSwitch" disabled>
-                     <span class="slider-obs"></span>
-                 </label>
+                 <label class="switch-obs"> <input type="checkbox" id="esperaSwitch" disabled> <span class="slider-obs"></span> </label>
             </div>
-
             <div class="flex justify-end space-x-2 md:space-x-3 mt-4">
                 <button id="cancelObsBtn" class="px-3 py-2 md:px-4 md:py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition text-sm md:text-base">Cancelar</button>
                 <button id="saveObsBtn" class="px-3 py-2 md:px-4 md:py-3 bg-green-500 text-white rounded-lg hover:bg-green-700 transition text-sm md:text-base">Salvar</button>
@@ -277,69 +271,45 @@
         </div>
     </div>
 
-    <!-- MODAL DE ALERTA (Layout Mobile) -->
     <div id="customAlertModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         <div class="bg-client-card p-6 rounded-xl shadow-2xl w-full max-w-sm text-center">
             <h3 class="text-lg md:text-xl font-bold mb-4 text-red-600" id="customAlertTitle">Aviso</h3>
             <p class="text-sm md:text-base mb-6 text-client-text" id="customAlertMessage">Mensagem Padrão.</p>
-            <button id="customAlertOkBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition text-base md:text-lg">
-                OK
-            </button>
+            <button id="customAlertOkBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition text-base md:text-lg"> OK </button>
         </div>
     </div>
 
-    <!-- MODAL DE ASSOCIAÇÃO (Layout Mobile) -->
     <div id="associationModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4" style="display: none;">
         <div class="content-card bg-client-card p-6 md:p-8 rounded-xl shadow-2xl w-full max-w-sm text-center">
             <h3 class="text-xl md:text-2xl font-bold text-indigo-700 mb-4">Associação à Mesa</h3>
             <p class="text-xs md:text-sm text-client-text-secondary mb-4">Para enviar o pedido, informe a Mesa e seu WhatsApp.</p>
-
             <input type="number" id="assocTableNumber" placeholder="Nº da Mesa*" class="w-full p-3 md:p-4 mb-3 input-pdv text-base text-center" min="1" required>
             <input type="text" id="assocName" placeholder="Seu Nome (Opcional)" class="w-full p-3 md:p-4 mb-3 input-pdv text-base">
             <input type="tel" id="assocPhone" placeholder="WhatsApp (DDD+Número)*" class="w-full p-3 md:p-4 mb-4 input-pdv text-base" required>
-
             <div id="assocErrorMsg" class="text-red-500 text-xs md:text-sm mb-4" style="display: none;"></div>
-
             <div class="flex flex-col space-y-2">
-                <button id="assocSendOrderBtn" class="w-full bg-indigo-600 text-white font-bold py-3 md:py-4 rounded-lg hover:bg-indigo-700 transition text-base md:text-lg">
-                    <i class="fas fa-paper-plane"></i> Enviar Pedido
-                </button>
-                 <button id="assocCancelBtn" class="w-full bg-gray-500 text-white font-bold py-2 rounded-lg hover:bg-gray-600 transition text-sm">
-                     Cancelar
-                 </button>
+                <button id="assocSendOrderBtn" class="w-full bg-indigo-600 text-white font-bold py-3 md:py-4 rounded-lg hover:bg-indigo-700 transition text-base md:text-lg"> <i class="fas fa-paper-plane"></i> Enviar Pedido </button>
+                <button id="assocCancelBtn" class="w-full bg-gray-500 text-white font-bold py-2 rounded-lg hover:bg-gray-600 transition text-sm"> Cancelar </button>
             </div>
         </div>
     </div>
 
-    <!-- Modais Ocultos de Staff -->
-    <div id="calculatorModal" class="hidden"></div>
-    <div id="managerModal" class="hidden"></div>
-    <div id="waiterRegModal" class="hidden"></div>
-    <div id="customerRegModal" class="hidden"></div>
-    <div id="reportsModal" class="hidden"></div>
-    <div id="selectiveTransferModal" class="hidden"></div>
-    <div id="productManagementModal" class="hidden"></div>
-    <div id="tableTransferModal" class="hidden"></div>
-
+    {/* Modais Ocultos de Staff */}
+    <div id="calculatorModal" class="hidden"></div> <div id="managerModal" class="hidden"></div> <div id="waiterRegModal" class="hidden"></div> <div id="customerRegModal" class="hidden"></div> <div id="reportsModal" class="hidden"></div> <div id="selectiveTransferModal" class="hidden"></div> <div id="productManagementModal" class="hidden"></div> <div id="tableTransferModal" class="hidden"></div>
 
     <p class="mt-8 text-center text-xs text-client-text-secondary" id="user-id-display">.</p>
-
 
     <script>
         // Placeholders (mantidos para evitar erros se chamados)
         window.openManagerAuthModal = () => {};
-        // Função goToScreen para Cliente (Navegação Simples)
         window.goToScreen = (screenId) => {
              const appContainer = document.getElementById('appContainer');
-             // Mapeamento específico das telas do cliente
              const clientScreens = { 'clientOrderScreen': 0, 'clientPaymentScreen': 1 };
              const index = clientScreens[screenId];
              if (appContainer && index !== undefined) {
                   console.log(`[NAV CLIENT] Going to ${screenId} (index ${index})`);
                   appContainer.style.transform = `translateX(-${index * 100}vw)`;
-             } else {
-                  console.error(`[NAV CLIENT] Invalid screen ID: ${screenId}`);
-             }
+             } else { console.error(`[NAV CLIENT] Invalid screen ID: ${screenId}`); }
         };
         window.openKdsStatusModal = () => {};
         window.openProductInfoModal = () => {};
