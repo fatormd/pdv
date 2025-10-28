@@ -63,7 +63,7 @@
             <div id="clientOrderScreen" class="flex-shrink-0">
                 <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center text-green-700">
-                        <span class="text-2xl font-semibold mr-3" id="client-table-number">Mesa Cliente</span>
+                        <span class="text-2xl font-semibold mr-3" id="client-table-number">Cardápio Digital</span>
                     </div>
                     
                     <button id="goToPaymentBtnClient" class="rounded-full bg-green-600 p-3 text-white shadow-lg hover:bg-green-700 transition duration-150 w-12 h-12 flex items-center justify-center" title="Ver Conta" onclick="document.getElementById('appContainer').style.transform = 'translateX(-100vw)'">
@@ -241,17 +241,22 @@
     <div id="tableTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
 
 
-    <div id="loginModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
+    <div id="associationModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4" style="display: none;">
         <div class="content-card bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm text-center">
-            <h3 class="text-2xl font-bold text-indigo-700 mb-6">Acesso Mesa Digital</h3>
-            <input type="email" id="loginEmail" placeholder="E-mail (Ex: cliente@fator.com)" class="w-full p-4 mb-4 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
-            <input type="password" id="loginPassword" placeholder="Senha" class="w-full p-4 mb-6 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
+            <h3 class="text-2xl font-bold text-indigo-700 mb-4">Associação à Mesa</h3>
+            <p class="text-sm text-gray-600 mb-4">Para enviar o pedido, precisamos associar você a uma mesa. Use o Número da Mesa e seu WhatsApp para contato.</p>
             
-            <div class="flex space-x-3">
-                <button id="loginBtn" class="w-full bg-indigo-600 text-white font-bold py-4 rounded-lg hover:bg-indigo-700 transition text-lg disabled:opacity-50">Entrar</button>
-            </div>
+            <input type="number" id="assocTableNumber" placeholder="Nº da Mesa" class="w-full p-4 mb-4 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base text-center" min="1">
+            <input type="text" id="assocName" placeholder="Seu Nome (Opcional)" class="w-full p-4 mb-4 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
+            <input type="tel" id="assocPhone" placeholder="WhatsApp (Ex: 11987654321)*" class="w-full p-4 mb-6 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base">
+            
+            <div id="assocErrorMsg" class="text-red-500 text-sm mb-4" style="display: none;"></div>
 
-            <p class="mt-4 text-xs text-gray-400">Use 'cliente@fator.com' | Senha: 1234</p>
+            <div class="flex space-x-3">
+                <button id="assocSendOrderBtn" class="w-full bg-indigo-600 text-white font-bold py-4 rounded-lg hover:bg-indigo-700 transition text-lg">
+                    <i class="fas fa-paper-plane"></i> Enviar Pedido
+                </button>
+            </div>
         </div>
     </div>
     
