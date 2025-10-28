@@ -1,5 +1,4 @@
-// --- CONTROLLERS/USERMANAGEMENTCONTROLLER.JS (Corrigido para usar appId) ---
-// --- CORREÇÃO: Importa 'appId' além de 'db' ---
+// --- CONTROLLERS/USERMANAGEMENTCONTROLLER.JS (Completo e Estável) ---
 import { db, appId } from '/services/firebaseService.js';
 import { collection, getDocs, doc, setDoc, getDoc, deleteDoc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -12,22 +11,40 @@ let isUserManagementInitialized = false;
 let currentUsers = [];
 
 // --- FUNÇÃO AUXILIAR PARA OBTER REFERÊNCIA DA COLEÇÃO ---
-// --- CORREÇÃO: Usa 'appId' importado ---
 const getUsersCollectionRef = () => {
     if (!appId) {
         console.error("[UserMgmt] Erro crítico: appId não definido no firebaseService.");
-        // Você pode querer lançar um erro ou retornar null aqui
-        // Lançar um erro pode ser mais seguro para evitar operações no lugar errado.
         throw new Error("appId não está definido. Verifique a inicialização do Firebase.");
     }
     return collection(db, 'artifacts', appId, 'public', 'data', 'users');
 };
 
 // --- FUNÇÕES DE RENDERIZAÇÃO ---
-const renderUserList = () => { /* ... (código mantido igual) ... */
-    if (!userListContainer) { /*...*/ return; }
-    if (currentUsers.length === 0) { /*...*/ return; }
-    userListContainer.innerHTML = currentUsers.map(user => `... (HTML do item da lista) ...`).join('');
+const renderUserList = () => {
+    if (!userListContainer) { return; }
+
+    if (currentUsers.length === 0) {
+        userListContainer.innerHTML = '<p class="text-dark-placeholder italic">Nenhum usuário cadastrado.</p>';
+        return;
+    }
+
+    userListContainer.innerHTML = currentUsers.map(user => `
+        <div class="flex justify-between items-center py-2 border-b border-gray-600 last:border-b-0">
+            <div class="flex flex-col">
+                <span class="font-semibold text-dark-text">${user.name} (${user.role})</span>
+                <span class="text-xs ${user.isActive ? 'text-green-400' : 'text-red-400'}">${user.email} - ${user.isActive ? 'Ativo' : 'Inativo'}</span>
+            </div>
+            <div class="space-x-2 print-hide">
+                <button class="edit-user-btn p-2 text-indigo-400 hover:text-indigo-300 transition" data-user-email="${user.email}" title="Editar Usuário">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="delete-user-btn p-2 text-red-500 hover:text-red-400 transition" data-user-email="${user.email}" data-user-name="${user.name}" title="Excluir Usuário">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+            </div>
+        </div>
+    `).join('');
+
     attachUserListActionListeners();
 };
 
@@ -35,47 +52,48 @@ const renderUserList = () => { /* ... (código mantido igual) ... */
 // --- FUNÇÕES DE LÓGICA (CRUD) ---
 const fetchUsers = async () => {
     try {
-        const usersCollectionRef = getUsersCollectionRef(); // --- CORREÇÃO: Usa a função auxiliar ---
+        const usersCollectionRef = getUsersCollectionRef();
         const q = query(usersCollectionRef, orderBy('name', 'asc'));
         const querySnapshot = await getDocs(q);
         currentUsers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        console.log("[UserMgmt] Usuários carregados:", currentUsers.length);
         renderUserList();
-    } catch (error) { /* ... (erro) ... */ }
+    } catch (error) {
+        console.error("Erro ao buscar usuários:", error);
+        if(userListContainer) userListContainer.innerHTML = '<p class="text-red-400 font-bold">Erro ao carregar usuários.</p>';
+    }
 };
 
-const showUserForm = (userToEdit = null) => { /* ... (código mantido igual) ... */
-     if (!userForm || !userFormTitle /*... etc ...*/) { return; }
+const showUserForm = (userToEdit = null) => {
+     if (!userForm || !userFormTitle || !userIdInput || !userNameInput || !userEmailInput || !userPasswordInput || !userRoleSelect || !userIsActiveCheckbox || !userFormError) { return; }
      userFormError.style.display = 'none';
+
      if (userToEdit) {
-         console.log("[UserMgmt] Abrindo form em modo EDIÇÃO para:", userToEdit.email);
          userFormTitle.textContent = "Editar Usuário";
-         userIdInput.value = userToEdit.id; // email original
+         userIdInput.value = userToEdit.id;
          userNameInput.value = userToEdit.name;
          userEmailInput.value = userToEdit.email;
-         userEmailInput.readOnly = true; // Não permite editar email (ID)
+         userEmailInput.readOnly = true;
          userPasswordInput.value = '';
          userPasswordInput.placeholder = "Deixe em branco para não alterar";
          userPasswordInput.required = false;
          userRoleSelect.value = userToEdit.role;
          userIsActiveCheckbox.checked = userToEdit.isActive;
      } else {
-         console.log("[UserMgmt] Abrindo form em modo ADIÇÃO.");
          userFormTitle.textContent = "Adicionar Novo Usuário";
-         userIdInput.value = ''; // Limpa ID
+         userIdInput.value = '';
          userNameInput.value = '';
          userEmailInput.value = '';
-         userEmailInput.readOnly = false; // Permite digitar email
+         userEmailInput.readOnly = false;
          userPasswordInput.value = '';
          userPasswordInput.placeholder = "Senha";
-         userPasswordInput.required = true; // Senha obrigatória ao adicionar
+         userPasswordInput.required = true;
          userRoleSelect.value = '';
-         userIsActiveCheckbox.checked = true; // Novo usuário começa ativo
+         userIsActiveCheckbox.checked = true;
      }
      userForm.style.display = 'block';
      userNameInput.focus();
 };
-const hideUserForm = () => { /* ... (código mantido igual) ... */ };
+const hideUserForm = () => { if(userForm) userForm.style.display = 'none'; };
 
 const handleSaveUser = async (event) => {
     event.preventDefault();
@@ -88,106 +106,135 @@ const handleSaveUser = async (event) => {
     const role = userRoleSelect.value;
     const isActive = userIsActiveCheckbox.checked;
 
-    console.log("[UserMgmt] Tentando salvar usuário:", { email, name, role, isActive, isEditing: !!originalEmail });
-
-    if (!name || !email || !role || (!originalEmail && !password)) { /* ... (validação) ... */ return; }
+    if (!name || !email || !role || (!originalEmail && !password)) {
+        userFormError.textContent = "Preencha todos os campos obrigatórios (*).";
+        userFormError.style.display = 'block';
+        return;
+    }
 
     saveUserBtn.disabled = true; saveUserBtn.textContent = 'Salvando...'; userFormError.style.display = 'none';
 
     try {
-        const usersCollectionRef = getUsersCollectionRef(); // --- CORREÇÃO: Usa a função auxiliar ---
-        const userDocRef = doc(usersCollectionRef, email); // Usa email como ID
+        const usersCollectionRef = getUsersCollectionRef();
+        const userDocRef = doc(usersCollectionRef, email);
 
-        if (!originalEmail) { // Se for novo usuário
+        if (!originalEmail) { // Novo usuário
             const docSnap = await getDoc(userDocRef);
             if (docSnap.exists()) throw new Error(`O e-mail ${email} já está cadastrado.`);
-        } else if (originalEmail !== email) { // Se editou e mudou email (não permitido)
+        } else if (originalEmail !== email) { // Tentativa de mudar email
              throw new Error("Não é permitido alterar o e-mail (login) do usuário.");
         }
 
         const userData = { name, email, role, isActive, updatedAt: serverTimestamp() };
-        if (password) userData.password = password; // ATENÇÃO: SENHA EM TEXTO PLANO!
-
+        if (password) userData.password = password; // Senha em texto plano
+        
         let finalData;
-        if (!originalEmail) { // Criação
+        if (!originalEmail) {
             finalData = { ...userData, createdAt: serverTimestamp() };
-        } else { // Edição
+        } else {
              const existingDoc = await getDoc(userDocRef);
              const existingData = existingDoc.data() || {};
-             finalData = { ...existingData, ...userData }; // Mescla para preservar createdAt
-             if (!existingData.createdAt) finalData.createdAt = serverTimestamp(); // Garante createdAt
+             finalData = { ...existingData, ...userData };
+             if (!existingData.createdAt) finalData.createdAt = serverTimestamp();
         }
 
-        await setDoc(userDocRef, finalData); // Cria ou sobrescreve
-        console.log(`[UserMgmt] Usuário ${email} salvo com sucesso.`);
+        await setDoc(userDocRef, finalData);
         hideUserForm();
         await fetchUsers(); // Recarrega lista
 
-    } catch (error) { /* ... (erro) ... */ }
-    finally { /* ... (reseta botão) ... */ }
+    } catch (error) {
+        console.error("Erro ao salvar usuário:", error);
+        userFormError.textContent = `Erro: ${error.message}`;
+        userFormError.style.display = 'block';
+    } finally {
+        if(saveUserBtn){ saveUserBtn.disabled = false; saveUserBtn.textContent = 'Salvar Usuário'; }
+    }
 };
 
 const handleDeleteUser = async (email, name) => {
     if (!email || !name) return;
-    console.log(`[UserMgmt] Solicitando exclusão de: ${name} (${email})`);
-    if (!confirm(`...`)) { return; }
+    if (!confirm(`Tem certeza que deseja EXCLUIR o usuário "${name}" (${email})? Esta ação não pode ser desfeita.`)) { return; }
 
     try {
-        const usersCollectionRef = getUsersCollectionRef(); // --- CORREÇÃO: Usa a função auxiliar ---
+        const usersCollectionRef = getUsersCollectionRef();
         const userDocRef = doc(usersCollectionRef, email);
         await deleteDoc(userDocRef);
-        console.log(`[UserMgmt] Usuário ${email} excluído com sucesso.`);
         await fetchUsers();
-    } catch (error) { /* ... (erro) ... */ }
+    } catch (error) {
+        console.error("Erro ao excluir usuário:", error);
+        alert(`Falha ao excluir usuário: ${error.message}`);
+    }
 };
 
 // --- FUNÇÕES DE INICIALIZAÇÃO E LISTENERS ---
-const attachUserListActionListeners = () => { /* ... (código mantido igual) ... */ };
+const attachUserListActionListeners = () => {
+    document.querySelectorAll('.edit-user-btn').forEach(btn => { btn.replaceWith(btn.cloneNode(true)); });
+    document.querySelectorAll('.delete-user-btn').forEach(btn => { btn.replaceWith(btn.cloneNode(true)); });
 
-export const initUserManagementController = () => { /* ... (código mantido igual, mapeia elementos) ... */
-    if (isUserManagementInitialized) { console.log("[UserMgmtController] Já inicializado."); return; }
-    console.log("[UserMgmtController] Iniciando...");
+    document.querySelectorAll('.edit-user-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const email = e.currentTarget.dataset.userEmail;
+            const user = currentUsers.find(u => u.email === email);
+            if (user) { showUserForm(user); }
+        });
+    });
+
+    document.querySelectorAll('.delete-user-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const email = e.currentTarget.dataset.userEmail;
+            const name = e.currentTarget.dataset.userName;
+            handleDeleteUser(email, name);
+        });
+    });
+};
+
+export const initUserManagementController = () => {
+    if (isUserManagementInitialized) { return; }
+
+    // Mapeamento
     userManagementModal = document.getElementById('userManagementModal');
-    console.log("[UserMgmtController] Tentando mapear userManagementModal:", userManagementModal ? 'Encontrado' : 'NÃO ENCONTRADO');
-    // ... (mapeia OUTROS elementos) ...
     userListContainer = document.getElementById('userListContainer');
     showUserFormBtn = document.getElementById('showUserFormBtn');
     userForm = document.getElementById('userForm');
-    // ... (resto do mapeamento) ...
+    userFormTitle = document.getElementById('userFormTitle');
+    userIdInput = document.getElementById('userIdInput');
+    userNameInput = document.getElementById('userNameInput');
+    userEmailInput = document.getElementById('userEmailInput');
+    userPasswordInput = document.getElementById('userPasswordInput');
+    userRoleSelect = document.getElementById('userRoleSelect');
+    userIsActiveCheckbox = document.getElementById('userIsActiveCheckbox');
+    cancelUserFormBtn = document.getElementById('cancelUserFormBtn');
+    saveUserBtn = document.getElementById('saveUserBtn');
+    userFormError = document.getElementById('userFormError');
 
-    if (!userManagementModal || !userListContainer /* ... etc ... */) {
-        console.error("[UserMgmtController] Erro Fatal: Elementos essenciais não encontrados.");
-        return; // NÃO define isUserManagementInitialized
+    // Validação CRÍTICA (o erro anterior)
+    if (!userManagementModal || !userListContainer || !showUserFormBtn || !userForm || !saveUserBtn || !cancelUserFormBtn) {
+        console.error("[UserMgmtController] Erro Fatal: Elementos essenciais do modal não encontrados. Abortando inicialização.");
+        return;
     }
+
     // Adiciona Listeners
-    console.log("[UserMgmtController] Adicionando listeners...");
     showUserFormBtn.addEventListener('click', () => showUserForm(null));
     cancelUserFormBtn.addEventListener('click', hideUserForm);
     userForm.addEventListener('submit', handleSaveUser);
 
-    isUserManagementInitialized = true; // SÓ SE CHEGOU AQUI
-    console.log("[UserMgmtController] Inicializado com sucesso.");
+    isUserManagementInitialized = true;
 };
 
-export const openUserManagementModal = () => { /* ... (código mantido igual, chama init e fetchUsers) ... */
-    console.log("[UserMgmtController] openUserManagementModal chamada.");
+export const openUserManagementModal = () => {
     if (!isUserManagementInitialized) {
-        console.warn("[UserMgmtController] Tentando abrir modal, mas controller não inicializado. Chamando init...");
         initUserManagementController();
         if (!isUserManagementInitialized) {
-             console.error("[UserMgmtController] Inicialização falhou dentro de openUserManagementModal.");
              alert("Erro ao inicializar o módulo de gestão de usuários.");
              return;
         }
     }
     if (!userManagementModal) {
-        console.error("[UserMgmtController] Elemento userManagementModal não definido após init.");
         alert("Erro crítico: O elemento do modal de usuários não foi encontrado.");
         return;
     }
-    console.log("[UserMgmtController] Carregando usuários e mostrando modal...");
-    fetchUsers(); // Carrega/recarrega a lista
-    hideUserForm(); // Garante que form comece escondido
-    userManagementModal.style.display = 'flex'; // Mostra o modal
-    console.log("[UserMgmtController] Modal DEVE estar visível (display='flex').");
+
+    fetchUsers(); 
+    hideUserForm();
+    userManagementModal.style.display = 'flex';
 };
