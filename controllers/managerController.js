@@ -1,41 +1,35 @@
-// --- CONTROLLERS/MANAGERCONTROLLER.JS (Completo e Estável) ---
+// --- CONTROLLERS/MANAGERCONTROLLER.JS (Painel 4) ---
 import { goToScreen } from "/app.js";
 import { getProducts } from "/services/wooCommerceService.js";
-import { openUserManagementModal } from "/controllers/userManagementController.js";
+import { formatCurrency } from "/utils.js";
+// REMOVIDO: Importação do paymentController
 
 // Estado
 let managerInitialized = false;
 let productManagementModal; // Mapeado no init
 
-// --- FUNÇÕES DE GESTÃO (Lógica) ---
-
+// --- FUNÇÕES DE GESTÃO (Placeholders) ---
 const renderProductManagement = () => {
-     if (!productManagementModal) {
-         productManagementModal = document.getElementById('productManagementModal');
+    if (!productManagementModal) {
+         productManagementModal = document.getElementById('productManagementModal'); // Tenta mapear se falhou
          if (!productManagementModal) {
              alert("Módulo de Gestão de Produtos em desenvolvimento.");
              return;
          }
     }
+    
     const products = getProducts();
     let listHtml = products.map(p => `
         <div class="flex justify-between items-center py-2 border-b border-gray-600">
             <div class="flex flex-col">
                 <span class="font-semibold text-dark-text">${p.name}</span>
-                <span class="text-xs text-dark-placeholder">ID: ${p.id} | Cat: ${p.category}</span>
+                <span class="text-xs text-dark-placeholder">ID: ${p.id} | Setor: ${p.sector}</span>
             </div>
-             <div class="space-x-2 print-hide">
-                <button class="p-2 text-indigo-400 hover:text-indigo-300 transition" title="Editar Produto">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button class="p-2 text-red-500 hover:text-red-400 transition" title="Excluir Produto">
-                    <i class="fas fa-trash-alt"></i>
-                </button>
-            </div>
+            {/* ... (botões editar/excluir) ... */}
         </div>
     `).join('');
 
-     productManagementModal.innerHTML = `
+    productManagementModal.innerHTML = `
         <div class="bg-dark-card border border-gray-600 p-6 rounded-xl shadow-2xl w-full max-w-xl max-h-screen overflow-y-auto">
             <h3 class="text-xl font-bold mb-4 text-pumpkin">Gestão de Produtos (WooCommerce)</h3>
             <div class="flex justify-between mb-4">
@@ -46,7 +40,7 @@ const renderProductManagement = () => {
                     Fechar
                  </button>
             </div>
-            <div class="border border-gray-600 p-3 rounded-lg max-h-96 overflow-y-auto bg-dark-bg custom-scrollbar">
+            <div class="border border-gray-600 p-3 rounded-lg max-h-96 overflow-y-auto bg-dark-bg">
                 ${listHtml || '<p class="text-dark-placeholder italic">Nenhum produto carregado.</p>'}
             </div>
         </div>
@@ -54,72 +48,97 @@ const renderProductManagement = () => {
     productManagementModal.style.display = 'flex';
 };
 
-/**
- * Função chamada pelo app.js (via openManagerAuthModal) após autenticação.
- * Direciona a ação para a função correta.
- */
+// Esta função agora é chamada pelo app.js (openManagerAuthModal)
 export const handleGerencialAction = (action, payload) => {
+    console.log(`[Manager] Executando ação gerencial: ${action}`);
     switch (action) {
+        // Ações de PaymentController são tratadas no app.js
+        case 'goToManagerPanel':
+             goToScreen('managerScreen');
+             break;
         case 'openProductManagement':
         case 'openCategoryManagement':
             renderProductManagement();
             break;
-        case 'openReportsModal':
-            const modal = document.getElementById('reportsModal');
-            if(modal) modal.style.display = 'flex';
-            else { console.error("[Manager] Modal de relatórios não encontrado."); alert("Modal de relatórios não encontrado."); }
+        case 'openInventoryManagement':
+            alert("Módulo de ESTOQUE (DEV).");
             break;
-        case 'openInventoryManagement': alert("Módulo de ESTOQUE (DEV)."); break;
-        case 'openCashManagement': alert("Módulo de GESTÃO DE CAIXA (DEV)."); break;
-        case 'openReservations': alert("Módulo de RESERVAS/FILA (DEV)."); break;
-        case 'openCustomerCRM': alert("Módulo de CRM (DEV)."); break;
-        case 'openRecipesManagement': alert("Módulo de FICHA TÉCNICA (DEV)."); break;
-        case 'openWooSync': alert("Ação de SINCRONIZAÇÃO (DEV)."); break;
-        default: console.warn(`[Manager] Ação Gerencial não reconhecida: ${action}.`); alert(`Ação Gerencial não reconhecida: ${action}.`);
+        case 'openCashManagement':
+            alert("Módulo de GESTÃO DE CAIXA (DEV).");
+            break;
+        case 'openReservations':
+            alert("Módulo de RESERVAS/FILA (DEV).");
+            break;
+        case 'openCustomerCRM':
+            alert("Módulo de CRM (DEV).");
+            break;
+        case 'openWaiterReg':
+            alert("Módulo de Cadastro de Usuários (DEV).");
+            break;
+        case 'openRecipesManagement':
+            alert("Módulo de FICHA TÉCNICA (DEV).");
+            break;
+        case 'openWooSync':
+            alert("Ação de SINCRONIZAÇÃO (DEV).");
+            break;
+        // REMOVIDO: 'deleteMass', 'openSelectiveTransfer' (tratados pelo app.js)
+        default:
+             alert(`Módulo Gerencial não reconhecido: ${action}.`);
     }
 };
 
+// REMOVIDO: export const openManagerAuthModal = (...) => { ... }; (Movido para app.js)
+
+
 // --- INICIALIZAÇÃO DO CONTROLLER ---
 export const initManagerController = () => {
-    if (managerInitialized) return;
+    if(managerInitialized) return;
     console.log("[ManagerController] Inicializando...");
 
     productManagementModal = document.getElementById('productManagementModal');
-    const managerScreen = document.getElementById('managerScreen');
-    if (!managerScreen) {
-        console.error("[ManagerController] Erro Fatal: Elemento #managerScreen não encontrado.");
-        return;
-    }
-    const managerCards = managerScreen.querySelectorAll('.manager-card');
+    const managerCards = document.querySelectorAll('#managerScreen .manager-card');
 
-    managerCards.forEach((card, index) => {
-        const newCard = card.cloneNode(true);
-        card.parentNode.replaceChild(newCard, card);
+    managerCards.forEach(card => {
+        const onclickAttr = card.getAttribute('onclick');
+        if (onclickAttr) {
+            card.removeAttribute('onclick'); // Remove onclick inline
 
-        const action = newCard.dataset.action;
+            // Tenta extrair a ação do openManagerAuthModal
+            const matchAuth = onclickAttr.match(/openManagerAuthModal\('([^']+)'/);
+            // CORREÇÃO: Trata o caso do modal de Relatórios
+            const matchReports = onclickAttr.includes("document.getElementById('reportsModal')");
 
-        if (action) {
-            newCard.addEventListener('click', () => {
+            if (matchAuth && matchAuth[1]) {
+                const action = matchAuth[1];
                 const payload = null;
-
-                if (action === 'openReportsModal') {
-                    handleGerencialAction(action, payload);
-                } else if (action === 'openWaiterReg') {
-                    // Chamada direta para o modal de usuários (que não precisa de senha, mas é uma ação gerencial)
-                    openUserManagementModal();
-                } else {
-                    // Ações que exigem senha
+                card.addEventListener('click', () => {
+                    // Chama a função GLOBAL do app.js
                     window.openManagerAuthModal(action, payload);
-                }
-            });
+                });
+            } else if (matchReports) {
+                 // Trata o botão de Relatórios especificamente
+                 card.addEventListener('click', () => {
+                     const modal = document.getElementById('reportsModal');
+                     // (O modal de relatórios também precisa de estilo dark)
+                     if(modal) modal.style.display = 'flex';
+                     else alert("Modal de relatórios não encontrado.");
+                 });
+            } else {
+                 console.warn("Não foi possível parsear onclick para card:", card.outerHTML);
+                 // Adiciona um listener de fallback
+                 card.addEventListener('click', () => {
+                    try { eval(onclickAttr); } catch(e) { console.error("Erro ao executar onclick antigo:", e); }
+                 });
+            }
         }
     });
 
+    // Mapeia e adiciona listener para o botão de voltar
     const backBtn = document.getElementById('backToPanelFromManagerBtn');
     if (backBtn) {
-        const newBackBtn = backBtn.cloneNode(true);
-        backBtn.parentNode.replaceChild(newBackBtn, backBtn);
-        newBackBtn.addEventListener('click', () => window.goToScreen('panelScreen'));
+        // Remove onclick inline se existir
+        backBtn.removeAttribute('onclick');
+        backBtn.addEventListener('click', () => window.goToScreen('panelScreen'));
     }
 
     managerInitialized = true;
