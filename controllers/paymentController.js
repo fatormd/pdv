@@ -44,6 +44,92 @@ const updateText = (id, value) => {
     if (el) el.textContent = value;
 };
 
+// ==========================================================
+// --- MOTOR DA CALCULADORA (Movido para o escopo do MÓDULO) ---
+// ==========================================================
+let calculatorState = { 
+    displayValue: '0', 
+    firstOperand: null, 
+    waitingForSecondOperand: false, 
+    operator: null 
+};
+
+function updateDisplay() {
+    if(calcDisplay) {
+        const formatted = calculatorState.displayValue.replace('.', ',');
+        calcDisplay.value = formatted;
+    }
+}
+
+function inputDigit(digit) {
+    const { displayValue, waitingForSecondOperand } = calculatorState;
+    if (waitingForSecondOperand) {
+        calculatorState.displayValue = digit;
+        calculatorState.waitingForSecondOperand = false;
+    } else {
+        calculatorState.displayValue = displayValue === '0' ? digit : displayValue + digit;
+    }
+}
+
+function inputDecimal(dot) {
+    if (calculatorState.waitingForSecondOperand) {
+        calculatorState.displayValue = '0.';
+        calculatorState.waitingForSecondOperand = false;
+        return;
+    }
+    if (!calculatorState.displayValue.includes('.')) {
+        calculatorState.displayValue += '.';
+    }
+}
+
+function handleOperator(nextOperator) {
+    const { firstOperand, displayValue, operator } = calculatorState;
+    const inputValue = parseFloat(displayValue);
+
+    if (operator && calculatorState.waitingForSecondOperand) {
+        calculatorState.operator = nextOperator;
+        return;
+    }
+
+    if (firstOperand == null && !isNaN(inputValue)) {
+        calculatorState.firstOperand = inputValue;
+    } else if (operator) {
+        const result = performCalculation[operator](firstOperand, inputValue);
+        calculatorState.displayValue = `${parseFloat(result.toFixed(7))}`; 
+        calculatorState.firstOperand = result;
+    }
+
+    calculatorState.waitingForSecondOperand = true;
+    calculatorState.operator = nextOperator;
+}
+
+const performCalculation = {
+    '/': (first, second) => first / second,
+    '*': (first, second) => first * second,
+    '+': (first, second) => first + second,
+    '-': (first, second) => first - second,
+    '%': (first, second) => first * (second / 100),
+    '=': (first, second) => second,
+};
+
+function resetCalculator() {
+    calculatorState = { 
+        displayValue: '0', 
+        firstOperand: null, 
+        waitingForSecondOperand: false, 
+        operator: null 
+    };
+}
+
+function backspace() {
+     let { displayValue } = calculatorState;
+     calculatorState.displayValue = displayValue.length > 1 ? displayValue.slice(0, -1) : '0';
+}
+// ==========================================================
+// --- FIM DO MOTOR DA CALCULADORA ---
+// ==========================================================
+
+
 // --- FUNÇÕES DE AÇÃO (PAGAMENTO) ---
 export const executeDeletePayment = async (timestamp) => {
     if (!currentTableId || !timestamp) return;
@@ -78,12 +164,10 @@ const _validatePaymentInputs = () => {
 // --- FUNÇÕES DE RENDERIZAÇÃO (PAGAMENTO) ---
 const renderRegisteredPayments = (payments) => {
     if (!paymentSummaryList) return;
-
     if (!payments || payments.length === 0) {
         paymentSummaryList.innerHTML = `<p class="text-sm text-dark-placeholder italic p-1">Nenhum pagamento registrado.</p>`;
         return;
     }
-
     paymentSummaryList.innerHTML = payments.map(p => `
         <div class="flex justify-between items-center py-2 border-b border-dark-border last:border-b-0">
             <div class="flex items-center space-x-2">
@@ -325,7 +409,7 @@ export const handleMassDeleteConfirmed = async () => {
 
         await batch.commit();
 
-        alert(`${itemsToDelete.length} item(s) removidos da conta.${closeTableConfirmed ? ' A mesa foi fechada.' : ''}`);
+        alert(`${itemsToDelete.length} item(ns) removidos da conta.${closeTableConfirmed ? ' A mesa foi fechada.' : ''}`);
         window.itemsToTransfer = []; 
 
         if (closeTableConfirmed && window.goToScreen) {
@@ -414,8 +498,7 @@ export const handleFinalizeOrder = async () => {
         
         const tableRef = getTableDocRef(currentTableId);
         // Exclui o documento da mesa
-        await updateDoc(tableRef, { status: 'closed' }); // Define o status como fechado
-        await doc(getFirestore(), tableRef.path).delete(); // Deleta a referência
+        await doc(getFirestore(), tableRef.path).delete(); 
         
         alert(`Pedido enviado ao WooCommerce (ID: ${wooOrder.id}). Mesa ${currentTableId} fechada com sucesso.`);
         
@@ -480,7 +563,7 @@ const searchCustomer = async () => {
             if (customerCpfInput) customerCpfInput.value = currentFoundCustomer.cpf || docNumber; 
             if (customerPhoneInput) customerPhoneInput.value = currentFoundCustomer.phone || '';
             if (customerEmailInput) customerEmailInput.value = currentFoundCustomer.email || '';
-            
+
             customerSearchResultsDiv.innerHTML = `<p class="text-sm text-green-400">Cliente encontrado: <strong>${currentFoundCustomer.name}</strong></p>`;
             if (saveCustomerBtn) saveCustomerBtn.disabled = true; 
             if (linkCustomerToTableBtn) linkCustomerToTableBtn.disabled = false;
@@ -490,7 +573,7 @@ const searchCustomer = async () => {
             if (customerCpfInput) customerCpfInput.value = docNumber; 
             if (customerPhoneInput) customerPhoneInput.value = '';
             if (customerEmailInput) customerEmailInput.value = '';
-            
+
             customerSearchResultsDiv.innerHTML = `<p class="text-sm text-yellow-400">Cliente não encontrado. Preencha os dados para cadastrar.</p>`;
             if (saveCustomerBtn) saveCustomerBtn.disabled = true; 
             if (linkCustomerToTableBtn) linkCustomerToTableBtn.disabled = true;
@@ -575,7 +658,21 @@ const handlePrintSummary = () => {
 };
 
 // --- INICIALIZAÇÃO DO CONTROLLER ---
-const attachReviewListListeners = () => { /* ... (implementação completa) ... */ };
+const attachReviewListListeners = () => {
+    const massDeleteBtn = document.getElementById('massDeleteBtn');
+    const massTransferBtn = document.getElementById('massTransferBtn');
+
+    if (massDeleteBtn) {
+         const newDeleteBtn = massDeleteBtn.cloneNode(true);
+         massDeleteBtn.parentNode.replaceChild(newDeleteBtn, massDeleteBtn);
+         newDeleteBtn.addEventListener('click', () => handleMassActionRequest('delete')); 
+    }
+     if (massTransferBtn) {
+         const newTransferBtn = massTransferBtn.cloneNode(true);
+         massTransferBtn.parentNode.replaceChild(newTransferBtn, massTransferBtn);
+         newTransferBtn.addEventListener('click', () => handleMassActionRequest('transfer')); 
+    }
+};
 
 export const initPaymentController = () => {
     if(paymentInitialized) return;
@@ -631,7 +728,7 @@ export const initPaymentController = () => {
     saveCustomerBtn = document.getElementById('saveCustomerBtn');
     linkCustomerToTableBtn = document.getElementById('linkCustomerToTableBtn');
 
-    if (!reviewItemsList) { console.error("[PaymentController] Erro Fatal: 'reviewItemsList' não encontrado."); return; }
+    if (!reviewItemsList || !calculatorModal) { console.error("[PaymentController] Erro Fatal: Elementos críticos (ReviewList/Calculadora) não encontrados."); return; }
 
     renderPaymentMethodButtons();
 
@@ -665,8 +762,6 @@ export const initPaymentController = () => {
             }
             updateDisplay();
         });
-    } else { 
-        console.error("[PaymentController] Erro: Contêiner 'calculator-buttons' não encontrado. Calculadora desativada."); 
     }
 
     if (confirmCalcBtn) {
@@ -735,4 +830,4 @@ export const initPaymentController = () => {
 
     paymentInitialized = true;
     console.log("[PaymentController] Inicializado.");
-};
+}; // Fim de initPaymentController
