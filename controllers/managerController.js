@@ -1,18 +1,15 @@
-// --- CONTROLLERS/MANAGERCONTROLLER.JS (com data-action e logs) ---
+// --- CONTROLLERS/MANAGERCONTROLLER.JS (Completo e Estável) ---
 import { goToScreen } from "/app.js";
 import { getProducts } from "/services/wooCommerceService.js";
-// Removida importação de formatCurrency (não usada aqui)
-// Removida importação de userManagementController (agora tratado no app.js)
+import { openUserManagementModal } from "/controllers/userManagementController.js";
 
 // Estado
 let managerInitialized = false;
 let productManagementModal; // Mapeado no init
 
-// --- FUNÇÕES DE GESTÃO (Placeholders/Lógica) ---
+// --- FUNÇÕES DE GESTÃO (Lógica) ---
 
-// Renderiza o modal de gestão de produtos (exemplo)
 const renderProductManagement = () => {
-    // Implementação mantida como antes...
      if (!productManagementModal) {
          productManagementModal = document.getElementById('productManagementModal');
          if (!productManagementModal) {
@@ -20,8 +17,7 @@ const renderProductManagement = () => {
              return;
          }
     }
-    // Adiciona lógica para buscar produtos e renderizar HTML aqui...
-    const products = getProducts(); // Exemplo
+    const products = getProducts();
     let listHtml = products.map(p => `
         <div class="flex justify-between items-center py-2 border-b border-gray-600">
             <div class="flex flex-col">
@@ -55,127 +51,77 @@ const renderProductManagement = () => {
             </div>
         </div>
     `;
-    // ... resto da lógica de renderização ...
     productManagementModal.style.display = 'flex';
 };
 
 /**
  * Função chamada pelo app.js (via openManagerAuthModal) após autenticação.
  * Direciona a ação para a função correta.
- * @param {string} action - O nome da ação (vindo do data-action).
- * @param {*} payload - Dados adicionais (geralmente null aqui).
  */
 export const handleGerencialAction = (action, payload) => {
-    console.log(`[Manager] handleGerencialAction recebida: ${action}`); // DEBUG LOG
-
     switch (action) {
-        // Ações tratadas DIRETAMENTE aqui (ou que abrem modais específicos)
         case 'openProductManagement':
-        case 'openCategoryManagement': // Assumindo que usa o mesmo modal/lógica
+        case 'openCategoryManagement':
             renderProductManagement();
             break;
         case 'openReportsModal':
             const modal = document.getElementById('reportsModal');
             if(modal) modal.style.display = 'flex';
-            else {
-                console.error("[Manager] Modal de relatórios não encontrado.");
-                alert("Modal de relatórios não encontrado.");
-            }
+            else { console.error("[Manager] Modal de relatórios não encontrado."); alert("Modal de relatórios não encontrado."); }
             break;
-
-        // Ações que são apenas placeholders por enquanto
-        case 'openInventoryManagement':
-            alert("Módulo de ESTOQUE (DEV).");
-            break;
-        case 'openCashManagement':
-            alert("Módulo de GESTÃO DE CAIXA (DEV).");
-            break;
-        case 'openReservations':
-            alert("Módulo de RESERVAS/FILA (DEV).");
-            break;
-        case 'openCustomerCRM':
-            alert("Módulo de CRM (DEV).");
-            break;
-        case 'openRecipesManagement':
-            alert("Módulo de FICHA TÉCNICA (DEV).");
-            break;
-        case 'openWooSync':
-            alert("Ação de SINCRONIZAÇÃO (DEV).");
-            break;
-
-        // Ação 'openWaiterReg' é tratada no app.js para chamar openUserManagementModal
-
-        // Ação 'goToManagerPanel' é tratada no app.js chamando goToScreen
-
-        default:
-             console.warn(`[Manager] Ação Gerencial não reconhecida explicitamente: ${action}.`);
-             alert(`Ação Gerencial não reconhecida: ${action}.`);
+        case 'openInventoryManagement': alert("Módulo de ESTOQUE (DEV)."); break;
+        case 'openCashManagement': alert("Módulo de GESTÃO DE CAIXA (DEV)."); break;
+        case 'openReservations': alert("Módulo de RESERVAS/FILA (DEV)."); break;
+        case 'openCustomerCRM': alert("Módulo de CRM (DEV)."); break;
+        case 'openRecipesManagement': alert("Módulo de FICHA TÉCNICA (DEV)."); break;
+        case 'openWooSync': alert("Ação de SINCRONIZAÇÃO (DEV)."); break;
+        default: console.warn(`[Manager] Ação Gerencial não reconhecida: ${action}.`); alert(`Ação Gerencial não reconhecida: ${action}.`);
     }
 };
 
 // --- INICIALIZAÇÃO DO CONTROLLER ---
 export const initManagerController = () => {
-    // Previne reinicialização
-    if (managerInitialized) {
-        console.log("[ManagerController] Já inicializado.");
-        return;
-    }
+    if (managerInitialized) return;
     console.log("[ManagerController] Inicializando...");
 
-    // Mapeia elementos específicos desta tela/módulo
-    productManagementModal = document.getElementById('productManagementModal'); // Para a função renderProductManagement
-    const managerScreen = document.getElementById('managerScreen'); // Seleciona a tela
+    productManagementModal = document.getElementById('productManagementModal');
+    const managerScreen = document.getElementById('managerScreen');
     if (!managerScreen) {
         console.error("[ManagerController] Erro Fatal: Elemento #managerScreen não encontrado.");
         return;
     }
-    const managerCards = managerScreen.querySelectorAll('.manager-card'); // Seleciona os cards DENTRO da tela
-    console.log(`[ManagerController] Encontrados ${managerCards.length} cards gerenciais.`);
+    const managerCards = managerScreen.querySelectorAll('.manager-card');
 
-    // --- LÓGICA DE ANEXAÇÃO DE LISTENERS (REVISADA) ---
     managerCards.forEach((card, index) => {
-        // 1. Limpa qualquer listener antigo clonando o nó (garantia extra)
         const newCard = card.cloneNode(true);
         card.parentNode.replaceChild(newCard, card);
 
-        // 2. Pega a ação do atributo data-action
         const action = newCard.dataset.action;
-        console.log(`[ManagerController] Card ${index}: Configurando para data-action = ${action}`);
 
         if (action) {
-            // 3. Adiciona o listener de clique ao *novo* nó clonado
             newCard.addEventListener('click', () => {
-                // LOG DENTRO DO LISTENER para confirmar que o clique dispara
-                console.log(`[ManagerController] Card clicado! Ação detectada: ${action}`);
-                const payload = null; // Payload não usado para essas ações por enquanto
+                const payload = null;
 
-                // Chama a função global openManagerAuthModal (definida no app.js)
-                // passando a ação lida do data-action.
-                // Exceto para o modal de relatórios que não precisa de senha.
                 if (action === 'openReportsModal') {
-                    handleGerencialAction(action, payload); // Chama a lógica direta
+                    handleGerencialAction(action, payload);
+                } else if (action === 'openWaiterReg') {
+                    // Chamada direta para o modal de usuários (que não precisa de senha, mas é uma ação gerencial)
+                    openUserManagementModal();
                 } else {
-                    window.openManagerAuthModal(action, payload); // Chama o modal de senha
+                    // Ações que exigem senha
+                    window.openManagerAuthModal(action, payload);
                 }
             });
-            console.log(`[ManagerController] Listener adicionado com sucesso para ação: ${action}`);
-        } else {
-             console.warn(`[ManagerController] Card ${index} encontrado sem data-action:`, newCard.outerHTML);
         }
     });
-    // --- FIM DA LÓGICA DE ANEXAÇÃO ---
 
-    // Listener para o botão de voltar
     const backBtn = document.getElementById('backToPanelFromManagerBtn');
     if (backBtn) {
-        // Limpa listener antigo (se houver) e adiciona o novo
         const newBackBtn = backBtn.cloneNode(true);
         backBtn.parentNode.replaceChild(newBackBtn, backBtn);
         newBackBtn.addEventListener('click', () => window.goToScreen('panelScreen'));
-    } else {
-        console.warn("[ManagerController] Botão 'backToPanelFromManagerBtn' não encontrado.");
     }
 
-    managerInitialized = true; // Marca como inicializado
-    console.log("[ManagerController] Inicializado com sucesso.");
+    managerInitialized = true;
+    console.log("[ManagerController] Inicializado.");
 };
