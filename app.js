@@ -98,7 +98,7 @@ const authenticateUserFromFirestore = async (email, password) => {
         if (docSnap.exists()) {
             const userData = docSnap.data();
             if (!userData.isActive) { return null; }
-            if (userData.password === password) { 
+            if (userData.password === password) {
                 return { email: userData.email, name: userData.name, role: userData.role };
             }
             return null;
@@ -146,7 +146,7 @@ export const goToScreen = async (screenId) => {
         console.log(`[NAV] Navegando para ${screenId} (índice ${screenIndex})`);
         if (appContainer) appContainer.style.transform = `translateX(-${screenIndex * 100}vw)`;
         if (mainContent && screenId !== 'loginScreen') mainContent.style.display = 'block';
-        
+
         // Ajuste visual para Staff
         if (!isClientMode) {
             document.body.classList.toggle('bg-gray-900', screenId === 'managerScreen');
@@ -175,7 +175,7 @@ export const handleTableTransferConfirmed = async (originTableId, targetTableId,
         if (!targetTableIsOpen) {
             if (!newDiners || !newSector) { /* ... */ return; }
             batch.set(targetTableRef, {
-                 tableNumber: parseInt(targetTableId), diners: newDiners, sector: newSector, 
+                 tableNumber: parseInt(targetTableId), diners: newDiners, sector: newSector,
                  status: 'open', createdAt: serverTimestamp(),
                  total: 0, sentItems: [], payments: [], serviceTaxApplied: true, selectedItems: []
             });
@@ -184,16 +184,16 @@ export const handleTableTransferConfirmed = async (originTableId, targetTableId,
         const transferValue = itemsToTransfer.reduce((sum, item) => sum + (item.price || 0), 0);
         const originCurrentTotal = currentOrderSnapshot?.tableNumber == originTableId ? (currentOrderSnapshot.total || 0) : (await getDoc(originTableRef)).data()?.total || 0;
         const originNewTotal = Math.max(0, originCurrentTotal - transferValue);
-        
+
         itemsToTransfer.forEach(item => { batch.update(originTableRef, { sentItems: arrayRemove(item) }); });
         batch.update(originTableRef, { total: originNewTotal });
 
         const targetData = targetTableIsOpen ? targetSnap.data() : { total: 0, sentItems: [] };
         const targetNewTotal = (targetData.total || 0) + transferValue;
-        
-        batch.update(targetTableRef, { 
-             sentItems: arrayUnion(...itemsToTransfer), 
-             total: targetNewTotal 
+
+        batch.update(targetTableRef, {
+             sentItems: arrayUnion(...itemsToTransfer),
+             total: targetNewTotal
         });
 
         await batch.commit();
@@ -212,7 +212,7 @@ window.openManagerAuthModal = (action, payload = null) => {
         openUserManagementModal();
         return;
     }
-    
+
     const managerModal = document.getElementById('managerModal');
     if (!managerModal) { console.error("Modal Gerente não encontrado!"); return; }
 
@@ -267,8 +267,9 @@ window.openManagerAuthModal = openManagerAuthModal;
 // --- WRAPPERS GLOBAIS PARA ONCLICKS ---
 window.deletePayment = (timestamp) => window.openManagerAuthModal('deletePayment', timestamp);
 window.handleMassActionRequest = (action) => { if(action === 'delete') window.openManagerAuthModal('executeMassDelete'); else if (action === 'transfer') window.openManagerAuthModal('executeMassTransfer'); };
-window.increaseLocalItemQuantity = increaseLocalItemQuantity;
-window.decreaseLocalItemQuantity = decreaseLocalItemQuantity;
+// Removidos os wrappers de increase/decrease aqui, pois serão definidos no DOMContentLoaded dependendo do modo
+// window.increaseLocalItemQuantity = increaseLocalItemQuantity; // REMOVIDO
+// window.decreaseLocalItemQuantity = decreaseLocalItemQuantity; // REMOVIDO
 window.openObsModalForGroup = openObsModalForGroup;
 window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`);
 window.openNfeModal = () => { /* ... (lógica) ... */ };
@@ -278,29 +279,34 @@ window.openNfeModal = openNfeModal;
 export const setTableListener = (tableId, isClientMode = false) => {
     if (unsubscribeTable) unsubscribeTable();
     const tableRef = getTableDocRef(tableId);
-    
+
     unsubscribeTable = onSnapshot(tableRef, (docSnapshot) => {
         if (docSnapshot.exists()) {
             currentOrderSnapshot = docSnapshot.data();
-            
+
             // NOVO: Redirecionamento se a mesa foi agrupada (apenas para cliente)
             if (isClientMode && currentOrderSnapshot.status === 'merged') {
                  if (unsubscribeTable) unsubscribeTable(); unsubscribeTable = null;
                  currentTableId = null;
                  const masterTable = currentOrderSnapshot.masterTable || 'Mestra';
                  clientLoginModal = document.getElementById('associationModal'); // Garante que o modal está mapeado
-                 clientLoginModal.style.display = 'flex';
+                 if (clientLoginModal) clientLoginModal.style.display = 'flex'; // Mostra o modal de associação
                  alert(`Esta mesa foi agrupada na Mesa ${masterTable}. Por favor, insira o número da Mesa ${masterTable}.`);
-                 return;
+                 // Limpa campos do modal se existirem
+                 const assocTableInput = document.getElementById('assocTableNumber');
+                 if (assocTableInput) assocTableInput.value = '';
+                 return; // Impede o resto da renderização
             }
 
             const firebaseSelectedItems = currentOrderSnapshot.selectedItems || [];
 
             // Apenas atualiza o array 'selectedItems' se ele for diferente do Firebase
-            if (JSON.stringify(firebaseSelectedItems) !== JSON.stringify(selectedItems)) {
+            // Exceto se for o cliente e o array local já tiver itens (cliente está montando pedido)
+            if (!(isClientMode && selectedItems.length > 0) || JSON.stringify(firebaseSelectedItems) !== JSON.stringify(selectedItems)) {
                  selectedItems.length = 0;
                  selectedItems.push(...firebaseSelectedItems);
             }
+
 
             if (isClientMode) {
                  renderClientOrderScreen(currentOrderSnapshot); // Renderiza a lista do carrinho do cliente
@@ -318,8 +324,8 @@ export const setTableListener = (tableId, isClientMode = false) => {
                  currentTableId = null; currentOrderSnapshot = null; selectedItems.length = 0;
                  if (isClientMode) {
                      clientLoginModal = document.getElementById('associationModal');
-                     if(clientLoginModal) clientLoginModal.style.display = 'flex';
-                     alert('A mesa foi fechada. Você pode tentar fazer login em outra mesa.');
+                     if(clientLoginModal) clientLoginModal.style.display = 'flex'; // Mostra o modal de associação
+                     alert('A mesa foi fechada. Você pode tentar se associar a outra mesa.');
                  } else {
                      goToScreen('panelScreen');
                  }
@@ -334,9 +340,10 @@ export const setTableListener = (tableId, isClientMode = false) => {
 };
 
 export const setCurrentTable = (tableId, isClientMode = false) => {
+    // Não executa se já estiver na mesma mesa
     if (currentTableId === tableId && unsubscribeTable) {
+        // Apenas re-renderiza se necessário (caso raro, onSnapshot deve cuidar disso)
         if(currentOrderSnapshot){
-             // Re-renderiza a tela atual se já estivermos nela
              if (isClientMode) {
                  renderClientOrderScreen(currentOrderSnapshot);
              } else {
@@ -348,10 +355,15 @@ export const setCurrentTable = (tableId, isClientMode = false) => {
     }
 
     currentTableId = tableId;
-    
+
     if (isClientMode) {
          const clientTableNumEl = document.getElementById('client-table-number');
+         // Atualiza o título da tela do cliente
          if(clientTableNumEl) clientTableNumEl.textContent = `Mesa ${tableId}`;
+         // Atualiza o título da tela de pagamento do cliente
+         const paymentTableNumElClient = document.getElementById('payment-table-number');
+         if(paymentTableNumElClient) paymentTableNumElClient.textContent = `Mesa ${tableId}`;
+
     } else {
          const currentTableNumEl = document.getElementById('current-table-number');
          const paymentTableNumEl = document.getElementById('payment-table-number');
@@ -374,7 +386,7 @@ window.selectTableAndStartListener = selectTableAndStartListener;
 
 
 // --- LÓGICA DE LOGIN ---
-const handleStaffLogin = async () => { 
+const handleStaffLogin = async () => {
     // Mapeamento local para esta função
     let loginBtn, loginEmailInput, loginPasswordInput, loginErrorMsg;
     loginBtn = document.getElementById('loginBtn');
@@ -396,16 +408,16 @@ const handleStaffLogin = async () => {
         try {
             const authInstance = auth;
             if (!authInstance) throw new Error("Firebase Auth não inicializado.");
-            const userCredential = await signInAnonymously(authInstance); 
+            const userCredential = await signInAnonymously(authInstance);
             userId = userCredential.user.uid;
-            
+
             const userName = staffData.name || userRole;
             const userIdDisplay = document.getElementById('user-id-display');
             if(userIdDisplay) userIdDisplay.textContent = `Usuário: ${userName} | ${userRole.toUpperCase()}`;
-            
-            await initStaffApp(); 
 
-        } catch (error) { 
+            await initStaffApp();
+
+        } catch (error) {
              console.error("[LOGIN] Erro pós-autenticação:", error);
              alert(`Erro ao iniciar sessão: ${error.message}.`);
              showLoginScreen();
@@ -417,34 +429,8 @@ const handleStaffLogin = async () => {
     if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Entrar'; }
 };
 
-window.handleClientLogin = async (tableNumber) => {
-    // Esta função agora é chamada *após* a validação no clientOrderController.js.
-    // O parâmetro tableNumber é recebido do modal de associação.
-
-    if (!tableNumber || tableNumber === '0') {
-         console.error("Tentativa de login do cliente sem número de mesa.");
-         return;
-    }
-    
-    try {
-        // Garantir que a autenticação anônima está ativa
-        const authInstance = auth;
-        if (authInstance && !authInstance.currentUser) {
-             await signInAnonymously(authInstance);
-        }
-
-        // 1. Iniciar App Cliente
-        await initClientApp();
-        setCurrentTable(tableNumber, true); // True para modo cliente
-        
-        // 2. Esconder o modal de associação (clientOrderController já faz isso)
-        
-    } catch (error) {
-         console.error("[LOGIN CLIENTE] Erro ao iniciar:", error);
-         alert(`Falha ao conectar à mesa: ${error.message}.`);
-    }
-};
-window.handleClientLogin = handleClientLogin;
+// Não é mais uma função global, é chamada internamente pelo clientOrderController
+// window.handleClientLogin = ... // REMOVIDO
 
 
 const handleLogout = () => {
@@ -458,7 +444,7 @@ const handleLogout = () => {
 window.handleLogout = handleLogout;
 
 // --- FUNÇÕES DE INICIALIZAÇÃO ---
-const initStaffApp = async () => { 
+const initStaffApp = async () => {
     try {
         // 1. Inicializa todos os controladores estáticos
         initPanelController();
@@ -472,17 +458,17 @@ const initStaffApp = async () => {
         fetchWooCommerceProducts().catch(e => console.error("[INIT ERROR] Falha ao carregar produtos:", e));
         fetchWooCommerceCategories().catch(e => console.error("[INIT ERROR] Falha ao carregar categorias:", e));
 
-        hideStatus(); 
+        hideStatus();
         hideLoginScreen();
 
         loadOpenTables(); // Carrega as mesas
-        
+
         await goToScreen('panelScreen');
 
-    } catch (error) { 
-        console.error("Erro CRÍTICO durante initStaffApp:", error); 
-        alert(`Erro grave na inicialização: ${error.message}. Verifique o console.`); 
-        showLoginScreen(); 
+    } catch (error) {
+        console.error("Erro CRÍTICO durante initStaffApp:", error);
+        alert(`Erro grave na inicialização: ${error.message}. Verifique o console.`);
+        showLoginScreen();
     }
 };
 
@@ -490,21 +476,22 @@ const initClientApp = async () => {
     try {
         // 1. Inicializa o controlador do cliente
         initClientOrderController();
-        
+
         // 2. Carrega o menu do Woo
         fetchWooCommerceProducts(renderClientMenu).catch(e => console.error("[INIT ERROR] Falha ao carregar produtos cliente:", e));
         fetchWooCommerceCategories(renderClientMenu).catch(e => console.error("[INIT ERROR] Falha ao carregar categorias cliente:", e));
-        
+
         // Esconde o modal de associação se ele existir (Apenas no client.html)
-        const clientAssocModal = document.getElementById('associationModal');
-        if (clientAssocModal) clientAssocModal.style.display = 'none';
+        // O modal será exibido quando o cliente tentar enviar o pedido pela primeira vez
+        clientLoginModal = document.getElementById('associationModal');
+        if (clientLoginModal) clientLoginModal.style.display = 'none';
 
         // Garante que o usuário anônimo está logado
         const authInstance = auth;
         if (authInstance && !authInstance.currentUser) {
              await signInAnonymously(authInstance);
         }
-        
+
         console.log("[ClientApp] Inicializado com sucesso.");
     } catch (error) {
         console.error("Erro CRÍTICO durante initClientApp:", error);
@@ -519,58 +506,71 @@ document.addEventListener('DOMContentLoaded', () => {
         const firebaseConfigRaw = typeof window.__firebase_config !== 'undefined' ? window.__firebase_config : null;
         const firebaseConfig = firebaseConfigRaw ? JSON.parse(firebaseConfigRaw) : FIREBASE_CONFIG;
         const appIdentifier = typeof window.__app_id !== 'undefined' ? window.__app_id : "pdv_fator_instance_001";
-        
+
         const app = initializeApp(firebaseConfig);
         const dbInstance = getFirestore(app);
         const authInstance = getAuth(app);
         const functionsInstance = getFunctions(app, 'us-central1');
-        
-        initializeFirebase(dbInstance, authInstance, appIdentifier, functionsInstance); 
+
+        initializeFirebase(dbInstance, authInstance, appIdentifier, functionsInstance);
 
         const isClientMode = window.location.pathname.includes('client.html');
-        
+
         // Mapeamento UI (Staff/Cliente)
         statusScreen = document.getElementById('statusScreen');
         mainContent = document.getElementById('mainContent');
         appContainer = document.getElementById('appContainer');
         mainHeader = document.getElementById('mainHeader');
-        
+
         // Se for modo cliente, prepara e inicializa o app cliente
         if (isClientMode) {
-            
-            // O initClientApp precisa ser chamado antes para o clientOrderController mapear o modal
-            initClientApp(); 
-            
+
+            // Inicializa o app cliente (que por sua vez inicializa o clientOrderController)
+            initClientApp();
+
             // Adiciona funções globais de manipulação de item do Cliente
+            // Estas são chamadas pelos onClicks no HTML do clientOrderController
             window.decreaseLocalItemQuantity = (id, note) => decreaseLocalItemQuantity(id, note);
             window.increaseLocalItemQuantity = (id, note) => increaseLocalItemQuantity(id, note);
-            
-            // O modal de associação é a primeira tela do cliente
-            const clientAssocModal = document.getElementById('associationModal');
-            if (clientAssocModal) clientAssocModal.style.display = 'flex';
+
+            // O modal de associação é a primeira "interação bloqueante" do cliente
+            // Não precisa ser exibido aqui, o clientOrderController cuida disso
 
 
         } else {
              // Modo Staff (Lógica original)
              loginBtn = document.getElementById('loginBtn');
              if (loginBtn) {
-                  loginBtn.addEventListener('click', handleStaffLogin);
+                  // Usa o evento submit do formulário para melhor prática
+                  const loginForm = document.getElementById('loginForm');
+                  if (loginForm) {
+                      loginForm.addEventListener('submit', (e) => {
+                          e.preventDefault(); // Impede o envio padrão do formulário
+                          handleStaffLogin();
+                      });
+                  } else if (loginBtn) {
+                      // Fallback se o form não for encontrado
+                      loginBtn.addEventListener('click', handleStaffLogin);
+                  }
              }
-             
+
              // Listener de autenticação para Staff
              onAuthStateChanged(authInstance, async (user) => {
                  if (user) {
-                     userId = user.uid; 
-                     if (userRole !== 'anonymous') { 
-                          await initStaffApp(); 
+                     userId = user.uid;
+                     // Só inicializa o app se já tivermos um userRole definido (após login bem-sucedido)
+                     if (userRole !== 'anonymous') {
+                          await initStaffApp();
                      } else {
+                          // Se está logado anonimamente mas sem role, força o login
                           showLoginScreen();
                      }
-                 } else { 
+                 } else {
+                      // Se não há usuário logado, mostra o login
                       showLoginScreen();
                  }
              });
-             
+
              // Adiciona listeners dos botões do cabeçalho
              const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
              const logoutBtnHeader = document.getElementById('logoutBtnHeader');
@@ -578,12 +578,12 @@ document.addEventListener('DOMContentLoaded', () => {
              if (logoutBtnHeader) logoutBtnHeader.addEventListener('click', handleLogout);
         }
 
-    } catch (e) { 
-        if(statusScreen) { 
+    } catch (e) {
+        if(statusScreen) {
              statusScreen.innerHTML = `<div class="flex flex-col items-center p-8 max-w-sm w-full text-center"><i class="fas fa-times-circle text-4xl text-red-500 mb-4"></i><h2 class="text-xl font-bold mb-2 text-red-400">Erro Crítico</h2><p class="text-dark-placeholder">${e.message}</p></div>`;
              statusScreen.style.display = 'flex';
         }
+        console.error("Erro fatal na inicialização:", e); // Loga o erro completo
         return;
     }
-});
-```eof
+}); // <-- FECHAMENTO CORRETO DO DOMContentLoaded
