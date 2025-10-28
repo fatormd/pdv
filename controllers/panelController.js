@@ -1,9 +1,11 @@
-// --- CONTROLLERS/PANELCONTROLLER.JS (Completo e Estável) ---
+// --- CONTROLLERS/PANELCONTROLLER.JS ---
 import { getTablesCollectionRef, getTableDocRef } from "/services/firebaseService.js";
 import { query, where, orderBy, onSnapshot, getDoc, setDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { formatCurrency, formatElapsedTime } from "/utils.js";
 // CORREÇÃO: Importa a função global do app.js
 import { goToScreen, currentTableId, selectedItems, unsubscribeTable, currentOrderSnapshot, setCurrentTable, userRole, selectTableAndStartListener } from "/app.js";
+// import { fetchWooCommerceProducts } from "/services/wooCommerceService.js"; // Não é mais necessário aqui
+// import { renderMenu } from "./orderController.js"; // Não é mais necessário aqui
 
 
 // --- ESTADO DO MÓDULO ---
@@ -17,6 +19,9 @@ let panelInitialized = false;
 const showCustomAlert = (title, message) => { /* ... (lógica mantida) ... */ };
 
 
+// ==================================================================
+//               FUNÇÃO CORRIGIDA / IMPLEMENTADA
+// ==================================================================
 // --- RENDERIZAÇÃO DE SETORES ---
 export const renderTableFilters = () => {
     const sectorFiltersContainer = document.getElementById('sectorFilters');
@@ -25,15 +30,24 @@ export const renderTableFilters = () => {
         return;
     }
 
-    const isActiveClass = (sector) => sector === currentSectorFilter ? 'bg-pumpkin text-white border-pumpkin' : 'bg-dark-input text-dark-text border-gray-600';
-    
-    sectorFiltersContainer.innerHTML = SECTORS.map(sector => `
-        <button class="sector-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap ${isActiveClass(sector)}" 
-                data-sector="${sector}">
-            ${sector}
-        </button>
-    `).join('');
+    // Usa a constante SECTORS definida no topo deste arquivo
+    sectorFiltersContainer.innerHTML = SECTORS.map(sector => {
+        // Define 'Todos' como o filtro ativo inicial
+        const isActive = sector === currentSectorFilter;
+        const activeClasses = 'bg-pumpkin text-white border-pumpkin';
+        const inactiveClasses = 'bg-dark-input text-dark-text border-gray-600';
+        
+        return `
+            <button class="sector-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap ${isActive ? activeClasses : inactiveClasses}" 
+                    data-sector="${sector}">
+                ${sector}
+            </button>
+        `;
+    }).join('');
 };
+// ==================================================================
+//                  FIM DA FUNÇÃO CORRIGIDA
+// ==================================================================
 
 
 // --- RENDERIZAÇÃO E CARREGAMENTO DE MESAS ---
@@ -107,20 +121,7 @@ const renderTables = (docs) => {
 
 export const loadOpenTables = () => {
     if (unsubscribeTables) { unsubscribeTables(); unsubscribeTables = null; }
-    
-    let tablesCollection;
-    try {
-        tablesCollection = getTablesCollectionRef();
-    } catch(e) {
-        // Se falhar, mostra uma mensagem de erro no painel
-        console.error("[Panel] ERRO CRÍTICO: Falha ao obter Tables Collection Ref. DB não inicializado?", e.message);
-        const openTablesList = document.getElementById('openTablesList');
-        if (openTablesList) {
-             openTablesList.innerHTML = `<div class="col-span-full text-sm text-red-400 font-bold italic p-4 content-card bg-dark-card border border-red-700">ERRO CRÍTICO: A conexão com o banco de dados falhou ao buscar as mesas.</div>`;
-        }
-        return; // Sai da função
-    }
-    
+    const tablesCollection = getTablesCollectionRef();
     let q;
     if (currentSectorFilter === 'Todos') q = query(tablesCollection, where('status', '==', 'open'), orderBy('tableNumber', 'asc'));
     else q = query(tablesCollection, where('status', '==', 'open'), where('sector', '==', currentSectorFilter), orderBy('tableNumber', 'asc'));
@@ -188,6 +189,10 @@ export const handleSearchTable = async () => {
     }
 };
 
+// REMOVIDO: export const openTableForOrder = async (...) => { ... };
+// REMOVIDO: export const loadTableOrder = (tableId) => { ... };
+// REMOVIDO: export const handleTableTransferConfirmed = async (...) => { ... }; // Movida para app.js
+
 
 // Função de inicialização do Controller
 export const initPanelController = () => {
@@ -200,16 +205,13 @@ export const initPanelController = () => {
     const mesaInput = document.getElementById('mesaInput');
     const pessoasInput = document.getElementById('pessoasInput');
     const sectorInput = document.getElementById('sectorInput');
-    const abrirMesaRealBtn = document.getElementById('abrirMesaBtn');
-
-    if (!abrirMesaBtn || !searchTableBtn || !sectorFiltersContainer || !mesaInput || !pessoasInput || !sectorInput) {
-        console.error("[PanelController] ERRO: Elementos essenciais de UI não encontrados no DOM. Abortando inicialização.");
-        return;
-    }
-
+    const abrirMesaRealBtn = document.getElementById('abrirMesaBtn'); // Para checkInputs
 
     if (abrirMesaBtn) abrirMesaBtn.addEventListener('click', handleAbrirMesa);
+    else console.error("[PanelController] Botão 'abrirMesaBtn' não encontrado.");
+
     if (searchTableBtn) searchTableBtn.addEventListener('click', handleSearchTable);
+    else console.error("[PanelController] Botão 'searchTableBtn' não encontrado.");
 
     if (sectorFiltersContainer) {
          sectorFiltersContainer.addEventListener('click', (e) => {
@@ -217,10 +219,20 @@ export const initPanelController = () => {
             if (btn) {
                 const sector = btn.dataset.sector;
                 currentSectorFilter = sector;
-                renderTableFilters(); // Re-renderiza para atualizar cores
+                sectorFiltersContainer.querySelectorAll('.sector-btn').forEach(b => {
+                    const isActive = b.dataset.sector === currentSectorFilter;
+                    b.classList.toggle('bg-pumpkin', isActive);
+                    b.classList.toggle('text-white', isActive);
+                    b.classList.toggle('bg-dark-input', !isActive);
+                    b.classList.toggle('text-dark-text', !isActive);
+                    b.classList.toggle('border-gray-600', !isActive);
+                    b.classList.toggle('border-pumpkin', isActive);
+                });
                 loadOpenTables(); // Recarrega mesas com o novo filtro
             }
         });
+    } else {
+         console.error("[PanelController] Container 'sectorFilters' não encontrado.");
     }
 
     const checkInputs = () => {
@@ -235,6 +247,7 @@ export const initPanelController = () => {
     if(pessoasInput) pessoasInput.addEventListener('input', checkInputs);
     if(sectorInput) sectorInput.addEventListener('change', checkInputs);
 
+    // window.openKdsStatusModal = (tableId) => { alert(`Abrir status KDS ${tableId} (DEV)`); }; // Já definido no app.js
 
     panelInitialized = true;
     console.log("[PanelController] Inicializado.");
