@@ -14,8 +14,6 @@ import { httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebas
 //               NOVA FUNÇÃO PROXY
 // ==================================================================
 
-// REMOVIDO: const callWooApi = httpsCallable(functions, 'proxyWooCommerce');
-
 /**
  * Helper genérico para chamar a Cloud Function.
  * 'data' deve ser { method: 'GET'|'POST', endpoint: '...', payload: {...} }
@@ -69,7 +67,7 @@ export const createWooCommerceOrder = async (orderSnapshot) => {
     const line_items = Object.values(groupedItems).map(group => ({
         product_id: group.product_id,
         quantity: group.quantity,
-        subtotal: group.total.toFixed(2).toString()
+        subtotal: (group.total || 0).toFixed(2).toString() // Garante 2 casas decimais para o subtotal do item
     }));
 
     if (line_items.length === 0) {
@@ -83,7 +81,12 @@ export const createWooCommerceOrder = async (orderSnapshot) => {
     const payment_method_title = payments.length > 0
         ? payments.map(p => `${p.method} (${p.value})`).join(', ')
         : 'PDV Local';
-    const totalPaid = payments.reduce((sum, p) => sum + getNumericValueFromCurrency(p.value), 0);
+    // REMOVIDO: const totalPaid = payments.reduce((sum, p) => sum + getNumericValueFromCurrency(p.value), 0); 
+    
+    // --- CORREÇÃO CRÍTICA APLICADA AQUI ---
+    // Pega o valor total da conta (Subtotal + Serviço) que foi calculado no renderPaymentSummary
+    const finalBillTotal = orderSnapshot.total ? parseFloat(orderSnapshot.total) : 0;
+
 
     // 3. Formatar Cliente (Lógica local mantida)
     const customerData = {};
@@ -100,8 +103,8 @@ export const createWooCommerceOrder = async (orderSnapshot) => {
         payment_method_title: payment_method_title,
         set_paid: true,
         status: "completed",
-        // Correção: Usar o total PAGO, não necessariamente o total da conta (caso haja troco ou erro)
-        total: totalPaid.toFixed(2).toString(),
+        // CORRIGIDO: Agora usa o total FINAL da conta, não o total pago.
+        total: finalBillTotal.toFixed(2).toString(), 
         line_items: line_items,
         ...customerData,
         customer_note: `Pedido do PDV - Mesa ${orderSnapshot.tableNumber || 'N/A'}.`
