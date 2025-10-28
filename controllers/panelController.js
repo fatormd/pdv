@@ -1,4 +1,4 @@
-// --- CONTROLLERS/PANELCONTROLLER.JS ---
+// --- CONTROLLERS/PANELCONTROLLER.JS (Completo e Estável) ---
 import { getTablesCollectionRef, getTableDocRef } from "/services/firebaseService.js";
 import { query, where, orderBy, onSnapshot, getDoc, setDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { formatCurrency, formatElapsedTime } from "/utils.js";
@@ -188,11 +188,6 @@ export const handleSearchTable = async () => {
         alert(`A Mesa ${tableNumber} não está aberta.`);
     }
 };
-
-// REMOVIDO: export const openTableForOrder = async (...) => { ... };
-// REMOVIDO: export const loadTableOrder = (tableId) => { ... };
-// REMOVIDO: export const handleTableTransferConfirmed = async (...) => { ... }; // Movida para app.js
-
 
 // Função de inicialização do Controller
 export const initPanelController = () => {
