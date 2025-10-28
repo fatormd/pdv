@@ -1,11 +1,10 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (Novo Módulo - Painel 5) ---
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (Refatorado com Event Delegation) ---
 import { getProducts, getCategories } from "/services/wooCommerceService.js";
 import { formatCurrency } from "/utils.js";
-import { saveSelectedItemsToFirebase } from "/services/firebaseService.js"; 
-// Certifique-se de que setCurrentTable e outros sejam exportados de app.js
-import { currentTableId, selectedItems, userRole, currentOrderSnapshot, goToScreen, setCurrentTable } from "/app.js"; 
+import { saveSelectedItemsToFirebase } from "/services/firebaseService.js";
+import { currentTableId, selectedItems, userRole, currentOrderSnapshot, goToScreen, setCurrentTable } from "/app.js";
 import { arrayUnion, serverTimestamp, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { getTableDocRef, getCustomersCollectionRef } from "/services/firebaseService.js"; 
+import { getTableDocRef, getCustomersCollectionRef } from "/services/firebaseService.js";
 import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 
@@ -13,25 +12,17 @@ import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/f
 let clientObsModal, clientObsInput, clientSaveObsBtn, clientCancelObsBtn;
 let clientSearchProductInput, clientCategoryFiltersContainer, clientMenuItemsGrid;
 let clientObsItemName, clientEsperaSwitch;
-
-// NOVO: Elementos de Associação
 let clientAssocModal, assocTableInput, assocPhoneInput, assocNameInput, assocSendOrderBtn, assocErrorMsg, assocCancelBtn;
 
 // Estado local
-let currentClientSearch = ''; 
-let currentClientCategoryFilter = 'all'; 
+let currentClientSearch = '';
+let currentClientCategoryFilter = 'all';
 let clientInitialized = false;
-
-// Variável para armazenar o ID do cliente após o cadastro/associação
-let associatedClientDocId = null; 
+let associatedClientDocId = null;
 
 // --- LÓGICA DE MANIPULAÇÃO DE ITENS LOCAIS (Cliente) ---
-
-// Adiciona/remove item na seleção local e salva no Firebase
 const _updateLocalItemQuantity = (itemId, noteKey, delta) => {
     let indexToRemove = -1;
-    
-    // Encontra o ÍNDICE do último item correspondente para REMOÇÃO
     if (delta < 0) {
         for (let i = selectedItems.length - 1; i >= 0; i--) {
             if (selectedItems[i].id == itemId && (selectedItems[i].note || '') === noteKey) {
@@ -42,39 +33,34 @@ const _updateLocalItemQuantity = (itemId, noteKey, delta) => {
     }
 
     if (delta > 0) {
-         // Adicionar - Tenta copiar o último item com a mesma ID e nota (para manter a ordem)
-         const itemToCopy = selectedItems.findLast(item => item.id == itemId && (item.note || '') === noteKey);
-         if (itemToCopy) {
-             selectedItems.push({ ...itemToCopy }); // Adiciona uma cópia exata
-         } else {
-             // Se não houver nenhum com essa nota, adiciona um novo do zero (raro, mas seguro)
-             const products = getProducts();
-             const product = products.find(p => p.id == itemId);
-             if (!product) return;
-             const newItem = { id: product.id, name: product.name, price: product.price, sector: product.sector || 'cozinha', category: product.category || 'uncategorized', note: noteKey };
-             selectedItems.push(newItem);
-         }
+        const itemToCopy = selectedItems.findLast(item => item.id == itemId && (item.note || '') === noteKey);
+        if (itemToCopy) {
+            selectedItems.push({ ...itemToCopy });
+        } else {
+            const products = getProducts();
+            const product = products.find(p => p.id == itemId);
+            if (!product) return;
+            const newItem = { id: product.id, name: product.name, price: product.price, sector: product.sector || 'cozinha', category: product.category || 'uncategorized', note: noteKey };
+            selectedItems.push(newItem);
+        }
     } else if (delta < 0 && indexToRemove !== -1) {
-        // Remover
         selectedItems.splice(indexToRemove, 1);
     }
-    
-    renderClientOrderScreen(); // Re-renderiza a lista de itens selecionados
-    if (currentTableId) { // Só salva se já estiver associado a uma mesa
-        saveSelectedItemsToFirebase(currentTableId, selectedItems); 
+
+    renderClientOrderScreen();
+    if (currentTableId) {
+        saveSelectedItemsToFirebase(currentTableId, selectedItems);
     }
 };
 
 export const increaseLocalItemQuantity = (itemId, noteKey) => _updateLocalItemQuantity(itemId, noteKey, 1);
 export const decreaseLocalItemQuantity = (itemId, noteKey) => _updateLocalItemQuantity(itemId, noteKey, -1);
-// Expor globalmente para os onClicks do HTML
 window.increaseLocalItemQuantity = increaseLocalItemQuantity;
 window.decreaseLocalItemQuantity = decreaseLocalItemQuantity;
 
 
-// Chamado pelo botão + do cardápio do cliente
+// Chamado pelo botão + do cardápio do cliente (AGORA VIA EVENT DELEGATION)
 export const addClientItemToSelection = (product) => {
-    // Não precisa de currentTableId aqui, o cliente monta o carrinho antes de associar
     const newItem = {
         id: product.id,
         name: product.name,
@@ -84,21 +70,19 @@ export const addClientItemToSelection = (product) => {
         note: ''
     };
 
-    selectedItems.push(newItem); 
-    renderClientOrderScreen(); // Atualiza a UI
-    
-    // Salva no Firebase APENAS se já estiver associado a uma mesa
+    selectedItems.push(newItem);
+    renderClientOrderScreen();
+
     if (currentTableId) {
-        saveSelectedItemsToFirebase(currentTableId, selectedItems); 
+        saveSelectedItemsToFirebase(currentTableId, selectedItems);
     }
-    
-    // Abre o modal de observação para o item recém-adicionado
-    openClientObsModalForGroup(product.id, ''); 
+
+    openClientObsModalForGroup(product.id, '');
 };
-window.addClientItemToSelection = addClientItemToSelection;
+// window.addClientItemToSelection = addClientItemToSelection; // Não precisa mais ser global
 
 
-// --- FUNÇÕES DE RENDERIZAÇÃO DE MENU (Cliente) ---
+// --- FUNÇÕES DE RENDERIZAÇÃO DE MENU (Cliente - Refatorado) ---
 export const renderClientMenu = () => {
     if (!clientMenuItemsGrid || !clientCategoryFiltersContainer) return;
 
@@ -131,7 +115,7 @@ export const renderClientMenu = () => {
         filteredProducts = filteredProducts.filter(p => p.category === currentClientCategoryFilter);
     }
 
-    // 3. Renderiza Itens do Cardápio
+    // 3. Renderiza Itens do Cardápio (SEM onclick inline)
     if (filteredProducts.length === 0) {
         clientMenuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-gray-500 italic">Nenhum produto encontrado.</div>`;
     } else {
@@ -142,8 +126,8 @@ export const renderClientMenu = () => {
                 <div class="flex justify-between items-center mt-2">
                     <span class="font-bold text-lg text-pumpkin">${formatCurrency(product.price)}</span>
                     <button class="add-item-btn bg-green-600 text-white p-2 rounded-full hover:bg-green-700 transition"
-                            onclick="window.addClientItemToSelection(${JSON.stringify(product).replace(/'/g, '&#39;')})">
-                        <i class="fas fa-plus text-base"></i>
+                            data-product='${JSON.stringify(product).replace(/'/g, '&#39;')}'> {/* Adiciona data attribute */}
+                        <i class="fas fa-plus text-base pointer-events-none"></i> {/* pointer-events-none no ícone */}
                     </button>
                 </div>
             </div>
@@ -154,25 +138,26 @@ export const renderClientMenu = () => {
 
 // Função de Renderização da Lista de Pedidos do Cliente
 export const renderClientOrderScreen = () => {
+    // ... (código inalterado)
     const openOrderList = document.getElementById('openOrderListClient');
     const openItemsCount = document.getElementById('openItemsCountClient');
     const sendBtn = document.getElementById('sendClientOrderBtn');
-    
+
     if (!openOrderList) return;
-    
+
     const openItemsCountValue = selectedItems.length;
     if(openItemsCount) openItemsCount.textContent = openItemsCountValue;
 
     if (sendBtn) {
         sendBtn.disabled = openItemsCountValue === 0;
     }
-    
+
     if (openItemsCountValue === 0) {
         openOrderList.innerHTML = `<div class="text-base text-gray-500 italic p-2">Nenhum item selecionado.</div>`;
     } else {
         // Lógica de Agrupamento para exibição
         const groupedItems = selectedItems.reduce((acc, item) => {
-            const key = `${item.id}-${item.note || ''}`; 
+            const key = `${item.id}-${item.note || ''}`;
             if (!acc[key]) {
                 acc[key] = { ...item, count: 0 };
             }
@@ -184,20 +169,20 @@ export const renderClientOrderScreen = () => {
             <div class="flex justify-between items-center bg-gray-100 p-3 rounded-lg shadow-sm">
                 <div class="flex flex-col flex-grow min-w-0 mr-2">
                     <span class="font-semibold text-gray-800">${group.name} (${group.count}x)</span>
-                    <span class="text-sm cursor-pointer text-indigo-500 hover:text-indigo-700" 
+                    <span class="text-sm cursor-pointer text-indigo-500 hover:text-indigo-700"
                           onclick="window.openClientObsModalForGroup('${group.id}', '${group.note || ''}')">
                         ${group.note ? `(${group.note})` : `(Adicionar Obs.)`}
                     </span>
                 </div>
 
                 <div class="flex items-center space-x-2 flex-shrink-0">
-                    <button class="qty-btn bg-red-500 text-white rounded-full h-8 w-8 flex items-center justify-center hover:bg-red-600 transition duration-150" 
+                    <button class="qty-btn bg-red-500 text-white rounded-full h-8 w-8 flex items-center justify-center hover:bg-red-600 transition duration-150"
                             onclick="window.decreaseLocalItemQuantity('${group.id}', '${group.note || ''}')" title="Remover um">
-                        <i class="fas fa-minus"></i>
+                        <i class="fas fa-minus pointer-events-none"></i>
                     </button>
-                    <button class="qty-btn bg-green-500 text-white rounded-full h-8 w-8 flex items-center justify-center hover:bg-green-600 transition duration-150" 
+                    <button class="qty-btn bg-green-500 text-white rounded-full h-8 w-8 flex items-center justify-center hover:bg-green-600 transition duration-150"
                             onclick="window.increaseLocalItemQuantity('${group.id}', '${group.note || ''}')" title="Adicionar um">
-                        <i class="fas fa-plus"></i>
+                        <i class="fas fa-plus pointer-events-none"></i>
                     </button>
                 </div>
             </div>
@@ -208,25 +193,24 @@ export const renderClientOrderScreen = () => {
 
 // Abertura do Modal de Observações (Cliente - Apenas Quick Buttons)
 export function openClientObsModalForGroup(itemId, noteKey) {
+    // ... (código inalterado)
     const products = getProducts();
     const product = products.find(p => p.id == itemId);
 
     if (!clientObsModal || !product) return;
 
     clientObsItemName.textContent = product.name;
-    
-    // O cliente NÃO DEVE usar [EM ESPERA]
-    const currentNoteCleaned = noteKey.replace(' [EM ESPERA]', '').trim(); 
+
+    const currentNoteCleaned = noteKey.replace(' [EM ESPERA]', '').trim();
     clientObsInput.value = currentNoteCleaned;
-    clientObsInput.readOnly = true; // CRÍTICO: Bloqueia a edição livre
+    clientObsInput.readOnly = true;
     clientObsInput.placeholder = "Apenas botões rápidos permitidos.";
-    
+
     clientObsModal.dataset.itemId = itemId;
     clientObsModal.dataset.originalNoteKey = noteKey;
-    
-    // Desativa o switch 'Em Espera' se existir (client.html já o desativa)
+
     if (clientEsperaSwitch) clientEsperaSwitch.checked = false;
-    
+
     clientObsModal.style.display = 'flex';
 }
 window.openClientObsModalForGroup = openClientObsModalForGroup;
@@ -234,15 +218,14 @@ window.openClientObsModalForGroup = openClientObsModalForGroup;
 
 // FUNÇÃO PRINCIPAL: Envio de Pedido pelo Cliente (Aciona Modal se necessário)
 export const handleClientSendOrder = async () => {
+    // ... (código inalterado)
     if (selectedItems.length === 0) {
         alert("Adicione itens ao seu pedido antes de enviar.");
         return;
     }
-    
-    // Se o cliente ainda não está associado à mesa, abre o modal de associação.
+
     if (!currentTableId) {
         if (clientAssocModal) clientAssocModal.style.display = 'flex';
-        // Atualiza a mensagem
         if(assocErrorMsg) {
              assocErrorMsg.textContent = "Para enviar seu pedido, preencha a mesa e seu contato.";
              assocErrorMsg.classList.remove('text-red-500');
@@ -251,8 +234,7 @@ export const handleClientSendOrder = async () => {
         }
         return;
     }
-    
-    // Se já associado, confirma e envia o pedido
+
     if (!confirm(`Confirmar o envio de ${selectedItems.length} item(s) para o Garçom? O garçom deve aprovar o pedido antes de enviá-lo à cozinha.`)) return;
 
     const btn = document.getElementById('sendClientOrderBtn');
@@ -260,31 +242,29 @@ export const handleClientSendOrder = async () => {
 
     try {
         const tableRef = getTableDocRef(currentTableId);
-        
+
         const requestedOrder = {
             orderId: `req_${Date.now()}`,
             items: selectedItems.map(item => ({...item, requestedAt: Date.now()})),
             requestedAt: Date.now(),
-            status: 'pending_waiter', // Novo status para o Garçom
+            status: 'pending_waiter',
             clientInfo: {
-                 docId: associatedClientDocId, // O ID/Telefone do cliente que associou
-                 name: currentOrderSnapshot?.clientName || 'Cliente Comanda', // Usa o nome da mesa, se houver
-                 phone: associatedClientDocId || 'N/A' // O ID é o telefone
+                 docId: associatedClientDocId,
+                 name: currentOrderSnapshot?.clientName || 'Cliente Comanda',
+                 phone: associatedClientDocId || 'N/A'
             }
         };
-        
-        // Atualiza o Firebase para notificar o Staff
+
         await updateDoc(tableRef, {
-            requestedOrders: arrayUnion(requestedOrder), 
-            selectedItems: [], // Limpa o carrinho local do cliente
-            clientOrderPending: true, // Flag para o card da mesa do Staff
-            waiterNotification: { type: 'client_request', timestamp: serverTimestamp() } 
+            requestedOrders: arrayUnion(requestedOrder),
+            selectedItems: [],
+            clientOrderPending: true,
+            waiterNotification: { type: 'client_request', timestamp: serverTimestamp() }
         });
 
-        // Limpa o estado local
-        selectedItems.length = 0; 
-        renderClientOrderScreen(); // Re-renderiza a tela do cliente
-        
+        selectedItems.length = 0;
+        renderClientOrderScreen();
+
         alert(`Pedido enviado! Aguarde a confirmação do seu Garçom.`);
 
     } catch (e) {
@@ -295,8 +275,9 @@ export const handleClientSendOrder = async () => {
     }
 };
 
-// NOVO: Lógica de Associação e Envio (Chamada pelo Modal)
+// Lógica de Associação e Envio (Chamada pelo Modal)
 export const handleClientAssociationAndSend = async () => {
+    // ... (código inalterado)
     const tableNumber = assocTableInput?.value.trim();
     const phone = assocPhoneInput?.value.replace(/\D/g, ''); // Apenas números
     const name = assocNameInput?.value.trim() || 'Cliente Comanda';
@@ -316,7 +297,6 @@ export const handleClientAssociationAndSend = async () => {
     if (assocSendOrderBtn) { assocSendOrderBtn.disabled = true; assocSendOrderBtn.textContent = 'Verificando...'; }
 
     try {
-        // 1. Verificar se a mesa existe e está aberta
         const tableRef = getTableDocRef(tableNumber);
         const docSnap = await getDoc(tableRef);
 
@@ -327,37 +307,29 @@ export const handleClientAssociationAndSend = async () => {
             return;
         }
 
-        // 2. Cadastrar/Associar Cliente via Telefone (Usando telefone como ID do Cliente)
         const customersRef = getCustomersCollectionRef();
         const clientDocId = phone;
         const clientDocRef = doc(customersRef, clientDocId);
-        
+
         const clientData = {
             name: name,
             phone: phone,
-            associatedTable: tableNumber, // Opcional: rastrear a mesa atual do cliente
+            associatedTable: tableNumber,
             lastVisit: serverTimestamp(),
-            // Adicione outros campos como e-mail ou CPF se existirem no modal
         };
-        
-        // Se o cliente já existe, apenas atualiza lastVisit e associatedTable
-        await setDoc(clientDocRef, clientData, { merge: true }); 
 
-        // 3. Estabelecer o Listener na Mesa e atualizar estado global
-        associatedClientDocId = clientDocId; // Armazena o ID do cliente
+        await setDoc(clientDocRef, clientData, { merge: true });
+
+        associatedClientDocId = clientDocId;
         setCurrentTable(tableNumber, true); // True para modo cliente (isso inicia o listener)
 
-        // Salva o carrinho que o cliente montou *antes* de associar
         if (selectedItems.length > 0) {
             await saveSelectedItemsToFirebase(tableNumber, selectedItems);
         }
 
-        // 4. Fechar o modal
         if (clientAssocModal) clientAssocModal.style.display = 'none';
-        
-        // 5. Chama a função de envio, que agora saberá que está associado
-        // A confirmação final ('Confirmar envio...') será exibida aqui
-        handleClientSendOrder(); 
+
+        handleClientSendOrder();
 
     } catch (error) {
          console.error("[ASSOCIAÇÃO CLIENTE] Erro:", error);
@@ -371,37 +343,36 @@ export const handleClientAssociationAndSend = async () => {
 
 // Listener para as Quick-Buttons do Modal de Observação (Cliente)
 const handleQuickButtonClient = (e) => {
+    // ... (código inalterado)
     const btn = e.target.closest('.quick-obs-btn');
     if (btn && clientObsInput) {
         const obsText = btn.dataset.obs;
         let currentValue = clientObsInput.value.trim();
-        
-        // Lógica para adicionar vírgula e espaço
+
         if (currentValue && !currentValue.endsWith(',') && currentValue.length > 0) {
             currentValue += ', ';
         } else if (currentValue.endsWith(',')) {
             currentValue += ' ';
         }
-        
+
         clientObsInput.value = (currentValue + obsText).trim();
     }
 };
 
 const handleSaveClientObs = () => {
+    // ... (código inalterado)
     const itemId = clientObsModal.dataset.itemId;
     const originalNoteKey = clientObsModal.dataset.originalNoteKey;
     let newNote = clientObsInput.value.trim();
-    
-    // Remove qualquer tag [EM ESPERA] que possa ter sido adicionada por erro
+
     newNote = newNote.replace(/ \[EM ESPERA\]/gi, '').trim();
-    
+
     let updated = false;
-    let firstUpdateIndex = -1; // Rastreia o primeiro item atualizado para evitar recursão
-    
-    // Cria um novo array temporário com as atualizações
+    let firstUpdateIndex = -1;
+
     const updatedItems = selectedItems.map((item, index) => {
         if (item.id == itemId && (item.note || '') === originalNoteKey) {
-            if (!updated) { // Atualiza apenas a primeira ocorrência para abrir o modal de novo item
+            if (!updated) {
                  firstUpdateIndex = index;
             }
             updated = true;
@@ -409,15 +380,14 @@ const handleSaveClientObs = () => {
         }
         return item;
     });
-    
-    // Muta o array original 'selectedItems'
-    selectedItems.length = 0; 
+
+    selectedItems.length = 0;
     selectedItems.push(...updatedItems);
 
     if (updated) {
         clientObsModal.style.display = 'none';
         renderClientOrderScreen();
-        if (currentTableId) { // Só salva se já associado
+        if (currentTableId) {
             saveSelectedItemsToFirebase(currentTableId, selectedItems);
         }
     } else {
@@ -428,48 +398,47 @@ const handleSaveClientObs = () => {
 // --- INICIALIZAÇÃO DO CONTROLLER DO CLIENTE ---
 export const initClientOrderController = () => {
     if(clientInitialized) return;
-    
-    // Mapeia os elementos do modal de Observação
+
+    // Mapeia os elementos
     clientObsModal = document.getElementById('obsModal');
     clientObsItemName = document.getElementById('obsItemName');
     clientObsInput = document.getElementById('obsInput');
     clientSaveObsBtn = document.getElementById('saveObsBtn');
     clientCancelObsBtn = document.getElementById('cancelObsBtn');
-    clientEsperaSwitch = document.getElementById('esperaSwitch'); 
+    clientEsperaSwitch = document.getElementById('esperaSwitch');
 
-    // Mapeia os elementos do modal de Associação/Cadastro (NOVO)
-    clientAssocModal = document.getElementById('associationModal'); 
+    clientAssocModal = document.getElementById('associationModal');
     assocTableInput = document.getElementById('assocTableNumber');
     assocPhoneInput = document.getElementById('assocPhone');
     assocNameInput = document.getElementById('assocName');
     assocSendOrderBtn = document.getElementById('assocSendOrderBtn');
     assocErrorMsg = document.getElementById('assocErrorMsg');
-    assocCancelBtn = document.getElementById('assocCancelBtn'); // Botão Cancelar do Modal
+    assocCancelBtn = document.getElementById('assocCancelBtn');
 
-    // Mapeia os elementos de Menu
     clientSearchProductInput = document.getElementById('searchProductInputClient');
     clientCategoryFiltersContainer = document.getElementById('categoryFiltersClient');
     clientMenuItemsGrid = document.getElementById('menuItemsGridClient');
-    
+
+    // Validação de Elementos Essenciais
+    if (!clientObsModal || !clientAssocModal || !clientMenuItemsGrid) {
+        console.error("[ClientController] Erro Fatal: Elementos críticos (modais, grid de menu) não encontrados.");
+        return;
+    }
+
     // Listeners Essenciais
     const sendClientBtn = document.getElementById('sendClientOrderBtn');
     if (sendClientBtn) sendClientBtn.addEventListener('click', handleClientSendOrder);
-    
-    // NOVO: Listener do Botão de Envio/Associação do Modal
+
     if (assocSendOrderBtn) assocSendOrderBtn.addEventListener('click', handleClientAssociationAndSend);
-    // NOVO: Listener para fechar o modal de associação
     if (assocCancelBtn) assocCancelBtn.addEventListener('click', () => { if(clientAssocModal) clientAssocModal.style.display = 'none'; });
-    
+
     if (clientSaveObsBtn) clientSaveObsBtn.addEventListener('click', handleSaveClientObs);
-    if (clientCancelObsBtn) clientCancelObsBtn.addEventListener('click', () => { 
-        // Lógica de Cancelamento do Modal OBS: Se for um item novo, remove-o
+    if (clientCancelObsBtn) clientCancelObsBtn.addEventListener('click', () => {
         const itemId = clientObsModal.dataset.itemId;
         const originalNoteKey = clientObsModal.dataset.originalNoteKey;
         const currentNote = clientObsInput.value.trim();
 
         if (originalNoteKey === '' && currentNote === '') {
-             // Se o item foi recém-adicionado (note original vazia) E o usuário não digitou nada
-             // E cancelou, remove o último item adicionado com esse ID
              let lastIndex = -1;
              for (let i = selectedItems.length - 1; i >= 0; i--) {
                  if (selectedItems[i].id == itemId && selectedItems[i].note === '') {
@@ -478,35 +447,48 @@ export const initClientOrderController = () => {
                  }
              }
              if (lastIndex > -1) {
-                 selectedItems.splice(lastIndex, 1); // Remove o item
-                 console.log("Item recém-adicionado cancelado.");
-                 renderClientOrderScreen(); // Re-renderiza
-                 if (currentTableId) saveSelectedItemsToFirebase(currentTableId, selectedItems); // Salva
+                 selectedItems.splice(lastIndex, 1);
+                 renderClientOrderScreen();
+                 if (currentTableId) saveSelectedItemsToFirebase(currentTableId, selectedItems);
              }
         }
-        clientObsModal.style.display = 'none'; 
+        clientObsModal.style.display = 'none';
     });
 
-    // Listener para busca de produto
     if (clientSearchProductInput) {
         clientSearchProductInput.addEventListener('input', (e) => {
             currentClientSearch = e.target.value;
-            renderClientMenu(); 
+            renderClientMenu();
         });
     }
 
-    // Listener para filtros de categoria (delegação de evento)
     if (clientCategoryFiltersContainer) {
         clientCategoryFiltersContainer.addEventListener('click', (e) => {
             const btn = e.target.closest('.category-btn');
             if (btn) {
                 currentClientCategoryFilter = btn.dataset.category;
-                renderClientMenu(); 
+                renderClientMenu();
             }
         });
     }
-    
-    // Anexa o listener de Quick-Buttons para o modal
+
+    // *** NOVO: Event Delegation para adicionar item ***
+    if (clientMenuItemsGrid) {
+        clientMenuItemsGrid.addEventListener('click', (e) => {
+            // Verifica se o clique foi no botão ou no ícone dentro dele
+            const addBtn = e.target.closest('.add-item-btn');
+            if (addBtn) {
+                try {
+                    // Tenta parsear os dados do produto do atributo data-product
+                    const productData = JSON.parse(addBtn.dataset.product.replace(/&#39;/g, "'"));
+                    addClientItemToSelection(productData); // Chama a função para adicionar
+                } catch (err) {
+                    console.error("Erro ao parsear dados do produto no clique:", err, addBtn.dataset.product);
+                }
+            }
+        });
+    }
+
     const quickObsButtons = document.getElementById('quickObsButtons');
     if (quickObsButtons) {
         quickObsButtons.addEventListener('click', handleQuickButtonClient);
