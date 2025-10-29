@@ -1,5 +1,7 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (Completo, com Modal de Info) ---
-import { getProducts, getCategories } from "/services/wooCommerceService.js";
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (Refatorado com Modal de Info e Correção de Dependência) ---
+
+// ATUALIZADO: Importa os 'fetchers' além dos 'getters'
+import { getProducts, getCategories, fetchWooCommerceProducts, fetchWooCommerceCategories } from "/services/wooCommerceService.js";
 import { formatCurrency } from "/utils.js";
 import { saveSelectedItemsToFirebase } from "/services/firebaseService.js";
 import { currentTableId, selectedItems, userRole, currentOrderSnapshot, goToScreen, setCurrentTable } from "/app.js";
@@ -24,7 +26,7 @@ let clientInitialized = false;
 let associatedClientDocId = null;
 
 // --- LÓGICA DE MANIPULAÇÃO DE ITENS LOCAIS (Cliente) ---
-
+// ... (Funções _updateLocalItemQuantity, increaseLocalItemQuantity, decreaseLocalItemQuantity - Sem Alteração) ...
 const _updateLocalItemQuantity = (itemId, noteKey, delta) => {
     let indexToRemove = -1;
     if (delta < 0) {
@@ -65,6 +67,7 @@ window.decreaseLocalItemQuantity = decreaseLocalItemQuantity;
 
 // Chamado pelo botão + do cardápio do cliente (AGORA VIA EVENT DELEGATION)
 export const addClientItemToSelection = (product) => {
+    // ... (Sem Alteração) ...
     const newItem = {
         id: product.id,
         name: product.name,
@@ -87,6 +90,7 @@ export const addClientItemToSelection = (product) => {
 
 // --- FUNÇÕES DE RENDERIZAÇÃO DE MENU (Cliente) ---
 export const renderClientMenu = () => {
+    // ... (Sem Alteração) ...
     if (!clientMenuItemsGrid || !clientCategoryFiltersContainer) return;
 
     const products = getProducts();
@@ -123,7 +127,6 @@ export const renderClientMenu = () => {
     }
 
     // 3. Renderiza Itens do Cardápio (HTML LIMPO)
-    // O JSON.stringify(product) agora inclui 'description' e 'image' graças à Etapa 1.
     if (filteredProducts.length === 0) {
         clientMenuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-dark-placeholder italic">Nenhum produto encontrado.</div>`;
     } else {
@@ -139,19 +142,21 @@ export const renderClientMenu = () => {
                     </button>
                 </div>
             </div>
-        `).join(''); // String HTML finalizada aqui, sem comentários internos
+        `).join('');
     }
 };
 
 
 // Função de Renderização da Lista de Pedidos do Cliente
 export const renderClientOrderScreen = () => {
+    // ... (Sem Alteração) ...
     const openOrderList = document.getElementById('openOrderListClient');
     const openItemsCount = document.getElementById('openItemsCountClient');
     const sendBtn = document.getElementById('sendClientOrderBtn');
 
     if (!openOrderList) return;
 
+    // ATENÇÃO: selectedItems agora é importado de app.js e é 100% confiável
     const openItemsCountValue = selectedItems.length;
     if(openItemsCount) openItemsCount.textContent = openItemsCountValue;
 
@@ -197,11 +202,11 @@ export const renderClientOrderScreen = () => {
     }
 };
 
-
 // --- FUNÇÕES DE MODAL ---
 
 // Abertura do Modal de Observações (Cliente - Apenas Quick Buttons)
 export function openClientObsModalForGroup(itemId, noteKey) {
+    // ... (Sem Alteração) ...
     const products = getProducts();
     const product = products.find(p => p.id == itemId);
 
@@ -225,26 +230,22 @@ window.openClientObsModalForGroup = openClientObsModalForGroup; // Expor globalm
 
 // NOVO: Define a função para abrir o modal de info e a expõe globalmente
 export const openProductInfoModal = (product) => {
+    // ... (Sem Alteração) ...
     if (!clientProductInfoModal || !infoProductName || !infoProductDescription || !infoProductImage) {
         console.error("Elementos do Modal de Informação do Produto não encontrados.");
         return;
     }
-
-    // Popula os dados do modal
     infoProductName.textContent = product.name;
-    // Usa innerHTML para renderizar a descrição formatada (negrito, parágrafos) vinda do WooCommerce
     infoProductDescription.innerHTML = product.description; 
-    infoProductImage.src = product.image; // Define a URL da imagem
-
-    // Exibe o modal
+    infoProductImage.src = product.image;
     clientProductInfoModal.style.display = 'flex';
 };
-// NOVO: Atribui ao window para sobrescrever o placeholder em app.js
 window.openProductInfoModal = openProductInfoModal;
 
 
 // --- FUNÇÃO PRINCIPAL: Envio de Pedido pelo Cliente ---
 export const handleClientSendOrder = async () => {
+    // ... (Sem Alteração - O 'selectedItems' agora estará correto) ...
     if (selectedItems.length === 0) {
         alert("Adicione itens ao seu pedido antes de enviar.");
         return;
@@ -303,6 +304,7 @@ export const handleClientSendOrder = async () => {
 
 // Lógica de Associação e Envio (Chamada pelo Modal)
 export const handleClientAssociationAndSend = async () => {
+    // ... (Sem Alteração) ...
     const tableNumber = assocTableInput?.value.trim();
     const phone = assocPhoneInput?.value.replace(/\D/g, '');
     const name = assocNameInput?.value.trim() || 'Cliente Comanda';
@@ -368,6 +370,7 @@ export const handleClientAssociationAndSend = async () => {
 
 // Listener para as Quick-Buttons do Modal de Observação (Cliente)
 const handleQuickButtonClient = (e) => {
+    // ... (Sem Alteração) ...
     const btn = e.target.closest('.quick-obs-btn');
     if (btn && clientObsInput) {
         const obsText = btn.dataset.obs;
@@ -385,6 +388,7 @@ const handleQuickButtonClient = (e) => {
 
 // Salvar Observação do Cliente
 const handleSaveClientObs = () => {
+    // ... (Sem Alteração) ...
     const itemId = clientObsModal.dataset.itemId;
     const originalNoteKey = clientObsModal.dataset.originalNoteKey;
     let newNote = clientObsInput.value.trim();
@@ -424,6 +428,7 @@ export const initClientOrderController = () => {
     if(clientInitialized) return;
 
     // Mapeia os elementos
+    // ... (Mapeamento de clientObsModal, clientAssocModal, etc. - Sem Alteração) ...
     clientObsModal = document.getElementById('obsModal');
     clientObsItemName = document.getElementById('obsItemName');
     clientObsInput = document.getElementById('obsInput');
@@ -450,12 +455,13 @@ export const initClientOrderController = () => {
     infoProductImage = document.getElementById('infoProductImage');
 
     // Validação de Elementos Essenciais
-    if (!clientObsModal || !clientAssocModal || !clientMenuItemsGrid || !clientProductInfoModal) { // NOVO: Valida o modal de info
+    if (!clientObsModal || !clientAssocModal || !clientMenuItemsGrid || !clientProductInfoModal) { // Valida o modal de info
         console.error("[ClientController] Erro Fatal: Elementos críticos (modais, grid de menu) não encontrados.");
         return;
     }
 
     // Listeners Essenciais
+    // ... (Listeners de sendClientBtn, assocSendOrderBtn, etc. - Sem Alteração) ...
     const sendClientBtn = document.getElementById('sendClientOrderBtn');
     if (sendClientBtn) sendClientBtn.addEventListener('click', handleClientSendOrder);
 
@@ -505,12 +511,10 @@ export const initClientOrderController = () => {
     // ATUALIZADO: Event Delegation para adicionar item OU abrir info
     if (clientMenuItemsGrid) {
         clientMenuItemsGrid.addEventListener('click', (e) => {
-            // Tenta pegar o botão de adicionar
             const addBtn = e.target.closest('.add-item-btn');
             
             if (addBtn) {
-                // AÇÃO 1: Usuário clicou no BOTÃO DE ADICIONAR
-                e.stopPropagation(); // Impede que o clique "suba" para o card
+                e.stopPropagation(); // Impede o clique de "borbulhar" para o card
                 try {
                     const productData = JSON.parse(addBtn.dataset.product.replace(/&#39;/g, "'"));
                     addClientItemToSelection(productData);
@@ -518,16 +522,15 @@ export const initClientOrderController = () => {
                     console.error("Erro ao parsear dados do produto no clique (add):", err, addBtn.dataset.product);
                 }
             } else {
-                // AÇÃO 2: Usuário não clicou no botão, checa se clicou no CARD
                 const card = e.target.closest('.product-card');
                 if (card) {
-                    // Pega o botão *dentro* do card clicado para ler os dados
                     const buttonForData = card.querySelector('.add-item-btn');
                     if (buttonForData) {
                         try {
                             const productData = JSON.parse(buttonForData.dataset.product.replace(/&#39;/g, "'"));
                             openProductInfoModal(productData); // Abre o modal de info
-                        } catch (err) {
+                        } catch (err)
+ {
                             console.error("Erro ao parsear dados do produto no clique (info):", err, buttonForData.dataset.product);
                         }
                     }
@@ -540,6 +543,12 @@ export const initClientOrderController = () => {
     if (quickObsButtons) {
         quickObsButtons.addEventListener('click', handleQuickButtonClient);
     }
+
+    // ATUALIZADO: O controller agora busca seus próprios dados
+    console.log("[ClientOrderController] Inicializando e buscando dados do WooCommerce...");
+    fetchWooCommerceProducts(renderClientMenu).catch(e => console.error("[ClientController INIT] Falha ao carregar produtos:", e));
+    fetchWooCommerceCategories(renderClientMenu).catch(e => console.error("[ClientController INIT] Falha ao carregar categorias:", e));
+
 
     clientInitialized = true;
     console.log("[ClientOrderController] Inicializado.");
