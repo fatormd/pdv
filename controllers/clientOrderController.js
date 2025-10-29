@@ -8,7 +8,7 @@ import { getTableDocRef, getCustomersCollectionRef } from "/services/firebaseSer
 import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 
-// --- VARIÁVEIS DE ELEMENTOS (Definidas no DOMContentLoaded) ---
+// --- VARIÁVEIS DE ELEMENTOS ---
 let clientObsModal, clientObsInput, clientSaveObsBtn, clientCancelObsBtn;
 let clientSearchProductInput, clientCategoryFiltersContainer, clientMenuItemsGrid;
 let clientObsItemName, clientEsperaSwitch;
@@ -91,8 +91,7 @@ export const renderClientMenu = () => {
     // 1. Renderiza Filtros de Categoria
     if (categories.length > 0 && clientCategoryFiltersContainer.innerHTML.trim() === '') {
         clientCategoryFiltersContainer.innerHTML = categories.map(cat => {
-            const isActive = cat.slug === currentClientCategoryFilter ? 'bg-indigo-700 text-white' : 'bg-gray-200 text-gray-700';
-            // Usa as classes dark mode nos filtros também
+            const isActive = cat.slug === currentClientCategoryFilter;
             const inactiveClasses = 'bg-dark-input text-dark-text border border-dark-border';
             const activeClasses = 'bg-pumpkin text-white border-pumpkin';
             return `<button class="category-btn text-base px-4 py-2 rounded-full font-semibold whitespace-nowrap ${isActive ? activeClasses : inactiveClasses}" data-category="${cat.slug || cat.id}">${cat.name}</button>`;
@@ -101,7 +100,6 @@ export const renderClientMenu = () => {
      // Atualiza o estado ativo dos botões de categoria
      clientCategoryFiltersContainer.querySelectorAll('.category-btn').forEach(btn => {
         const isActive = btn.dataset.category === currentClientCategoryFilter;
-        // Classes Dark Mode
         btn.classList.toggle('bg-pumpkin', isActive);
         btn.classList.toggle('text-white', isActive);
         btn.classList.toggle('border-pumpkin', isActive);
@@ -120,7 +118,7 @@ export const renderClientMenu = () => {
         filteredProducts = filteredProducts.filter(p => p.category === currentClientCategoryFilter);
     }
 
-    // 3. Renderiza Itens do Cardápio (SEM comentários no botão)
+    // 3. Renderiza Itens do Cardápio (HTML LIMPO)
     if (filteredProducts.length === 0) {
         clientMenuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-dark-placeholder italic">Nenhum produto encontrado.</div>`;
     } else {
@@ -133,10 +131,10 @@ export const renderClientMenu = () => {
                     <button class="add-item-btn bg-green-600 text-white p-2 rounded-full hover:bg-green-700 transition"
                             data-product='${JSON.stringify(product).replace(/'/g, '&#39;')}'>
                         <i class="fas fa-plus text-base pointer-events-none"></i>
-                    </button> {/* Comentários removidos daqui */}
+                    </button>
                 </div>
             </div>
-        `).join('');
+        `).join(''); // String HTML finalizada aqui, sem comentários internos
     }
 };
 
@@ -171,7 +169,7 @@ export const renderClientOrderScreen = () => {
         }, {});
 
         openOrderList.innerHTML = Object.values(groupedItems).map(group => `
-            <div class="flex justify-between items-center bg-dark-input p-3 rounded-lg shadow-sm border border-dark-border"> {/* Estilo dark aplicado */}
+            <div class="flex justify-between items-center bg-dark-input p-3 rounded-lg shadow-sm border border-dark-border">
                 <div class="flex flex-col flex-grow min-w-0 mr-2">
                     <span class="font-semibold text-dark-text">${group.name} (${group.count}x)</span>
                     <span class="text-sm cursor-pointer text-indigo-400 hover:text-indigo-300"
@@ -218,7 +216,6 @@ export function openClientObsModalForGroup(itemId, noteKey) {
 
     clientObsModal.style.display = 'flex';
 }
-// window.openClientObsModalForGroup = openClientObsModalForGroup; // Já definido globalmente no app.js
 
 
 // FUNÇÃO PRINCIPAL: Envio de Pedido pelo Cliente (Aciona Modal se necessário)
@@ -233,7 +230,7 @@ export const handleClientSendOrder = async () => {
         if (clientAssocModal) clientAssocModal.style.display = 'flex';
         if(assocErrorMsg) {
              assocErrorMsg.textContent = "Para enviar seu pedido, preencha a mesa e seu contato.";
-             assocErrorMsg.classList.remove('text-red-400'); // Corrigido para red-400 (tema dark)
+             assocErrorMsg.classList.remove('text-red-400');
              assocErrorMsg.classList.add('text-dark-placeholder');
              assocErrorMsg.style.display = 'block';
         }
@@ -284,7 +281,7 @@ export const handleClientSendOrder = async () => {
 export const handleClientAssociationAndSend = async () => {
     // ... (código inalterado)
     const tableNumber = assocTableInput?.value.trim();
-    const phone = assocPhoneInput?.value.replace(/\D/g, ''); // Apenas números
+    const phone = assocPhoneInput?.value.replace(/\D/g, '');
     const name = assocNameInput?.value.trim() || 'Cliente Comanda';
 
     if (!tableNumber || tableNumber === '0') {
@@ -292,7 +289,7 @@ export const handleClientAssociationAndSend = async () => {
          assocErrorMsg.style.display = 'block';
          return;
     }
-    if (phone.length < 10) { // Telefone com DDD, 10 ou 11 dígitos
+    if (phone.length < 10) {
          assocErrorMsg.textContent = "Telefone/WhatsApp inválido. Mínimo 10 dígitos.";
          assocErrorMsg.style.display = 'block';
          return;
@@ -326,7 +323,7 @@ export const handleClientAssociationAndSend = async () => {
         await setDoc(clientDocRef, clientData, { merge: true });
 
         associatedClientDocId = clientDocId;
-        setCurrentTable(tableNumber, true); // True para modo cliente (isso inicia o listener)
+        setCurrentTable(tableNumber, true);
 
         if (selectedItems.length > 0) {
             await saveSelectedItemsToFirebase(tableNumber, selectedItems);
@@ -500,3 +497,4 @@ export const initClientOrderController = () => {
     clientInitialized = true;
     console.log("[ClientOrderController] Inicializado.");
 };
+
