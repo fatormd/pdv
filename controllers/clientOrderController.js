@@ -1,4 +1,4 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (Layout Atualizado, Filtros Corrigidos, Comentário Removido - COMPLETO) ---
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (Layout Atualizado, Filtros Corrigidos, Comentário Removido - COMPLETO v3) ---
 
 // Importa funções necessárias dos serviços e do app principal
 import { getProducts, getCategories, fetchWooCommerceProducts, fetchWooCommerceCategories } from "/services/wooCommerceService.js";
@@ -148,10 +148,12 @@ export const renderClientMenu = () => {
             const productDataString = JSON.stringify(product).replace(/'/g, '&#39;');
 
             // Estrutura HTML do card (SEM COMENTÁRIOS INTERNOS)
+            // A altura da imagem foi ajustada em versões anteriores
+            // O espaçamento vertical mb-1 foi adicionado em versões anteriores
             return `
-            <div class="product-card bg-dark-card border border-dark-border rounded-xl shadow-md overflow-hidden flex flex-col">
+            <div class="product-card bg-dark-card border border-dark-border rounded-xl shadow-md overflow-hidden flex flex-col mb-1">
 
-                <img src="${product.image}" alt="${product.name}" class="w-full h-32 md:h-40 object-cover cursor-pointer info-img-trigger" data-product='${productDataString}'>
+                <img src="${product.image}" alt="${product.name}" class="w-full h-40 md:h-48 object-cover cursor-pointer info-img-trigger" data-product='${productDataString}'>
 
                 <div class="p-3 flex flex-col flex-grow">
 
