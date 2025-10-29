@@ -83,11 +83,9 @@
 </head>
 <body class="bg-dark-bg text-dark-text min-h-screen client-mode">
 
-    {/* lg:max-w-7xl lg:mx-auto removido temporariamente para testar altura */}
     <main id="mainContent" class="relative overflow-hidden">
         <div id="appContainer" class="flex transition-transform duration-300 ease-out">
 
-            {/* Adicionado flex flex-col h-full */}
             <div id="clientOrderScreen" class="w-screen flex-shrink-0 flex flex-col h-full">
                 <div class="flex items-center justify-between mb-4 md:mb-6 flex-shrink-0">
                     <div class="flex items-center text-green-400">
@@ -106,41 +104,26 @@
                                 <i class="fas fa-check-circle"></i>
                             </button>
                         </div>
-                        {/* Lista de itens do pedido com scroll próprio */}
                         <div id="openOrderListClient" class="space-y-2 md:space-y-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
                             <div class="text-sm md:text-base text-dark-placeholder italic p-2">Nenhum item selecionado.</div>
                         </div>
                     </div>
                 </div>
 
-                {/* ATUALIZADO: Adicionado flex flex-col e flex-grow/overflow-hidden para controlar altura */}
-                <div id="menuContainerClient" class="flex flex-col flex-grow overflow-hidden"> {/* flex-grow faz ocupar espaço, overflow evita crescer demais */}
-                    {/* Título e Busca (Não ocupam espaço extra) */}
-                    <div class="flex justify-between items-center mb-3 md:mb-4 px-1 flex-shrink-0">
+                <div id="menuContainerClient" class="flex flex-col flex-grow overflow-hidden"> <div class="flex justify-between items-center mb-3 md:mb-4 px-1 flex-shrink-0">
                         <h2 class="text-lg md:text-xl font-bold text-dark-text">Cardápio</h2>
                         <div class="relative">
                             <input type="text" id="searchProductInputClient" placeholder="Buscar..." class="pr-8 input-pdv text-sm w-32 md:w-48 lg:w-64">
                             <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-dark-placeholder"></i>
                         </div>
                     </div>
-                    {/* Filtros de Categoria (Não ocupam espaço extra) */}
                     <div id="categoryFiltersClient" class="flex space-x-2 overflow-x-auto pb-3 mb-4 px-1 flex-shrink-0">
-                        {/* Botões Categoria */}
-                    </div>
+                        </div>
 
-                    {/* Grid de Itens (Responsivo) */}
-                    {/* ATUALIZADO: Removido px-1, gap reduzido, adicionado overflow-y-auto */}
-                    {/* O flex-grow foi movido para o container pai, este div apenas rola */}
-                    <div id="menuItemsGridClient" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1 overflow-y-auto custom-scrollbar pb-4"> {/* px-1 removido, gap alterado para gap-1, overflow-y-auto adicionado, pb-4 para espaço */}
-                        {/* Itens Cardápio */}
-                         <div class="col-span-full text-center p-6 text-dark-placeholder italic">Carregando cardápio...</div>
+                    <div id="menuItemsGridClient" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1 overflow-y-auto custom-scrollbar pb-4"> <div class="col-span-full text-center p-6 text-dark-placeholder italic">Carregando cardápio...</div>
                     </div>
                 </div>
-            </div> {/* Fim de clientOrderScreen */}
-
-            {/* Adicionado flex flex-col h-full */}
-            <div id="clientPaymentScreen" class="w-screen flex-shrink-0 flex flex-col h-full">
-                 {/* Cabeçalho (Não ocupa espaço extra) */}
+            </div> <div id="clientPaymentScreen" class="w-screen flex-shrink-0 flex flex-col h-full">
                  <div class="flex items-center justify-between mb-4 md:mb-6 flex-shrink-0">
                     <div class="flex items-center text-indigo-400">
                         <button id="backToOrderFromPaymentBtn" class="mr-2 text-2xl md:text-3xl p-2 hover:text-indigo-300 transition" title="Voltar para o Pedido" onclick="window.goToScreen('clientOrderScreen')">
@@ -150,16 +133,11 @@
                     </div>
                 </div>
 
-                {/* Container principal da tela de pagamento com scroll */}
-                <div class="flex-grow overflow-y-auto custom-scrollbar pb-4 pr-1"> {/* Permite rolagem se conteúdo exceder */}
-                    {/* Resumo da Conta */}
-                    <div class="content-card p-3 md:p-4 mb-6 rounded-lg bg-dark-card border border-dark-border">
+                <div class="flex-grow overflow-y-auto custom-scrollbar pb-4 pr-1"> <div class="content-card p-3 md:p-4 mb-6 rounded-lg bg-dark-card border border-dark-border">
                         <h2 class="text-lg md:text-xl font-semibold text-green-400 mb-3 md:mb-4">Resumo da Conta</h2>
-                        {/* Lista de itens da conta com scroll próprio */}
                         <div id="reviewItemsList" class="space-y-2 md:space-y-3 pt-2 mb-4 max-h-72 overflow-y-auto pr-2 custom-scrollbar">
                              <div class="text-sm md:text-base text-dark-placeholder italic p-2">Nenhum item na conta para revisão.</div>
                         </div>
-                        {/* Totais */}
                         <div class="border-t border-dark-border pt-3 md:pt-4 mt-3 md:mt-4 space-y-2">
                             <div class="flex justify-between items-center">
                                 <span class="text-base md:text-lg font-bold text-dark-text">SUBTOTAL:</span>
@@ -188,32 +166,23 @@
                         </div>
                     </div>
 
-                    {/* Solicitar Fechamento */}
                     <div class="content-card p-3 md:p-4 mt-6 rounded-lg bg-dark-card border border-dark-border">
                         <button id="requestBillBtn" class="w-full bg-pumpkin text-white font-bold py-3 rounded-lg hover:bg-pumpkin-dark transition duration-150 text-base md:text-lg">
                             <i class="fas fa-cash-register"></i> SOLICITAR FECHAMENTO DE CONTA
                         </button>
                         <p class="mt-3 md:mt-4 text-xs md:text-sm text-dark-placeholder text-center">O pagamento deve ser efetuado com o garçom.</p>
                     </div>
-                </div> {/* Fim do container de scroll do pagamento */}
-            </div> {/* Fim de clientPaymentScreen */}
+                </div> </div> </div> </main>
 
-        </div> {/* Fim de appContainer */}
-    </main>
-
-    {/* --- MODAIS (Usando tema dark padrão - Sem alterações estruturais) --- */}
     <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         <div class="bg-dark-card border border-dark-border p-4 md:p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 id="obsItemName" class="text-lg md:text-xl font-bold mb-4 text-indigo-400">Adicionar Observação</h3>
             <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-4">
-                 {/* Botões rápidos */}
                  <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="1 CP">1 CP</button>
-                 {/* ... outros botões rápidos ... */}
                  <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Bem Passado">Bem Passado</button>
             </div>
             <textarea id="obsInput" rows="2" placeholder="Apenas botões rápidos permitidos." class="w-full p-3 input-pdv text-sm md:text-base" readonly></textarea>
-            <div class="flex items-center justify-between mt-3 mb-4 opacity-50 hidden"> {/* Mantém oculto */}
-                 <span class="text-dark-text font-semibold">Item em Espera?</span>
+            <div class="flex items-center justify-between mt-3 mb-4 opacity-50 hidden"> <span class="text-dark-text font-semibold">Item em Espera?</span>
                  <label class="switch-obs"> <input type="checkbox" id="esperaSwitch" disabled> <span class="slider-obs"></span> </label>
             </div>
             <div class="flex justify-end space-x-2 md:space-x-3 mt-4">
@@ -224,8 +193,7 @@
     </div>
 
     <div id="customAlertModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
-        {/* ... conteúdo do modal ... */}
-    </div>
+        </div>
 
     <div id="associationModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4" style="display: none;">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
@@ -246,25 +214,18 @@
             </div>
         </div>
     </div>
-    {/* Modal de Informação do Produto */}
+
     <div id="productInfoModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         <div class="bg-dark-card border border-dark-border p-5 md:p-6 rounded-xl shadow-2xl w-full max-w-md relative max-h-[85vh] overflow-y-auto custom-scrollbar">
-            {/* Botão Fechar */}
             <button onclick="document.getElementById('productInfoModal').style.display='none'" class="absolute top-2 right-2 text-dark-placeholder hover:text-dark-text text-2xl">&times;</button>
-            {/* Imagem do Produto */}
             <img id="infoProductImage" src="..." alt="Imagem do Produto" class="w-full h-48 md:h-64 object-cover rounded-lg mb-4 border border-dark-border">
-            {/* Nome do Produto */}
             <h3 id="infoProductName" class="text-xl md:text-2xl font-bold mb-2 text-pumpkin">Nome</h3>
-            {/* Descrição */}
             <div id="infoProductDescription" class="text-sm md:text-base text-dark-text space-y-2">Descrição...</div>
-             {/* Botão Fechar Inferior */}
              <button onclick="document.getElementById('productInfoModal').style.display='none'" class="mt-6 w-full bg-gray-600 text-gray-200 font-bold py-2 rounded-lg hover:bg-gray-500 transition text-sm">Fechar</button>
         </div>
     </div>
 
-    {/* Modais Ocultos de Staff */}
     <div id="calculatorModal" class="hidden"></div>
-    {/* ... outros modais ocultos ... */}
     <div id="tableTransferModal" class="hidden"></div>
 
     <p class="mt-8 text-center text-xs text-dark-placeholder" id="user-id-display">.</p>
