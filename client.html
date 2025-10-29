@@ -7,9 +7,7 @@
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 
-    <link rel="stylesheet" href="style.css"> <!-- Usa o CSS principal com tema escuro -->
-
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css"> <script src="https://cdn.tailwindcss.com"></script>
 
     <script>
         // Configuração original do Tailwind (mantém as cores dark)
@@ -71,16 +69,12 @@
 
     </style>
 </head>
-<!-- Adiciona as classes de tema escuro ao body -->
 <body class="bg-dark-bg text-dark-text min-h-screen client-mode">
 
-    <!-- Container principal agora centralizado em telas grandes -->
     <main id="mainContent" class="relative overflow-hidden lg:max-w-7xl lg:mx-auto">
         <div id="appContainer" class="flex transition-transform duration-300 ease-out">
 
-            <!-- TELA DE PEDIDO DO CLIENTE (Dark Mode) -->
             <div id="clientOrderScreen" class="w-screen flex-shrink-0">
-                <!-- Cabeçalho -->
                 <div class="flex items-center justify-between mb-4 md:mb-6">
                     <div class="flex items-center text-green-400">
                         <span class="text-xl md:text-2xl font-semibold mr-3" id="client-table-number">Cardápio Digital</span>
@@ -90,7 +84,6 @@
                     </button>
                 </div>
 
-                <!-- Seu Pedido -->
                 <div id="orderingInputsClient" class="mb-6 md:mb-8">
                     <div class="p-3 md:p-4 content-card rounded-lg bg-dark-card border border-dark-border">
                         <div class="flex justify-between items-center mb-3 md:mb-4">
@@ -105,7 +98,6 @@
                     </div>
                 </div>
 
-                <!-- Cardápio -->
                 <div id="menuContainerClient">
                     <div class="flex justify-between items-center mb-3 md:mb-4 px-1">
                         <h2 class="text-lg md:text-xl font-bold text-dark-text">Cardápio</h2>
@@ -115,18 +107,13 @@
                         </div>
                     </div>
                     <div id="categoryFiltersClient" class="flex space-x-2 overflow-x-auto pb-3 mb-4 px-1">
-                        <!-- Botões Categoria - Usarão estilo dark padrão -->
-                    </div>
-                    <!-- Grid de Itens (Responsivo - CORRIGIDO) -->
-                    <!-- Inicia com 2 colunas, 3 em md, 4 em lg -->
+                        </div>
                     <div id="menuItemsGridClient" class="px-1 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-                        <!-- Itens Cardápio - Usarão estilo dark padrão -->
-                         <div class="col-span-full text-center p-6 text-dark-placeholder italic">Carregando cardápio...</div>
+                        <div class="col-span-full text-center p-6 text-dark-placeholder italic">Carregando cardápio...</div>
                     </div>
                 </div>
             </div>
 
-            <!-- TELA DE PAGAMENTO/RESUMO (Dark Mode) -->
             <div id="clientPaymentScreen" class="w-screen flex-shrink-0">
                  <div class="flex items-center justify-between mb-4 md:mb-6">
                     <div class="flex items-center text-indigo-400">
@@ -137,13 +124,11 @@
                     </div>
                 </div>
 
-                <!-- Resumo da Conta -->
                 <div class="content-card p-3 md:p-4 mb-6 rounded-lg bg-dark-card border border-dark-border">
                     <h2 class="text-lg md:text-xl font-semibold text-green-400 mb-3 md:mb-4">Resumo da Conta</h2>
                     <div id="reviewItemsList" class="space-y-2 md:space-y-3 pt-2 mb-4 max-h-72 overflow-y-auto pr-2 custom-scrollbar">
                          <div class="text-sm md:text-base text-dark-placeholder italic p-2">Nenhum item na conta para revisão.</div>
                     </div>
-                    <!-- Totais -->
                     <div class="border-t border-dark-border pt-3 md:pt-4 mt-3 md:mt-4 space-y-2">
                         <div class="flex justify-between items-center">
                             <span class="text-base md:text-lg font-bold text-dark-text">SUBTOTAL:</span>
@@ -172,7 +157,6 @@
                     </div>
                 </div>
 
-                <!-- Solicitar Fechamento -->
                 <div class="content-card p-3 md:p-4 mt-6 rounded-lg bg-dark-card border border-dark-border">
                     <button id="requestBillBtn" class="w-full bg-pumpkin text-white font-bold py-3 rounded-lg hover:bg-pumpkin-dark transition duration-150 text-base md:text-lg">
                         <i class="fas fa-cash-register"></i> SOLICITAR FECHAMENTO DE CONTA
@@ -184,7 +168,6 @@
         </div>
     </main>
 
-    <!-- --- MODAIS (Usando tema dark padrão) --- -->
     <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         <div class="bg-dark-card border border-dark-border p-4 md:p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 id="obsItemName" class="text-lg md:text-xl font-bold mb-4 text-indigo-400">Adicionar Observação</h3>
@@ -205,8 +188,7 @@
                  <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Bem Passado">Bem Passado</button>
             </div>
             <textarea id="obsInput" rows="2" placeholder="Apenas botões rápidos permitidos." class="w-full p-3 input-pdv text-sm md:text-base" readonly></textarea>
-            <div class="flex items-center justify-between mt-3 mb-4 opacity-50 hidden"> <!-- Mantém oculto -->
-                 <span class="text-dark-text font-semibold">Item em Espera?</span>
+            <div class="flex items-center justify-between mt-3 mb-4 opacity-50 hidden"> <span class="text-dark-text font-semibold">Item em Espera?</span>
                  <label class="switch-obs"> <input type="checkbox" id="esperaSwitch" disabled> <span class="slider-obs"></span> </label>
             </div>
             <div class="flex justify-end space-x-2 md:space-x-3 mt-4">
@@ -239,7 +221,6 @@
         </div>
     </div>
 
-    <!-- Modais Ocultos de Staff -->
     <div id="calculatorModal" class="hidden"></div> <div id="managerModal" class="hidden"></div> <div id="waiterRegModal" class="hidden"></div> <div id="customerRegModal" class="hidden"></div> <div id="reportsModal" class="hidden"></div> <div id="selectiveTransferModal" class="hidden"></div> <div id="productManagementModal" class="hidden"></div> <div id="tableTransferModal" class="hidden"></div>
 
     <p class="mt-8 text-center text-xs text-dark-placeholder" id="user-id-display">.</p>
