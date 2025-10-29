@@ -1,6 +1,6 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (Layout Atualizado com Imagem e Botão Info - Completo) ---
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (Layout Atualizado, Filtros Corrigidos - COMPLETO) ---
 
-// ATUALIZADO: Importa os 'fetchers' além dos 'getters'
+// Importa funções necessárias dos serviços e do app principal
 import { getProducts, getCategories, fetchWooCommerceProducts, fetchWooCommerceCategories } from "/services/wooCommerceService.js";
 import { formatCurrency } from "/utils.js";
 import { saveSelectedItemsToFirebase } from "/services/firebaseService.js";
@@ -11,23 +11,25 @@ import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/f
 
 
 // --- VARIÁVEIS DE ELEMENTOS ---
+// Mapeia os elementos HTML que este controlador irá manipular
 let clientObsModal, clientObsInput, clientSaveObsBtn, clientCancelObsBtn;
 let clientSearchProductInput, clientCategoryFiltersContainer, clientMenuItemsGrid;
-let clientObsItemName, clientEsperaSwitch;
-let clientAssocModal, assocTableInput, assocPhoneInput, assocNameInput, assocSendOrderBtn, assocErrorMsg, assocCancelBtn;
+let clientObsItemName, clientEsperaSwitch; // Elementos do modal de observação
+let clientAssocModal, assocTableInput, assocPhoneInput, assocNameInput, assocSendOrderBtn, assocErrorMsg, assocCancelBtn; // Elementos do modal de associação
+let clientProductInfoModal, infoProductName, infoProductDescription, infoProductImage; // Elementos do modal de informação do produto
 
-// NOVO: Variáveis para o Modal de Informação do Produto
-let clientProductInfoModal, infoProductName, infoProductDescription, infoProductImage;
-
-// Estado local
+// --- ESTADO LOCAL DO MÓDULO ---
+// Guarda o estado atual da busca e filtro de categoria
 let currentClientSearch = '';
 let currentClientCategoryFilter = 'all';
-let clientInitialized = false;
-let associatedClientDocId = null;
+let clientInitialized = false; // Flag para garantir que a inicialização ocorra apenas uma vez
+let associatedClientDocId = null; // Guarda o ID (telefone) do cliente associado à mesa
 
 // --- LÓGICA DE MANIPULAÇÃO DE ITENS LOCAIS (Cliente) ---
+// Função interna para adicionar ou remover itens do array 'selectedItems' (carrinho local)
 const _updateLocalItemQuantity = (itemId, noteKey, delta) => {
     let indexToRemove = -1;
+    // Se delta < 0, procura o último item correspondente para remover
     if (delta < 0) {
         for (let i = selectedItems.length - 1; i >= 0; i--) {
             if (selectedItems[i].id == itemId && (selectedItems[i].note || '') === noteKey) {
@@ -37,49 +39,57 @@ const _updateLocalItemQuantity = (itemId, noteKey, delta) => {
         }
     }
 
+    // Se delta > 0, adiciona uma cópia do último item correspondente (ou um novo se não existir)
     if (delta > 0) {
         const itemToCopy = selectedItems.findLast(item => item.id == itemId && (item.note || '') === noteKey);
         if (itemToCopy) {
-            selectedItems.push({ ...itemToCopy });
+            selectedItems.push({ ...itemToCopy }); // Adiciona cópia
         } else {
+            // Se não encontrou cópia (primeira vez adicionando com essa nota), busca dados do produto
             const products = getProducts();
             const product = products.find(p => p.id == itemId);
-            if (!product) return;
+            if (!product) {
+                console.error(`Produto com ID ${itemId} não encontrado para adicionar.`);
+                return; // Aborta se produto não existe
+            }
+            // Cria novo item
             const newItem = { id: product.id, name: product.name, price: product.price, sector: product.sector || 'cozinha', category: product.category || 'uncategorized', note: noteKey };
             selectedItems.push(newItem);
         }
     } else if (delta < 0 && indexToRemove !== -1) {
+        // Remove o item se delta < 0 e um índice foi encontrado
         selectedItems.splice(indexToRemove, 1);
     }
 
-    renderClientOrderScreen(); // Re-renderiza a lista do carrinho
+    renderClientOrderScreen(); // Atualiza a exibição do carrinho
     if (currentTableId) {
         // Salva o estado atualizado no Firebase se houver uma mesa associada
         saveSelectedItemsToFirebase(currentTableId, selectedItems);
     }
 };
 
+// Funções exportadas que chamam a função interna (usadas pelos onClicks no HTML)
 export const increaseLocalItemQuantity = (itemId, noteKey) => _updateLocalItemQuantity(itemId, noteKey, 1);
 export const decreaseLocalItemQuantity = (itemId, noteKey) => _updateLocalItemQuantity(itemId, noteKey, -1);
-// window.increase/decrease são definidos dinamicamente em app.js para o escopo global
+// As funções acima são atribuídas a window dinamicamente em app.js
 
 
-// Chamado pelo botão + do cardápio do cliente (AGORA VIA EVENT DELEGATION)
+// Chamado pelo botão '+' ou pelo modal OBS quando um novo item é adicionado
 export const addClientItemToSelection = (product) => {
     const newItem = {
         id: product.id,
         name: product.name,
         price: product.price,
-        sector: product.sector || 'cozinha',
-        category: product.category || 'uncategorized',
+        sector: product.sector || 'cozinha', // Assume 'cozinha' como padrão
+        category: product.category || 'uncategorized', // Assume 'uncategorized' como padrão
         note: '' // Nota inicial vazia
     };
 
-    selectedItems.push(newItem); // Adiciona ao array local 'selectedItems' (importado de app.js)
-    renderClientOrderScreen(); // Atualiza a exibição da lista de itens selecionados
+    selectedItems.push(newItem); // Adiciona ao array local 'selectedItems'
+    renderClientOrderScreen(); // Atualiza a exibição do carrinho
 
     if (currentTableId) {
-        // Salva o array atualizado no Firebase se já houver uma mesa associada
+        // Salva no Firebase se já houver mesa associada
         saveSelectedItemsToFirebase(currentTableId, selectedItems);
     }
 
@@ -96,47 +106,48 @@ export const renderClientMenu = () => {
         return;
     }
 
-    const products = getProducts(); // Pega os produtos já buscados
-    const categories = getCategories(); // Pega as categorias já buscadas
+    const products = getProducts(); // Pega a lista de produtos (já deve ter sido carregada)
+    const categories = getCategories(); // Pega a lista de categorias
     console.log(`[Client] renderClientMenu - Products: ${products.length}, Categories: ${categories.length}`);
 
-    // 1. Renderiza Filtros de Categoria (se ainda não renderizados)
-    if (categories.length > 0 && clientCategoryFiltersContainer.innerHTML.trim() === '') {
-        clientCategoryFiltersContainer.innerHTML = categories.map(cat => {
-            const isActive = cat.slug === currentClientCategoryFilter;
+    // CORREÇÃO 1: Renderiza/Atualiza Filtros de Categoria SEMPRE que houver categorias
+    if (categories.length > 0) {
+        const categoryButtonsHTML = categories.map(cat => {
+            const isActive = cat.slug === currentClientCategoryFilter; // Verifica se é o filtro ativo
             const inactiveClasses = 'bg-dark-input text-dark-text border border-dark-border';
             const activeClasses = 'bg-pumpkin text-white border-pumpkin';
+            // Gera o HTML do botão
             return `<button class="category-btn text-base px-4 py-2 rounded-full font-semibold whitespace-nowrap ${isActive ? activeClasses : inactiveClasses}" data-category="${cat.slug || cat.id}">${cat.name}</button>`;
         }).join('');
+        // Atualiza o conteúdo do container de filtros
+        clientCategoryFiltersContainer.innerHTML = categoryButtonsHTML;
+    } else {
+        // Se não houver categorias (algo deu errado na busca?), limpa o container
+        clientCategoryFiltersContainer.innerHTML = '';
+        console.warn("[Client] Nenhuma categoria encontrada para renderizar filtros.");
     }
-     // Atualiza o estado ativo dos botões de categoria
-     clientCategoryFiltersContainer.querySelectorAll('.category-btn').forEach(btn => {
-        const isActive = btn.dataset.category === currentClientCategoryFilter;
-        btn.classList.toggle('bg-pumpkin', isActive);
-        btn.classList.toggle('text-white', isActive);
-        btn.classList.toggle('border-pumpkin', isActive);
-        btn.classList.toggle('bg-dark-input', !isActive);
-        btn.classList.toggle('text-dark-text', !isActive);
-        btn.classList.toggle('border-dark-border', !isActive);
-    });
 
-    // 2. Filtra Produtos baseado no estado atual (busca e categoria)
+    // 2. Filtra Produtos baseado na busca e categoria selecionada
     let filteredProducts = products;
-    if (currentClientSearch) {
+    if (currentClientSearch) { // Filtra por busca (texto no nome)
         const normalizedSearch = currentClientSearch.toLowerCase();
         filteredProducts = filteredProducts.filter(p => p.name.toLowerCase().includes(normalizedSearch));
     }
-    if (currentClientCategoryFilter !== 'all') {
+    if (currentClientCategoryFilter !== 'all') { // Filtra por categoria (se não for 'Todos')
         filteredProducts = filteredProducts.filter(p => p.category === currentClientCategoryFilter);
     }
 
-    // 3. Renderiza Itens do Cardápio (HTML ATUALIZADO com novo layout)
+    // 3. Renderiza os Cards de Produtos filtrados
     if (filteredProducts.length === 0) {
+        // Mensagem se nenhum produto corresponder aos filtros
         clientMenuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-dark-placeholder italic">Nenhum produto encontrado com os filtros atuais.</div>`;
     } else {
+        // Gera o HTML para cada card de produto
         clientMenuItemsGrid.innerHTML = filteredProducts.map(product => {
-            const productDataString = JSON.stringify(product).replace(/'/g, '&#39;'); // Prepara os dados para os botões
+            // Prepara a string JSON do produto para ser usada nos atributos data-product dos botões
+            const productDataString = JSON.stringify(product).replace(/'/g, '&#39;');
 
+            // Estrutura HTML do card (com imagem, nome, preço, botão +, botão info)
             return `
             <div class="product-card bg-dark-card border border-dark-border rounded-xl shadow-md overflow-hidden flex flex-col">
 
@@ -145,7 +156,9 @@ export const renderClientMenu = () => {
                 <div class="p-3 flex flex-col flex-grow">
                     <h4 class="font-bold text-base text-dark-text mb-2 flex-grow cursor-pointer info-name-trigger" data-product='${productDataString}'>${product.name}</h4>
 
-                    <div class="flex justify-between items-center mt-auto mb-3"> {/* Use mt-auto para empurrar para baixo */}
+                    {/* CORREÇÃO 2: Comentário removido */}
+                    {/* Preço e Botão Adicionar (empurrados para baixo com mt-auto) */}
+                    <div class="flex justify-between items-center mt-auto mb-3">
                         <span class="font-bold text-lg text-pumpkin">${formatCurrency(product.price)}</span>
                         <button class="add-item-btn bg-green-600 text-white p-2 rounded-full hover:bg-green-700 transition w-9 h-9 flex items-center justify-center"
                                 data-product='${productDataString}' title="Adicionar ao Pedido">
@@ -168,47 +181,50 @@ export const renderClientMenu = () => {
 
 // Função de Renderização da Lista de Pedidos do Cliente (Carrinho)
 export const renderClientOrderScreen = () => {
-    const openOrderList = document.getElementById('openOrderListClient');
-    const openItemsCount = document.getElementById('openItemsCountClient');
-    const sendBtn = document.getElementById('sendClientOrderBtn');
+    const openOrderList = document.getElementById('openOrderListClient'); // Container da lista
+    const openItemsCount = document.getElementById('openItemsCountClient'); // Span do contador
+    const sendBtn = document.getElementById('sendClientOrderBtn'); // Botão de enviar pedido
 
     if (!openOrderList) {
         console.error("Elemento openOrderListClient não encontrado.");
-        return;
+        return; // Aborta se o container não existe
     }
 
-    const openItemsCountValue = selectedItems.length;
-    if(openItemsCount) openItemsCount.textContent = openItemsCountValue;
+    const openItemsCountValue = selectedItems.length; // Pega o número de itens no carrinho
+    if(openItemsCount) openItemsCount.textContent = openItemsCountValue; // Atualiza o contador
 
-    // Habilita/desabilita botão de enviar pedido
+    // Habilita/desabilita botão de enviar pedido baseado se há itens
     if (sendBtn) {
         sendBtn.disabled = openItemsCountValue === 0;
     }
 
+    // Se o carrinho está vazio, exibe mensagem
     if (openItemsCountValue === 0) {
         openOrderList.innerHTML = `<div class="text-sm md:text-base text-dark-placeholder italic p-2">Nenhum item selecionado.</div>`;
     } else {
-        // Agrupa itens iguais com a mesma observação para exibição
+        // Agrupa itens iguais com a mesma observação para exibição mais limpa
         const groupedItems = selectedItems.reduce((acc, item) => {
-            const key = `${item.id}-${item.note || ''}`;
+            const key = `${item.id}-${item.note || ''}`; // Chave única por item + nota
             if (!acc[key]) {
-                acc[key] = { ...item, count: 0 };
+                acc[key] = { ...item, count: 0 }; // Inicializa grupo se não existe
             }
-            acc[key].count++;
+            acc[key].count++; // Incrementa contador do grupo
             return acc;
         }, {});
 
         // Gera o HTML para cada grupo de item no carrinho
         openOrderList.innerHTML = Object.values(groupedItems).map(group => `
             <div class="flex justify-between items-center bg-dark-input p-3 rounded-lg shadow-sm border border-dark-border">
+                {/* Informações do item (Nome, Quantidade, Nota) */}
                 <div class="flex flex-col flex-grow min-w-0 mr-2">
                     <span class="font-semibold text-dark-text">${group.name} (${group.count}x)</span>
+                    {/* Span clicável para abrir modal de OBS */}
                     <span class="text-sm cursor-pointer text-indigo-400 hover:text-indigo-300"
                           onclick="window.openClientObsModalForGroup('${group.id}', '${group.note || ''}')">
                         ${group.note ? `(${group.note})` : `(Adicionar Obs.)`}
                     </span>
                 </div>
-
+                {/* Botões +/- */}
                 <div class="flex items-center space-x-2 flex-shrink-0">
                     <button class="qty-btn bg-red-600 text-white rounded-full h-8 w-8 flex items-center justify-center hover:bg-red-700 transition duration-150"
                             onclick="window.decreaseLocalItemQuantity('${group.id}', '${group.note || ''}')" title="Remover um">
@@ -229,22 +245,23 @@ export const renderClientOrderScreen = () => {
 // Abertura do Modal de Observações (Cliente - Apenas Quick Buttons)
 export function openClientObsModalForGroup(itemId, noteKey) {
     const products = getProducts();
-    const product = products.find(p => p.id == itemId);
+    const product = products.find(p => p.id == itemId); // Encontra o produto pelo ID
 
+    // Validação
     if (!clientObsModal || !clientObsItemName || !clientObsInput || !product) {
         console.error("Erro ao abrir modal OBS: Elementos ou produto não encontrados.");
         return;
     }
 
-    clientObsItemName.textContent = product.name;
+    clientObsItemName.textContent = product.name; // Exibe nome do produto no modal
 
-    // Limpa a tag [EM ESPERA] se existir (não aplicável ao cliente, mas por segurança)
+    // Limpa a tag [EM ESPERA] (não aplicável ao cliente) e preenche o input
     const currentNoteCleaned = noteKey.replace(' [EM ESPERA]', '').trim();
     clientObsInput.value = currentNoteCleaned;
-    clientObsInput.readOnly = true; // Cliente só usa botões rápidos
+    clientObsInput.readOnly = true; // Input desabilitado para digitação
     clientObsInput.placeholder = "Use os botões rápidos abaixo.";
 
-    // Guarda o ID e a nota original para referência ao salvar
+    // Armazena dados no modal para referência ao salvar
     clientObsModal.dataset.itemId = itemId;
     clientObsModal.dataset.originalNoteKey = noteKey;
 
@@ -256,18 +273,20 @@ export function openClientObsModalForGroup(itemId, noteKey) {
 // Expõe a função globalmente para ser chamada pelo onclick no HTML
 window.openClientObsModalForGroup = openClientObsModalForGroup;
 
-// Define a função para abrir o modal de info e a expõe globalmente
+// Define a função para abrir o modal de informações do produto
 export const openProductInfoModal = (product) => {
+    // Validação dos elementos do modal
     if (!clientProductInfoModal || !infoProductName || !infoProductDescription || !infoProductImage) {
         console.error("Elementos do Modal de Informação do Produto não encontrados.");
         return;
     }
     console.log("[Client] Opening Product Info Modal for:", product.name);
-    // Popula os dados do modal
+
+    // Popula os dados do modal com as informações do produto
     infoProductName.textContent = product.name;
-    // Usa innerHTML para renderizar a descrição formatada (pode conter <p>, <strong>, etc.)
+    // Usa innerHTML pois a descrição vinda do WooCommerce pode ter HTML (<p>, <strong>)
     infoProductDescription.innerHTML = product.description;
-    infoProductImage.src = product.image; // Define a URL da imagem (ou placeholder)
+    infoProductImage.src = product.image; // Define a URL da imagem
 
     // Exibe o modal
     clientProductInfoModal.style.display = 'flex';
@@ -286,48 +305,48 @@ export const handleClientSendOrder = async () => {
 
     // Verifica se o cliente já está associado a uma mesa
     if (!currentTableId) {
-        // Se não estiver, abre o modal de associação
+        // Se não, abre o modal de associação
         if (clientAssocModal) clientAssocModal.style.display = 'flex';
         if(assocErrorMsg) {
              assocErrorMsg.textContent = "Para enviar seu pedido, preencha a mesa e seu contato.";
-             assocErrorMsg.classList.remove('text-red-400'); // Garante estilo padrão
+             assocErrorMsg.classList.remove('text-red-400');
              assocErrorMsg.classList.add('text-dark-placeholder');
              assocErrorMsg.style.display = 'block';
         }
-        return; // Interrompe o envio até associar
+        return; // Interrompe até associar
     }
 
     // Confirmação com o usuário
     if (!confirm(`Confirmar o envio de ${selectedItems.length} item(s) para o Garçom? O garçom deve aprovar o pedido antes de enviá-lo à cozinha.`)) return;
 
     const btn = document.getElementById('sendClientOrderBtn');
-    if (btn) btn.disabled = true; // Desabilita o botão durante o envio
+    if (btn) btn.disabled = true; // Desabilita botão
 
     try {
-        const tableRef = getTableDocRef(currentTableId);
+        const tableRef = getTableDocRef(currentTableId); // Referência do documento da mesa
 
-        // Cria o objeto do pedido pendente
+        // Monta o objeto do pedido pendente
         const requestedOrder = {
-            orderId: `req_${Date.now()}`, // ID único para o pedido pendente
+            orderId: `req_${Date.now()}`, // ID único baseado no timestamp
             items: selectedItems.map(item => ({...item, requestedAt: Date.now()})), // Adiciona timestamp a cada item
             requestedAt: Date.now(),
             status: 'pending_waiter', // Status inicial
-            clientInfo: {
-                 docId: associatedClientDocId, // Telefone/ID do cliente
-                 name: currentOrderSnapshot?.clientName || 'Cliente Comanda', // Nome associado à mesa ou padrão
+            clientInfo: { // Informações do cliente que fez o pedido
+                 docId: associatedClientDocId, // Telefone/ID
+                 name: currentOrderSnapshot?.clientName || 'Cliente Comanda', // Nome (se associado) ou padrão
                  phone: associatedClientDocId || 'N/A'
             }
         };
 
         // Atualiza o documento da mesa no Firestore
         await updateDoc(tableRef, {
-            requestedOrders: arrayUnion(requestedOrder), // Adiciona o pedido à lista de pendentes
-            selectedItems: [], // Limpa o carrinho local do garçom (embora o cliente use o seu)
-            clientOrderPending: true, // Sinaliza que há pedido pendente
-            waiterNotification: { type: 'client_request', timestamp: serverTimestamp() } // Notifica o garçom
+            requestedOrders: arrayUnion(requestedOrder), // Adiciona o novo pedido à lista de pendentes
+            selectedItems: [], // Limpa o carrinho 'selectedItems' (usado pelo garçom)
+            clientOrderPending: true, // Liga a flag de alerta para o garçom
+            waiterNotification: { type: 'client_request', timestamp: serverTimestamp() } // Objeto de notificação
         });
 
-        // Limpa o carrinho local do cliente APÓS o envio bem-sucedido
+        // Limpa o carrinho local do cliente após o envio bem-sucedido
         selectedItems.length = 0;
         renderClientOrderScreen(); // Re-renderiza a lista (agora vazia)
 
@@ -341,26 +360,25 @@ export const handleClientSendOrder = async () => {
     }
 };
 
-// Lógica de Associação e Envio (Chamada pelo Modal de Associação)
+// Lógica de Associação à Mesa e Envio do Pedido (Chamada pelo Modal de Associação)
 export const handleClientAssociationAndSend = async () => {
     const tableNumber = assocTableInput?.value.trim();
-    const phone = assocPhoneInput?.value.replace(/\D/g, ''); // Remove não-números
-    const name = assocNameInput?.value.trim() || 'Cliente Comanda'; // Usa nome padrão se vazio
+    const phone = assocPhoneInput?.value.replace(/\D/g, ''); // Remove caracteres não numéricos
+    const name = assocNameInput?.value.trim() || 'Cliente Comanda'; // Nome padrão se vazio
 
-    // Validações básicas
+    // Validações
     if (!tableNumber || tableNumber === '0') {
          assocErrorMsg.textContent = "Número da mesa é obrigatório.";
          assocErrorMsg.style.display = 'block';
          return;
     }
-    if (phone.length < 10) { // Validação simples de telefone (DDD + 8 ou 9 dígitos)
+    if (phone.length < 10) { // Validação simples de telefone
          assocErrorMsg.textContent = "Telefone/WhatsApp inválido. Inclua DDD (mínimo 10 dígitos).";
          assocErrorMsg.style.display = 'block';
          return;
     }
-    assocErrorMsg.style.display = 'none'; // Limpa erro se passou
+    assocErrorMsg.style.display = 'none'; // Limpa erro
 
-    // Desabilita botão durante o processo
     if (assocSendOrderBtn) { assocSendOrderBtn.disabled = true; assocSendOrderBtn.textContent = 'Verificando...'; }
 
     try {
@@ -375,25 +393,23 @@ export const handleClientAssociationAndSend = async () => {
             return;
         }
 
-        // Salva/Atualiza dados do cliente (usando telefone como ID)
+        // Salva/Atualiza dados do cliente na coleção 'customers'
         const customersRef = getCustomersCollectionRef();
-        const clientDocId = phone; // Telefone como ID
+        const clientDocId = phone; // Usa o telefone como ID único do cliente
         const clientDocRef = doc(customersRef, clientDocId);
-
         const clientData = {
             name: name,
             phone: phone,
-            associatedTable: tableNumber, // Guarda a mesa atual associada
-            lastVisit: serverTimestamp(),
+            associatedTable: tableNumber, // Guarda a última mesa associada
+            lastVisit: serverTimestamp(), // Atualiza timestamp da última visita/associação
         };
-        // Usa set com merge:true para criar ou atualizar o cliente
-        await setDoc(clientDocRef, clientData, { merge: true });
+        await setDoc(clientDocRef, clientData, { merge: true }); // Cria ou atualiza
 
-        // Atualiza estado global
-        associatedClientDocId = clientDocId;
-        setCurrentTable(tableNumber, true); // Define a mesa atual E inicia o listener para ela
+        // Define a mesa atual no estado global e inicia o listener
+        associatedClientDocId = clientDocId; // Guarda o ID do cliente
+        setCurrentTable(tableNumber, true); // O 'true' indica que é o modo cliente
 
-        // Salva itens que já estavam no carrinho ANTES de associar
+        // Se o cliente já tinha itens no carrinho antes de associar, salva-os na mesa
         if (selectedItems.length > 0) {
             await saveSelectedItemsToFirebase(tableNumber, selectedItems);
         }
@@ -401,7 +417,7 @@ export const handleClientAssociationAndSend = async () => {
         // Fecha o modal de associação
         if (clientAssocModal) clientAssocModal.style.display = 'none';
 
-        // Tenta enviar o pedido que estava pendente
+        // Tenta enviar o pedido que estava pendente (ou os itens recém-salvos)
         handleClientSendOrder();
 
     } catch (error) {
@@ -409,48 +425,47 @@ export const handleClientAssociationAndSend = async () => {
          assocErrorMsg.textContent = `Falha na associação/cadastro: ${error.message}. Tente novamente.`;
          assocErrorMsg.style.display = 'block';
     } finally {
-        // Reabilita o botão
         if (assocSendOrderBtn) { assocSendOrderBtn.disabled = false; assocSendOrderBtn.textContent = 'Enviar Pedido'; }
     }
 };
 
 
-// Listener para as Quick-Buttons do Modal de Observação (Cliente)
+// Listener para os Botões Rápidos no Modal de Observação do Cliente
 const handleQuickButtonClient = (e) => {
-    const btn = e.target.closest('.quick-obs-btn');
-    if (btn && clientObsInput) {
-        const obsText = btn.dataset.obs;
-        let currentValue = clientObsInput.value.trim();
+    const btn = e.target.closest('.quick-obs-btn'); // Encontra o botão clicado
+    if (btn && clientObsInput) { // Verifica se é um botão rápido e o input existe
+        const obsText = btn.dataset.obs; // Pega o texto da observação do botão
+        let currentValue = clientObsInput.value.trim(); // Pega o valor atual do input
 
-        // Adiciona vírgula e espaço se necessário
+        // Adiciona vírgula e espaço antes da nova obs, se necessário
         if (currentValue && !currentValue.endsWith(',') && currentValue.length > 0) {
             currentValue += ', ';
         } else if (currentValue.endsWith(',')) {
-            currentValue += ' '; // Apenas espaço se já termina com vírgula
+            currentValue += ' ';
         }
-
+        // Concatena a nova observação
         clientObsInput.value = (currentValue + obsText).trim();
     }
 };
 
-// Salvar Observação do Cliente (do modal OBS)
+// Função chamada ao clicar em "Salvar" no Modal de Observação do Cliente
 const handleSaveClientObs = () => {
-    const itemId = clientObsModal.dataset.itemId;
-    const originalNoteKey = clientObsModal.dataset.originalNoteKey;
-    let newNote = clientObsInput.value.trim(); // Pega o valor do input (preenchido pelos botões)
+    const itemId = clientObsModal.dataset.itemId; // ID do item sendo editado
+    const originalNoteKey = clientObsModal.dataset.originalNoteKey; // Nota original (chave de agrupamento)
+    let newNote = clientObsInput.value.trim(); // Nova nota (montada pelos botões rápidos)
 
     newNote = newNote.replace(/ \[EM ESPERA\]/gi, '').trim(); // Remove tag de espera (precaução)
 
-    let updated = false;
+    let updated = false; // Flag para indicar se alguma atualização ocorreu
 
-    // Cria um novo array temporário com as atualizações
+    // Cria um NOVO array com os itens atualizados
     const updatedItems = selectedItems.map(item => {
-        // Atualiza TODAS as ocorrências do item com a nota original para a nova nota
+        // Se o item corresponde ao ID E à nota original, atualiza a nota
         if (item.id == itemId && (item.note || '') === originalNoteKey) {
             updated = true;
-            return { ...item, note: newNote };
+            return { ...item, note: newNote }; // Retorna o item com a nova nota
         }
-        return item; // Mantém o item inalterado se não corresponder
+        return item; // Retorna o item original se não corresponder
     });
 
     // Se houve atualização, substitui o array 'selectedItems' global
@@ -459,14 +474,14 @@ const handleSaveClientObs = () => {
         selectedItems.push(...updatedItems); // Adiciona os itens atualizados
 
         clientObsModal.style.display = 'none'; // Fecha o modal
-        renderClientOrderScreen(); // Re-renderiza a lista de pedidos com a nova nota
+        renderClientOrderScreen(); // Re-renderiza a lista de pedidos com a nota atualizada
         if (currentTableId) {
             saveSelectedItemsToFirebase(currentTableId, selectedItems); // Salva no Firebase
         }
     } else {
-        // Caso raro: o item foi removido enquanto o modal estava aberto
-        console.warn("Nenhum item encontrado para atualizar a observação (item pode ter sido removido).");
-        clientObsModal.style.display = 'none';
+        // Caso raro onde o item foi removido enquanto o modal estava aberto
+        console.warn("Nenhum item encontrado para atualizar a observação.");
+        clientObsModal.style.display = 'none'; // Fecha o modal mesmo assim
     }
 };
 
@@ -475,10 +490,10 @@ export const initClientOrderController = () => {
     console.log("[ClientOrderController] initClientOrderController CALLED");
     if(clientInitialized) {
         console.log("[ClientOrderController] Already initialized.");
-        return;
+        return; // Impede re-inicialização
     }
 
-    // Mapeia os elementos da UI
+    // Mapeia os elementos HTML essenciais para variáveis
     clientObsModal = document.getElementById('obsModal');
     clientObsItemName = document.getElementById('obsItemName');
     clientObsInput = document.getElementById('obsInput');
@@ -504,36 +519,40 @@ export const initClientOrderController = () => {
     infoProductDescription = document.getElementById('infoProductDescription');
     infoProductImage = document.getElementById('infoProductImage');
 
-    // Validação de Elementos Essenciais
-    const essentialElements = [clientObsModal, clientAssocModal, clientMenuItemsGrid, clientProductInfoModal, clientSearchProductInput, clientCategoryFiltersContainer];
+    // Validação CRÍTICA: Verifica se todos os elementos essenciais foram encontrados
+    const essentialElements = [
+        clientObsModal, clientAssocModal, clientMenuItemsGrid, clientProductInfoModal,
+        clientSearchProductInput, clientCategoryFiltersContainer, clientSaveObsBtn, clientCancelObsBtn,
+        assocSendOrderBtn, assocCancelBtn
+    ];
     if (essentialElements.some(el => !el)) {
-        console.error("[ClientController] Erro Fatal: Elementos críticos (modais, grid, busca, filtros) não encontrados. Aborting initialization.");
-        // Você pode querer exibir uma mensagem para o usuário aqui
+        console.error("[ClientController] Erro Fatal: Elementos críticos não encontrados no HTML. Verifique os IDs. Aborting initialization.");
+        // Exibe mensagem de erro para o usuário final
         const body = document.querySelector('body');
-        if (body) body.innerHTML = '<p style="color: red; text-align: center; margin-top: 50px;">Erro ao carregar a interface. Tente recarregar a página.</p>';
+        if (body) body.innerHTML = '<p style="color: red; text-align: center; margin-top: 50px;">Erro ao carregar a interface. Os elementos necessários não foram encontrados. Tente recarregar a página.</p>';
         return; // Aborta a inicialização
     }
     console.log("[ClientOrderController] Essential elements mapped.");
 
 
-    // Adiciona Listeners Essenciais
+    // Adiciona os Listeners (ouvintes de eventos) aos elementos
     const sendClientBtn = document.getElementById('sendClientOrderBtn');
     if (sendClientBtn) sendClientBtn.addEventListener('click', handleClientSendOrder);
 
     if (assocSendOrderBtn) assocSendOrderBtn.addEventListener('click', handleClientAssociationAndSend);
     if (assocCancelBtn) assocCancelBtn.addEventListener('click', () => { if(clientAssocModal) clientAssocModal.style.display = 'none'; });
 
+    // Listeners do Modal OBS
     if (clientSaveObsBtn) clientSaveObsBtn.addEventListener('click', handleSaveClientObs);
     if (clientCancelObsBtn) clientCancelObsBtn.addEventListener('click', () => {
         const itemId = clientObsModal.dataset.itemId;
         const originalNoteKey = clientObsModal.dataset.originalNoteKey;
         const currentNote = clientObsInput.value.trim();
 
-        // Se o item foi recém-adicionado (nota original vazia) E o usuário não digitou nada (ou apagou)
-        // E cancelou, remove o último item adicionado com esse ID
+        // Lógica para remover item recém-adicionado se cancelar modal OBS vazio
         if (originalNoteKey === '' && currentNote === '') {
              let lastIndex = -1;
-             for (let i = selectedItems.length - 1; i >= 0; i--) {
+             for (let i = selectedItems.length - 1; i >= 0; i--) { // Procura de trás pra frente
                  if (selectedItems[i].id == itemId && selectedItems[i].note === '') {
                      lastIndex = i;
                      break;
@@ -541,99 +560,98 @@ export const initClientOrderController = () => {
              }
              if (lastIndex > -1) {
                  selectedItems.splice(lastIndex, 1); // Remove o item
-                 renderClientOrderScreen(); // Re-renderiza
+                 renderClientOrderScreen(); // Re-renderiza o carrinho
                  if (currentTableId) saveSelectedItemsToFirebase(currentTableId, selectedItems); // Salva
                  console.log("[Client] Item recém-adicionado cancelado e removido.");
              }
         }
-        clientObsModal.style.display = 'none'; // Fecha o modal de qualquer forma
+        clientObsModal.style.display = 'none'; // Fecha o modal
     });
 
-    // Listener para busca de produtos
+    // Listener para input de busca
     if (clientSearchProductInput) {
         clientSearchProductInput.addEventListener('input', (e) => {
-            currentClientSearch = e.target.value;
-            renderClientMenu(); // Re-renderiza o menu com o filtro de busca
+            currentClientSearch = e.target.value; // Atualiza estado da busca
+            renderClientMenu(); // Re-renderiza o menu com o filtro
         });
     }
 
-    // Listener para filtros de categoria
+    // Listener para botões de filtro de categoria (delegação de evento)
     if (clientCategoryFiltersContainer) {
         clientCategoryFiltersContainer.addEventListener('click', (e) => {
-            const btn = e.target.closest('.category-btn');
+            const btn = e.target.closest('.category-btn'); // Acha o botão clicado
             if (btn) {
-                currentClientCategoryFilter = btn.dataset.category;
-                renderClientMenu(); // Re-renderiza o menu com o filtro de categoria
+                currentClientCategoryFilter = btn.dataset.category; // Atualiza estado do filtro
+                renderClientMenu(); // Re-renderiza o menu
             }
         });
     }
 
-    // Event Delegation para cliques no grid de produtos
+    // Event Delegation para cliques no grid de produtos (ATUALIZADO)
     if (clientMenuItemsGrid) {
         clientMenuItemsGrid.addEventListener('click', (e) => {
+            let productData; // Variável para guardar os dados do produto
 
-            // Prioridade 1: Botão de Informações
-            const infoBtn = e.target.closest('.info-btn');
-            if (infoBtn && infoBtn.dataset.product) {
-                console.log("[Client Click] Info button clicked.");
+            // Tenta parsear os dados do elemento clicado ou de um pai relevante
+            const clickedElement = e.target;
+            const dataElement = clickedElement.closest('[data-product]'); // Procura o elemento mais próximo com data-product
+
+            if (dataElement && dataElement.dataset.product) {
                 try {
-                    const productData = JSON.parse(infoBtn.dataset.product.replace(/&#39;/g, "'"));
-                    openProductInfoModal(productData);
-                } catch (err) { /* ... erro ... */ }
-                return; // Ação concluída
+                    productData = JSON.parse(dataElement.dataset.product.replace(/&#39;/g, "'"));
+                } catch (err) {
+                    console.error("Erro ao parsear dados do produto no clique:", err, dataElement.dataset.product);
+                    return; // Aborta se não conseguir ler os dados
+                }
+            } else {
+                // Se o elemento clicado não tem data-product, ignora o clique
+                // console.log("[Client Click] Clicked element without product data.");
+                return;
             }
 
-             // Prioridade 2: Clique na Imagem ou Nome (também abre Info)
-             const infoTrigger = e.target.closest('.info-img-trigger, .info-name-trigger');
-             if (infoTrigger && infoTrigger.dataset.product) {
-                 console.log("[Client Click] Info trigger (img/name) clicked.");
-                 try {
-                     const productData = JSON.parse(infoTrigger.dataset.product.replace(/&#39;/g, "'"));
-                     openProductInfoModal(productData);
-                 } catch (err) { /* ... erro ... */ }
-                 return; // Ação concluída
-             }
+            // Agora, verifica QUAL parte do card foi clicada usando as classes
+            if (clickedElement.closest('.info-btn')) {
+                // Clicou no botão "Informações"
+                console.log("[Client Click] Info button clicked.");
+                openProductInfoModal(productData);
 
-            // Prioridade 3: Botão de Adicionar
-            const addBtn = e.target.closest('.add-item-btn');
-            if (addBtn && addBtn.dataset.product) {
-                 console.log("[Client Click] Add button clicked.");
-                 try {
-                     const productData = JSON.parse(addBtn.dataset.product.replace(/&#39;/g, "'"));
-                     addClientItemToSelection(productData);
-                 } catch (err) { /* ... erro ... */ }
-                 return; // Ação concluída
-            }
+            } else if (clickedElement.closest('.info-img-trigger') || clickedElement.closest('.info-name-trigger')) {
+                // Clicou na Imagem ou no Nome
+                console.log("[Client Click] Info trigger (img/name) clicked.");
+                openProductInfoModal(productData);
 
-            // Se não foi nenhum dos botões/triggers específicos
-            const card = e.target.closest('.product-card');
-             if (card) {
+            } else if (clickedElement.closest('.add-item-btn')) {
+                // Clicou no botão "+"
+                console.log("[Client Click] Add button clicked.");
+                addClientItemToSelection(productData);
+
+            } else if (clickedElement.closest('.product-card')) {
+                // Clicou em outra área do card (sem ação definida)
                 console.log("[Client Click] Card area clicked (no specific action).");
-             }
+            }
         });
     } else {
         console.error("[ClientOrderController] menuItemsGrid NOT FOUND for attaching listener.");
     }
 
-    // Listener para botões rápidos no modal de OBS
+    // Listener para botões rápidos no modal OBS (delegação de evento)
     const quickObsButtons = document.getElementById('quickObsButtons');
     if (quickObsButtons) {
         quickObsButtons.addEventListener('click', handleQuickButtonClient);
     }
 
-    // Busca os dados do WooCommerce (Produtos e Categorias)
+    // Busca os dados iniciais do WooCommerce (Produtos e Categorias)
+    // Passa 'renderClientMenu' como callback para ser executada após cada busca
     console.log("[ClientOrderController] Fetching WooCommerce data...");
-    // Chama fetchWooCommerceProducts e passa renderClientMenu como callback a ser executado quando os produtos chegarem
     fetchWooCommerceProducts(renderClientMenu)
         .then(() => console.log("[ClientOrderController] Products fetched successfully."))
         .catch(e => console.error("[ClientController INIT] Falha CRÍTICA ao carregar produtos:", e));
 
-    // Chama fetchWooCommerceCategories e passa renderClientMenu como callback
     fetchWooCommerceCategories(renderClientMenu)
         .then(() => console.log("[ClientOrderController] Categories fetched successfully."))
         .catch(e => console.error("[ClientController INIT] Falha CRÍTICA ao carregar categorias:", e));
 
 
-    clientInitialized = true;
+    clientInitialized = true; // Marca como inicializado
     console.log("[ClientOrderController] initClientOrderController FINISHED.");
 };
