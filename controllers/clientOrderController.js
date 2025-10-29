@@ -1,4 +1,4 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (Layout Atualizado, Filtros Corrigidos, Comentário Removido - COMPLETO v3) ---
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (Layout Atualizado, Filtros Corrigidos, Comentário Removido DEFINITIVAMENTE - COMPLETO v4) ---
 
 // Importa funções necessárias dos serviços e do app principal
 import { getProducts, getCategories, fetchWooCommerceProducts, fetchWooCommerceCategories } from "/services/wooCommerceService.js";
@@ -137,7 +137,7 @@ export const renderClientMenu = () => {
         filteredProducts = filteredProducts.filter(p => p.category === currentClientCategoryFilter);
     }
 
-    // 3. Renderiza os Cards de Produtos filtrados (HTML ATUALIZADO e LIMPO)
+    // 3. Renderiza os Cards de Produtos filtrados (HTML ATUALIZADO e DEFINITIVAMENTE LIMPO)
     if (filteredProducts.length === 0) {
         // Mensagem se nenhum produto corresponder aos filtros
         clientMenuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-dark-placeholder italic">Nenhum produto encontrado com os filtros atuais.</div>`;
@@ -147,9 +147,7 @@ export const renderClientMenu = () => {
             // Prepara a string JSON do produto para ser usada nos atributos data-product dos botões
             const productDataString = JSON.stringify(product).replace(/'/g, '&#39;');
 
-            // Estrutura HTML do card (SEM COMENTÁRIOS INTERNOS)
-            // A altura da imagem foi ajustada em versões anteriores
-            // O espaçamento vertical mb-1 foi adicionado em versões anteriores
+            // Estrutura HTML do card (SEM COMENTÁRIOS INTERNOS INDESEJADOS)
             return `
             <div class="product-card bg-dark-card border border-dark-border rounded-xl shadow-md overflow-hidden flex flex-col mb-1">
 
