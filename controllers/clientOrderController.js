@@ -2,6 +2,7 @@
 
 // Importa funções necessárias dos serviços e do app principal
 import { getProducts, getCategories, fetchWooCommerceProducts, fetchWooCommerceCategories } from "/services/wooCommerceService.js";
+// ATUALIZADO: Importa formatCurrency
 import { formatCurrency } from "/utils.js";
 import { saveSelectedItemsToFirebase } from "/services/firebaseService.js";
 import { currentTableId, selectedItems, userRole, currentOrderSnapshot, goToScreen, setCurrentTable } from "/app.js";
@@ -16,7 +17,8 @@ let clientObsModal, clientObsInput, clientSaveObsBtn, clientCancelObsBtn;
 let clientSearchProductInput, clientCategoryFiltersContainer, clientMenuItemsGrid;
 let clientObsItemName, clientEsperaSwitch; // Elementos do modal de observação
 let clientAssocModal, assocTableInput, assocPhoneInput, assocNameInput, assocSendOrderBtn, assocErrorMsg, assocCancelBtn; // Elementos do modal de associação
-let clientProductInfoModal, infoProductName, infoProductDescription, infoProductImage; // Elementos do modal de informação do produto
+// ATUALIZADO: Adiciona elementos do modal de info
+let clientProductInfoModal, infoProductName, infoProductDescription, infoProductImage, infoProductPrice, infoProductImageLink; // Elementos do modal de informação do produto
 
 // --- ESTADO LOCAL DO MÓDULO ---
 // Guarda o estado atual da busca e filtro de categoria
@@ -53,7 +55,7 @@ const _updateLocalItemQuantity = (itemId, noteKey, delta) => {
                 return; // Aborta se produto não existe
             }
             // Cria novo item
-            const newItem = { id: product.id, name: product.name, price: product.price, sector: product.sector || 'cozinha', category: product.category || 'uncategorized', note: noteKey };
+            const newItem = { id: product.id, name: product.name, price: product.price, sector: product.sector || 'cozinha', category: product.category || 'uncategorIZED', note: noteKey };
             selectedItems.push(newItem);
         }
     } else if (delta < 0 && indexToRemove !== -1) {
@@ -147,18 +149,22 @@ export const renderClientMenu = () => {
             // Prepara a string JSON do produto para ser usada nos atributos data-product dos botões
             const productDataString = JSON.stringify(product).replace(/'/g, '&#39;');
 
-            // Estrutura HTML do card (SEM COMENTÁRIOS INTERNOS INDESEJADOS)
+            // 
+            // /===================================================\
+            // | INÍCIO DA ATUALIZAÇÃO DO CARD (HTML)              |
+            // \===================================================/
+            //
             return `
             <div class="product-card bg-dark-card border border-dark-border rounded-xl shadow-md overflow-hidden flex flex-col mb-1">
 
-                <img src="${product.image}" alt="${product.name}" class="w-full h-40 md:h-48 object-cover cursor-pointer info-img-trigger" data-product='${productDataString}'>
+                <img src="${product.image}" alt="${product.name}" class="w-full h-56 md:h-64 object-cover cursor-pointer info-img-trigger" data-product='${productDataString}'>
 
                 <div class="p-3 flex flex-col flex-grow">
 
                     <h4 class="font-bold text-base text-dark-text mb-2 flex-grow cursor-pointer info-name-trigger" data-product='${productDataString}'>${product.name}</h4>
 
                     <div class="flex justify-between items-center mt-auto mb-3">
-                        <span class="font-bold text-lg text-pumpkin">${formatCurrency(product.price)}</span>
+                        <span class="font-bold text-base text-pumpkin">${formatCurrency(product.price)}</span>
                         <button class="add-item-btn bg-green-600 text-white p-2 rounded-full hover:bg-green-700 transition w-9 h-9 flex items-center justify-center"
                                 data-product='${productDataString}' title="Adicionar ao Pedido">
                             <i class="fas fa-plus text-base pointer-events-none"></i>
@@ -167,11 +173,16 @@ export const renderClientMenu = () => {
 
                     <button class="info-btn w-full bg-indigo-600 text-white text-xs font-semibold py-2 rounded-lg hover:bg-indigo-700 transition"
                             data-product='${productDataString}'>
-                        <i class="fas fa-info-circle mr-1"></i> Informações
+                        <i class="fas fa-info-circle mr-1"></i> Descrição
                     </button>
                 </div>
             </div>
             `;
+            // 
+            // /===================================================\
+            // | FIM DA ATUALIZAÇÃO DO CARD (HTML)                 |
+            // \===================================================/
+            //
         }).join('');
     }
     console.log("[Client] renderClientMenu FINISHED rendering.");
@@ -214,16 +225,13 @@ export const renderClientOrderScreen = () => {
         // Gera o HTML para cada grupo de item no carrinho
         openOrderList.innerHTML = Object.values(groupedItems).map(group => `
             <div class="flex justify-between items-center bg-dark-input p-3 rounded-lg shadow-sm border border-dark-border">
-                {/* Informações do item (Nome, Quantidade, Nota) */}
                 <div class="flex flex-col flex-grow min-w-0 mr-2">
                     <span class="font-semibold text-dark-text">${group.name} (${group.count}x)</span>
-                    {/* Span clicável para abrir modal de OBS */}
                     <span class="text-sm cursor-pointer text-indigo-400 hover:text-indigo-300"
                           onclick="window.openClientObsModalForGroup('${group.id}', '${group.note || ''}')">
                         ${group.note ? `(${group.note})` : `(Adicionar Obs.)`}
                     </span>
                 </div>
-                {/* Botões +/- */}
                 <div class="flex items-center space-x-2 flex-shrink-0">
                     <button class="qty-btn bg-red-600 text-white rounded-full h-8 w-8 flex items-center justify-center hover:bg-red-700 transition duration-150"
                             onclick="window.decreaseLocalItemQuantity('${group.id}', '${group.note || ''}')" title="Remover um">
@@ -272,10 +280,16 @@ export function openClientObsModalForGroup(itemId, noteKey) {
 // Expõe a função globalmente para ser chamada pelo onclick no HTML
 window.openClientObsModalForGroup = openClientObsModalForGroup;
 
+
+//
+// /===================================================\
+// | INÍCIO DA ATUALIZAÇÃO (Lógica do Modal de Info)   |
+// \===================================================/
+//
 // Define a função para abrir o modal de informações do produto
 export const openProductInfoModal = (product) => {
     // Validação dos elementos do modal
-    if (!clientProductInfoModal || !infoProductName || !infoProductDescription || !infoProductImage) {
+    if (!clientProductInfoModal || !infoProductName || !infoProductDescription || !infoProductImage || !infoProductPrice || !infoProductImageLink) {
         console.error("Elementos do Modal de Informação do Produto não encontrados.");
         return;
     }
@@ -283,13 +297,25 @@ export const openProductInfoModal = (product) => {
 
     // Popula os dados do modal com as informações do produto
     infoProductName.textContent = product.name;
+    // Adicionado: Popula o preço
+    infoProductPrice.textContent = formatCurrency(product.price);
     // Usa innerHTML pois a descrição vinda do WooCommerce pode ter HTML (<p>, <strong>)
     infoProductDescription.innerHTML = product.description;
     infoProductImage.src = product.image; // Define a URL da imagem (ou placeholder)
+    // Adicionado: Define o link da imagem (para abrir em nova aba)
+    infoProductImageLink.href = product.image;
+    // Adicionado: Armazena os dados do produto no próprio modal
+    clientProductInfoModal.dataset.product = JSON.stringify(product);
+
 
     // Exibe o modal
     clientProductInfoModal.style.display = 'flex';
 };
+//
+// /===================================================\
+// | FIM DA ATUALIZAÇÃO (Lógica do Modal de Info)      |
+// \===================================================/
+//
 // Atribui ao window para sobrescrever o placeholder em app.js e ser chamada pelo listener
 window.openProductInfoModal = openProductInfoModal;
 
@@ -512,17 +538,33 @@ export const initClientOrderController = () => {
     clientCategoryFiltersContainer = document.getElementById('categoryFiltersClient');
     clientMenuItemsGrid = document.getElementById('menuItemsGridClient');
 
+    //
+    // /===================================================\
+    // | INÍCIO DA ATUALIZAÇÃO (Mapeamento de elementos)   |
+    // \===================================================/
+    //
     // Mapeia elementos do Modal de Info
     clientProductInfoModal = document.getElementById('productInfoModal');
     infoProductName = document.getElementById('infoProductName');
     infoProductDescription = document.getElementById('infoProductDescription');
     infoProductImage = document.getElementById('infoProductImage');
+    // Adicionados:
+    infoProductPrice = document.getElementById('infoProductPrice');
+    infoProductImageLink = document.getElementById('infoProductImageLink');
+    //
+    // /===================================================\
+    // | FIM DA ATUALIZAÇÃO (Mapeamento de elementos)      |
+    // \===================================================/
+    //
+
 
     // Validação CRÍTICA: Verifica se todos os elementos essenciais foram encontrados
     const essentialElements = [
         clientObsModal, clientAssocModal, clientMenuItemsGrid, clientProductInfoModal,
         clientSearchProductInput, clientCategoryFiltersContainer, clientSaveObsBtn, clientCancelObsBtn,
-        assocSendOrderBtn, assocCancelBtn, infoProductName, infoProductDescription, infoProductImage // Adiciona validação dos elementos do modal info
+        assocSendOrderBtn, assocCancelBtn, 
+        // Adicionados:
+        infoProductName, infoProductDescription, infoProductImage, infoProductPrice, infoProductImageLink
     ];
     if (essentialElements.some(el => !el)) {
         console.error("[ClientController] Erro Fatal: Elementos críticos não encontrados no HTML. Verifique os IDs. Aborting initialization.");
@@ -612,7 +654,7 @@ export const initClientOrderController = () => {
 
             // Agora, com productData disponível, verifica QUAL parte foi clicada
             if (clickedElement.closest('.info-btn')) {
-                // Clicou no botão "Informações"
+                // Clicou no botão "Descrição"
                 console.log("[Client Click] Info button clicked.");
                 openProductInfoModal(productData);
 
@@ -640,6 +682,37 @@ export const initClientOrderController = () => {
     if (quickObsButtons) {
         quickObsButtons.addEventListener('click', handleQuickButtonClient);
     }
+    
+    //
+    // /===================================================\
+    // | INÍCIO DA ATUALIZAÇÃO (Listener do botão do Modal)|
+    // \===================================================/
+    //
+    const infoProductAddBtn = document.getElementById('infoProductAddBtn');
+    if (infoProductAddBtn) {
+        infoProductAddBtn.addEventListener('click', () => {
+            // Pega os dados do produto armazenados no modal
+            const productDataString = clientProductInfoModal.dataset.product;
+            if (productDataString) {
+                try {
+                    const product = JSON.parse(productDataString);
+                    // Reutiliza a função existente para adicionar o item
+                    addClientItemToSelection(product);
+                    // Fecha o modal após adicionar
+                    clientProductInfoModal.style.display = 'none'; 
+                } catch (e) {
+                    console.error("Erro ao adicionar produto pelo modal", e);
+                    alert("Não foi possível adicionar o produto.");
+                }
+            }
+        });
+    }
+    //
+    // /===================================================\
+    // | FIM DA ATUALIZAÇÃO (Listener do botão do Modal)   |
+    // \===================================================/
+    //
+
 
     // Busca os dados iniciais do WooCommerce (Produtos e Categorias)
     // Passa 'renderClientMenu' como callback para ser executada após cada busca bem-sucedida
