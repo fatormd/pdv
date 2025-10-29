@@ -215,16 +215,30 @@
         </div>
     </div>
 
+
     <div id="productInfoModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         <div class="bg-dark-card border border-dark-border p-5 md:p-6 rounded-xl shadow-2xl w-full max-w-md relative max-h-[85vh] overflow-y-auto custom-scrollbar">
-            <button onclick="document.getElementById('productInfoModal').style.display='none'" class="absolute top-2 right-2 text-dark-placeholder hover:text-dark-text text-2xl">&times;</button>
-            <img id="infoProductImage" src="..." alt="Imagem do Produto" class="w-full h-48 md:h-64 object-cover rounded-lg mb-4 border border-dark-border">
-            <h3 id="infoProductName" class="text-xl md:text-2xl font-bold mb-2 text-pumpkin">Nome</h3>
-            <div id="infoProductDescription" class="text-sm md:text-base text-dark-text space-y-2">Descrição...</div>
-             <button onclick="document.getElementById('productInfoModal').style.display='none'" class="mt-6 w-full bg-gray-600 text-gray-200 font-bold py-2 rounded-lg hover:bg-gray-500 transition text-sm">Fechar</button>
+            <button onclick="document.getElementById('productInfoModal').style.display='none'" class="absolute top-2 right-2 text-dark-placeholder hover:text-dark-text text-2xl z-10">&times;</button>
+            
+            <a id="infoProductImageLink" href="#" target="_blank" class="block w-full h-48 md:h-64 mb-4 rounded-lg overflow-hidden border border-dark-border">
+                <img id="infoProductImage" src="https://placehold.co/600x400/1f2937/d1d5db?text=Produto" alt="Imagem do Produto" class="w-full h-full object-cover">
+            </a>
+            
+            <h3 id="infoProductName" class="text-xl md:text-2xl font-bold mb-2 text-pumpkin">Nome do Produto</h3>
+            
+            <p id="infoProductPrice" class="text-xl font-bold text-pumpkin mb-3">R$ 0,00</p>
+            
+            <div id="infoProductDescription" class="text-sm md:text-base text-dark-text space-y-2 mb-6">Carregando descrição...</div>
+             
+             <button id="infoProductAddBtn" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition text-base">
+                <i class="fas fa-plus mr-2"></i> Quero esse
+             </button>
+             
+             <button onclick="document.getElementById('productInfoModal').style.display='none'" class="mt-3 w-full bg-gray-600 text-gray-200 font-bold py-2 rounded-lg hover:bg-gray-500 transition text-sm">
+                Fechar
+             </button>
         </div>
     </div>
-
     <div id="calculatorModal" class="hidden"></div>
     <div id="tableTransferModal" class="hidden"></div>
 
