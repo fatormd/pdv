@@ -1,4 +1,4 @@
-// --- SERVICES/WOOCOMMERCESERVICE.JS ---
+// --- SERVICES/WOOCOMMERCESERVICE.JS (ATUALIZADO) ---
 import { getNumericValueFromCurrency } from "/utils.js";
 // NOVOS IMPORTS
 import { functions } from "/services/firebaseService.js";
@@ -154,7 +154,14 @@ export const fetchWooCommerceProducts = async (renderMenuCallback) => {
             name: p.name,
             price: parseFloat(p.price || 0), // Garante que preço seja número
             category: p.categories && p.categories.length > 0 ? p.categories[0].slug : 'uncategorized',
-            sector: 'cozinha' // Você pode buscar isso de um custom field se quiser
+            sector: 'cozinha', // Você pode buscar isso de um custom field se quiser
+            
+            // --- LINHAS NOVAS ADICIONADAS ---
+            // Armazena a descrição (que pode conter HTML)
+            description: p.description || 'Descrição não disponível.',
+            // Armazena a URL da primeira imagem, ou um placeholder se não houver imagem
+            image: p.images && p.images.length > 0 ? p.images[0].src : 'https://placehold.co/600x400/1f2937/d1d5db?text=Produto'
+            // --- FIM DAS LINHAS NOVAS ---
         }));
         if (renderMenuCallback) renderMenuCallback();
         return WOOCOMMERCE_PRODUCTS;
