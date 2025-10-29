@@ -1,4 +1,4 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (Refatorado com Modal de Info) ---
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (Completo, com Modal de Info) ---
 import { getProducts, getCategories } from "/services/wooCommerceService.js";
 import { formatCurrency } from "/utils.js";
 import { saveSelectedItemsToFirebase } from "/services/firebaseService.js";
@@ -24,7 +24,39 @@ let clientInitialized = false;
 let associatedClientDocId = null;
 
 // --- LÓGICA DE MANIPULAÇÃO DE ITENS LOCAIS (Cliente) ---
-// ... (Funções _updateLocalItemQuantity, increaseLocalItemQuantity, decreaseLocalItemQuantity - Sem Alteração) ...
+
+const _updateLocalItemQuantity = (itemId, noteKey, delta) => {
+    let indexToRemove = -1;
+    if (delta < 0) {
+        for (let i = selectedItems.length - 1; i >= 0; i--) {
+            if (selectedItems[i].id == itemId && (selectedItems[i].note || '') === noteKey) {
+                indexToRemove = i;
+                break;
+            }
+        }
+    }
+
+    if (delta > 0) {
+        const itemToCopy = selectedItems.findLast(item => item.id == itemId && (item.note || '') === noteKey);
+        if (itemToCopy) {
+            selectedItems.push({ ...itemToCopy });
+        } else {
+            const products = getProducts();
+            const product = products.find(p => p.id == itemId);
+            if (!product) return;
+            const newItem = { id: product.id, name: product.name, price: product.price, sector: product.sector || 'cozinha', category: product.category || 'uncategorized', note: noteKey };
+            selectedItems.push(newItem);
+        }
+    } else if (delta < 0 && indexToRemove !== -1) {
+        selectedItems.splice(indexToRemove, 1);
+    }
+
+    renderClientOrderScreen();
+    if (currentTableId) {
+        saveSelectedItemsToFirebase(currentTableId, selectedItems);
+    }
+};
+
 export const increaseLocalItemQuantity = (itemId, noteKey) => _updateLocalItemQuantity(itemId, noteKey, 1);
 export const decreaseLocalItemQuantity = (itemId, noteKey) => _updateLocalItemQuantity(itemId, noteKey, -1);
 window.increaseLocalItemQuantity = increaseLocalItemQuantity;
@@ -33,7 +65,6 @@ window.decreaseLocalItemQuantity = decreaseLocalItemQuantity;
 
 // Chamado pelo botão + do cardápio do cliente (AGORA VIA EVENT DELEGATION)
 export const addClientItemToSelection = (product) => {
-    // ... (Sem Alteração) ...
     const newItem = {
         id: product.id,
         name: product.name,
@@ -56,7 +87,6 @@ export const addClientItemToSelection = (product) => {
 
 // --- FUNÇÕES DE RENDERIZAÇÃO DE MENU (Cliente) ---
 export const renderClientMenu = () => {
-    // ... (Lógica de renderização dos filtros de categoria - Sem Alteração) ...
     if (!clientMenuItemsGrid || !clientCategoryFiltersContainer) return;
 
     const products = getProducts();
@@ -93,7 +123,7 @@ export const renderClientMenu = () => {
     }
 
     // 3. Renderiza Itens do Cardápio (HTML LIMPO)
-    // ATUALIZADO: O JSON.stringify(product) agora inclui 'description' e 'image' graças à Etapa 1.
+    // O JSON.stringify(product) agora inclui 'description' e 'image' graças à Etapa 1.
     if (filteredProducts.length === 0) {
         clientMenuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-dark-placeholder italic">Nenhum produto encontrado.</div>`;
     } else {
@@ -116,7 +146,6 @@ export const renderClientMenu = () => {
 
 // Função de Renderização da Lista de Pedidos do Cliente
 export const renderClientOrderScreen = () => {
-    // ... (Sem Alteração) ...
     const openOrderList = document.getElementById('openOrderListClient');
     const openItemsCount = document.getElementById('openItemsCountClient');
     const sendBtn = document.getElementById('sendClientOrderBtn');
@@ -168,11 +197,11 @@ export const renderClientOrderScreen = () => {
     }
 };
 
+
 // --- FUNÇÕES DE MODAL ---
 
 // Abertura do Modal de Observações (Cliente - Apenas Quick Buttons)
 export function openClientObsModalForGroup(itemId, noteKey) {
-    // ... (Sem Alteração) ...
     const products = getProducts();
     const product = products.find(p => p.id == itemId);
 
@@ -192,6 +221,8 @@ export function openClientObsModalForGroup(itemId, noteKey) {
 
     clientObsModal.style.display = 'flex';
 }
+window.openClientObsModalForGroup = openClientObsModalForGroup; // Expor globalmente
+
 // NOVO: Define a função para abrir o modal de info e a expõe globalmente
 export const openProductInfoModal = (product) => {
     if (!clientProductInfoModal || !infoProductName || !infoProductDescription || !infoProductImage) {
@@ -214,7 +245,6 @@ window.openProductInfoModal = openProductInfoModal;
 
 // --- FUNÇÃO PRINCIPAL: Envio de Pedido pelo Cliente ---
 export const handleClientSendOrder = async () => {
-    // ... (Sem Alteração) ...
     if (selectedItems.length === 0) {
         alert("Adicione itens ao seu pedido antes de enviar.");
         return;
@@ -273,7 +303,6 @@ export const handleClientSendOrder = async () => {
 
 // Lógica de Associação e Envio (Chamada pelo Modal)
 export const handleClientAssociationAndSend = async () => {
-    // ... (Sem Alteração) ...
     const tableNumber = assocTableInput?.value.trim();
     const phone = assocPhoneInput?.value.replace(/\D/g, '');
     const name = assocNameInput?.value.trim() || 'Cliente Comanda';
@@ -339,7 +368,6 @@ export const handleClientAssociationAndSend = async () => {
 
 // Listener para as Quick-Buttons do Modal de Observação (Cliente)
 const handleQuickButtonClient = (e) => {
-    // ... (Sem Alteração) ...
     const btn = e.target.closest('.quick-obs-btn');
     if (btn && clientObsInput) {
         const obsText = btn.dataset.obs;
@@ -357,7 +385,6 @@ const handleQuickButtonClient = (e) => {
 
 // Salvar Observação do Cliente
 const handleSaveClientObs = () => {
-    // ... (Sem Alteração) ...
     const itemId = clientObsModal.dataset.itemId;
     const originalNoteKey = clientObsModal.dataset.originalNoteKey;
     let newNote = clientObsInput.value.trim();
@@ -429,7 +456,6 @@ export const initClientOrderController = () => {
     }
 
     // Listeners Essenciais
-    // ... (Listeners de sendClientBtn, assocSendOrderBtn, assocCancelBtn, clientSaveObsBtn - Sem Alteração) ...
     const sendClientBtn = document.getElementById('sendClientOrderBtn');
     if (sendClientBtn) sendClientBtn.addEventListener('click', handleClientSendOrder);
 
@@ -484,6 +510,7 @@ export const initClientOrderController = () => {
             
             if (addBtn) {
                 // AÇÃO 1: Usuário clicou no BOTÃO DE ADICIONAR
+                e.stopPropagation(); // Impede que o clique "suba" para o card
                 try {
                     const productData = JSON.parse(addBtn.dataset.product.replace(/&#39;/g, "'"));
                     addClientItemToSelection(productData);
