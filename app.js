@@ -15,7 +15,9 @@ import { initOrderController, renderOrderScreen, increaseLocalItemQuantity, decr
 import { initPaymentController, renderPaymentSummary, deletePayment, handleMassActionRequest, handleFinalizeOrder, handleMassDeleteConfirmed, executeDeletePayment, openTableTransferModal, handleConfirmTableTransfer } from '/controllers/paymentController.js';
 import { initManagerController, handleGerencialAction } from '/controllers/managerController.js';
 import { initUserManagementController, openUserManagementModal } from '/controllers/userManagementController.js';
-import { initClientOrderController, renderClientMenu, renderClientOrderScreen } from '/controllers/clientOrderController.js'; // IMPORT CLIENTE
+
+// ATUALIZADO: Importa apenas o INIT e o RENDER da tela de pedido do cliente (o menu é carregado pelo próprio controller)
+import { initClientOrderController, renderClientOrderScreen } from '/controllers/clientOrderController.js'; 
 
 
 // --- CONFIGURAÇÃO ---
@@ -42,6 +44,7 @@ let clientLoginModal;
 
 // --- FUNÇÕES CORE E ROTIAMENTO ---
 export const hideStatus = () => {
+    // ... (Sem alteração)
     if (!statusScreen) statusScreen = document.getElementById('statusScreen');
     if (statusScreen) {
         statusScreen.style.cssText = 'display: none !important';
@@ -49,6 +52,7 @@ export const hideStatus = () => {
 };
 
 const showLoginScreen = () => {
+    // ... (Sem alteração)
     statusScreen = document.getElementById('statusScreen');
     mainContent = document.getElementById('mainContent');
     mainHeader = document.getElementById('mainHeader');
@@ -70,6 +74,7 @@ const showLoginScreen = () => {
 };
 
 const hideLoginScreen = () => {
+    // ... (Sem alteração)
     mainHeader = document.getElementById('mainHeader');
     mainContent = document.getElementById('mainContent');
 
@@ -87,6 +92,7 @@ const hideLoginScreen = () => {
 
 // --- FUNÇÃO DE AUTENTICAÇÃO VIA FIRESTORE (CORE) ---
 const authenticateUserFromFirestore = async (email, password) => {
+    // ... (Sem alteração)
     try {
         if (!db) throw new Error("Conexão com banco de dados indisponível.");
         if (!appId) throw new Error("appId não está definido no firebaseService.");
@@ -113,6 +119,7 @@ const authenticateUserFromFirestore = async (email, password) => {
  * Navega entre as telas do SPA. (Adaptado para Cliente também)
  */
 export const goToScreen = async (screenId) => {
+    // ... (Sem alteração)
     if (!appContainer) appContainer = document.getElementById('appContainer');
     if (!mainContent) mainContent = document.getElementById('mainContent');
     const isClientMode = window.location.pathname.includes('client.html');
@@ -158,6 +165,7 @@ export const goToScreen = async (screenId) => {
 window.goToScreen = goToScreen;
 
 export const handleTableTransferConfirmed = async (originTableId, targetTableId, itemsToTransfer, newDiners = 0, newSector = '') => {
+    // ... (Sem alteração)
     if (!originTableId || !targetTableId || itemsToTransfer.length === 0) { /* ... */ return; }
     if (originTableId === targetTableId) { /* ... */ return; }
 
@@ -207,6 +215,7 @@ window.handleTableTransferConfirmed = handleTableTransferConfirmed;
  * Abre o modal de autenticação para ações gerenciais e delega a ação.
  */
 window.openManagerAuthModal = (action, payload = null) => {
+    // ... (Sem alteração)
     // Ação de Usuários é tratada diretamente para simplificar o fluxo de cadastro
     if (action === 'openWaiterReg') {
         openUserManagementModal();
@@ -277,6 +286,7 @@ window.openNfeModal = openNfeModal;
 
 // --- LÓGICA DE LISTENER DA MESA ---
 export const setTableListener = (tableId, isClientMode = false) => {
+    // ... (Sem alteração)
     if (unsubscribeTable) unsubscribeTable();
     const tableRef = getTableDocRef(tableId);
 
@@ -340,6 +350,7 @@ export const setTableListener = (tableId, isClientMode = false) => {
 };
 
 export const setCurrentTable = (tableId, isClientMode = false) => {
+    // ... (Sem alteração)
     // Não executa se já estiver na mesma mesa
     if (currentTableId === tableId && unsubscribeTable) {
         // Apenas re-renderiza se necessário (caso raro, onSnapshot deve cuidar disso)
@@ -377,6 +388,7 @@ export const setCurrentTable = (tableId, isClientMode = false) => {
 };
 
 export const selectTableAndStartListener = async (tableId) => {
+    // ... (Sem alteração)
     try {
         await goToScreen('orderScreen');
         setCurrentTable(tableId);
@@ -387,6 +399,7 @@ window.selectTableAndStartListener = selectTableAndStartListener;
 
 // --- LÓGICA DE LOGIN ---
 const handleStaffLogin = async () => {
+    // ... (Sem alteração)
     // Mapeamento local para esta função
     let loginBtn, loginEmailInput, loginPasswordInput, loginErrorMsg;
     loginBtn = document.getElementById('loginBtn');
@@ -434,6 +447,7 @@ const handleStaffLogin = async () => {
 
 
 const handleLogout = () => {
+    // ... (Sem alteração)
     // Limpa estado global
     userId = null; currentTableId = null; selectedItems.length = 0; userRole = 'anonymous'; currentOrderSnapshot = null;
     if (unsubscribeTable) { unsubscribeTable(); unsubscribeTable = null; }
@@ -445,6 +459,7 @@ window.handleLogout = handleLogout;
 
 // --- FUNÇÕES DE INICIALIZAÇÃO ---
 const initStaffApp = async () => {
+    // ... (Sem alteração)
     try {
         // 1. Inicializa todos os controladores estáticos
         initPanelController();
@@ -477,9 +492,10 @@ const initClientApp = async () => {
         // 1. Inicializa o controlador do cliente
         initClientOrderController();
 
-        // 2. Carrega o menu do Woo
-        fetchWooCommerceProducts(renderClientMenu).catch(e => console.error("[INIT ERROR] Falha ao carregar produtos cliente:", e));
-        fetchWooCommerceCategories(renderClientMenu).catch(e => console.error("[INIT ERROR] Falha ao carregar categorias cliente:", e));
+        // 2. ATUALIZADO: Removemos o carregamento do menu daqui.
+        // O initClientOrderController agora é responsável por carregar o próprio menu.
+        // fetchWooCommerceProducts(renderClientMenu).catch(e => console.error("[INIT ERROR] Falha ao carregar produtos cliente:", e)); // REMOVIDO
+        // fetchWooCommerceCategories(renderClientMenu).catch(e => console.error("[INIT ERROR] Falha ao carregar categorias cliente:", e)); // REMOVIDO
 
         // Esconde o modal de associação se ele existir (Apenas no client.html)
         // O modal será exibido quando o cliente tentar enviar o pedido pela primeira vez
@@ -527,6 +543,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Inicializa o app cliente (que por sua vez inicializa o clientOrderController)
             initClientApp();
+
+            // ATUALIZADO: Importa os controladores de quantidade
+            const { increaseLocalItemQuantity, decreaseLocalItemQuantity } = await import('/controllers/clientOrderController.js');
 
             // Adiciona funções globais de manipulação de item do Cliente
             // Estas são chamadas pelos onClicks no HTML do clientOrderController
