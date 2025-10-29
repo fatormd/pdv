@@ -55,7 +55,7 @@ const _updateLocalItemQuantity = (itemId, noteKey, delta) => {
                 return; // Aborta se produto não existe
             }
             // Cria novo item
-            const newItem = { id: product.id, name: product.name, price: product.price, sector: product.sector || 'cozinha', category: product.category || 'uncategorIZED', note: noteKey };
+            const newItem = { id: product.id, name: product.name, price: product.price, sector: product.sector || 'cozinha', category: product.category || 'uncategorized', note: noteKey };
             selectedItems.push(newItem);
         }
     } else if (delta < 0 && indexToRemove !== -1) {
