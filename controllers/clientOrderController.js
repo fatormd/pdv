@@ -1,4 +1,4 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (Layout Atualizado, Filtros Corrigidos - COMPLETO) ---
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (Layout Atualizado, Filtros Corrigidos, Comentário Removido - COMPLETO) ---
 
 // Importa funções necessárias dos serviços e do app principal
 import { getProducts, getCategories, fetchWooCommerceProducts, fetchWooCommerceCategories } from "/services/wooCommerceService.js";
@@ -85,8 +85,8 @@ export const addClientItemToSelection = (product) => {
         note: '' // Nota inicial vazia
     };
 
-    selectedItems.push(newItem); // Adiciona ao array local 'selectedItems'
-    renderClientOrderScreen(); // Atualiza a exibição do carrinho
+    selectedItems.push(newItem); // Adiciona ao array local 'selectedItems' (importado de app.js)
+    renderClientOrderScreen(); // Atualiza a exibição da lista de itens selecionados
 
     if (currentTableId) {
         // Salva no Firebase se já houver mesa associada
@@ -122,7 +122,7 @@ export const renderClientMenu = () => {
         // Atualiza o conteúdo do container de filtros
         clientCategoryFiltersContainer.innerHTML = categoryButtonsHTML;
     } else {
-        // Se não houver categorias (algo deu errado na busca?), limpa o container
+        // Se não houver categorias (exceto 'Todos'), limpa a área de filtros
         clientCategoryFiltersContainer.innerHTML = '';
         console.warn("[Client] Nenhuma categoria encontrada para renderizar filtros.");
     }
@@ -137,7 +137,7 @@ export const renderClientMenu = () => {
         filteredProducts = filteredProducts.filter(p => p.category === currentClientCategoryFilter);
     }
 
-    // 3. Renderiza os Cards de Produtos filtrados
+    // 3. Renderiza os Cards de Produtos filtrados (HTML ATUALIZADO e LIMPO)
     if (filteredProducts.length === 0) {
         // Mensagem se nenhum produto corresponder aos filtros
         clientMenuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-dark-placeholder italic">Nenhum produto encontrado com os filtros atuais.</div>`;
@@ -147,17 +147,16 @@ export const renderClientMenu = () => {
             // Prepara a string JSON do produto para ser usada nos atributos data-product dos botões
             const productDataString = JSON.stringify(product).replace(/'/g, '&#39;');
 
-            // Estrutura HTML do card (com imagem, nome, preço, botão +, botão info)
+            // Estrutura HTML do card (SEM COMENTÁRIOS INTERNOS)
             return `
             <div class="product-card bg-dark-card border border-dark-border rounded-xl shadow-md overflow-hidden flex flex-col">
 
                 <img src="${product.image}" alt="${product.name}" class="w-full h-32 md:h-40 object-cover cursor-pointer info-img-trigger" data-product='${productDataString}'>
 
                 <div class="p-3 flex flex-col flex-grow">
+
                     <h4 class="font-bold text-base text-dark-text mb-2 flex-grow cursor-pointer info-name-trigger" data-product='${productDataString}'>${product.name}</h4>
 
-                    {/* CORREÇÃO 2: Comentário removido */}
-                    {/* Preço e Botão Adicionar (empurrados para baixo com mt-auto) */}
                     <div class="flex justify-between items-center mt-auto mb-3">
                         <span class="font-bold text-lg text-pumpkin">${formatCurrency(product.price)}</span>
                         <button class="add-item-btn bg-green-600 text-white p-2 rounded-full hover:bg-green-700 transition w-9 h-9 flex items-center justify-center"
@@ -286,7 +285,7 @@ export const openProductInfoModal = (product) => {
     infoProductName.textContent = product.name;
     // Usa innerHTML pois a descrição vinda do WooCommerce pode ter HTML (<p>, <strong>)
     infoProductDescription.innerHTML = product.description;
-    infoProductImage.src = product.image; // Define a URL da imagem
+    infoProductImage.src = product.image; // Define a URL da imagem (ou placeholder)
 
     // Exibe o modal
     clientProductInfoModal.style.display = 'flex';
@@ -309,7 +308,7 @@ export const handleClientSendOrder = async () => {
         if (clientAssocModal) clientAssocModal.style.display = 'flex';
         if(assocErrorMsg) {
              assocErrorMsg.textContent = "Para enviar seu pedido, preencha a mesa e seu contato.";
-             assocErrorMsg.classList.remove('text-red-400');
+             assocErrorMsg.classList.remove('text-red-400'); // Garante estilo padrão
              assocErrorMsg.classList.add('text-dark-placeholder');
              assocErrorMsg.style.display = 'block';
         }
@@ -346,7 +345,7 @@ export const handleClientSendOrder = async () => {
             waiterNotification: { type: 'client_request', timestamp: serverTimestamp() } // Objeto de notificação
         });
 
-        // Limpa o carrinho local do cliente após o envio bem-sucedido
+        // Limpa o carrinho local do cliente APÓS o envio bem-sucedido
         selectedItems.length = 0;
         renderClientOrderScreen(); // Re-renderiza a lista (agora vazia)
 
@@ -441,7 +440,7 @@ const handleQuickButtonClient = (e) => {
         if (currentValue && !currentValue.endsWith(',') && currentValue.length > 0) {
             currentValue += ', ';
         } else if (currentValue.endsWith(',')) {
-            currentValue += ' ';
+            currentValue += ' '; // Apenas espaço se já termina com vírgula
         }
         // Concatena a nova observação
         clientObsInput.value = (currentValue + obsText).trim();
@@ -523,7 +522,7 @@ export const initClientOrderController = () => {
     const essentialElements = [
         clientObsModal, clientAssocModal, clientMenuItemsGrid, clientProductInfoModal,
         clientSearchProductInput, clientCategoryFiltersContainer, clientSaveObsBtn, clientCancelObsBtn,
-        assocSendOrderBtn, assocCancelBtn
+        assocSendOrderBtn, assocCancelBtn, infoProductName, infoProductDescription, infoProductImage // Adiciona validação dos elementos do modal info
     ];
     if (essentialElements.some(el => !el)) {
         console.error("[ClientController] Erro Fatal: Elementos críticos não encontrados no HTML. Verifique os IDs. Aborting initialization.");
@@ -565,7 +564,7 @@ export const initClientOrderController = () => {
                  console.log("[Client] Item recém-adicionado cancelado e removido.");
              }
         }
-        clientObsModal.style.display = 'none'; // Fecha o modal
+        clientObsModal.style.display = 'none'; // Fecha o modal de qualquer forma
     });
 
     // Listener para input de busca
@@ -587,15 +586,17 @@ export const initClientOrderController = () => {
         });
     }
 
-    // Event Delegation para cliques no grid de produtos (ATUALIZADO)
+    // Event Delegation para cliques no grid de produtos (ATUALIZADO para nova estrutura de card)
     if (clientMenuItemsGrid) {
         clientMenuItemsGrid.addEventListener('click', (e) => {
             let productData; // Variável para guardar os dados do produto
+            const clickedElement = e.target; // O elemento exato que recebeu o clique
 
-            // Tenta parsear os dados do elemento clicado ou de um pai relevante
-            const clickedElement = e.target;
-            const dataElement = clickedElement.closest('[data-product]'); // Procura o elemento mais próximo com data-product
+            // Tenta encontrar o elemento PAI mais próximo que contém os dados do produto
+            // Isso funciona se clicar na imagem, nome, botão info ou botão add
+            const dataElement = clickedElement.closest('[data-product]');
 
+            // Se encontrou um elemento com dados, tenta parsear
             if (dataElement && dataElement.dataset.product) {
                 try {
                     productData = JSON.parse(dataElement.dataset.product.replace(/&#39;/g, "'"));
@@ -604,19 +605,19 @@ export const initClientOrderController = () => {
                     return; // Aborta se não conseguir ler os dados
                 }
             } else {
-                // Se o elemento clicado não tem data-product, ignora o clique
+                // Se o elemento clicado (ou seus pais próximos) não tem data-product, ignora
                 // console.log("[Client Click] Clicked element without product data.");
                 return;
             }
 
-            // Agora, verifica QUAL parte do card foi clicada usando as classes
+            // Agora, com productData disponível, verifica QUAL parte foi clicada
             if (clickedElement.closest('.info-btn')) {
                 // Clicou no botão "Informações"
                 console.log("[Client Click] Info button clicked.");
                 openProductInfoModal(productData);
 
             } else if (clickedElement.closest('.info-img-trigger') || clickedElement.closest('.info-name-trigger')) {
-                // Clicou na Imagem ou no Nome
+                // Clicou na Imagem ou no Nome (que também abrem o modal info)
                 console.log("[Client Click] Info trigger (img/name) clicked.");
                 openProductInfoModal(productData);
 
@@ -626,7 +627,7 @@ export const initClientOrderController = () => {
                 addClientItemToSelection(productData);
 
             } else if (clickedElement.closest('.product-card')) {
-                // Clicou em outra área do card (sem ação definida)
+                // Clicou em outra área do card (sem ação definida por enquanto)
                 console.log("[Client Click] Card area clicked (no specific action).");
             }
         });
@@ -641,7 +642,7 @@ export const initClientOrderController = () => {
     }
 
     // Busca os dados iniciais do WooCommerce (Produtos e Categorias)
-    // Passa 'renderClientMenu' como callback para ser executada após cada busca
+    // Passa 'renderClientMenu' como callback para ser executada após cada busca bem-sucedida
     console.log("[ClientOrderController] Fetching WooCommerce data...");
     fetchWooCommerceProducts(renderClientMenu)
         .then(() => console.log("[ClientOrderController] Products fetched successfully."))
@@ -652,6 +653,6 @@ export const initClientOrderController = () => {
         .catch(e => console.error("[ClientController INIT] Falha CRÍTICA ao carregar categorias:", e));
 
 
-    clientInitialized = true; // Marca como inicializado
+    clientInitialized = true; // Marca como inicializado para evitar re-execução
     console.log("[ClientOrderController] initClientOrderController FINISHED.");
 };
