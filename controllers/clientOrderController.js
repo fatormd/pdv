@@ -79,10 +79,9 @@ export const addClientItemToSelection = (product) => {
 
     openClientObsModalForGroup(product.id, '');
 };
-// window.addClientItemToSelection = addClientItemToSelection; // Não precisa mais ser global
 
 
-// --- FUNÇÕES DE RENDERIZAÇÃO DE MENU (Cliente - Refatorado) ---
+// --- FUNÇÕES DE RENDERIZAÇÃO DE MENU (Cliente - Comentários Removidos do Botão) ---
 export const renderClientMenu = () => {
     if (!clientMenuItemsGrid || !clientCategoryFiltersContainer) return;
 
@@ -93,19 +92,21 @@ export const renderClientMenu = () => {
     if (categories.length > 0 && clientCategoryFiltersContainer.innerHTML.trim() === '') {
         clientCategoryFiltersContainer.innerHTML = categories.map(cat => {
             const isActive = cat.slug === currentClientCategoryFilter ? 'bg-indigo-700 text-white' : 'bg-gray-200 text-gray-700';
-            // Usa as classes dark-mode equivalentes se estivermos no tema escuro
-             const darkIsActive = cat.slug === currentClientCategoryFilter ? 'bg-primary text-white' : 'bg-dark-input text-dark-placeholder border border-dark-border';
-            return `<button class="category-btn text-base px-4 py-2 rounded-full font-semibold whitespace-nowrap ${darkIsActive}" data-category="${cat.slug || cat.id}">${cat.name}</button>`;
+            // Usa as classes dark mode nos filtros também
+            const inactiveClasses = 'bg-dark-input text-dark-text border border-dark-border';
+            const activeClasses = 'bg-pumpkin text-white border-pumpkin';
+            return `<button class="category-btn text-base px-4 py-2 rounded-full font-semibold whitespace-nowrap ${isActive ? activeClasses : inactiveClasses}" data-category="${cat.slug || cat.id}">${cat.name}</button>`;
         }).join('');
     }
-     // Atualiza o estado ativo dos botões de categoria (para tema escuro)
+     // Atualiza o estado ativo dos botões de categoria
      clientCategoryFiltersContainer.querySelectorAll('.category-btn').forEach(btn => {
         const isActive = btn.dataset.category === currentClientCategoryFilter;
-        btn.classList.toggle('bg-primary', isActive); // Cor primária (indigo) para ativo
+        // Classes Dark Mode
+        btn.classList.toggle('bg-pumpkin', isActive);
         btn.classList.toggle('text-white', isActive);
+        btn.classList.toggle('border-pumpkin', isActive);
         btn.classList.toggle('bg-dark-input', !isActive);
-        btn.classList.toggle('text-dark-placeholder', !isActive);
-        btn.classList.toggle('border', !isActive); // Garante borda apenas se inativo
+        btn.classList.toggle('text-dark-text', !isActive);
         btn.classList.toggle('border-dark-border', !isActive);
     });
 
@@ -119,20 +120,20 @@ export const renderClientMenu = () => {
         filteredProducts = filteredProducts.filter(p => p.category === currentClientCategoryFilter);
     }
 
-    // 3. Renderiza Itens do Cardápio (SEM onclick inline E SEM comentários inválidos)
+    // 3. Renderiza Itens do Cardápio (SEM comentários no botão)
     if (filteredProducts.length === 0) {
         clientMenuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-dark-placeholder italic">Nenhum produto encontrado.</div>`;
     } else {
         clientMenuItemsGrid.innerHTML = filteredProducts.map(product => `
-            <div class="product-card bg-dark-card border border-dark-border p-4 rounded-xl shadow-md cursor-pointer hover:shadow-lg transition duration-150"> {/* Usa classes dark */}
-                <h4 class="font-bold text-base text-dark-text">${product.name}</h4> {/* Usa classes dark */}
-                <p class="text-xs text-dark-placeholder">${product.category} (${product.sector})</p> {/* Usa classes dark */}
+            <div class="product-card bg-dark-card border border-dark-border p-4 rounded-xl shadow-md cursor-pointer hover:shadow-lg transition duration-150">
+                <h4 class="font-bold text-base text-dark-text">${product.name}</h4>
+                <p class="text-xs text-dark-placeholder">${product.category} (${product.sector})</p>
                 <div class="flex justify-between items-center mt-2">
                     <span class="font-bold text-lg text-pumpkin">${formatCurrency(product.price)}</span>
                     <button class="add-item-btn bg-green-600 text-white p-2 rounded-full hover:bg-green-700 transition"
-                            data-product='${JSON.stringify(product).replace(/'/g, '&#39;')}'> {/* CORREÇÃO AQUI: Removemos os comentários inválidos */}
+                            data-product='${JSON.stringify(product).replace(/'/g, '&#39;')}'>
                         <i class="fas fa-plus text-base pointer-events-none"></i>
-                    </button>
+                    </button> {/* Comentários removidos daqui */}
                 </div>
             </div>
         `).join('');
@@ -142,6 +143,7 @@ export const renderClientMenu = () => {
 
 // Função de Renderização da Lista de Pedidos do Cliente
 export const renderClientOrderScreen = () => {
+    // ... (código inalterado)
     const openOrderList = document.getElementById('openOrderListClient');
     const openItemsCount = document.getElementById('openItemsCountClient');
     const sendBtn = document.getElementById('sendClientOrderBtn');
@@ -156,7 +158,7 @@ export const renderClientOrderScreen = () => {
     }
 
     if (openItemsCountValue === 0) {
-        openOrderList.innerHTML = `<div class="text-sm md:text-base text-dark-placeholder italic p-2">Nenhum item selecionado.</div>`; // Classe dark
+        openOrderList.innerHTML = `<div class="text-sm md:text-base text-dark-placeholder italic p-2">Nenhum item selecionado.</div>`;
     } else {
         // Lógica de Agrupamento para exibição
         const groupedItems = selectedItems.reduce((acc, item) => {
@@ -169,21 +171,21 @@ export const renderClientOrderScreen = () => {
         }, {});
 
         openOrderList.innerHTML = Object.values(groupedItems).map(group => `
-            <div class="flex justify-between items-center bg-dark-input border border-dark-border p-3 rounded-lg shadow-sm"> {/* Classes dark */}
+            <div class="flex justify-between items-center bg-dark-input p-3 rounded-lg shadow-sm border border-dark-border"> {/* Estilo dark aplicado */}
                 <div class="flex flex-col flex-grow min-w-0 mr-2">
-                    <span class="font-semibold text-dark-text">${group.name} (${group.count}x)</span> {/* Classes dark */}
-                    <span class="text-sm cursor-pointer text-indigo-400 hover:text-indigo-300" /* Cor ajustada */
+                    <span class="font-semibold text-dark-text">${group.name} (${group.count}x)</span>
+                    <span class="text-sm cursor-pointer text-indigo-400 hover:text-indigo-300"
                           onclick="window.openClientObsModalForGroup('${group.id}', '${group.note || ''}')">
                         ${group.note ? `(${group.note})` : `(Adicionar Obs.)`}
                     </span>
                 </div>
 
                 <div class="flex items-center space-x-2 flex-shrink-0">
-                    <button class="qty-btn bg-red-600 text-white rounded-full h-8 w-8 flex items-center justify-center hover:bg-red-700 transition duration-150" /* Cor ajustada */
+                    <button class="qty-btn bg-red-600 text-white rounded-full h-8 w-8 flex items-center justify-center hover:bg-red-700 transition duration-150"
                             onclick="window.decreaseLocalItemQuantity('${group.id}', '${group.note || ''}')" title="Remover um">
                         <i class="fas fa-minus pointer-events-none"></i>
                     </button>
-                    <button class="qty-btn bg-green-600 text-white rounded-full h-8 w-8 flex items-center justify-center hover:bg-green-700 transition duration-150" /* Cor ajustada */
+                    <button class="qty-btn bg-green-600 text-white rounded-full h-8 w-8 flex items-center justify-center hover:bg-green-700 transition duration-150"
                             onclick="window.increaseLocalItemQuantity('${group.id}', '${group.note || ''}')" title="Adicionar um">
                         <i class="fas fa-plus pointer-events-none"></i>
                     </button>
@@ -196,6 +198,7 @@ export const renderClientOrderScreen = () => {
 
 // Abertura do Modal de Observações (Cliente - Apenas Quick Buttons)
 export function openClientObsModalForGroup(itemId, noteKey) {
+    // ... (código inalterado)
     const products = getProducts();
     const product = products.find(p => p.id == itemId);
 
@@ -215,11 +218,12 @@ export function openClientObsModalForGroup(itemId, noteKey) {
 
     clientObsModal.style.display = 'flex';
 }
-window.openClientObsModalForGroup = openClientObsModalForGroup;
+// window.openClientObsModalForGroup = openClientObsModalForGroup; // Já definido globalmente no app.js
 
 
 // FUNÇÃO PRINCIPAL: Envio de Pedido pelo Cliente (Aciona Modal se necessário)
 export const handleClientSendOrder = async () => {
+    // ... (código inalterado)
     if (selectedItems.length === 0) {
         alert("Adicione itens ao seu pedido antes de enviar.");
         return;
@@ -229,7 +233,7 @@ export const handleClientSendOrder = async () => {
         if (clientAssocModal) clientAssocModal.style.display = 'flex';
         if(assocErrorMsg) {
              assocErrorMsg.textContent = "Para enviar seu pedido, preencha a mesa e seu contato.";
-             assocErrorMsg.classList.remove('text-red-400'); // Cor ajustada para dark
+             assocErrorMsg.classList.remove('text-red-400'); // Corrigido para red-400 (tema dark)
              assocErrorMsg.classList.add('text-dark-placeholder');
              assocErrorMsg.style.display = 'block';
         }
@@ -278,6 +282,7 @@ export const handleClientSendOrder = async () => {
 
 // Lógica de Associação e Envio (Chamada pelo Modal)
 export const handleClientAssociationAndSend = async () => {
+    // ... (código inalterado)
     const tableNumber = assocTableInput?.value.trim();
     const phone = assocPhoneInput?.value.replace(/\D/g, ''); // Apenas números
     const name = assocNameInput?.value.trim() || 'Cliente Comanda';
@@ -343,6 +348,7 @@ export const handleClientAssociationAndSend = async () => {
 
 // Listener para as Quick-Buttons do Modal de Observação (Cliente)
 const handleQuickButtonClient = (e) => {
+    // ... (código inalterado)
     const btn = e.target.closest('.quick-obs-btn');
     if (btn && clientObsInput) {
         const obsText = btn.dataset.obs;
@@ -359,6 +365,7 @@ const handleQuickButtonClient = (e) => {
 };
 
 const handleSaveClientObs = () => {
+    // ... (código inalterado)
     const itemId = clientObsModal.dataset.itemId;
     const originalNoteKey = clientObsModal.dataset.originalNoteKey;
     let newNote = clientObsInput.value.trim();
@@ -470,7 +477,7 @@ export const initClientOrderController = () => {
         });
     }
 
-    // *** Event Delegation para adicionar item ***
+    // Event Delegation para adicionar item
     if (clientMenuItemsGrid) {
         clientMenuItemsGrid.addEventListener('click', (e) => {
             const addBtn = e.target.closest('.add-item-btn');
