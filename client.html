@@ -228,9 +228,24 @@
     </div>
 
     <div id="associationModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4" style="display: none;">
-        {/* ... conteúdo do modal ... */}
+        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
+            <h3 class="text-xl font-bold mb-4 text-pumpkin">Associar à Mesa</h3>
+            <p class="text-base mb-4 text-dark-text">Para enviar seu pedido, precisamos saber qual é a sua mesa e um contato.</p>
+            
+            <div class="space-y-4">
+                <input type="number" id="assocTableNumber" placeholder="Nº da Mesa*" class="input-pdv w-full" inputmode="numeric">
+                <input type="tel" id="assocPhone" placeholder="Seu Telefone/WhatsApp (com DDD)*" class="input-pdv w-full" inputmode="tel">
+                <input type="text" id="assocName" placeholder="Seu Nome (Opcional)" class="input-pdv w-full">
+            </div>
+            
+            <p id="assocErrorMsg" class="text-red-400 text-sm mt-3" style="display: none;">Mensagem de erro aqui</p>
+            
+            <div class="flex justify-end space-x-3 mt-6">
+                <button id="assocCancelBtn" class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition">Cancelar</button>
+                <button id="assocSendOrderBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">Associar e Enviar</button>
+            </div>
+        </div>
     </div>
-
     {/* Modal de Informação do Produto */}
     <div id="productInfoModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         <div class="bg-dark-card border border-dark-border p-5 md:p-6 rounded-xl shadow-2xl w-full max-w-md relative max-h-[85vh] overflow-y-auto custom-scrollbar">
