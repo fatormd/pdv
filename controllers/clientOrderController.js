@@ -1,4 +1,4 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (Refatorado com Modal de Info e Correção de Dependência) ---
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (Completo, com Modal de Info e Logs) ---
 
 // ATUALIZADO: Importa os 'fetchers' além dos 'getters'
 import { getProducts, getCategories, fetchWooCommerceProducts, fetchWooCommerceCategories } from "/services/wooCommerceService.js";
@@ -26,7 +26,6 @@ let clientInitialized = false;
 let associatedClientDocId = null;
 
 // --- LÓGICA DE MANIPULAÇÃO DE ITENS LOCAIS (Cliente) ---
-// ... (Funções _updateLocalItemQuantity, increaseLocalItemQuantity, decreaseLocalItemQuantity - Sem Alteração) ...
 const _updateLocalItemQuantity = (itemId, noteKey, delta) => {
     let indexToRemove = -1;
     if (delta < 0) {
@@ -61,13 +60,11 @@ const _updateLocalItemQuantity = (itemId, noteKey, delta) => {
 
 export const increaseLocalItemQuantity = (itemId, noteKey) => _updateLocalItemQuantity(itemId, noteKey, 1);
 export const decreaseLocalItemQuantity = (itemId, noteKey) => _updateLocalItemQuantity(itemId, noteKey, -1);
-window.increaseLocalItemQuantity = increaseLocalItemQuantity;
-window.decreaseLocalItemQuantity = decreaseLocalItemQuantity;
+// Removido window.increase/decrease aqui, app.js cuida disso dinamicamente
 
 
 // Chamado pelo botão + do cardápio do cliente (AGORA VIA EVENT DELEGATION)
 export const addClientItemToSelection = (product) => {
-    // ... (Sem Alteração) ...
     const newItem = {
         id: product.id,
         name: product.name,
@@ -90,11 +87,15 @@ export const addClientItemToSelection = (product) => {
 
 // --- FUNÇÕES DE RENDERIZAÇÃO DE MENU (Cliente) ---
 export const renderClientMenu = () => {
-    // ... (Sem Alteração) ...
-    if (!clientMenuItemsGrid || !clientCategoryFiltersContainer) return;
+    console.log("[Client] renderClientMenu CALLED"); // LOG ADICIONADO
+    if (!clientMenuItemsGrid || !clientCategoryFiltersContainer) {
+        console.error("[Client] renderClientMenu ABORTED - Grid or Filters container not found."); // LOG ADICIONADO
+        return;
+    }
 
     const products = getProducts();
     const categories = getCategories();
+    console.log(`[Client] renderClientMenu - Products: ${products.length}, Categories: ${categories.length}`); // LOG ADICIONADO
 
     // 1. Renderiza Filtros de Categoria
     if (categories.length > 0 && clientCategoryFiltersContainer.innerHTML.trim() === '') {
@@ -126,9 +127,9 @@ export const renderClientMenu = () => {
         filteredProducts = filteredProducts.filter(p => p.category === currentClientCategoryFilter);
     }
 
-    // 3. Renderiza Itens do Cardápio (HTML LIMPO)
+    // 3. Renderiza Itens do Cardápio
     if (filteredProducts.length === 0) {
-        clientMenuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-dark-placeholder italic">Nenhum produto encontrado.</div>`;
+        clientMenuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-dark-placeholder italic">Nenhum produto encontrado com os filtros atuais.</div>`; // Mensagem mais clara
     } else {
         clientMenuItemsGrid.innerHTML = filteredProducts.map(product => `
             <div class="product-card bg-dark-card border border-dark-border p-4 rounded-xl shadow-md cursor-pointer hover:shadow-lg transition duration-150">
@@ -144,12 +145,12 @@ export const renderClientMenu = () => {
             </div>
         `).join('');
     }
+    console.log("[Client] renderClientMenu FINISHED rendering."); // LOG ADICIONADO
 };
 
 
 // Função de Renderização da Lista de Pedidos do Cliente
 export const renderClientOrderScreen = () => {
-    // ... (Sem Alteração) ...
     const openOrderList = document.getElementById('openOrderListClient');
     const openItemsCount = document.getElementById('openItemsCountClient');
     const sendBtn = document.getElementById('sendClientOrderBtn');
@@ -206,7 +207,6 @@ export const renderClientOrderScreen = () => {
 
 // Abertura do Modal de Observações (Cliente - Apenas Quick Buttons)
 export function openClientObsModalForGroup(itemId, noteKey) {
-    // ... (Sem Alteração) ...
     const products = getProducts();
     const product = products.find(p => p.id == itemId);
 
@@ -230,13 +230,13 @@ window.openClientObsModalForGroup = openClientObsModalForGroup; // Expor globalm
 
 // NOVO: Define a função para abrir o modal de info e a expõe globalmente
 export const openProductInfoModal = (product) => {
-    // ... (Sem Alteração) ...
     if (!clientProductInfoModal || !infoProductName || !infoProductDescription || !infoProductImage) {
         console.error("Elementos do Modal de Informação do Produto não encontrados.");
         return;
     }
+    console.log("[Client] Opening Product Info Modal for:", product.name); // LOG ADICIONADO
     infoProductName.textContent = product.name;
-    infoProductDescription.innerHTML = product.description; 
+    infoProductDescription.innerHTML = product.description;
     infoProductImage.src = product.image;
     clientProductInfoModal.style.display = 'flex';
 };
@@ -245,7 +245,6 @@ window.openProductInfoModal = openProductInfoModal;
 
 // --- FUNÇÃO PRINCIPAL: Envio de Pedido pelo Cliente ---
 export const handleClientSendOrder = async () => {
-    // ... (Sem Alteração - O 'selectedItems' agora estará correto) ...
     if (selectedItems.length === 0) {
         alert("Adicione itens ao seu pedido antes de enviar.");
         return;
@@ -289,8 +288,8 @@ export const handleClientSendOrder = async () => {
             waiterNotification: { type: 'client_request', timestamp: serverTimestamp() }
         });
 
-        selectedItems.length = 0;
-        renderClientOrderScreen();
+        selectedItems.length = 0; // Limpa o array local após o envio bem-sucedido
+        renderClientOrderScreen(); // Re-renderiza a lista vazia
 
         alert(`Pedido enviado! Aguarde a confirmação do seu Garçom.`);
 
@@ -304,7 +303,6 @@ export const handleClientSendOrder = async () => {
 
 // Lógica de Associação e Envio (Chamada pelo Modal)
 export const handleClientAssociationAndSend = async () => {
-    // ... (Sem Alteração) ...
     const tableNumber = assocTableInput?.value.trim();
     const phone = assocPhoneInput?.value.replace(/\D/g, '');
     const name = assocNameInput?.value.trim() || 'Cliente Comanda';
@@ -348,14 +346,16 @@ export const handleClientAssociationAndSend = async () => {
         await setDoc(clientDocRef, clientData, { merge: true });
 
         associatedClientDocId = clientDocId;
-        setCurrentTable(tableNumber, true);
+        setCurrentTable(tableNumber, true); // Define a mesa atual E inicia o listener
 
+        // Salva itens que já estavam no carrinho ANTES de associar
         if (selectedItems.length > 0) {
             await saveSelectedItemsToFirebase(tableNumber, selectedItems);
         }
 
         if (clientAssocModal) clientAssocModal.style.display = 'none';
 
+        // Tenta enviar o pedido imediatamente após associar
         handleClientSendOrder();
 
     } catch (error) {
@@ -370,7 +370,6 @@ export const handleClientAssociationAndSend = async () => {
 
 // Listener para as Quick-Buttons do Modal de Observação (Cliente)
 const handleQuickButtonClient = (e) => {
-    // ... (Sem Alteração) ...
     const btn = e.target.closest('.quick-obs-btn');
     if (btn && clientObsInput) {
         const obsText = btn.dataset.obs;
@@ -388,53 +387,55 @@ const handleQuickButtonClient = (e) => {
 
 // Salvar Observação do Cliente
 const handleSaveClientObs = () => {
-    // ... (Sem Alteração) ...
     const itemId = clientObsModal.dataset.itemId;
     const originalNoteKey = clientObsModal.dataset.originalNoteKey;
     let newNote = clientObsInput.value.trim();
 
-    newNote = newNote.replace(/ \[EM ESPERA\]/gi, '').trim();
+    newNote = newNote.replace(/ \[EM ESPERA\]/gi, '').trim(); // Remove tag de espera se existir
 
     let updated = false;
-    let firstUpdateIndex = -1;
 
-    const updatedItems = selectedItems.map((item, index) => {
+    // Cria um novo array temporário com as atualizações
+    const updatedItems = selectedItems.map(item => {
+        // Atualiza TODAS as ocorrências com a nota original para a nova nota
         if (item.id == itemId && (item.note || '') === originalNoteKey) {
-            if (!updated) {
-                 firstUpdateIndex = index;
-            }
             updated = true;
             return { ...item, note: newNote };
         }
         return item;
     });
 
+    // Muta o array original 'selectedItems'
     selectedItems.length = 0;
     selectedItems.push(...updatedItems);
 
     if (updated) {
         clientObsModal.style.display = 'none';
-        renderClientOrderScreen();
+        renderClientOrderScreen(); // Re-renderiza a lista de pedidos
         if (currentTableId) {
-            saveSelectedItemsToFirebase(currentTableId, selectedItems);
+            saveSelectedItemsToFirebase(currentTableId, selectedItems); // Salva no Firebase
         }
     } else {
+        console.warn("Nenhum item encontrado para atualizar a observação.");
         clientObsModal.style.display = 'none';
     }
 };
 
 // --- INICIALIZAÇÃO DO CONTROLLER DO CLIENTE ---
 export const initClientOrderController = () => {
-    if(clientInitialized) return;
+    console.log("[ClientOrderController] initClientOrderController CALLED"); // LOG ADICIONADO
+    if(clientInitialized) {
+        console.log("[ClientOrderController] Already initialized."); // LOG ADICIONADO
+        return;
+    }
 
     // Mapeia os elementos
-    // ... (Mapeamento de clientObsModal, clientAssocModal, etc. - Sem Alteração) ...
     clientObsModal = document.getElementById('obsModal');
     clientObsItemName = document.getElementById('obsItemName');
     clientObsInput = document.getElementById('obsInput');
     clientSaveObsBtn = document.getElementById('saveObsBtn');
     clientCancelObsBtn = document.getElementById('cancelObsBtn');
-    clientEsperaSwitch = document.getElementById('esperaSwitch');
+    clientEsperaSwitch = document.getElementById('esperaSwitch'); // Embora oculto, pode ser necessário
 
     clientAssocModal = document.getElementById('associationModal');
     assocTableInput = document.getElementById('assocTableNumber');
@@ -448,20 +449,21 @@ export const initClientOrderController = () => {
     clientCategoryFiltersContainer = document.getElementById('categoryFiltersClient');
     clientMenuItemsGrid = document.getElementById('menuItemsGridClient');
 
-    // NOVO: Mapeia elementos do Modal de Info
+    // Mapeia elementos do Modal de Info
     clientProductInfoModal = document.getElementById('productInfoModal');
     infoProductName = document.getElementById('infoProductName');
     infoProductDescription = document.getElementById('infoProductDescription');
     infoProductImage = document.getElementById('infoProductImage');
 
     // Validação de Elementos Essenciais
-    if (!clientObsModal || !clientAssocModal || !clientMenuItemsGrid || !clientProductInfoModal) { // Valida o modal de info
-        console.error("[ClientController] Erro Fatal: Elementos críticos (modais, grid de menu) não encontrados.");
-        return;
+    if (!clientObsModal || !clientAssocModal || !clientMenuItemsGrid || !clientProductInfoModal) {
+        console.error("[ClientController] Erro Fatal: Elementos críticos (modais, grid de menu) não encontrados. Aborting initialization.");
+        return; // Aborta se elementos cruciais não existem
     }
+    console.log("[ClientOrderController] Essential elements mapped."); // LOG ADICIONADO
+
 
     // Listeners Essenciais
-    // ... (Listeners de sendClientBtn, assocSendOrderBtn, etc. - Sem Alteração) ...
     const sendClientBtn = document.getElementById('sendClientOrderBtn');
     if (sendClientBtn) sendClientBtn.addEventListener('click', handleClientSendOrder);
 
@@ -474,6 +476,8 @@ export const initClientOrderController = () => {
         const originalNoteKey = clientObsModal.dataset.originalNoteKey;
         const currentNote = clientObsInput.value.trim();
 
+        // Se o item foi recém-adicionado (nota original vazia) E o usuário não digitou nada
+        // E cancelou, remove o último item adicionado com esse ID
         if (originalNoteKey === '' && currentNote === '') {
              let lastIndex = -1;
              for (let i = selectedItems.length - 1; i >= 0; i--) {
@@ -483,9 +487,10 @@ export const initClientOrderController = () => {
                  }
              }
              if (lastIndex > -1) {
-                 selectedItems.splice(lastIndex, 1);
-                 renderClientOrderScreen();
-                 if (currentTableId) saveSelectedItemsToFirebase(currentTableId, selectedItems);
+                 selectedItems.splice(lastIndex, 1); // Remove o item
+                 renderClientOrderScreen(); // Re-renderiza
+                 if (currentTableId) saveSelectedItemsToFirebase(currentTableId, selectedItems); // Salva
+                 console.log("[Client] Item recém-adicionado cancelado e removido."); // Log
              }
         }
         clientObsModal.style.display = 'none';
@@ -508,11 +513,11 @@ export const initClientOrderController = () => {
         });
     }
 
-    // ATUALIZADO: Event Delegation para adicionar item OU abrir info
+    // Event Delegation para adicionar item OU abrir info
     if (clientMenuItemsGrid) {
         clientMenuItemsGrid.addEventListener('click', (e) => {
             const addBtn = e.target.closest('.add-item-btn');
-            
+
             if (addBtn) {
                 e.stopPropagation(); // Impede o clique de "borbulhar" para o card
                 try {
@@ -525,18 +530,21 @@ export const initClientOrderController = () => {
                 const card = e.target.closest('.product-card');
                 if (card) {
                     const buttonForData = card.querySelector('.add-item-btn');
-                    if (buttonForData) {
+                    if (buttonForData && buttonForData.dataset.product) { // Verifica se há dados
                         try {
                             const productData = JSON.parse(buttonForData.dataset.product.replace(/&#39;/g, "'"));
                             openProductInfoModal(productData); // Abre o modal de info
-                        } catch (err)
- {
+                        } catch (err) {
                             console.error("Erro ao parsear dados do produto no clique (info):", err, buttonForData.dataset.product);
                         }
+                    } else {
+                         console.warn("Card clicado, mas não foi possível encontrar dados do produto associado."); // Log
                     }
                 }
             }
         });
+    } else {
+        console.error("[ClientOrderController] menuItemsGrid NOT FOUND for attaching listener."); // LOG ADICIONADO
     }
 
     const quickObsButtons = document.getElementById('quickObsButtons');
@@ -544,12 +552,17 @@ export const initClientOrderController = () => {
         quickObsButtons.addEventListener('click', handleQuickButtonClient);
     }
 
-    // ATUALIZADO: O controller agora busca seus próprios dados
-    console.log("[ClientOrderController] Inicializando e buscando dados do WooCommerce...");
-    fetchWooCommerceProducts(renderClientMenu).catch(e => console.error("[ClientController INIT] Falha ao carregar produtos:", e));
-    fetchWooCommerceCategories(renderClientMenu).catch(e => console.error("[ClientController INIT] Falha ao carregar categorias:", e));
+    // O controller busca seus próprios dados
+    console.log("[ClientOrderController] Fetching WooCommerce data..."); // LOG ADICIONADO
+    fetchWooCommerceProducts(renderClientMenu)
+        .then(() => console.log("[ClientOrderController] Products fetched successfully.")) // LOG ADICIONADO
+        .catch(e => console.error("[ClientController INIT] Falha CRÍTICA ao carregar produtos:", e)); // Log mais enfático
+
+    fetchWooCommerceCategories(renderClientMenu)
+        .then(() => console.log("[ClientOrderController] Categories fetched successfully.")) // LOG ADICIONADO
+        .catch(e => console.error("[ClientController INIT] Falha CRÍTICA ao carregar categorias:", e)); // Log mais enfático
 
 
     clientInitialized = true;
-    console.log("[ClientOrderController] Inicializado.");
+    console.log("[ClientOrderController] initClientOrderController FINISHED."); // LOG ADICIONADO
 };
