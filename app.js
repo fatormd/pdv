@@ -88,6 +88,7 @@ const hideLoginScreen = () => {
 };
 
 // --- FUNÇÃO DE AUTENTICAÇÃO VIA FIRESTORE (CORE) ---
+// ** CORREÇÃO APLICADA: re-lança o erro (throw) para o handleStaffLogin pegar **
 const authenticateUserFromFirestore = async (email, password) => {
     try {
         if (!db) throw new Error("Conexão com banco de dados indisponível.");
@@ -107,7 +108,8 @@ const authenticateUserFromFirestore = async (email, password) => {
         } else { return null; }
     } catch (error) {
         console.error("[AUTH Firestore] Erro ao verificar usuário:", error);
-        return null;
+        // RE-LANÇA o erro para o try...catch do handleStaffLogin pegar
+        throw new Error(`Falha ao verificar usuário: ${error.message}`);
     }
 };
 
@@ -117,7 +119,8 @@ const authenticateUserFromFirestore = async (email, password) => {
 export const goToScreen = async (screenId) => {
     if (!appContainer) appContainer = document.getElementById('appContainer');
     if (!mainContent) mainContent = document.getElementById('mainContent');
-    const isClientMode = window.location.pathname.includes('client.html');
+    // ** CORREÇÃO APLICADA: Verifica pelo ID do elemento, não pela URL **
+    const isClientMode = !!document.getElementById('clientOrderScreen');
 
     // Lógicas de pré-navegação e limpeza de estado (apenas Staff)
     if (!isClientMode) {
@@ -399,6 +402,7 @@ window.selectTableAndStartListener = selectTableAndStartListener;
 
 
 // --- LÓGICA DE LOGIN ---
+// ** CORREÇÃO APLICADA: try...catch...finally completo **
 const handleStaffLogin = async () => {
     // Mapeamento local para esta função
     let loginBtn, loginEmailInput, loginPasswordInput, loginErrorMsg;
@@ -451,6 +455,7 @@ const handleStaffLogin = async () => {
         if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Entrar'; }
     }
 };
+
 
 const handleLogout = () => {
     // Limpa estado global
@@ -542,6 +547,7 @@ document.addEventListener('DOMContentLoaded', () => {
         initializeFirebase(dbInstance, authInstance, appIdentifier, functionsInstance);
         console.log("[APP] Firebase Initialized"); // Log Adicionado
 
+        // ** CORREÇÃO APLICADA: Verifica pelo ID do elemento, não pela URL **
         const isClientMode = !!document.getElementById('clientOrderScreen');
         console.log(`[APP] Mode: ${isClientMode ? 'Client' : 'Staff'}`); // Log Adicionado
 
@@ -627,3 +633,4 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 }); // <-- FECHAMENTO CORRETO DO DOMContentLoaded
+
