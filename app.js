@@ -536,7 +536,7 @@ document.addEventListener('DOMContentLoaded', () => {
         initializeFirebase(dbInstance, authInstance, appIdentifier, functionsInstance);
         console.log("[APP] Firebase Initialized"); // Log Adicionado
 
-        const isClientMode = window.location.pathname.includes('client.html');
+        const isClientMode = !!document.getElementById('clientOrderScreen');
         console.log(`[APP] Mode: ${isClientMode ? 'Client' : 'Staff'}`); // Log Adicionado
 
         // Mapeamento UI
