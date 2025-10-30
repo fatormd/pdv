@@ -161,7 +161,7 @@ export const renderClientMenu = () => {
 
                 <div class="p-3 flex flex-col flex-grow">
 
-                    <h4 class="font-bold text-base text-dark-text mb-2 flex-grow cursor-pointer info-name-trigger" data-product='${productDataString}'>${product.name}</h4>
+                    <h4 class="font-bold text-base text-dark-text mb-2 cursor-pointer info-name-trigger" data-product='${productDataString}'>${product.name}</h4>
 
                     <div class="flex justify-between items-center mt-auto mb-3">
                         <span class="font-bold text-base text-pumpkin">${formatCurrency(product.price)}</span>
