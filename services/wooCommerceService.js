@@ -160,7 +160,7 @@ export const fetchWooCommerceProducts = async (renderMenuCallback) => {
             // Armazena a descrição (que pode conter HTML)
             description: p.description || 'Descrição não disponível.',
             // Armazena a URL da primeira imagem, ou um placeholder se não houver imagem
-            image: p.images && p.images.length > 0 ? p.images[0].src : 'https://placehold.co/600x400/1f2937/d1d5db?text=Produto'
+            image: (p.images && p.images.length > 0 && p.images[0].src) ? p.images[0].src : 'https://placehold.co/600x400/1f2937/d1d5db?text=Produto'
             // --- FIM DAS LINHAS NOVAS ---
         }));
         if (renderMenuCallback) renderMenuCallback();
