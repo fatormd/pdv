@@ -11,7 +11,17 @@ import { formatCurrency, formatElapsedTime } from '/utils.js';
 
 // --- IMPORTS ESTÁTICOS PARA CONTROLADORES CORE (Garantia de Funcionamento) ---
 import { initPanelController, loadOpenTables, renderTableFilters, handleAbrirMesa, handleSearchTable, openTableMergeModal } from '/controllers/panelController.js';
-import { initOrderController, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity, openObsModalForGroup } from '/controllers/orderController.js';
+//
+// /===================================================\
+// | INÍCIO DA ATUALIZAÇÃO (Importa renderMenu)        |
+// \===================================================/
+//
+import { initOrderController, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity, openObsModalForGroup, renderMenu } from '/controllers/orderController.js';
+//
+// /===================================================\
+// | FIM DA ATUALIZAÇÃO                                |
+// \===================================================/
+//
 import { initPaymentController, renderPaymentSummary, deletePayment, handleMassActionRequest, handleFinalizeOrder, handleMassDeleteConfirmed, executeDeletePayment, openTableTransferModal, handleConfirmTableTransfer } from '/controllers/paymentController.js';
 import { initManagerController, handleGerencialAction } from '/controllers/managerController.js';
 import { initUserManagementController, openUserManagementModal } from '/controllers/userManagementController.js';
@@ -88,7 +98,6 @@ const hideLoginScreen = () => {
 };
 
 // --- FUNÇÃO DE AUTENTICAÇÃO VIA FIRESTORE (CORE) ---
-// ** CORREÇÃO APLICADA: re-lança o erro (throw) para o handleStaffLogin pegar **
 const authenticateUserFromFirestore = async (email, password) => {
     try {
         if (!db) throw new Error("Conexão com banco de dados indisponível.");
@@ -108,8 +117,7 @@ const authenticateUserFromFirestore = async (email, password) => {
         } else { return null; }
     } catch (error) {
         console.error("[AUTH Firestore] Erro ao verificar usuário:", error);
-        // RE-LANÇA o erro para o try...catch do handleStaffLogin pegar
-        throw new Error(`Falha ao verificar usuário: ${error.message}`);
+        return null;
     }
 };
 
@@ -119,8 +127,7 @@ const authenticateUserFromFirestore = async (email, password) => {
 export const goToScreen = async (screenId) => {
     if (!appContainer) appContainer = document.getElementById('appContainer');
     if (!mainContent) mainContent = document.getElementById('mainContent');
-    // ** CORREÇÃO APLICADA: Verifica pelo ID do elemento, não pela URL **
-    const isClientMode = !!document.getElementById('clientOrderScreen');
+    const isClientMode = window.location.pathname.includes('client.html');
 
     // Lógicas de pré-navegação e limpeza de estado (apenas Staff)
     if (!isClientMode) {
@@ -402,7 +409,6 @@ window.selectTableAndStartListener = selectTableAndStartListener;
 
 
 // --- LÓGICA DE LOGIN ---
-// ** CORREÇÃO APLICADA: try...catch...finally completo **
 const handleStaffLogin = async () => {
     // Mapeamento local para esta função
     let loginBtn, loginEmailInput, loginPasswordInput, loginErrorMsg;
@@ -415,45 +421,38 @@ const handleStaffLogin = async () => {
     if (loginErrorMsg) loginErrorMsg.style.display = 'none';
     loginBtn.disabled = true; loginBtn.textContent = 'Entrando...';
 
-    try { // <- ADICIONADO TRY
-        const email = loginEmailInput.value.trim().toLowerCase();
-        const password = loginPasswordInput.value.trim();
+    const email = loginEmailInput.value.trim().toLowerCase();
+    const password = loginPasswordInput.value.trim();
 
-        const staffData = await authenticateUserFromFirestore(email, password);
+    const staffData = await authenticateUserFromFirestore(email, password);
 
-        if (staffData) {
-            userRole = staffData.role;
-            // O try/catch interno para signInAnonymously já existe e está correto
-            try {
-                const authInstance = auth;
-                if (!authInstance) throw new Error("Firebase Auth não inicializado.");
-                
-                const userCredential = await signInAnonymously(authInstance);
-                userId = userCredential.user.uid; 
+    if (staffData) {
+        userRole = staffData.role;
+        try {
+            const authInstance = auth;
+            if (!authInstance) throw new Error("Firebase Auth não inicializado.");
+            // Tenta logar anonimamente APÓS verificar no Firestore
+            const userCredential = await signInAnonymously(authInstance);
+            userId = userCredential.user.uid; // Guarda o UID anônimo
 
-                const userName = staffData.name || userRole;
-                const userIdDisplay = document.getElementById('user-id-display');
-                if(userIdDisplay) userIdDisplay.textContent = `Usuário: ${userName} | ${userRole.toUpperCase()}`;
+            const userName = staffData.name || userRole;
+            const userIdDisplay = document.getElementById('user-id-display');
+            if(userIdDisplay) userIdDisplay.textContent = `Usuário: ${userName} | ${userRole.toUpperCase()}`;
 
-            } catch (error) {
-                 console.error("[LOGIN] Erro pós-autenticação:", error);
-                 alert(`Erro ao iniciar sessão: ${error.message}.`);
-                 showLoginScreen();
-                 if(loginErrorMsg) { loginErrorMsg.textContent = `Erro: ${error.message}`; loginErrorMsg.style.display = 'block'; }
-            }
-        } else {
-            if(loginErrorMsg) { loginErrorMsg.textContent = 'E-mail, senha inválidos ou usuário inativo.'; loginErrorMsg.style.display = 'block'; }
+            // A inicialização do app agora é feita pelo onAuthStateChanged
+            // await initStaffApp(); // REMOVIDO DAQUI
+
+        } catch (error) {
+             console.error("[LOGIN] Erro pós-autenticação:", error);
+             alert(`Erro ao iniciar sessão: ${error.message}.`);
+             showLoginScreen();
+             if(loginErrorMsg) { loginErrorMsg.textContent = `Erro: ${error.message}`; loginErrorMsg.style.display = 'block'; }
         }
-    
-    } catch (e) { // <- ADICIONADO CATCH
-        // Se o authenticateUserFromFirestore falhar (ex: Regras do Firestore), o erro será pego
-        console.error("Erro fatal no handleStaffLogin (Verifique as Regras do Firestore!):", e);
-        if(loginErrorMsg) { loginErrorMsg.textContent = `Erro ao autenticar: ${e.message}`; loginErrorMsg.style.display = 'block'; }
-    
-    } finally { // <- ADICIONADO FINALLY
-        // Isso GARANTE que o botão seja reabilitado, mesmo se houver erro
-        if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Entrar'; }
+    } else {
+        if(loginErrorMsg) { loginErrorMsg.textContent = 'E-mail, senha inválidos ou usuário inativo.'; loginErrorMsg.style.display = 'block'; }
     }
+    // Garante que o botão seja reativado mesmo se o onAuthStateChanged demorar
+    if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Entrar'; }
 };
 
 
@@ -488,8 +487,18 @@ const initStaffApp = async () => {
 
         // Renderiza filtros e busca dados iniciais
         renderTableFilters();
-        fetchWooCommerceProducts().catch(e => console.error("[INIT Staff] Falha ao carregar produtos:", e));
-        fetchWooCommerceCategories().catch(e => console.error("[INIT Staff] Falha ao carregar categorias:", e));
+        //
+        // /===================================================\
+        // | INÍCIO DA ATUALIZAÇÃO (Adiciona callback 'renderMenu') |
+        // \===================================================/
+        //
+        fetchWooCommerceProducts(renderMenu).catch(e => console.error("[INIT Staff] Falha ao carregar produtos:", e));
+        fetchWooCommerceCategories(renderMenu).catch(e => console.error("[INIT Staff] Falha ao carregar categorias:", e));
+        //
+        // /===================================================\
+        // | FIM DA ATUALIZAÇÃO                                |
+        // \===================================================/
+        //
 
         hideStatus();
         hideLoginScreen();
@@ -547,8 +556,7 @@ document.addEventListener('DOMContentLoaded', () => {
         initializeFirebase(dbInstance, authInstance, appIdentifier, functionsInstance);
         console.log("[APP] Firebase Initialized"); // Log Adicionado
 
-        // ** CORREÇÃO APLICADA: Verifica pelo ID do elemento, não pela URL **
-        const isClientMode = !!document.getElementById('clientOrderScreen');
+        const isClientMode = window.location.pathname.includes('client.html');
         console.log(`[APP] Mode: ${isClientMode ? 'Client' : 'Staff'}`); // Log Adicionado
 
         // Mapeamento UI
@@ -633,4 +641,3 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 }); // <-- FECHAMENTO CORRETO DO DOMContentLoaded
-
