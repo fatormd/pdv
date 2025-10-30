@@ -78,6 +78,14 @@
         body.client-mode #mainContent {
             height: 100vh; /* Garante altura total no modo cliente */
         }
+        
+        /* Adicionado CSS para o Switch (copiado de style.css) */
+        .switch-obs { position: relative; display: inline-block; width: 50px; height: 28px; }
+        .switch-obs input { opacity: 0; width: 0; height: 0; }
+        .slider-obs { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #4b5563; transition: .4s; border-radius: 34px; }
+        .slider-obs:before { background-color: white; height: 20px; width: 20px; left: 4px; bottom: 4px; border-radius: 50%; position: absolute; content: ""; transition: .4s;}
+        input:checked + .slider-obs { background-color: #fbbf24; }
+        input:checked + .slider-obs:before { transform: translateX(22px); }
 
     </style>
 </head>
@@ -95,7 +103,7 @@
                         <i class="fas fa-receipt text-lg md:text-xl"></i>
                     </button>
                 </div>
-<div class="flex-grow overflow-y-auto custom-scrollbar">
+
                 <div id="orderingInputsClient" class="mb-6 md:mb-8 flex-shrink-0">
                     <div class="p-3 md:p-4 content-card rounded-lg bg-dark-card border border-dark-border">
                         <div class="flex justify-between items-center mb-3 md:mb-4">
@@ -110,7 +118,7 @@
                     </div>
                 </div>
 
-                <div id="menuContainerClient" class="flex flex-col"> <div class="flex justify-between items-center mb-3 md:mb-4 px-1 flex-shrink-0">
+                <div id="menuContainerClient" class="flex flex-col flex-grow overflow-hidden"> <div class="flex justify-between items-center mb-3 md:mb-4 px-1 flex-shrink-0">
                         <h2 class="text-lg md:text-xl font-bold text-dark-text">Cardápio</h2>
                         <div class="relative">
                             <input type="text" id="searchProductInputClient" placeholder="Buscar..." class="pr-8 input-pdv text-sm w-32 md:w-48 lg:w-64">
@@ -120,9 +128,9 @@
                     <div id="categoryFiltersClient" class="flex space-x-2 overflow-x-auto pb-3 mb-4 px-1 flex-shrink-0">
                         </div>
 
-                    <div id="menuItemsGridClient" class="flex flex-wrap pb-4"> <div class="col-span-full text-center p-6 text-dark-placeholder italic">Carregando cardápio...</div>
+                    <div id="menuItemsGridClient" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1 overflow-y-auto custom-scrollbar pb-4"> <div class="col-span-full text-center p-6 text-dark-placeholder italic">Carregando cardápio...</div>
                     </div>
-                </div></div>
+                </div>
             </div> <div id="clientPaymentScreen" class="w-screen flex-shrink-0 flex flex-col h-full">
                  <div class="flex items-center justify-between mb-4 md:mb-6 flex-shrink-0">
                     <div class="flex items-center text-indigo-400">
@@ -177,21 +185,40 @@
     <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         <div class="bg-dark-card border border-dark-border p-4 md:p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 id="obsItemName" class="text-lg md:text-xl font-bold mb-4 text-indigo-400">Adicionar Observação</h3>
+            
             <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-4">
                  <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="1 CP">1 CP</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="2 CP">2 CP</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="3 CP">3 CP</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Sem Gelo">Sem Gelo</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Gelo à Parte">Gelo à Parte</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Laranja">Laranja</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Limão">Limão</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Limão Espremido">Limão Espremido</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Natural">Natural</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Mal Passado">Mal Passado</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Ponto Menos">Ponto Menos</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Ao Ponto">Ao Ponto</button>
+                 <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Ponto Mais">Ponto Mais</button>
                  <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Bem Passado">Bem Passado</button>
             </div>
-            <textarea id="obsInput" rows="2" placeholder="Apenas botões rápidos permitidos." class="w-full p-3 input-pdv text-sm md:text-base" readonly></textarea>
-            <div class="flex items-center justify-between mt-3 mb-4 opacity-50 hidden"> <span class="text-dark-text font-semibold">Item em Espera?</span>
-                 <label class="switch-obs"> <input type="checkbox" id="esperaSwitch" disabled> <span class="slider-obs"></span> </label>
+            
+            <textarea id="obsInput" rows="2" placeholder="Ex: Sem cebola, ponto da carne..." class="w-full p-3 input-pdv text-sm md:text-base"></textarea>
+            
+            <div class="flex items-center justify-between mt-3 mb-4">
+                 <span class="text-dark-text font-semibold">Item em Espera?</span>
+                 <label class="switch-obs"> 
+                    <input type="checkbox" id="esperaSwitch"> 
+                    <span class="slider-obs"></span> 
+                </label>
             </div>
+            
             <div class="flex justify-end space-x-2 md:space-x-3 mt-4">
                 <button id="cancelObsBtn" class="px-3 py-2 md:px-4 md:py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm md:text-base">Cancelar</button>
                 <button id="saveObsBtn" class="px-3 py-2 md:px-4 md:py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm md:text-base">Salvar</button>
             </div>
         </div>
     </div>
-
     <div id="customAlertModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         </div>
 
@@ -239,6 +266,8 @@
              </button>
         </div>
     </div>
+
+
     <div id="calculatorModal" class="hidden"></div>
     <div id="tableTransferModal" class="hidden"></div>
 
