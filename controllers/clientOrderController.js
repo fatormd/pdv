@@ -154,31 +154,32 @@ export const renderClientMenu = () => {
             // | INÍCIO DA ATUALIZAÇÃO DO CARD (HTML)              |
             // \===================================================/
             //
-            return `
-        <div class="w-1/2 md:w-1/3 lg:w-1/4 p-0.5">
-            <div class="product-card bg-dark-card border border-dark-border rounded-xl shadow-md overflow-hidden flex flex-col h-full">
+return `
+            <div class="w-1/2 md:w-1/3 lg:w-1/4 p-0.5">
+                <div class="product-card bg-dark-card border border-dark-border rounded-xl shadow-md overflow-hidden flex flex-col h-full">
 
-                <img src="${product.image}" alt="${product.name}" class="w-full h-56 md:h-64 object-cover cursor-pointer info-img-trigger" data-product='${productDataString}'>
-
-                <div class="p-3 flex flex-col flex-grow">
-
-                    <h4 class="font-bold text-base text-dark-text mb-2 cursor-pointer info-name-trigger" data-product='${productDataString}'>${product.name}</h4>
-
-                    <div class="flex justify-between items-center mt-auto mb-3">
-                        <span class="font-bold text-base text-pumpkin">${formatCurrency(product.price)}</span>
-                        <button class="add-item-btn bg-green-600 text-white p-2 rounded-full hover:bg-green-700 transition w-9 h-9 flex items-center justify-center"
-                                data-product='${productDataString}' title="Adicionar ao Pedido">
-                            <i class="fas fa-plus text-base pointer-events-none"></i>
-                        </button>
+                    <img src="${product.image}" alt="${product.name}" class="w-full h-56 md:h-64 object-cover cursor-pointer info-img-trigger" data-product='${productDataString}'>
+    
+                    <div class="p-3 flex flex-col flex-grow">
+                        
+                        <div class="flex justify-between items-start mb-2">
+                            <h4 class="font-bold text-sm text-dark-text cursor-pointer info-name-trigger" data-product='${productDataString}'>${product.name}</h4>
+                            <span class="font-bold text-sm text-pumpkin ml-2 flex-shrink-0">${formatCurrency(product.price)}</span>
+                        </div>
+    
+                        <div class="flex space-x-2 mt-auto">
+                            <button class="info-btn flex-1 bg-indigo-600 text-white text-xs font-semibold py-2 px-1 rounded-lg hover:bg-indigo-700 transition"
+                                    data-product='${productDataString}'>
+                                Descrição
+                            </button>
+                            <button class="add-item-btn flex-1 bg-green-600 text-white text-xs font-semibold py-2 px-1 rounded-lg hover:bg-green-700 transition"
+                                    data-product='${productDataString}' title="Adicionar ao Pedido">
+                                Adicionar
+                            </button>
+                        </div>
                     </div>
-
-                    <button class="info-btn w-full bg-indigo-600 text-white text-xs font-semibold py-2 rounded-lg hover:bg-indigo-700 transition"
-                            data-product='${productDataString}'>
-                        <i class="fas fa-info-circle mr-1"></i> Descrição
-                    </button>
                 </div>
             </div>
-        </div>
             `;
             // 
             // /===================================================\
