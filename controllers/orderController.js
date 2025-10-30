@@ -69,7 +69,17 @@ window.decreaseLocalItemQuantity = decreaseLocalItemQuantity;
 
 // --- FUNÇÕES DE EXIBIÇÃO DE TELA E MODAL ---
 
+//
+// /===================================================\
+// | INÍCIO DA ATUALIZAÇÃO (Adicionado 'export')       |
+// \===================================================/
+//
 export const renderMenu = () => {
+//
+// /===================================================\
+// | FIM DA ATUALIZAÇÃO                                |
+// \===================================================/
+//
     if (!menuItemsGrid || !categoryFiltersContainer) {
         return;
     }
