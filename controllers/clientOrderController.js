@@ -1,8 +1,7 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (Layout Atualizado, Filtros Corrigidos, Comentário Removido DEFINITIVAMENTE - COMPLETO v4) ---
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (Refatorado para Modal completo e Correção de Bug) ---
 
 // Importa funções necessárias dos serviços e do app principal
 import { getProducts, getCategories, fetchWooCommerceProducts, fetchWooCommerceCategories } from "/services/wooCommerceService.js";
-// ATUALIZADO: Importa formatCurrency
 import { formatCurrency } from "/utils.js";
 import { saveSelectedItemsToFirebase } from "/services/firebaseService.js";
 import { currentTableId, selectedItems, userRole, currentOrderSnapshot, goToScreen, setCurrentTable } from "/app.js";
@@ -17,7 +16,6 @@ let clientObsModal, clientObsInput, clientSaveObsBtn, clientCancelObsBtn;
 let clientSearchProductInput, clientCategoryFiltersContainer, clientMenuItemsGrid;
 let clientObsItemName, clientEsperaSwitch; // Elementos do modal de observação
 let clientAssocModal, assocTableInput, assocPhoneInput, assocNameInput, assocSendOrderBtn, assocErrorMsg, assocCancelBtn; // Elementos do modal de associação
-// ATUALIZADO: Adiciona elementos do modal de info
 let clientProductInfoModal, infoProductName, infoProductDescription, infoProductImage, infoProductPrice, infoProductImageLink; // Elementos do modal de informação do produto
 
 // --- ESTADO LOCAL DO MÓDULO ---
@@ -95,8 +93,18 @@ export const addClientItemToSelection = (product) => {
         saveSelectedItemsToFirebase(currentTableId, selectedItems);
     }
 
-    // Abre o modal de observação para o item recém-adicionado
-    openClientObsModalForGroup(product.id, '');
+    //
+    // /===================================================\
+    // | INÍCIO DA ATUALIZAÇÃO (Correção Bug 2)            |
+    // \===================================================/
+    //
+    // Abre o modal de observação, passando 'true' para indicar que é um item NOVO
+    openClientObsModalForGroup(product.id, '', true);
+    //
+    // /===================================================\
+    // | FIM DA ATUALIZAÇÃO                                |
+    // \===================================================/
+    //
 };
 
 
@@ -142,7 +150,7 @@ export const renderClientMenu = () => {
     // 3. Renderiza os Cards de Produtos filtrados (HTML ATUALIZADO e DEFINITIVAMENTE LIMPO)
     if (filteredProducts.length === 0) {
         // Mensagem se nenhum produto corresponder aos filtros
-        clientMenuItemsGrid.innerHTML = `<div class="w-full text-center p-6 text-dark-placeholder italic">Nenhum produto encontrado com os filtros atuais.</div>`;
+        clientMenuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-dark-placeholder italic">Nenhum produto encontrado com os filtros atuais.</div>`;
     } else {
         // Gera o HTML para cada card de produto
         clientMenuItemsGrid.innerHTML = filteredProducts.map(product => {
@@ -154,32 +162,27 @@ export const renderClientMenu = () => {
             // | INÍCIO DA ATUALIZAÇÃO DO CARD (HTML)              |
             // \===================================================/
             //
-return `
-            <div class="w-1/2 md:w-1/3 lg:w-1/4 p-0.5">
-                <div class="product-card bg-dark-card border border-dark-border rounded-xl shadow-md overflow-hidden flex flex-col h-full">
+            return `
+            <div class="product-card bg-dark-card border border-dark-border rounded-xl shadow-md overflow-hidden flex flex-col mb-1">
 
-                    <img src="${product.image}" alt="${product.name}" class="w-full h-56 md:h-64 object-cover cursor-pointer info-img-trigger" data-product='${productDataString}'>
-    
-                    <div class="p-3 flex flex-col flex-grow">
-                        
-                        <h4 class="font-bold text-sm text-dark-text mb-2 cursor-pointer info-name-trigger" data-product='${productDataString}'>
-                            ${product.name} / 
-                            <span class="text-pumpkin">${formatCurrency(product.price)}</span>
-                        </h4>
+                <img src="${product.image}" alt="${product.name}" class="w-full h-56 md:h-64 object-cover cursor-pointer info-img-trigger" data-product='${productDataString}'>
 
-                        <div class="flex items-center space-x-2 mt-auto">
-                            
-                            <button class="info-btn flex-1 bg-indigo-600 text-white text-xs font-semibold py-2 px-1 rounded-lg hover:bg-indigo-700 transition"
-                                    data-product='${productDataString}'>
-                                Descrição
-                            </button>
-                            
-                            <button class="add-item-btn bg-green-600 text-white p-2 rounded-full hover:bg-green-700 transition w-9 h-9 flex items-center justify-center flex-shrink-0"
-                                    data-product='${productDataString}' title="Adicionar ao Pedido">
-                                <i class="fas fa-plus text-base pointer-events-none"></i>
-                            </button>
-                        </div>
+                <div class="p-3 flex flex-col flex-grow">
+
+                    <h4 class="font-bold text-base text-dark-text mb-2 flex-grow cursor-pointer info-name-trigger" data-product='${productDataString}'>${product.name}</h4>
+
+                    <div class="flex justify-between items-center mt-auto mb-3">
+                        <span class="font-bold text-base text-pumpkin">${formatCurrency(product.price)}</span>
+                        <button class="add-item-btn bg-green-600 text-white p-2 rounded-full hover:bg-green-700 transition w-9 h-9 flex items-center justify-center"
+                                data-product='${productDataString}' title="Adicionar ao Pedido">
+                            <i class="fas fa-plus text-base pointer-events-none"></i>
+                        </button>
                     </div>
+
+                    <button class="info-btn w-full bg-indigo-600 text-white text-xs font-semibold py-2 rounded-lg hover:bg-indigo-700 transition"
+                            data-product='${productDataString}'>
+                        <i class="fas fa-info-circle mr-1"></i> Descrição
+                    </button>
                 </div>
             </div>
             `;
@@ -228,16 +231,34 @@ export const renderClientOrderScreen = () => {
         }, {});
 
         // Gera o HTML para cada grupo de item no carrinho
-        openOrderList.innerHTML = Object.values(groupedItems).map(group => `
+        openOrderList.innerHTML = Object.values(groupedItems).map(group => {
+            //
+            // /===================================================\
+            // | INÍCIO DA ATUALIZAÇÃO (Exibição da Nota)         |
+            // \===================================================/
+            //
+            // Formata a nota para exibição, destacando o [EM ESPERA]
+            let noteDisplay;
+            if (group.note) {
+                const esperaTag = ' [EM ESPERA]';
+                const cleanNote = group.note.replace(esperaTag, '').trim();
+                const hasEspera = group.note.includes(esperaTag);
+                
+                noteDisplay = `(<span class="text-yellow-400">${cleanNote}</span>${hasEspera ? ' <i class="fas fa-pause-circle text-yellow-400"></i>' : ''})`;
+            } else {
+                noteDisplay = `(Adicionar Obs.)`;
+            }
+
+            return `
             <div class="flex justify-between items-center bg-dark-input p-3 rounded-lg shadow-sm border border-dark-border">
                 <div class="flex flex-col flex-grow min-w-0 mr-2">
                     <span class="font-semibold text-dark-text">${group.name} (${group.count}x)</span>
                     <span class="text-sm cursor-pointer text-indigo-400 hover:text-indigo-300"
                           onclick="window.openClientObsModalForGroup('${group.id}', '${group.note || ''}')">
-                        ${group.note ? `(${group.note})` : `(Adicionar Obs.)`}
+                        ${noteDisplay}
                     </span>
                 </div>
-                <div class="flex items-center space-x-2 flex-shrink-0">
+            <div class="flex items-center space-x-2 flex-shrink-0">
                     <button class="qty-btn bg-red-600 text-white rounded-full h-8 w-8 flex items-center justify-center hover:bg-red-700 transition duration-150"
                             onclick="window.decreaseLocalItemQuantity('${group.id}', '${group.note || ''}')" title="Remover um">
                         <i class="fas fa-minus pointer-events-none"></i>
@@ -248,49 +269,62 @@ export const renderClientOrderScreen = () => {
                     </button>
                 </div>
             </div>
-        `).join('');
+            `;
+        }).join('');
     }
 };
 
 // --- FUNÇÕES DE MODAL ---
 
-// Abertura do Modal de Observações (Cliente - Apenas Quick Buttons)
-export function openClientObsModalForGroup(itemId, noteKey) {
+//
+// /===================================================\
+// | INÍCIO DA ATUALIZAÇÃO (Lógica Modal Obs - Req 1 e 2) |
+// \===================================================/
+//
+// Abertura do Modal de Observações (Cliente - Agora completo)
+export function openClientObsModalForGroup(itemId, noteKey, isNew = false) {
     const products = getProducts();
     const product = products.find(p => p.id == itemId); // Encontra o produto pelo ID
 
     // Validação
-    if (!clientObsModal || !clientObsItemName || !clientObsInput || !product) {
+    if (!clientObsModal || !clientObsItemName || !clientObsInput || !clientEsperaSwitch || !product) {
         console.error("Erro ao abrir modal OBS: Elementos ou produto não encontrados.");
         return;
     }
 
     clientObsItemName.textContent = product.name; // Exibe nome do produto no modal
 
-    // Limpa a tag [EM ESPERA] (não aplicável ao cliente) e preenche o input
-    const currentNoteCleaned = noteKey.replace(' [EM ESPERA]', '').trim();
+    // Limpa a tag [EM ESPERA] e preenche o input
+    const esperaTag = ' [EM ESPERA]';
+    const currentNoteCleaned = noteKey.replace(esperaTag, '').trim();
     clientObsInput.value = currentNoteCleaned;
-    clientObsInput.readOnly = true; // Input desabilitado para digitação
-    clientObsInput.placeholder = "Use os botões rápidos abaixo.";
+    
+    // 1. Não é mais readOnly
+    clientObsInput.readOnly = false; 
+    clientObsInput.placeholder = "Ex: Sem cebola, Ponto da carne...";
 
     // Armazena dados no modal para referência ao salvar
     clientObsModal.dataset.itemId = itemId;
     clientObsModal.dataset.originalNoteKey = noteKey;
+    
+    // 2. Define o status de 'isNewItem' para o bugfix do 'cancelar'
+    clientObsModal.dataset.isNewItem = isNew ? 'true' : 'false';
 
-    // Garante que o switch de espera (se visível) esteja desmarcado
-    if (clientEsperaSwitch) clientEsperaSwitch.checked = false;
+    // 3. Define o estado correto do switch 'Em Espera'
+    clientEsperaSwitch.checked = noteKey.toLowerCase().includes('espera');
 
     clientObsModal.style.display = 'flex'; // Exibe o modal
+    clientObsInput.focus(); // Foca no input
 }
+//
+// /===================================================\
+// | FIM DA ATUALIZAÇÃO (Lógica Modal Obs)             |
+// \===================================================/
+//
 // Expõe a função globalmente para ser chamada pelo onclick no HTML
 window.openClientObsModalForGroup = openClientObsModalForGroup;
 
 
-//
-// /===================================================\
-// | INÍCIO DA ATUALIZAÇÃO (Lógica do Modal de Info)   |
-// \===================================================/
-//
 // Define a função para abrir o modal de informações do produto
 export const openProductInfoModal = (product) => {
     // Validação dos elementos do modal
@@ -316,11 +350,6 @@ export const openProductInfoModal = (product) => {
     // Exibe o modal
     clientProductInfoModal.style.display = 'flex';
 };
-//
-// /===================================================\
-// | FIM DA ATUALIZAÇÃO (Lógica do Modal de Info)      |
-// \===================================================/
-//
 // Atribui ao window para sobrescrever o placeholder em app.js e ser chamada pelo listener
 window.openProductInfoModal = openProductInfoModal;
 
@@ -463,7 +492,8 @@ export const handleClientAssociationAndSend = async () => {
 // Listener para os Botões Rápidos no Modal de Observação do Cliente
 const handleQuickButtonClient = (e) => {
     const btn = e.target.closest('.quick-obs-btn'); // Encontra o botão clicado
-    if (btn && clientObsInput) { // Verifica se é um botão rápido e o input existe
+    // ATUALIZAÇÃO: Verifica se o input não é read-only (não é mais, mas é uma boa prática)
+    if (btn && clientObsInput && !clientObsInput.readOnly) { 
         const obsText = btn.dataset.obs; // Pega o texto da observação do botão
         let currentValue = clientObsInput.value.trim(); // Pega o valor atual do input
 
@@ -478,13 +508,31 @@ const handleQuickButtonClient = (e) => {
     }
 };
 
+//
+// /===================================================\
+// | INÍCIO DA ATUALIZAÇÃO (Lógica Salvar Obs - Req 1) |
+// \===================================================/
+//
 // Função chamada ao clicar em "Salvar" no Modal de Observação do Cliente
 const handleSaveClientObs = () => {
     const itemId = clientObsModal.dataset.itemId; // ID do item sendo editado
     const originalNoteKey = clientObsModal.dataset.originalNoteKey; // Nota original (chave de agrupamento)
-    let newNote = clientObsInput.value.trim(); // Nova nota (montada pelos botões rápidos)
+    let newNote = clientObsInput.value.trim(); // Nova nota (digitada ou via botões)
 
-    newNote = newNote.replace(/ \[EM ESPERA\]/gi, '').trim(); // Remove tag de espera (precaução)
+    // 1. Adiciona a tag [EM ESPERA] se o switch estiver marcado
+    const isEsperaActive = clientEsperaSwitch.checked;
+    const esperaTag = ' [EM ESPERA]';
+    
+    // Limpa tags antigas para evitar duplicatas
+    let noteCleaned = newNote.replace(esperaTag, '').trim();
+    noteCleaned = noteCleaned.replace(/,?\s*\[EM ESPERA\]/gi, '').trim();
+
+    if (isEsperaActive) {
+        newNote = (noteCleaned + esperaTag).trim();
+    } else {
+        newNote = noteCleaned;
+    }
+    // Fim da lógica de Espera
 
     let updated = false; // Flag para indicar se alguma atualização ocorreu
 
@@ -514,6 +562,12 @@ const handleSaveClientObs = () => {
         clientObsModal.style.display = 'none'; // Fecha o modal mesmo assim
     }
 };
+//
+// /===================================================\
+// | FIM DA ATUALIZAÇÃO (Lógica Salvar Obs)            |
+// \===================================================/
+//
+
 
 // --- INICIALIZAÇÃO DO CONTROLLER DO CLIENTE ---
 export const initClientOrderController = () => {
@@ -529,7 +583,7 @@ export const initClientOrderController = () => {
     clientObsInput = document.getElementById('obsInput');
     clientSaveObsBtn = document.getElementById('saveObsBtn');
     clientCancelObsBtn = document.getElementById('cancelObsBtn');
-    clientEsperaSwitch = document.getElementById('esperaSwitch'); // Mesmo oculto, mapeia por segurança
+    clientEsperaSwitch = document.getElementById('esperaSwitch'); // Agora mapeado e validado
 
     clientAssocModal = document.getElementById('associationModal');
     assocTableInput = document.getElementById('assocTableNumber');
@@ -543,24 +597,13 @@ export const initClientOrderController = () => {
     clientCategoryFiltersContainer = document.getElementById('categoryFiltersClient');
     clientMenuItemsGrid = document.getElementById('menuItemsGridClient');
 
-    //
-    // /===================================================\
-    // | INÍCIO DA ATUALIZAÇÃO (Mapeamento de elementos)   |
-    // \===================================================/
-    //
     // Mapeia elementos do Modal de Info
     clientProductInfoModal = document.getElementById('productInfoModal');
     infoProductName = document.getElementById('infoProductName');
     infoProductDescription = document.getElementById('infoProductDescription');
     infoProductImage = document.getElementById('infoProductImage');
-    // Adicionados:
     infoProductPrice = document.getElementById('infoProductPrice');
     infoProductImageLink = document.getElementById('infoProductImageLink');
-    //
-    // /===================================================\
-    // | FIM DA ATUALIZAÇÃO (Mapeamento de elementos)      |
-    // \===================================================/
-    //
 
 
     // Validação CRÍTICA: Verifica se todos os elementos essenciais foram encontrados
@@ -568,8 +611,8 @@ export const initClientOrderController = () => {
         clientObsModal, clientAssocModal, clientMenuItemsGrid, clientProductInfoModal,
         clientSearchProductInput, clientCategoryFiltersContainer, clientSaveObsBtn, clientCancelObsBtn,
         assocSendOrderBtn, assocCancelBtn, 
-        // Adicionados:
-        infoProductName, infoProductDescription, infoProductImage, infoProductPrice, infoProductImageLink
+        infoProductName, infoProductDescription, infoProductImage, infoProductPrice, infoProductImageLink,
+        clientEsperaSwitch // Adicionado à validação
     ];
     if (essentialElements.some(el => !el)) {
         console.error("[ClientController] Erro Fatal: Elementos críticos não encontrados no HTML. Verifique os IDs. Aborting initialization.");
@@ -590,13 +633,22 @@ export const initClientOrderController = () => {
 
     // Listeners do Modal OBS
     if (clientSaveObsBtn) clientSaveObsBtn.addEventListener('click', handleSaveClientObs);
+    
+    //
+    // /===================================================\
+    // | INÍCIO DA ATUALIZAÇÃO (Lógica Cancelar Obs - Bug 2) |
+    // \===================================================/
+    //
     if (clientCancelObsBtn) clientCancelObsBtn.addEventListener('click', () => {
         const itemId = clientObsModal.dataset.itemId;
         const originalNoteKey = clientObsModal.dataset.originalNoteKey;
         const currentNote = clientObsInput.value.trim();
+        // Pega o status de "item novo" que foi salvo no modal
+        const isNewItem = clientObsModal.dataset.isNewItem === 'true';
 
         // Lógica para remover item recém-adicionado se cancelar modal OBS vazio
-        if (originalNoteKey === '' && currentNote === '') {
+        // SÓ remove se for um item NOVO (isNewItem) E o usuário não digitou nada
+        if (isNewItem && originalNoteKey === '' && currentNote === '') {
              let lastIndex = -1;
              for (let i = selectedItems.length - 1; i >= 0; i--) { // Procura de trás pra frente
                  if (selectedItems[i].id == itemId && selectedItems[i].note === '') {
@@ -611,8 +663,15 @@ export const initClientOrderController = () => {
                  console.log("[Client] Item recém-adicionado cancelado e removido.");
              }
         }
+        // Se NÃO for um item novo, ele apenas fecha o modal, sem apagar nada.
         clientObsModal.style.display = 'none'; // Fecha o modal de qualquer forma
     });
+    //
+    // /===================================================\
+    // | FIM DA ATUALIZAÇÃO (Lógica Cancelar Obs)          |
+    // \===================================================/
+    //
+
 
     // Listener para input de busca
     if (clientSearchProductInput) {
@@ -688,11 +747,7 @@ export const initClientOrderController = () => {
         quickObsButtons.addEventListener('click', handleQuickButtonClient);
     }
     
-    //
-    // /===================================================\
-    // | INÍCIO DA ATUALIZAÇÃO (Listener do botão do Modal)|
-    // \===================================================/
-    //
+    // Listener para o botão "Quero esse" (do modal de info)
     const infoProductAddBtn = document.getElementById('infoProductAddBtn');
     if (infoProductAddBtn) {
         infoProductAddBtn.addEventListener('click', () => {
@@ -712,11 +767,6 @@ export const initClientOrderController = () => {
             }
         });
     }
-    //
-    // /===================================================\
-    // | FIM DA ATUALIZAÇÃO (Listener do botão do Modal)   |
-    // \===================================================/
-    //
 
 
     // Busca os dados iniciais do WooCommerce (Produtos e Categorias)
