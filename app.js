@@ -440,9 +440,17 @@ const handleStaffLogin = async () => {
         }
     } else {
         if(loginErrorMsg) { loginErrorMsg.textContent = 'E-mail, senha inválidos ou usuário inativo.'; loginErrorMsg.style.display = 'block'; }
+        }
+    
+    } catch (e) { // <- ADICIONADO CATCH
+        // Agora, se o authenticateUserFromFirestore falhar, o erro será pego
+        console.error("Erro fatal no handleStaffLogin (Verifique as Regras do Firestore!):", e);
+        if(loginErrorMsg) { loginErrorMsg.textContent = `Erro ao autenticar: ${e.message}`; loginErrorMsg.style.display = 'block'; }
+    
+    } finally { // <- ADICIONADO FINALLY
+        // Isso GARANTE que o botão seja reabilitado, mesmo se houver erro
+        if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Entrar'; }
     }
-    // Garante que o botão seja reativado mesmo se o onAuthStateChanged demorar
-    if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Entrar'; }
 };
 
 
