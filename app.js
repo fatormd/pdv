@@ -411,39 +411,38 @@ const handleStaffLogin = async () => {
     if (loginErrorMsg) loginErrorMsg.style.display = 'none';
     loginBtn.disabled = true; loginBtn.textContent = 'Entrando...';
 
-    const email = loginEmailInput.value.trim().toLowerCase();
-    const password = loginPasswordInput.value.trim();
+    try { // <- ADICIONADO TRY
+        const email = loginEmailInput.value.trim().toLowerCase();
+        const password = loginPasswordInput.value.trim();
 
-    const staffData = await authenticateUserFromFirestore(email, password);
+        const staffData = await authenticateUserFromFirestore(email, password);
 
-    if (staffData) {
-        userRole = staffData.role;
-        try {
-            const authInstance = auth;
-            if (!authInstance) throw new Error("Firebase Auth não inicializado.");
-            // Tenta logar anonimamente APÓS verificar no Firestore
-            const userCredential = await signInAnonymously(authInstance);
-            userId = userCredential.user.uid; // Guarda o UID anônimo
+        if (staffData) {
+            userRole = staffData.role;
+            // O try/catch interno para signInAnonymously já existe e está correto
+            try {
+                const authInstance = auth;
+                if (!authInstance) throw new Error("Firebase Auth não inicializado.");
+                
+                const userCredential = await signInAnonymously(authInstance);
+                userId = userCredential.user.uid; 
 
-            const userName = staffData.name || userRole;
-            const userIdDisplay = document.getElementById('user-id-display');
-            if(userIdDisplay) userIdDisplay.textContent = `Usuário: ${userName} | ${userRole.toUpperCase()}`;
+                const userName = staffData.name || userRole;
+                const userIdDisplay = document.getElementById('user-id-display');
+                if(userIdDisplay) userIdDisplay.textContent = `Usuário: ${userName} | ${userRole.toUpperCase()}`;
 
-            // A inicialização do app agora é feita pelo onAuthStateChanged
-            // await initStaffApp(); // REMOVIDO DAQUI
-
-        } catch (error) {
-             console.error("[LOGIN] Erro pós-autenticação:", error);
-             alert(`Erro ao iniciar sessão: ${error.message}.`);
-             showLoginScreen();
-             if(loginErrorMsg) { loginErrorMsg.textContent = `Erro: ${error.message}`; loginErrorMsg.style.display = 'block'; }
-        }
-    } else {
-        if(loginErrorMsg) { loginErrorMsg.textContent = 'E-mail, senha inválidos ou usuário inativo.'; loginErrorMsg.style.display = 'block'; }
+            } catch (error) {
+                 console.error("[LOGIN] Erro pós-autenticação:", error);
+                 alert(`Erro ao iniciar sessão: ${error.message}.`);
+                 showLoginScreen();
+                 if(loginErrorMsg) { loginErrorMsg.textContent = `Erro: ${error.message}`; loginErrorMsg.style.display = 'block'; }
+            }
+        } else {
+            if(loginErrorMsg) { loginErrorMsg.textContent = 'E-mail, senha inválidos ou usuário inativo.'; loginErrorMsg.style.display = 'block'; }
         }
     
     } catch (e) { // <- ADICIONADO CATCH
-        // Agora, se o authenticateUserFromFirestore falhar, o erro será pego
+        // Se o authenticateUserFromFirestore falhar (ex: Regras do Firestore), o erro será pego
         console.error("Erro fatal no handleStaffLogin (Verifique as Regras do Firestore!):", e);
         if(loginErrorMsg) { loginErrorMsg.textContent = `Erro ao autenticar: ${e.message}`; loginErrorMsg.style.display = 'block'; }
     
@@ -452,7 +451,6 @@ const handleStaffLogin = async () => {
         if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Entrar'; }
     }
 };
-
 
 const handleLogout = () => {
     // Limpa estado global
