@@ -95,7 +95,7 @@
                         <i class="fas fa-receipt text-lg md:text-xl"></i>
                     </button>
                 </div>
-
+<div class="flex-grow overflow-y-auto custom-scrollbar">
                 <div id="orderingInputsClient" class="mb-6 md:mb-8 flex-shrink-0">
                     <div class="p-3 md:p-4 content-card rounded-lg bg-dark-card border border-dark-border">
                         <div class="flex justify-between items-center mb-3 md:mb-4">
@@ -110,7 +110,7 @@
                     </div>
                 </div>
 
-                <div id="menuContainerClient" class="flex flex-col flex-grow overflow-hidden"> <div class="flex justify-between items-center mb-3 md:mb-4 px-1 flex-shrink-0">
+                <div id="menuContainerClient" class="flex flex-col"> <div class="flex justify-between items-center mb-3 md:mb-4 px-1 flex-shrink-0">
                         <h2 class="text-lg md:text-xl font-bold text-dark-text">Cardápio</h2>
                         <div class="relative">
                             <input type="text" id="searchProductInputClient" placeholder="Buscar..." class="pr-8 input-pdv text-sm w-32 md:w-48 lg:w-64">
@@ -120,9 +120,9 @@
                     <div id="categoryFiltersClient" class="flex space-x-2 overflow-x-auto pb-3 mb-4 px-1 flex-shrink-0">
                         </div>
 
-                    <div id="menuItemsGridClient" class="flex flex-wrap overflow-y-auto custom-scrollbar pb-4"> <div class="col-span-full text-center p-6 text-dark-placeholder italic">Carregando cardápio...</div>
+                    <div id="menuItemsGridClient" class="flex flex-wrap pb-4"> <div class="col-span-full text-center p-6 text-dark-placeholder italic">Carregando cardápio...</div>
                     </div>
-                </div>
+                </div></div>
             </div> <div id="clientPaymentScreen" class="w-screen flex-shrink-0 flex flex-col h-full">
                  <div class="flex items-center justify-between mb-4 md:mb-6 flex-shrink-0">
                     <div class="flex items-center text-indigo-400">
