@@ -142,7 +142,7 @@ export const renderClientMenu = () => {
     // 3. Renderiza os Cards de Produtos filtrados (HTML ATUALIZADO e DEFINITIVAMENTE LIMPO)
     if (filteredProducts.length === 0) {
         // Mensagem se nenhum produto corresponder aos filtros
-        clientMenuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-dark-placeholder italic">Nenhum produto encontrado com os filtros atuais.</div>`;
+        clientMenuItemsGrid.innerHTML = `<div class="w-full text-center p-6 text-dark-placeholder italic">Nenhum produto encontrado com os filtros atuais.</div>`;
     } else {
         // Gera o HTML para cada card de produto
         clientMenuItemsGrid.innerHTML = filteredProducts.map(product => {
