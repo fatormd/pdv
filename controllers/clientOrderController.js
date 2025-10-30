@@ -155,7 +155,7 @@ export const renderClientMenu = () => {
             // \===================================================/
             //
             return `
-            <div class="product-card bg-dark-card border border-dark-border rounded-xl shadow-md overflow-hidden flex flex-col mb-1">
+            <div class="product-card bg-dark-card border border-dark-border rounded-xl shadow-md overflow-hidden flex flex-col mb-1 h-full">
 
                 <img src="${product.image}" alt="${product.name}" class="w-full h-56 md:h-64 object-cover cursor-pointer info-img-trigger" data-product='${productDataString}'>
 
