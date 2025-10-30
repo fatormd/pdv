@@ -162,19 +162,21 @@ return `
     
                     <div class="p-3 flex flex-col flex-grow">
                         
-                        <div class="flex justify-between items-start mb-2">
-                            <h4 class="font-bold text-sm text-dark-text cursor-pointer info-name-trigger" data-product='${productDataString}'>${product.name}</h4>
-                            <span class="font-bold text-sm text-pumpkin ml-2 flex-shrink-0">${formatCurrency(product.price)}</span>
-                        </div>
-    
-                        <div class="flex space-x-2 mt-auto">
+                        <h4 class="font-bold text-sm text-dark-text mb-2 cursor-pointer info-name-trigger" data-product='${productDataString}'>
+                            ${product.name} / 
+                            <span class="text-pumpkin">${formatCurrency(product.price)}</span>
+                        </h4>
+
+                        <div class="flex items-center space-x-2 mt-auto">
+                            
                             <button class="info-btn flex-1 bg-indigo-600 text-white text-xs font-semibold py-2 px-1 rounded-lg hover:bg-indigo-700 transition"
                                     data-product='${productDataString}'>
                                 Descrição
                             </button>
-                            <button class="add-item-btn flex-1 bg-green-600 text-white text-xs font-semibold py-2 px-1 rounded-lg hover:bg-green-700 transition"
+                            
+                            <button class="add-item-btn bg-green-600 text-white p-2 rounded-full hover:bg-green-700 transition w-9 h-9 flex items-center justify-center flex-shrink-0"
                                     data-product='${productDataString}' title="Adicionar ao Pedido">
-                                Adicionar
+                                <i class="fas fa-plus text-base pointer-events-none"></i>
                             </button>
                         </div>
                     </div>
