@@ -356,19 +356,22 @@
                     <h2 class="text-2xl font-bold text-pumpkin">Painel Gerencial</h2>
                 </div>
                 <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" data-action="openProductManagement"> <i class="fas fa-box-open text-3xl mb-2"></i> <h4 class="font-bold text-lg">Produtos</h4> <p class="text-xs">Gerenciar cardápio (WooCommerce)</p> </div>
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" data-action="openCashManagement"> <i class="fas fa-cash-register text-3xl mb-2 text-green-400"></i> <h4 class="font-bold text-lg">Gestão de Caixa</h4> <p class="text-xs">Abertura, fechamento, sangria</p> </div>
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" data-action="openReportsModal"> <i class="fas fa-chart-line text-3xl mb-2 text-indigo-400"></i> <h4 class="font-bold text-lg">Relatórios</h4> <p class="text-xs">Vendas, produtos, comissões</p> </div>
+                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openProductManagement')"> <i class="fas fa-box-open text-3xl mb-2"></i> <h4 class="font-bold text-lg">Produtos</h4> <p class="text-xs">Gerenciar cardápio (WooCommerce)</p> </div>
+                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openCashManagement')"> <i class="fas fa-cash-register text-3xl mb-2 text-green-400"></i> <h4 class="font-bold text-lg">Gestão de Caixa</h4> <p class="text-xs">Abertura, fechamento, sangria</p> </div>
+                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="document.getElementById('reportsModal').style.display='flex'"> <i class="fas fa-chart-line text-3xl mb-2 text-indigo-400"></i> <h4 class="font-bold text-lg">Relatórios</h4> <p class="text-xs">Vendas, produtos, comissões</p> </div>
                     
                     <div class="manager-card content-card p-4 text-center cursor-pointer" data-action="openTableMerge" onclick="window.openManagerAuthModal('openTableMerge')"> <i class="fas fa-people-arrows text-3xl mb-2 text-pumpkin"></i> <h4 class="font-bold text-lg">Agrupar Mesas</h4> <p class="text-xs">Unir mesas em uma conta mestra</p> </div>
 
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" data-action="openInventoryManagement"> <i class="fas fa-boxes text-3xl mb-2"></i> <h4 class="font-bold text-lg">Estoque</h4> <p class="text-xs">(Em breve)</p> </div>
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" data-action="openRecipesManagement"> <i class="fas fa-book text-3xl mb-2"></i> <h4 class="font-bold text-lg">Ficha Técnica</h4> <p class="text-xs">(Em breve)</p> </div>
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" data-action="openCustomerCRM"> <i class="fas fa-users text-3xl mb-2 text-indigo-400"></i> <h4 class="font-bold text-lg">Clientes (CRM)</h4> <p class="text-xs">(Em breve)</p> </div>
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" data-action="openWaiterReg"> <i class="fas fa-user-shield text-3xl mb-2 text-red-400"></i> <h4 class="font-bold text-lg">Usuários</h4> <p class="text-xs">Cadastrar Garçons / Gerentes</p> </div>
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" data-action="openWooSync"> <i class="fas fa-sync text-3xl mb-2 text-gray-400"></i> <h4 class="font-bold text-lg">Sincronizar</h4> <p class="text-xs">Forçar sincronia com WooCommerce</p> </div>
+                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openInventoryManagement')"> <i class="fas fa-boxes text-3xl mb-2"></i> <h4 class="font-bold text-lg">Estoque</h4> <p class="text-xs">(Em breve)</p> </div>
+                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openRecipesManagement')"> <i class="fas fa-book text-3xl mb-2"></i> <h4 class="font-bold text-lg">Ficha Técnica</h4> <p class="text-xs">(Em breve)</p> </div>
+                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openCustomerCRM')"> <i class="fas fa-users text-3xl mb-2 text-indigo-400"></i> <h4 class="font-bold text-lg">Clientes (CRM)</h4> <p class="text-xs">(Em breve)</p> </div>
+                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openWaiterReg')"> <i class="fas fa-user-shield text-3xl mb-2 text-red-400"></i> <h4 class="font-bold text-lg">Usuários</h4> <p class="text-xs">Cadastrar Garçons / Gerentes</p> </div>
+                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openWooSync')"> <i class="fas fa-sync text-3xl mb-2 text-gray-400"></i> <h4 class="font-bold text-lg">Sincronizar</h4> <p class="text-xs">Forçar sincronia com WooCommerce</p> </div>
+                    
+                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openSectorManagement')"> <i class="fas fa-map-signs text-3xl mb-2"></i> <h4 class="font-bold text-lg">Gerenciar Setores</h4> <p class="text-xs">Adicionar/remover setores das mesas</p> </div>
+                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openQuickObsManagement')"> <i class="fas fa-comment-dots text-3xl mb-2"></i> <h4 class="font-bold text-lg">Obs. Rápidas</h4> <p class="text-xs">Adicionar/remover botões de obs.</p> </div>
                 </div>
-            </div>
+                </div>
 
         </div>
     </main>
