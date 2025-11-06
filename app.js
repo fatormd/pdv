@@ -532,25 +532,43 @@ document.addEventListener('DOMContentLoaded', async () => {
                  window.increaseLocalItemQuantity = module.increaseLocalItemQuantity;
              }).catch(err => console.error("Failed to dynamically load client quantity functions:", err));
         } else {
-             // Fluxo do Staff (INICIALIZAÇÃO VIA URL)
+             // Fluxo do Staff (HARD BYPASS DE AUTENTICAÇÃO PARA DEV/TESTES)
              
              const staffEntry = determineRoleFromPath();
              
-             // 1. Define o papel e nome
+             // 1. Define o papel
              userRole = staffEntry.role;
              
              if (userRole !== 'anonymous') {
                  
-                 // 2. Força o login anônimo para obter um UID, limpando sessões anteriores para evitar conflitos
-                 const authInstance = auth;
-                 if (authInstance.currentUser) {
-                    await signOut(authInstance); 
-                    console.log("[APP] Cleared previous Firebase session.");
+                 // NOVO AJUSTE CRÍTICO: Tenta obter um usuário anônimo ou reutiliza o existente
+                 try {
+                     if (!authInstance.currentUser) {
+                         const userCredential = await signInAnonymously(authInstance);
+                         userId = userCredential.user.uid;
+                         console.log("[APP] Forced new anonymous sign-in (Clean Start).");
+                     } else {
+                         // Reutiliza o usuário anônimo existente (mais rápido e evita conflitos)
+                         userId = authInstance.currentUser.uid;
+                         console.log("[APP] Reusing existing anonymous session.");
+                     }
+                 } catch (e) {
+                     // Se falhar ao logar anonimamente, tenta deslogar e logar novamente
+                      console.warn("[APP] Anonymous sign-in failed. Forcing sign-out and retry.", e);
+                      // Tenta forçar a limpeza e novo login
+                      await signOut(authInstance).catch(() => {});
+                      try {
+                          const userCredential = await signInAnonymously(authInstance);
+                          userId = userCredential.user.uid;
+                          console.log("[APP] Forced new anonymous sign-in after cleanup.");
+                      } catch (e2) {
+                           console.error("[APP] Fatal: Cannot establish anonymous session even after cleanup.", e2);
+                           alert("Erro fatal de autenticação. Tente limpar o cache do navegador.");
+                           return;
+                      }
                  }
-                 const userCredential = await signInAnonymously(authInstance);
-                 userId = userCredential.user.uid; 
                  
-                 // 3. Atualiza a UI e inicializa o app
+                 // 2. Atualiza a UI e inicializa o app
                  const userName = staffEntry.name || 'Staff';
                  const userIdDisplay = document.getElementById('user-id-display');
                  if(userIdDisplay) userIdDisplay.textContent = `Usuário: ${userName} | ${userRole.toUpperCase()}`;
@@ -565,7 +583,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                  // Remove listeners do formulário de login (agora inútil)
                  const loginForm = document.getElementById('loginForm');
-                 if(loginForm) loginForm.removeEventListener('submit', handleStaffLogin);
+                 if(loginForm) {
+                      loginForm.removeEventListener('submit', handleStaffLogin);
+                      // Remove o evento de clique do botão de login (caso ele ainda esteja lá)
+                      const loginBtn = document.getElementById('loginBtn');
+                      if(loginBtn) loginBtn.removeEventListener('click', handleStaffLogin);
+                 }
                  
                  // Listener de Logout/Gerencial (mantido)
                  const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
