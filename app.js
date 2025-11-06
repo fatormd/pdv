@@ -1,4 +1,4 @@
-// --- APP.JS (CORRIGIDO PARA DEPENDÊNCIA DO CLIENTE e COM LOGS) ---
+// --- APP.JS (AGORA SEM OBRIGAÇÃO DE LOGIN) ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapshot, writeBatch, arrayRemove, arrayUnion, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
@@ -42,7 +42,6 @@ const FIREBASE_CONFIG = {
 
 // --- VARIÁVEIS GLOBAIS ---
 export const screens = { 'loginScreen': 0, 'panelScreen': 1, 'orderScreen': 2, 'paymentScreen': 3, 'managerScreen': 4, 'clientOrderScreen': 0, 'clientPaymentScreen': 1};
-// const MANAGER_PASSWORD = '1234'; // REMOVIDO: Senha do gerente não deve ser exposta
 export let currentTableId = null; export let selectedItems = []; export let currentOrderSnapshot = null;
 export let userRole = 'anonymous'; export let userId = null; export let unsubscribeTable = null;
 
@@ -416,9 +415,9 @@ export const selectTableAndStartListener = async (tableId) => {
 window.selectTableAndStartListener = selectTableAndStartListener;
 
 
-// --- LÓGICA DE LOGIN ---
+// --- LÓGICA DE LOGIN (DESATIVADA) ---
+// Função de login mantida apenas para referência, mas não será usada no fluxo principal
 const handleStaffLogin = async () => {
-    // Mapeamento local para esta função
     let loginBtn, loginEmailInput, loginPasswordInput, loginErrorMsg;
     loginBtn = document.getElementById('loginBtn');
     loginEmailInput = document.getElementById('loginEmail');
@@ -440,23 +439,18 @@ const handleStaffLogin = async () => {
             const authInstance = auth;
             if (!authInstance) throw new Error("Firebase Auth não inicializado.");
             
-            // NOVO AJUSTE CRÍTICO: Limpa explicitamente qualquer sessão anterior (Cliente ou Garçom)
             if (authInstance.currentUser) {
                 console.log("[LOGIN] Clearing previous session before Staff login.");
-                // Força o logout, limpando o token de sessão que pode estar em conflito
                 await signOut(authInstance); 
             }
             
-            // FORÇA NOVO LOGIN ANÔNIMO para garantir um novo token de sessão limpo
             const userCredential = await signInAnonymously(authInstance);
-            userId = userCredential.user.uid; // Guarda o UID anônimo
-
+            userId = userCredential.user.uid; 
 
             const userName = staffData.name || userRole;
             const userIdDisplay = document.getElementById('user-id-display');
             if(userIdDisplay) userIdDisplay.textContent = `Usuário: ${userName} | ${userRole.toUpperCase()}`;
 
-            // A inicialização é feita AQUI DENTRO para garantir a ordem síncrona do login.
             await initStaffApp(); 
 
         } catch (error) {
@@ -468,7 +462,6 @@ const handleStaffLogin = async () => {
     } else {
         if(loginErrorMsg) { loginErrorMsg.textContent = 'E-mail, senha inválidos ou usuário inativo.'; loginErrorMsg.style.display = 'block'; }
     }
-    // Garante que o botão seja reativado mesmo se o onAuthStateChanged demorar
     if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Entrar'; }
 };
 
@@ -559,7 +552,7 @@ const initClientApp = async () => {
 
 
 // --- DOMContentLoaded (Ponto de entrada) ---
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => { // Adicionado 'async'
     console.log("[APP] DOMContentLoaded"); // Log Adicionado
     try {
         // Inicialização do Firebase
@@ -583,63 +576,38 @@ document.addEventListener('DOMContentLoaded', () => {
         mainHeader = document.getElementById('mainHeader');
 
         if (isClientMode) {
-            // Inicializa o app cliente
-            initClientApp(); // Chama a versão simplificada
-
-            // Funções globais de quantidade (ainda necessárias para onClicks no HTML)
-            // Carrega dinamicamente para garantir que o controller foi inicializado ANTES
-             import('/controllers/clientOrderController.js').then(module => {
+            // Fluxo do cliente (mantido)
+            initClientApp(); 
+            import('/controllers/clientOrderController.js').then(module => {
                  window.decreaseLocalItemQuantity = module.decreaseLocalItemQuantity;
                  window.increaseLocalItemQuantity = module.increaseLocalItemQuantity;
-                 console.log("[APP] Client quantity functions attached to window."); // Log Adicionado
+                 console.log("[APP] Client quantity functions attached to window.");
              }).catch(err => console.error("Failed to dynamically load client quantity functions:", err));
-
         } else {
-             // Modo Staff
-             // Configura o botão/formulário de login
-             loginBtn = document.getElementById('loginBtn');
-             if (loginBtn) {
-                  const loginForm = document.getElementById('loginForm');
-                  if (loginForm) {
-                      loginForm.addEventListener('submit', (e) => {
-                          e.preventDefault();
-                          handleStaffLogin();
-                      });
-                  } else {
-                      loginBtn.addEventListener('click', handleStaffLogin); // Fallback
-                  }
-             } else {
-                 console.error("[APP] Login button not found."); // Log de erro
+             // Fluxo do Staff (LOGIN DESATIVADO)
+             
+             // 1. Força o login anônimo para obter um UID, se não existir
+             if (!authInstance.currentUser) {
+                 await signInAnonymously(authInstance);
+                 console.log("[APP] Forced anonymous sign-in for Staff dev mode.");
              }
+             
+             // 2. Define o perfil padrão para o desenvolvimento
+             userRole = 'garcom'; 
+             userId = authInstance.currentUser.uid;
+             
+             // 3. Atualiza a UI e inicializa o app
+             const userIdDisplay = document.getElementById('user-id-display');
+             if(userIdDisplay) userIdDisplay.textContent = `Usuário: DEV Mode | GARCOM`;
+             
+             await initStaffApp(); // Inicia o app diretamente
 
-             // Listener de autenticação para Staff
-             onAuthStateChanged(authInstance, async (user) => {
-                 console.log("[APP] onAuthStateChanged:", user ? `User UID: ${user.uid}` : 'No user'); // Log Adicionado
-                 if (user) {
-                     // Usuário está logado (anonimamente após verificação no Firestore)
-                     userId = user.uid; // Guarda o UID anônimo
-                     // Só inicializa o app completo se já tivermos um userRole definido
-                     // (ou seja, o login via handleStaffLogin foi bem-sucedido ANTES)
-                     if (userRole !== 'anonymous') {
-                         // AJUSTE: O initStaffApp agora é chamado diretamente pelo handleStaffLogin
-                         // para garantir a ordem síncrona do login. Não precisamos mais da lógica de inicialização aqui.
-                         console.log("[APP] Authenticated via handleStaffLogin. Initialization done."); 
-                     } else {
-                          // Logado anonimamente, mas sem ter passado pelo handleStaffLogin ainda.
-                          // Isso pode acontecer se o usuário recarregar a página já logado anonimamente.
-                          // Força a tela de login para obter o userRole correto.
-                          console.log("[APP] Anonymous user without role, showing login.");
-                          showLoginScreen();
-                     }
-                 } else {
-                      // Nenhum usuário logado (nem anônimo)
-                      userId = null;
-                      userRole = 'anonymous'; // Reseta o papel
-                      showLoginScreen(); // Mostra a tela de login
-                 }
-             });
+             // Remove listeners do formulário de login (agora inútil)
+             const loginForm = document.getElementById('loginForm');
+             if(loginForm) loginForm.removeEventListener('submit', (e) => e.preventDefault());
 
-             // Listeners dos botões do cabeçalho
+
+             // Listener de Logout/Gerencial (mantido)
              const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
              const logoutBtnHeader = document.getElementById('logoutBtnHeader');
              if (openManagerPanelBtn) openManagerPanelBtn.addEventListener('click', () => { window.openManagerAuthModal('goToManagerPanel'); });
@@ -651,7 +619,7 @@ document.addEventListener('DOMContentLoaded', () => {
              statusScreen.innerHTML = `<div class="flex flex-col items-center p-8 max-w-sm w-full text-center"><i class="fas fa-times-circle text-4xl text-red-500 mb-4"></i><h2 class="text-xl font-bold mb-2 text-red-400">Erro Crítico</h2><p class="text-dark-placeholder">${e.message}</p></div>`;
              statusScreen.style.display = 'flex';
         }
-        console.error("Erro fatal na inicialização:", e); // Loga o erro completo
+        console.error("Erro fatal na inicialização:", e); 
         return;
     }
 }); // <-- FECHAMENTO CORRETO DO DOMContentLoaded
