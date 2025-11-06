@@ -1,4 +1,4 @@
-// --- APP.JS (CORRIGIDO PARA ESTABILIDADE DO LOGIN MANUAL COM RELOAD FORÇADO) ---
+// --- APP.JS (AGORA SEM LOGIN MANUAL E COM BYPASS DE SESSÃO) ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapshot, writeBatch, arrayRemove, arrayUnion, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
@@ -34,7 +34,6 @@ const FIREBASE_CONFIG = {
 export const screens = { 'loginScreen': 0, 'panelScreen': 1, 'orderScreen': 2, 'paymentScreen': 3, 'managerScreen': 4, 'clientOrderScreen': 0, 'clientPaymentScreen': 1};
 export let currentTableId = null; export let selectedItems = []; export let currentOrderSnapshot = null;
 export let userRole = 'anonymous'; export let userId = null; export let unsubscribeTable = null;
-const AUTH_SUCCESS_FLAG = 'pdv_auth_success'; // Flag para localStorage
 
 // --- ELEMENTOS UI ---
 let statusScreen, mainContent, appContainer, loginScreen, mainHeader;
@@ -242,7 +241,6 @@ window.openManagerAuthModal = (action, payload = null) => {
 
     if(authBtn && input) {
         const handleAuthClick = async () => {
-            // OBS: A checagem de senha em '1234' é apenas para fluxo/demonstração.
             if (input.value === '1234') {
                 managerModal.style.display = 'none';
 
@@ -406,68 +404,11 @@ export const selectTableAndStartListener = async (tableId) => {
 window.selectTableAndStartListener = selectTableAndStartListener;
 
 
-// --- LÓGICA DE LOGIN ---
+// --- LÓGICA DE LOGIN (REMOVIDA DO FLUXO PRINCIPAL) ---
 const handleStaffLogin = async (event) => {
     if(event && event.preventDefault) event.preventDefault();
-    
-    let loginBtn, loginEmailInput, loginPasswordInput, loginErrorMsg;
-    loginBtn = document.getElementById('loginBtn');
-    loginEmailInput = document.getElementById('loginEmail');
-    loginPasswordInput = document.getElementById('loginPassword');
-    loginErrorMsg = document.getElementById('loginErrorMsg');
-
-    if (!loginBtn || !loginEmailInput || !loginPasswordInput) { return; }
-    if (loginErrorMsg) loginErrorMsg.style.display = 'none';
-    
-    loginBtn.disabled = true; 
-    loginBtn.textContent = 'Entrando...';
-
-    const email = loginEmailInput.value.trim().toLowerCase();
-    const password = loginPasswordInput.value.trim();
-    
-    try {
-        // 1. Tenta autenticar credenciais no Firestore
-        const staffData = await authenticateUserFromFirestore(email, password);
-
-        if (staffData) {
-            
-            // CORREÇÃO CRÍTICA: Se a autenticação foi bem-sucedida no Firestore, 
-            // forçamos o sign-out da sessão atual (que está em conflito), salvamos a role 
-            // no storage e recarregamos a página.
-            const authInstance = auth;
-            if (authInstance && authInstance.currentUser) {
-                 await signOut(authInstance).catch(() => {});
-            }
-            
-            // Salva a Role e o Name no localStorage antes do reload
-            localStorage.setItem(AUTH_SUCCESS_FLAG, 'true');
-            localStorage.setItem('pdv_user_role', staffData.role);
-            localStorage.setItem('pdv_user_name', staffData.name || staffData.role);
-            
-            // Força o reload para limpar o estado de sessão do navegador
-            window.location.reload(); 
-            // A execução para aqui, a inicialização ocorrerá no DOMContentLoaded após o reload
-            return; 
-
-        } else {
-            // Falha na autenticação (credenciais inválidas ou usuário inativo)
-            if(loginErrorMsg) { 
-                loginErrorMsg.textContent = 'E-mail, senha inválidos ou usuário inativo.'; 
-                loginErrorMsg.style.display = 'block'; 
-            }
-        }
-        
-    } catch (error) {
-         console.error("[LOGIN] Erro fatal:", error);
-         alert(`Erro ao iniciar sessão: ${error.message}.`);
-         if(loginErrorMsg) { loginErrorMsg.textContent = `Erro: ${error.message}`; loginErrorMsg.style.display = 'block'; }
-    } finally {
-        // Garante que o botão seja reativado se o reload não ocorreu
-        if (loginBtn) {
-             loginBtn.disabled = false; 
-             loginBtn.textContent = 'Entrar'; 
-        }
-    }
+    alert("Login manual desativado. Acesse pela rota /garcom ou /gerente.");
+    return;
 };
 
 
@@ -476,11 +417,6 @@ const handleLogout = () => {
     userId = null; currentTableId = null; selectedItems.length = 0; userRole = 'anonymous'; currentOrderSnapshot = null;
     if (unsubscribeTable) { unsubscribeTable(); unsubscribeTable = null; }
 
-    // Limpa flags do localStorage
-    localStorage.removeItem(AUTH_SUCCESS_FLAG);
-    localStorage.removeItem('pdv_user_role');
-    localStorage.removeItem('pdv_user_name');
-    
     // Desloga do Firebase Auth
     const authInstance = auth;
     if (authInstance) {
@@ -495,7 +431,7 @@ const handleLogout = () => {
 window.handleLogout = handleLogout;
 
 // --- FUNÇÕES DE INICIALIZAÇÃO ---
-const initStaffApp = async (staffName) => {
+const initStaffApp = async (staffName) => { // Aceita o nome como parâmetro
     console.log("[StaffApp] initStaffApp CALLED"); 
     try {
         // Inicializa controladores
@@ -517,15 +453,15 @@ const initStaffApp = async (staffName) => {
         const userIdDisplay = document.getElementById('user-id-display');
         if(userIdDisplay) userIdDisplay.textContent = `Usuário: ${staffName} | ${userRole.toUpperCase()}`;
 
-        loadOpenTables(); 
+        loadOpenTables(); // Carrega as mesas abertas
 
-        await goToScreen('panelScreen'); 
+        await goToScreen('panelScreen'); // Vai para o painel inicial
         console.log("[StaffApp] initStaffApp FINISHED"); 
 
     } catch (error) {
         console.error("Erro CRÍTICO durante initStaffApp:", error);
         alert(`Erro grave na inicialização: ${error.message}. Verifique o console.`);
-        showLoginScreen(); 
+        showLoginScreen(); // Volta pro login em caso de erro grave
     }
 };
 
@@ -553,6 +489,24 @@ const initClientApp = async () => {
         alert(`Erro grave na inicialização do Cliente: ${error.message}. Verifique o console.`);
     }
 };
+
+// NOVO: Função para determinar o papel do usuário a partir da URL
+const determineRoleFromPath = () => {
+    const path = window.location.pathname.toLowerCase();
+    const isStaffPage = !path.includes('client.html');
+    
+    if (!isStaffPage) {
+        return { role: 'anonymous', name: null };
+    }
+
+    // Mapeamento de rotas (Exemplo: pdv.fatormd.com/garcom -> role: garcom)
+    if (path.includes('/garcom')) return { role: 'garcom', name: 'Garçom' };
+    if (path.includes('/gerente')) return { role: 'gerente', name: 'Gerente' };
+    
+    // Se for 'index.html' ou '/' (o default), assume Garçom
+    return { role: 'garcom', name: 'Garçom' }; 
+};
+
 
 // --- DOMContentLoaded (Ponto de entrada) ---
 document.addEventListener('DOMContentLoaded', async () => { 
@@ -586,51 +540,34 @@ document.addEventListener('DOMContentLoaded', async () => {
                  window.increaseLocalItemQuantity = module.increaseLocalItemQuantity;
              }).catch(err => console.error("Failed to dynamically load client quantity functions:", err));
         } else {
-             // FLUXO DE INICIALIZAÇÃO STAFF COM BYPASS DE RELOAD
-
-             const authSuccess = localStorage.getItem(AUTH_SUCCESS_FLAG) === 'true';
-             localStorage.removeItem(AUTH_SUCCESS_FLAG); // Limpa a flag imediatamente
-
-             // 1. Checa se o login foi bem-sucedido ANTES do reload
-             if (authSuccess) {
-                 userRole = localStorage.getItem('pdv_user_role') || 'garcom';
-                 const staffName = localStorage.getItem('pdv_user_name') || userRole;
-                 localStorage.removeItem('pdv_user_role');
-                 localStorage.removeItem('pdv_user_name');
+             // FLUXO DE INICIALIZAÇÃO STAFF (ACESSADO POR URL)
+             
+             const staffEntry = determineRoleFromPath();
+             userRole = staffEntry.role;
+             
+             if (userRole !== 'anonymous') {
                  
-                 // Força o sign-in anônimo para pegar um novo UID após o reload (o token antigo foi limpo)
+                 // 1. Limpeza agressiva da sessão anterior (resolve o problema do Chrome)
+                 const authInstance = auth;
+                 await signOut(authInstance).catch(() => {});
+                 
+                 // 2. Força um novo sign-in anônimo para obter um token limpo
                  const userCredential = await signInAnonymously(authInstance);
-                 userId = userCredential.user.uid;
+                 userId = userCredential.user.uid; 
                  
-                 console.log("[APP] Successful login detected from localStorage. Initializing app...");
-                 await initStaffApp(staffName);
-                 
-             } else {
-                 // 2. Se não há flag, mostra o login e configura o listener de autenticação
-                 
-                 // Restaura o listener de login para o botão 'Entrar'
-                 const loginForm = document.getElementById('loginForm');
-                 if (loginForm) {
-                     const newLoginForm = loginForm.cloneNode(true);
-                     loginForm.parentNode.replaceChild(newLoginForm, loginForm);
-                     newLoginForm.addEventListener('submit', handleStaffLogin);
-                 }
+                 // 3. Inicializa o App com o papel e nome obtido
+                 console.log(`[APP] Initializing as ${userRole.toUpperCase()} via URL.`);
+                 await initStaffApp(staffEntry.name);
 
-                 // Listener de autenticação para Staff
-                 onAuthStateChanged(authInstance, async (user) => {
-                     // Se o usuário está logado, mas não passou pelo fluxo manual, mostra login
-                     if (user && !authSuccess) {
-                         showLoginScreen(); 
-                     }
-                 });
-
-                 showLoginScreen();
-
-                 // Listeners dos botões do cabeçalho
+                 // Listeners do cabeçalho
                  const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
                  const logoutBtnHeader = document.getElementById('logoutBtnHeader');
                  if (openManagerPanelBtn) openManagerPanelBtn.addEventListener('click', () => { window.openManagerAuthModal('goToManagerPanel'); });
                  if (logoutBtnHeader) logoutBtnHeader.addEventListener('click', handleLogout);
+                 
+             } else {
+                 // Caso fallback (Deve ser a tela de cliente)
+                 showLoginScreen(); 
              }
         }
 
