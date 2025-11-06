@@ -440,15 +440,17 @@ const handleStaffLogin = async () => {
             const authInstance = auth;
             if (!authInstance) throw new Error("Firebase Auth não inicializado.");
             
-            // CORREÇÃO CRÍTICA: Evita tentar signInAnonymously se o usuário já estiver logado (e.g., pelo cliente)
-            if (!authInstance.currentUser) {
-                // Tenta logar anonimamente APÓS verificar no Firestore
-                const userCredential = await signInAnonymously(authInstance);
-                userId = userCredential.user.uid; // Guarda o UID anônimo
-            } else {
-                // Já está logado (provavelmente anonimamente), usa o UID existente.
-                userId = authInstance.currentUser.uid;
+            // NOVO AJUSTE CRÍTICO: Limpa explicitamente qualquer sessão anterior (Cliente ou Garçom)
+            if (authInstance.currentUser) {
+                console.log("[LOGIN] Clearing previous session before Staff login.");
+                // Força o logout, limpando o token de sessão que pode estar em conflito
+                await signOut(authInstance); 
             }
+            
+            // FORÇA NOVO LOGIN ANÔNIMO para garantir um novo token de sessão limpo
+            const userCredential = await signInAnonymously(authInstance);
+            userId = userCredential.user.uid; // Guarda o UID anônimo
+
 
             const userName = staffData.name || userRole;
             const userIdDisplay = document.getElementById('user-id-display');
