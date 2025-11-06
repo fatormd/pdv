@@ -132,14 +132,21 @@
                     </div>
                 </div>
             </div> <div id="clientPaymentScreen" class="w-screen flex-shrink-0 flex flex-col h-full">
-                 <div class="flex items-center justify-between mb-4 md:mb-6 flex-shrink-0">
+                 <div class="flex items-center justify-between mb-4 md:mb-6 flex-shrink-0 print-hide">
                     <div class="flex items-center text-indigo-400">
                         <button id="backToOrderFromPaymentBtn" class="mr-2 text-2xl md:text-3xl p-2 hover:text-indigo-300 transition" title="Voltar para o Pedido" onclick="window.goToScreen('clientOrderScreen')">
                             <i class="fas fa-arrow-left"></i>
                         </button>
                         <span class="text-xl md:text-2xl font-semibold mr-3" id="payment-table-number">Mesa Selecionada</span>
                     </div>
+                    <button id="printSummaryBtnClient" class="p-2 text-indigo-400 hover:text-indigo-300 transition" title="Imprimir Resumo" onclick="window.printSummaryClient()">
+                        <i class="fas fa-print text-lg md:text-xl"></i>
+                    </button>
                 </div>
+                 <div class="flex items-center justify-between mb-4 md:mb-6 flex-shrink-0 hidden print:flex">
+                     <span class="text-xl md:text-2xl font-semibold mr-3" id="payment-table-number-print">Conta da Mesa Selecionada</span>
+                 </div>
+
 
                 <div class="flex-grow overflow-y-auto custom-scrollbar pb-4 pr-1"> <div class="content-card p-3 md:p-4 mb-6 rounded-lg bg-dark-card border border-dark-border">
                         <h2 class="text-lg md:text-xl font-semibold text-green-400 mb-3 md:mb-4">Resumo da Conta</h2>
@@ -154,7 +161,7 @@
                             <div class="flex justify-between items-center">
                                 <div class="flex items-center">
                                     <span class="text-sm md:text-base font-bold text-green-400 mr-2">SERVIÇO (10%):</span>
-                                    <button id="toggleServiceTaxBtn" class="px-2 py-0.5 text-xs rounded-full bg-gray-600 text-gray-300 opacity-70 cursor-not-allowed" disabled>
+                                    <button id="toggleServiceTaxBtn" class="px-2 py-0.5 text-xs rounded-full bg-gray-600 text-gray-300 opacity-70 cursor-not-allowed print-hide" disabled>
                                         Aplicado
                                     </button>
                                 </div>
@@ -162,10 +169,11 @@
                             </div>
                              <div class="flex justify-between items-center">
                                 <span class="text-sm md:text-base font-bold text-indigo-400">VALOR POR PESSOA:</span>
-                                 <div class="flex items-center space-x-1">
+                                 <div class="flex items-center space-x-1 print-hide">
                                     <span id="valuePerDinerDisplay" class="text-sm md:text-base font-bold text-indigo-400">R$ 0,00</span>
                                     <input type="number" id="dinersSplitInput" class="w-12 p-1 text-xs md:text-sm border border-dark-border rounded-lg text-center bg-dark-input text-dark-text opacity-70" min="1" value="1" readonly>
                                  </div>
+                                 <span id="valuePerDinerDisplayPrint" class="text-sm md:text-base font-bold text-indigo-400 hidden print:block">R$ 0,00</span>
                             </div>
                             <div class="flex justify-between items-center pt-2 border-t border-dark-border mt-2">
                                 <span class="text-lg md:text-xl font-bold text-dark-text">TOTAL GERAL:</span>
@@ -174,7 +182,7 @@
                         </div>
                     </div>
 
-                    <div class="content-card p-3 md:p-4 mt-6 rounded-lg bg-dark-card border border-dark-border">
+                    <div class="content-card p-3 md:p-4 mt-6 rounded-lg bg-dark-card border border-dark-border print-hide">
                         <button id="requestBillBtn" class="w-full bg-pumpkin text-white font-bold py-3 rounded-lg hover:bg-pumpkin-dark transition duration-150 text-base md:text-lg">
                             <i class="fas fa-cash-register"></i> SOLICITAR FECHAMENTO DE CONTA
                         </button>
@@ -274,6 +282,18 @@
     <p class="mt-8 text-center text-xs text-dark-placeholder" id="user-id-display">.</p>
 
     <script>
+        // NOVO: Função para imprimir o resumo da conta no modo cliente
+        window.printSummaryClient = () => {
+             const valuePerDinerText = document.getElementById('valuePerDinerDisplay')?.textContent || 'R$ 0,00';
+             const tableNumber = document.getElementById('payment-table-number')?.textContent || 'Mesa Selecionada';
+             // Atualiza o valor por pessoa (escondido) e o cabeçalho de impressão
+             const valuePrintEl = document.getElementById('valuePerDinerDisplayPrint');
+             const tableNumPrintEl = document.getElementById('payment-table-number-print');
+             if(valuePrintEl) valuePrintEl.textContent = valuePerDinerText;
+             if(tableNumPrintEl) tableNumPrintEl.textContent = tableNumber;
+             window.print();
+        };
+        
         // Placeholders (mantidos)
         window.openManagerAuthModal = () => {};
         window.goToScreen = (screenId) => {
