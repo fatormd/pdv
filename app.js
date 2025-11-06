@@ -1,4 +1,4 @@
-// --- APP.JS (AGORA SEM OBRIGAÇÃO DE LOGIN) ---
+// --- APP.JS (CORRIGIDO COM ROTAS POR URL E GARÇOM-CAIXA) ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapshot, writeBatch, arrayRemove, arrayUnion, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
@@ -11,17 +11,7 @@ import { formatCurrency, formatElapsedTime } from '/utils.js';
 
 // --- IMPORTS ESTÁTICOS PARA CONTROLADORES CORE (Garantia de Funcionamento) ---
 import { initPanelController, loadOpenTables, renderTableFilters, handleAbrirMesa, handleSearchTable, openTableMergeModal } from '/controllers/panelController.js';
-//
-// /===================================================\
-// | INÍCIO DA ATUALIZAÇÃO (Importa renderMenu)        |
-// \===================================================/
-//
 import { initOrderController, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity, openObsModalForGroup, renderMenu } from '/controllers/orderController.js';
-//
-// /===================================================\
-// | FIM DA ATUALIZAÇÃO                                |
-// \===================================================/
-//
 import { initPaymentController, renderPaymentSummary, deletePayment, handleMassActionRequest, handleFinalizeOrder, handleMassDeleteConfirmed, executeDeletePayment, openTableTransferModal, handleConfirmTableTransfer } from '/controllers/paymentController.js';
 import { initManagerController, handleGerencialAction } from '/controllers/managerController.js';
 import { initUserManagementController, openUserManagementModal } from '/controllers/userManagementController.js';
@@ -91,6 +81,7 @@ const hideLoginScreen = () => {
     const logoutBtn = document.getElementById('logoutBtnHeader');
     const managerBtn = document.getElementById('openManagerPanelBtn');
     if (logoutBtn) logoutBtn.classList.remove('hidden');
+    // Mostra botão de gerente APENAS se for Gerente
     if (managerBtn) {
         managerBtn.classList.toggle('hidden', userRole !== 'gerente');
     }
@@ -251,7 +242,6 @@ window.openManagerAuthModal = (action, payload = null) => {
     if(authBtn && input) {
         const handleAuthClick = async () => {
             // OBS: A checagem de senha em '1234' é apenas para fluxo/demonstração.
-            // A segurança real está na checagem do 'userRole' no início desta função.
             if (input.value === '1234') {
                 managerModal.style.display = 'none';
 
@@ -415,56 +405,8 @@ export const selectTableAndStartListener = async (tableId) => {
 window.selectTableAndStartListener = selectTableAndStartListener;
 
 
-// --- LÓGICA DE LOGIN (DESATIVADA) ---
-// Função de login mantida apenas para referência, mas não será usada no fluxo principal
-const handleStaffLogin = async () => {
-    let loginBtn, loginEmailInput, loginPasswordInput, loginErrorMsg;
-    loginBtn = document.getElementById('loginBtn');
-    loginEmailInput = document.getElementById('loginEmail');
-    loginPasswordInput = document.getElementById('loginPassword');
-    loginErrorMsg = document.getElementById('loginErrorMsg');
-
-    if (!loginBtn || !loginEmailInput || !loginPasswordInput) { return; }
-    if (loginErrorMsg) loginErrorMsg.style.display = 'none';
-    loginBtn.disabled = true; loginBtn.textContent = 'Entrando...';
-
-    const email = loginEmailInput.value.trim().toLowerCase();
-    const password = loginPasswordInput.value.trim();
-
-    const staffData = await authenticateUserFromFirestore(email, password);
-
-    if (staffData) {
-        userRole = staffData.role;
-        try {
-            const authInstance = auth;
-            if (!authInstance) throw new Error("Firebase Auth não inicializado.");
-            
-            if (authInstance.currentUser) {
-                console.log("[LOGIN] Clearing previous session before Staff login.");
-                await signOut(authInstance); 
-            }
-            
-            const userCredential = await signInAnonymously(authInstance);
-            userId = userCredential.user.uid; 
-
-            const userName = staffData.name || userRole;
-            const userIdDisplay = document.getElementById('user-id-display');
-            if(userIdDisplay) userIdDisplay.textContent = `Usuário: ${userName} | ${userRole.toUpperCase()}`;
-
-            await initStaffApp(); 
-
-        } catch (error) {
-             console.error("[LOGIN] Erro pós-autenticação:", error);
-             alert(`Erro ao iniciar sessão: ${error.message}.`);
-             showLoginScreen();
-             if(loginErrorMsg) { loginErrorMsg.textContent = `Erro: ${error.message}`; loginErrorMsg.style.display = 'block'; }
-        }
-    } else {
-        if(loginErrorMsg) { loginErrorMsg.textContent = 'E-mail, senha inválidos ou usuário inativo.'; loginErrorMsg.style.display = 'block'; }
-    }
-    if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Entrar'; }
-};
-
+// --- LÓGICA DE LOGIN (Ignorada no fluxo principal do Staff por URL) ---
+const handleStaffLogin = async () => { /* ... */ };
 
 const handleLogout = () => {
     // Limpa estado global
@@ -497,18 +439,8 @@ const initStaffApp = async () => {
 
         // Renderiza filtros e busca dados iniciais
         renderTableFilters();
-        //
-        // /===================================================\
-        // | INÍCIO DA ATUALIZAÇÃO (Adiciona callback 'renderMenu') |
-        // \===================================================/
-        //
         fetchWooCommerceProducts(renderMenu).catch(e => console.error("[INIT Staff] Falha ao carregar produtos:", e));
         fetchWooCommerceCategories(renderMenu).catch(e => console.error("[INIT Staff] Falha ao carregar categorias:", e));
-        //
-        // /===================================================\
-        // | FIM DA ATUALIZAÇÃO                                |
-        // \===================================================/
-        //
 
         hideStatus();
         hideLoginScreen();
@@ -550,10 +482,27 @@ const initClientApp = async () => {
     }
 };
 
+// NOVO: Função para determinar o papel do usuário a partir da URL
+const determineRoleFromPath = () => {
+    const path = window.location.pathname.toLowerCase();
+    const isStaffPage = path.includes('index.html') || (path.endsWith('/') && !path.includes('client.html'));
+    
+    if (!isStaffPage) {
+        return { role: 'anonymous', name: null };
+    }
+
+    // Mapeamento de rotas (Exemplo: pdv.fatormd.com/garcom -> role: garcom)
+    if (path.includes('/garcom')) return { role: 'garcom', name: 'Garçom' };
+    if (path.includes('/gerente')) return { role: 'gerente', name: 'Gerente' };
+    
+    // Se for apenas 'index.html' ou '/' sem rota específica, assume 'garcom'
+    return { role: 'garcom', name: 'Garçom' }; 
+};
+
 
 // --- DOMContentLoaded (Ponto de entrada) ---
-document.addEventListener('DOMContentLoaded', async () => { // Adicionado 'async'
-    console.log("[APP] DOMContentLoaded"); // Log Adicionado
+document.addEventListener('DOMContentLoaded', async () => { 
+    console.log("[APP] DOMContentLoaded"); 
     try {
         // Inicialização do Firebase
         const firebaseConfigRaw = typeof window.__firebase_config !== 'undefined' ? window.__firebase_config : null;
@@ -564,10 +513,10 @@ document.addEventListener('DOMContentLoaded', async () => { // Adicionado 'async
         const authInstance = getAuth(app);
         const functionsInstance = getFunctions(app, 'us-central1');
         initializeFirebase(dbInstance, authInstance, appIdentifier, functionsInstance);
-        console.log("[APP] Firebase Initialized"); // Log Adicionado
+        console.log("[APP] Firebase Initialized"); 
 
         const isClientMode = window.location.pathname.includes('client.html');
-        console.log(`[APP] Mode: ${isClientMode ? 'Client' : 'Staff'}`); // Log Adicionado
+        console.log(`[APP] Mode: ${isClientMode ? 'Client' : 'Staff'}`); 
 
         // Mapeamento UI
         statusScreen = document.getElementById('statusScreen');
@@ -581,37 +530,52 @@ document.addEventListener('DOMContentLoaded', async () => { // Adicionado 'async
             import('/controllers/clientOrderController.js').then(module => {
                  window.decreaseLocalItemQuantity = module.decreaseLocalItemQuantity;
                  window.increaseLocalItemQuantity = module.increaseLocalItemQuantity;
-                 console.log("[APP] Client quantity functions attached to window.");
              }).catch(err => console.error("Failed to dynamically load client quantity functions:", err));
         } else {
-             // Fluxo do Staff (LOGIN DESATIVADO)
+             // Fluxo do Staff (INICIALIZAÇÃO VIA URL)
              
-             // 1. Força o login anônimo para obter um UID, se não existir
-             if (!authInstance.currentUser) {
-                 await signInAnonymously(authInstance);
-                 console.log("[APP] Forced anonymous sign-in for Staff dev mode.");
+             const staffEntry = determineRoleFromPath();
+             
+             // 1. Define o papel e nome
+             userRole = staffEntry.role;
+             
+             if (userRole !== 'anonymous') {
+                 
+                 // 2. Força o login anônimo para obter um UID, limpando sessões anteriores para evitar conflitos
+                 const authInstance = auth;
+                 if (authInstance.currentUser) {
+                    await signOut(authInstance); 
+                    console.log("[APP] Cleared previous Firebase session.");
+                 }
+                 const userCredential = await signInAnonymously(authInstance);
+                 userId = userCredential.user.uid; 
+                 
+                 // 3. Atualiza a UI e inicializa o app
+                 const userName = staffEntry.name || 'Staff';
+                 const userIdDisplay = document.getElementById('user-id-display');
+                 if(userIdDisplay) userIdDisplay.textContent = `Usuário: ${userName} | ${userRole.toUpperCase()}`;
+                 
+                 await initStaffApp(); 
+
+                 // Oculta o botão de Gerencial se for Garçom
+                 const managerBtn = document.getElementById('openManagerPanelBtn');
+                 if (managerBtn) {
+                     managerBtn.classList.toggle('hidden', userRole !== 'gerente');
+                 }
+
+                 // Remove listeners do formulário de login (agora inútil)
+                 const loginForm = document.getElementById('loginForm');
+                 if(loginForm) loginForm.removeEventListener('submit', handleStaffLogin);
+                 
+                 // Listener de Logout/Gerencial (mantido)
+                 const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
+                 const logoutBtnHeader = document.getElementById('logoutBtnHeader');
+                 if (openManagerPanelBtn) openManagerPanelBtn.addEventListener('click', () => { window.openManagerAuthModal('goToManagerPanel'); });
+                 if (logoutBtnHeader) logoutBtnHeader.addEventListener('click', handleLogout);
+
+             } else {
+                 showLoginScreen(); 
              }
-             
-             // 2. Define o perfil padrão para o desenvolvimento
-             userRole = 'garcom'; 
-             userId = authInstance.currentUser.uid;
-             
-             // 3. Atualiza a UI e inicializa o app
-             const userIdDisplay = document.getElementById('user-id-display');
-             if(userIdDisplay) userIdDisplay.textContent = `Usuário: DEV Mode | GARCOM`;
-             
-             await initStaffApp(); // Inicia o app diretamente
-
-             // Remove listeners do formulário de login (agora inútil)
-             const loginForm = document.getElementById('loginForm');
-             if(loginForm) loginForm.removeEventListener('submit', (e) => e.preventDefault());
-
-
-             // Listener de Logout/Gerencial (mantido)
-             const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
-             const logoutBtnHeader = document.getElementById('logoutBtnHeader');
-             if (openManagerPanelBtn) openManagerPanelBtn.addEventListener('click', () => { window.openManagerAuthModal('goToManagerPanel'); });
-             if (logoutBtnHeader) logoutBtnHeader.addEventListener('click', handleLogout);
         }
 
     } catch (e) {
@@ -622,4 +586,4 @@ document.addEventListener('DOMContentLoaded', async () => { // Adicionado 'async
         console.error("Erro fatal na inicialização:", e); 
         return;
     }
-}); // <-- FECHAMENTO CORRETO DO DOMContentLoaded
+});
