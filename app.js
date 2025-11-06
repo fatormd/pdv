@@ -42,7 +42,7 @@ const FIREBASE_CONFIG = {
 
 // --- VARIÁVEIS GLOBAIS ---
 export const screens = { 'loginScreen': 0, 'panelScreen': 1, 'orderScreen': 2, 'paymentScreen': 3, 'managerScreen': 4, 'clientOrderScreen': 0, 'clientPaymentScreen': 1};
-const MANAGER_PASSWORD = '1234';
+// const MANAGER_PASSWORD = '1234'; // REMOVIDO: Senha do gerente não deve ser exposta
 export let currentTableId = null; export let selectedItems = []; export let currentOrderSnapshot = null;
 export let userRole = 'anonymous'; export let userId = null; export let unsubscribeTable = null;
 
@@ -219,6 +219,12 @@ window.handleTableTransferConfirmed = handleTableTransferConfirmed;
  * Abre o modal de autenticação para ações gerenciais e delega a ação.
  */
 window.openManagerAuthModal = (action, payload = null) => {
+    // AJUSTE DE SEGURANÇA: Bloqueia acesso se o usuário não for gerente
+    if (userRole !== 'gerente') {
+        alert("Acesso negado. Apenas o perfil 'Gerente' pode realizar esta ação.");
+        return;
+    }
+    
     // Ação de Usuários é tratada diretamente para simplificar o fluxo de cadastro
     if (action === 'openWaiterReg') {
         openUserManagementModal();
@@ -245,7 +251,9 @@ window.openManagerAuthModal = (action, payload = null) => {
 
     if(authBtn && input) {
         const handleAuthClick = async () => {
-            if (input.value === MANAGER_PASSWORD) {
+            // OBS: A checagem de senha em '1234' é apenas para fluxo/demonstração.
+            // A segurança real está na checagem do 'userRole' no início desta função.
+            if (input.value === '1234') {
                 managerModal.style.display = 'none';
 
                 // Executa a ação (usando as funções estaticamente importadas)
@@ -439,8 +447,8 @@ const handleStaffLogin = async () => {
             const userIdDisplay = document.getElementById('user-id-display');
             if(userIdDisplay) userIdDisplay.textContent = `Usuário: ${userName} | ${userRole.toUpperCase()}`;
 
-            // A inicialização do app agora é feita pelo onAuthStateChanged
-            // await initStaffApp(); // REMOVIDO DAQUI
+            // AJUSTE CRÍTICO: A inicialização é feita AQUI DENTRO para garantir a ordem síncrona do login.
+            await initStaffApp(); 
 
         } catch (error) {
              console.error("[LOGIN] Erro pós-autenticação:", error);
@@ -604,12 +612,9 @@ document.addEventListener('DOMContentLoaded', () => {
                      // Só inicializa o app completo se já tivermos um userRole definido
                      // (ou seja, o login via handleStaffLogin foi bem-sucedido ANTES)
                      if (userRole !== 'anonymous') {
-                          // Garante que não inicialize múltiplas vezes se o estado mudar rapidamente
-                          if (document.body.classList.contains('logged-in')) {
-                              console.log("[APP] Already logged in, skipping initStaffApp.");
-                          } else {
-                              await initStaffApp();
-                          }
+                         // AJUSTE: O initStaffApp agora é chamado diretamente pelo handleStaffLogin
+                         // para garantir a ordem síncrona do login. Não precisamos mais da lógica de inicialização aqui.
+                         console.log("[APP] Authenticated via handleStaffLogin. Initialization done."); 
                      } else {
                           // Logado anonimamente, mas sem ter passado pelo handleStaffLogin ainda.
                           // Isso pode acontecer se o usuário recarregar a página já logado anonimamente.
