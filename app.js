@@ -1,4 +1,4 @@
-// --- APP.JS (CORRIGIDO COM ROTAS POR URL E GARÇOM-CAIXA) ---
+// --- APP.JS (CORRIGIDO PARA ESTABILIDADE DO LOGIN MANUAL) ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapshot, writeBatch, arrayRemove, arrayUnion, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
@@ -405,8 +405,75 @@ export const selectTableAndStartListener = async (tableId) => {
 window.selectTableAndStartListener = selectTableAndStartListener;
 
 
-// --- LÓGICA DE LOGIN (Ignorada no fluxo principal do Staff por URL) ---
-const handleStaffLogin = async () => { /* ... */ };
+// --- LÓGICA DE LOGIN ---
+const handleStaffLogin = async (event) => {
+    // Adicionado event.preventDefault() para evitar recarregar a página no submit do form
+    if(event && event.preventDefault) event.preventDefault();
+    
+    // Mapeamento local para esta função
+    let loginBtn, loginEmailInput, loginPasswordInput, loginErrorMsg;
+    loginBtn = document.getElementById('loginBtn');
+    loginEmailInput = document.getElementById('loginEmail');
+    loginPasswordInput = document.getElementById('loginPassword');
+    loginErrorMsg = document.getElementById('loginErrorMsg');
+
+    if (!loginBtn || !loginEmailInput || !loginPasswordInput) { return; }
+    if (loginErrorMsg) loginErrorMsg.style.display = 'none';
+    
+    loginBtn.disabled = true; 
+    loginBtn.textContent = 'Entrando...';
+
+    const email = loginEmailInput.value.trim().toLowerCase();
+    const password = loginPasswordInput.value.trim();
+    
+    try {
+        // 1. Tenta autenticar credenciais no Firestore
+        const staffData = await authenticateUserFromFirestore(email, password);
+
+        if (staffData) {
+            userRole = staffData.role;
+            const authInstance = auth;
+            if (!authInstance) throw new Error("Firebase Auth não inicializado.");
+            
+            // 2. Limpa qualquer sessão anterior para evitar conflitos
+            if (authInstance.currentUser) {
+                await signOut(authInstance).catch(() => {});
+            }
+            
+            // 3. Obtém um novo token anônimo
+            const userCredential = await signInAnonymously(authInstance);
+            userId = userCredential.user.uid; 
+
+            const userName = staffData.name || userRole;
+            const userIdDisplay = document.getElementById('user-id-display');
+            if(userIdDisplay) userIdDisplay.textContent = `Usuário: ${userName} | ${userRole.toUpperCase()}`;
+
+            // 4. Inicializa o App
+            await initStaffApp(); 
+
+        } else {
+            // Falha na autenticação (credenciais inválidas ou usuário inativo)
+            if(loginErrorMsg) { 
+                loginErrorMsg.textContent = 'E-mail, senha inválidos ou usuário inativo.'; 
+                loginErrorMsg.style.display = 'block'; 
+            }
+            // Não reinicia o App, apenas reabilita o botão
+        }
+        
+    } catch (error) {
+         console.error("[LOGIN] Erro pós-autenticação:", error);
+         alert(`Erro ao iniciar sessão: ${error.message}.`);
+         showLoginScreen();
+         if(loginErrorMsg) { loginErrorMsg.textContent = `Erro: ${error.message}`; loginErrorMsg.style.display = 'block'; }
+    } finally {
+        // 5. Garante que o botão seja reativado se a tela não mudou
+        if (loginBtn && document.getElementById('loginScreen').style.display !== 'none') {
+             loginBtn.disabled = false; 
+             loginBtn.textContent = 'Entrar'; 
+        }
+    }
+};
+
 
 const handleLogout = () => {
     // Limpa estado global
@@ -482,7 +549,7 @@ const initClientApp = async () => {
     }
 };
 
-// NOVO: Função para determinar o papel do usuário a partir da URL
+// NOVO: Função para determinar o papel do usuário a partir da URL (apenas para referência)
 const determineRoleFromPath = () => {
     const path = window.location.pathname.toLowerCase();
     const isStaffPage = path.includes('index.html') || (path.endsWith('/') && !path.includes('client.html'));
@@ -495,8 +562,8 @@ const determineRoleFromPath = () => {
     if (path.includes('/garcom')) return { role: 'garcom', name: 'Garçom' };
     if (path.includes('/gerente')) return { role: 'gerente', name: 'Gerente' };
     
-    // Se for apenas 'index.html' ou '/' sem rota específica, assume 'garcom'
-    return { role: 'garcom', name: 'Garçom' }; 
+    // Se for apenas 'index.html' ou '/' sem rota específica, permite o login manual
+    return { role: 'manual', name: 'Manual' }; 
 };
 
 
@@ -532,73 +599,45 @@ document.addEventListener('DOMContentLoaded', async () => {
                  window.increaseLocalItemQuantity = module.increaseLocalItemQuantity;
              }).catch(err => console.error("Failed to dynamically load client quantity functions:", err));
         } else {
-             // Fluxo do Staff (HARD BYPASS DE AUTENTICAÇÃO PARA DEV/TESTES)
+             // Fluxo do Staff - USANDO AGORA O LISTENER DE AUTH REAL
              
-             const staffEntry = determineRoleFromPath();
-             
-             // 1. Define o papel
-             userRole = staffEntry.role;
-             
-             if (userRole !== 'anonymous') {
-                 
-                 // NOVO AJUSTE CRÍTICO: Tenta obter um usuário anônimo ou reutiliza o existente
-                 try {
-                     if (!authInstance.currentUser) {
-                         const userCredential = await signInAnonymously(authInstance);
-                         userId = userCredential.user.uid;
-                         console.log("[APP] Forced new anonymous sign-in (Clean Start).");
-                     } else {
-                         // Reutiliza o usuário anônimo existente (mais rápido e evita conflitos)
-                         userId = authInstance.currentUser.uid;
-                         console.log("[APP] Reusing existing anonymous session.");
-                     }
-                 } catch (e) {
-                     // Se falhar ao logar anonimamente, tenta deslogar e logar novamente
-                      console.warn("[APP] Anonymous sign-in failed. Forcing sign-out and retry.", e);
-                      // Tenta forçar a limpeza e novo login
-                      await signOut(authInstance).catch(() => {});
-                      try {
-                          const userCredential = await signInAnonymously(authInstance);
-                          userId = userCredential.user.uid;
-                          console.log("[APP] Forced new anonymous sign-in after cleanup.");
-                      } catch (e2) {
-                           console.error("[APP] Fatal: Cannot establish anonymous session even after cleanup.", e2);
-                           alert("Erro fatal de autenticação. Tente limpar o cache do navegador.");
-                           return;
-                      }
-                 }
-                 
-                 // 2. Atualiza a UI e inicializa o app
-                 const userName = staffEntry.name || 'Staff';
-                 const userIdDisplay = document.getElementById('user-id-display');
-                 if(userIdDisplay) userIdDisplay.textContent = `Usuário: ${userName} | ${userRole.toUpperCase()}`;
-                 
-                 await initStaffApp(); 
-
-                 // Oculta o botão de Gerencial se for Garçom
-                 const managerBtn = document.getElementById('openManagerPanelBtn');
-                 if (managerBtn) {
-                     managerBtn.classList.toggle('hidden', userRole !== 'gerente');
-                 }
-
-                 // Remove listeners do formulário de login (agora inútil)
-                 const loginForm = document.getElementById('loginForm');
-                 if(loginForm) {
-                      loginForm.removeEventListener('submit', handleStaffLogin);
-                      // Remove o evento de clique do botão de login (caso ele ainda esteja lá)
-                      const loginBtn = document.getElementById('loginBtn');
-                      if(loginBtn) loginBtn.removeEventListener('click', handleStaffLogin);
-                 }
-                 
-                 // Listener de Logout/Gerencial (mantido)
-                 const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
-                 const logoutBtnHeader = document.getElementById('logoutBtnHeader');
-                 if (openManagerPanelBtn) openManagerPanelBtn.addEventListener('click', () => { window.openManagerAuthModal('goToManagerPanel'); });
-                 if (logoutBtnHeader) logoutBtnHeader.addEventListener('click', handleLogout);
-
-             } else {
-                 showLoginScreen(); 
+             // 1. Restaura o listener de login para o botão 'Entrar'
+             const loginForm = document.getElementById('loginForm');
+             if (loginForm) {
+                 // Remove o listener anterior (se houver) e adiciona o novo (mais robusto)
+                 const newLoginForm = loginForm.cloneNode(true);
+                 loginForm.parentNode.replaceChild(newLoginForm, loginForm);
+                 newLoginForm.addEventListener('submit', handleStaffLogin);
              }
+
+             // 2. Listener de autenticação para Staff
+             onAuthStateChanged(authInstance, async (user) => {
+                 console.log("[APP] onAuthStateChanged:", user ? `User UID: ${user.uid}` : 'No user');
+                 
+                 // Se o usuário está logado E a variável userRole foi definida (ou seja, passou pelo handleStaffLogin com sucesso)
+                 if (user && userRole !== 'anonymous') {
+                     userId = user.uid;
+                     
+                     // Se já foi inicializado (após refresh ou nav), apenas continua
+                     if (document.body.classList.contains('logged-in')) return;
+                     
+                     // Inicia o app completo se o login manual foi bem-sucedido
+                     await initStaffApp();
+                     
+                 } else {
+                     // Nenhum usuário logado ou login manual não foi concluído
+                     if (document.getElementById('statusScreen').style.display !== 'flex') {
+                          showLoginScreen();
+                     }
+                 }
+             });
+
+             // 3. Listeners dos botões do cabeçalho (precisam ser expostos se a página carregar diretamente)
+             const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
+             const logoutBtnHeader = document.getElementById('logoutBtnHeader');
+             if (openManagerPanelBtn) openManagerPanelBtn.addEventListener('click', () => { window.openManagerAuthModal('goToManagerPanel'); });
+             if (logoutBtnHeader) logoutBtnHeader.addEventListener('click', handleLogout);
+
         }
 
     } catch (e) {
