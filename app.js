@@ -54,10 +54,8 @@ const showLoginScreen = () => {
     mainContent = document.getElementById('mainContent');
     mainHeader = document.getElementById('mainHeader');
     appContainer = document.getElementById('appContainer');
-    loginEmailInput = document.getElementById('loginEmail');
-    loginPasswordInput = document.getElementById('loginPassword');
-    loginErrorMsg = document.getElementById('loginErrorMsg');
-
+    loginScreen = document.getElementById('loginScreen');
+    
     hideStatus();
     if (mainHeader) mainHeader.style.display = 'none';
     if (mainContent) mainContent.style.display = 'block';
@@ -65,9 +63,8 @@ const showLoginScreen = () => {
     document.body.classList.add('bg-dark-bg');
     document.body.classList.remove('bg-gray-900', 'logged-in');
 
-    if(loginEmailInput) loginEmailInput.value = '';
-    if(loginPasswordInput) loginPasswordInput.value = '';
-    if(loginErrorMsg) loginErrorMsg.style.display = 'none';
+    // A TELA DE LOGIN FOI OCULTADA NO HTML, então este bloco não deve fazer nada visível
+    // É mantido para evitar erros se outras partes do código chamarem showLoginScreen()
 };
 
 const hideLoginScreen = () => {
@@ -89,6 +86,7 @@ const hideLoginScreen = () => {
 
 // --- FUNÇÃO DE AUTENTICAÇÃO VIA FIRESTORE (CORE) ---
 const authenticateUserFromFirestore = async (email, password) => {
+    // FUNÇÃO MANTIDA MAS NÃO MAIS USADA NO FLUXO DE INICIALIZAÇÃO STAFF
     try {
         if (!db) throw new Error("Conexão com banco de dados indisponível.");
         if (!appId) throw new Error("appId não está definido no firebaseService.");
