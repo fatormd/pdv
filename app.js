@@ -439,15 +439,22 @@ const handleStaffLogin = async () => {
         try {
             const authInstance = auth;
             if (!authInstance) throw new Error("Firebase Auth não inicializado.");
-            // Tenta logar anonimamente APÓS verificar no Firestore
-            const userCredential = await signInAnonymously(authInstance);
-            userId = userCredential.user.uid; // Guarda o UID anônimo
+            
+            // CORREÇÃO CRÍTICA: Evita tentar signInAnonymously se o usuário já estiver logado (e.g., pelo cliente)
+            if (!authInstance.currentUser) {
+                // Tenta logar anonimamente APÓS verificar no Firestore
+                const userCredential = await signInAnonymously(authInstance);
+                userId = userCredential.user.uid; // Guarda o UID anônimo
+            } else {
+                // Já está logado (provavelmente anonimamente), usa o UID existente.
+                userId = authInstance.currentUser.uid;
+            }
 
             const userName = staffData.name || userRole;
             const userIdDisplay = document.getElementById('user-id-display');
             if(userIdDisplay) userIdDisplay.textContent = `Usuário: ${userName} | ${userRole.toUpperCase()}`;
 
-            // AJUSTE CRÍTICO: A inicialização é feita AQUI DENTRO para garantir a ordem síncrona do login.
+            // A inicialização é feita AQUI DENTRO para garantir a ordem síncrona do login.
             await initStaffApp(); 
 
         } catch (error) {
