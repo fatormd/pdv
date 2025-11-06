@@ -91,20 +91,31 @@ const renderTables = (docs) => {
 
             const elapsedTime = lastSentAt ? formatElapsedTime(lastSentAt) : null;
             const timerHtml = elapsedTime ? `<div class="table-timer"><i class="fas fa-clock"></i> <span>${elapsedTime}</span></div>` : '';
-            const statusIconHtml = lastSentAt ? `<button class="kds-status-icon-btn" title="Status KDS" onclick="window.openKdsStatusModal(${tableId})"><i class="fas fa-tasks"></i></button>` : '';
+            
+            // NOVO: Define o botão de KDS (agora no footer do card)
+            let kdsStatusButtonHtml = '';
+            if (lastSentAt) {
+                 kdsStatusButtonHtml = `<button class="kds-status-icon-btn" title="Status KDS" onclick="window.openKdsStatusModal(${tableId})"><i class="fas fa-tasks"></i></button>`;
+            }
+            
+            // NOVO: Define o botão de Agrupar Mesas (top-left) - Chama o modal de autenticação
+            const mergeIconHtml = isMerged ? '' : `<button class="merge-icon-btn" title="Agrupar Mesas" onclick="window.openManagerAuthModal('openTableMerge', ${tableId})"><i class="fas fa-people-arrows"></i></button>`;
+            
             const clientInfo = table.clientName ? `<p class="text-xs font-semibold">${table.clientName}</p>` : '';
             
             const statusText = isMerged ? `Agrupada (Mestra: ${table.masterTable})` : `Pessoas: ${table.diners}`;
 
             const cardHtml = `
                 <div class="table-card-panel ${cardColorClasses} shadow-md transition-colors duration-200 relative" data-table-id="${tableId}">
-                    ${attentionIconHtml} ${statusIconHtml}
+                    ${mergeIconHtml} ${attentionIconHtml}
                     <h3 class="font-bold text-2xl">Mesa ${table.tableNumber}</h3>
                     <p class="text-xs font-light">Setor: ${table.sector || 'N/A'}</p>
                     ${clientInfo}
                     <span class="font-bold text-lg mt-2">${formatCurrency(total)}</span>
                     <p class="text-xs font-light mt-1">${statusText}</p>
-                    ${timerHtml}
+                    <div class="flex items-center justify-center space-x-2 w-full mt-2">
+                         ${kdsStatusButtonHtml} ${timerHtml}
+                    </div>
                 </div>`;
             openTablesList.innerHTML += cardHtml;
         }
@@ -118,7 +129,8 @@ const renderTables = (docs) => {
         const newCard = card.cloneNode(true);
         card.parentNode.replaceChild(newCard, card);
         newCard.addEventListener('click', (e) => {
-            if (e.target.closest('.kds-status-icon-btn') || e.target.closest('.attention-icon')) return;
+            // AJUSTE: Ignora o clique se for nos novos botões de ícone
+            if (e.target.closest('.kds-status-icon-btn') || e.target.closest('.attention-icon') || e.target.closest('.merge-icon-btn')) return;
             const tableId = newCard.dataset.tableId;
             if (tableId) {
                 // Chama a função importada do app.js
@@ -444,5 +456,5 @@ export const initPanelController = () => {
 
 
     panelInitialized = true;
-    console.log("[PanelController] Inicializado.");
+    console.log("[PanelController] Inicializando.");
 };
