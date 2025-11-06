@@ -1,4 +1,4 @@
-// --- APP.JS (AGORA SEM LOGIN MANUAL E COM BYPASS DE SESSÃO) ---
+// --- APP.JS (VERSÃO FINAL SEM MODAL DE LOGIN MANUAL) ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapshot, writeBatch, arrayRemove, arrayUnion, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
@@ -50,21 +50,19 @@ export const hideStatus = () => {
 };
 
 const showLoginScreen = () => {
+    // ESTA FUNÇÃO FOI NEUTRALIZADA NO FLUXO STAFF. 
+    // A tela de login é oculta via HTML/CSS.
     statusScreen = document.getElementById('statusScreen');
     mainContent = document.getElementById('mainContent');
     mainHeader = document.getElementById('mainHeader');
     appContainer = document.getElementById('appContainer');
-    loginScreen = document.getElementById('loginScreen');
-    
+
     hideStatus();
     if (mainHeader) mainHeader.style.display = 'none';
     if (mainContent) mainContent.style.display = 'block';
     if (appContainer) appContainer.style.transform = `translateX(0vw)`;
     document.body.classList.add('bg-dark-bg');
     document.body.classList.remove('bg-gray-900', 'logged-in');
-
-    // A TELA DE LOGIN FOI OCULTADA NO HTML, então este bloco não deve fazer nada visível
-    // É mantido para evitar erros se outras partes do código chamarem showLoginScreen()
 };
 
 const hideLoginScreen = () => {
@@ -228,7 +226,7 @@ window.openManagerAuthModal = (action, payload = null) => {
             <p class="text-base mb-3 text-dark-text">Insira a senha do gerente para prosseguir.</p>
             <input type="password" id="managerPasswordInput" placeholder="Senha" class="w-full p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text placeholder-dark-placeholder focus:ring-red-500 focus:border-red-500 text-base" maxlength="4" autocomplete="current-password">
             <div class="flex justify-end space-x-3 mt-4">
-                <button class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition text-base" onclick="document.getElementById('managerModal').style.display='none'">Cancelar</button>
+                <button class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('managerModal').style.display='none'">Cancelar</button>
                 <button id="authManagerBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-base">Autenticar</button>
             </div>
         </div>
@@ -564,7 +562,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                  if (logoutBtnHeader) logoutBtnHeader.addEventListener('click', handleLogout);
                  
              } else {
-                 // Caso fallback (Deve ser a tela de cliente)
+                 // Este bloco agora é inacessível, mas o código de fallback permanece
+                 // Caso o usuário tente acessar um link que não seja /garcom ou /gerente.
                  showLoginScreen(); 
              }
         }
