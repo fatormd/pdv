@@ -164,10 +164,48 @@ body:not(.logged-in) #mainContent {
  }
  .table-card-panel.status-pending:hover { background-color: #4338ca; }
 
-.table-timer { color: #9ca3af; /* Cinza 400 */ font-size: 0.75rem; margin-top: 0.5rem; display: flex; align-items: center; justify-content: center; gap: 0.25rem;}
+.table-timer { color: #9ca3af; /* Cinza 400 */ font-size: 0.75rem; display: flex; align-items: center; justify-content: center; gap: 0.25rem;}
 .table-timer i { font-size: 0.75rem; }
-.attention-icon { position: absolute; top: 0.5rem; right: 0.5rem; font-size: 1.25rem; z-index: 10; color: #fbbf24; /* yellow-400 - Espera/Pendente */ }
-.kds-status-icon-btn { position: absolute; top: 0.5rem; left: 0.5rem; color: #a5b4fc; /* indigo-300 */ font-size: 1.25rem; z-index: 10; background: none; border: none; cursor: pointer; padding: 0; line-height: 1;}
+
+/* Botão de Agrupar Mesas (NOVO: Top-left) */
+.merge-icon-btn { 
+    position: absolute; 
+    top: 0.5rem; 
+    left: 0.5rem; 
+    color: #ff7518; /* pumpkin */ 
+    font-size: 1.25rem; 
+    z-index: 10; 
+    background: none; 
+    border: none; 
+    cursor: pointer; 
+    padding: 0; 
+    line-height: 1;
+}
+.merge-icon-btn:hover { color: #e46815; } /* pumpkin-dark */
+
+
+/* Ícone de Alerta (Permanece Top-right) */
+.attention-icon { 
+    position: absolute; 
+    top: 0.5rem; 
+    right: 0.5rem; 
+    font-size: 1.25rem; 
+    z-index: 10; 
+    color: #fbbf24; /* yellow-400 - Espera/Pendente */ 
+}
+
+
+/* Botão de Status KDS (AJUSTADO: Removido 'position: absolute' e 'top/left') */
+.kds-status-icon-btn { 
+    color: #a5b4fc; /* indigo-300 */ 
+    font-size: 1rem; /* Tamanho ajustado para o footer */
+    background: none; 
+    border: none; 
+    cursor: pointer; 
+    padding: 0; 
+    line-height: 1;
+    margin-right: 0.5rem; /* Margem para separar do timer */
+}
 .kds-status-icon-btn:hover { color: #c7d2fe; } /* indigo-200 */
 
 
