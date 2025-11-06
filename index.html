@@ -120,6 +120,11 @@
          .custom-scrollbar::-webkit-scrollbar-thumb:hover {
             background-color: #6b7280; /* Cor da barra ao passar o mouse */
         }
+        
+        /* ESTILO PARA OCULTAR O LOGIN DO FLUXO PRINCIPAL */
+        #loginScreen {
+            display: none !important;
+        }
 
     </style>
 </head>
@@ -150,8 +155,7 @@
         </div>
     </header>
 
-    <main id="mainContent" class="relative overflow-hidden" style="display: none;">
-        <div id="appContainer" class="flex transition-transform duration-300 ease-out" style="width: 500vw;">
+    <main id="mainContent" class="relative overflow-hidden" style="display: block;"> <div id="appContainer" class="flex transition-transform duration-300 ease-out" style="width: 500vw;">
 
             <div id="loginScreen" class="w-screen flex-shrink-0 flex items-center justify-center p-4 bg-dark-bg print-hide">
                  <div class="content-card bg-dark-card p-8 rounded-xl shadow-2xl w-full max-w-sm text-center">
@@ -395,7 +399,7 @@
                  <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Ponto Mais">Ponto Mais</button>
                  <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" data-obs="Bem Passado">Bem Passado</button>
             </div>
-            <textarea id="obsInput" rows="3" placeholder="Ex: Sem cebola, Ponto da carne..." class="input-pdv w-full p-3 text-base"></textarea>
+            <textarea id="obsInput" rows="3" placeholder="Ex: Sem cebola, Ponto da carne mal passada..." class="input-pdv w-full p-3 text-base"></textarea>
             <div class="flex items-center justify-between mt-3 mb-4">
                  <span class="text-dark-text font-semibold">Item em Espera?</span>
                  <label class="switch-obs">
