@@ -215,7 +215,7 @@
     <div id="customAlertModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         </div>
 
-    <div id="associationModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4" style="display: none;">
+    <div id="associationModal" class="fixed inset-0 bg-gray-900 bg-opacity-7Garante que o container ocupe a altura75 flex items-center justify-center z-50 p-4" style="display: none;">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
             <h3 class="text-xl font-bold mb-4 text-pumpkin">Associar à Mesa</h3>
             <p class="text-base mb-4 text-dark-text">Para enviar seu pedido, precisamos saber qual é a sua mesa e um contato.</p>
@@ -294,8 +294,9 @@
         // window.openProductInfoModal = () => {}; // Definido dinamicamente
         window.handleTableTransferConfirmed = () => {};
 
+        // ==== INÍCIO DA CORREÇÃO: Usa o app_id correto do Firebase ====
         // Config Firebase (mantida)
-        window.__app_id = "pdv_fator_instance_001";
+        window.__app_id = "1:1097659747429:web:8ec0a7c3978c311dbe0a8c";
         window.__firebase_config = JSON.stringify({
             apiKey: "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY",
             authDomain: "fator-pdv.firebaseapp.com",
@@ -304,6 +305,7 @@
             messagingSenderId: "1097659747429",
             appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c" // Corrigido appId se necessário
         });
+        // ==== FIM DA CORREÇÃO ====
     </script>
 
     <script type="module" src="app.js"></script>
