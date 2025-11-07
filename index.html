@@ -567,7 +567,12 @@
                         <label for="userEmailInput" class="block text-sm font-medium text-dark-placeholder mb-1">E-mail (Login)*</label>
                         <input type="email" id="userEmailInput" placeholder="email@exemplo.com" class="input-pdv w-full" required autocomplete="username">
                     </div>
-                     
+                    
+                    <div id="userPasswordContainer">
+                        <label for="userPasswordInput" class="block text-sm font-medium text-dark-placeholder mb-1">Senha*</label>
+                        <input type="password" id="userPasswordInput" placeholder="Senha (mínimo 6 caracteres)" class="input-pdv w-full" autocomplete="new-password">
+                        <p id="passwordHint" class="text-xs text-dark-placeholder mt-1" style="display: none;">Deixe em branco para não alterar a senha existente.</p>
+                    </div>
                     <div>
                         <label for="userRoleSelect" class="block text-sm font-medium text-dark-placeholder mb-1">Função (Papel)*</label>
                         <select id="userRoleSelect" class="input-pdv w-full" required>
