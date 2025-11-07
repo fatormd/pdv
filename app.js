@@ -87,7 +87,14 @@ const hideLoginScreen = () => {
 
     const logoutBtn = document.getElementById('logoutBtnHeader');
     const managerBtn = document.getElementById('openManagerPanelBtn');
+    
+    // ==== INÍCIO DA CORREÇÃO ====
+    const cashierBtn = document.getElementById('openCashierBtn'); // Mapeia o botão de caixa
+
     if (logoutBtn) logoutBtn.classList.remove('hidden');
+    if (cashierBtn) cashierBtn.classList.remove('hidden'); // Exibe o botão de caixa para todos os staff
+    // ==== FIM DA CORREÇÃO ====
+    
     // Mostra botão de gerente APENAS se for Gerente
     if (managerBtn) {
         managerBtn.classList.toggle('hidden', userRole !== 'gerente');
@@ -602,6 +609,20 @@ document.addEventListener('DOMContentLoaded', async () => {
              // Listeners do cabeçalho (mantidos)
              const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
              const logoutBtnHeader = document.getElementById('logoutBtnHeader');
+             
+             // ==== INÍCIO DA CORREÇÃO (Mapeia o botão de caixa aqui também) ====
+             const cashierBtn = document.getElementById('openCashierBtn');
+             if (cashierBtn) {
+                 // Adiciona um listener (mesmo que seja só um alerta por enquanto)
+                 cashierBtn.addEventListener('click', () => {
+                     alert("Módulo de 'Meu Caixa' em desenvolvimento.");
+                     // No futuro, você pode chamar uma função como:
+                     // window.openManagerAuthModal('openCashManagement');
+                     // ou uma função específica do garçom
+                 });
+             }
+             // ==== FIM DA CORREÇÃO ====
+
              if (openManagerPanelBtn) openManagerPanelBtn.addEventListener('click', () => { window.openManagerAuthModal('goToManagerPanel'); });
              if (logoutBtnHeader) logoutBtnHeader.addEventListener('click', handleLogout);
         }
