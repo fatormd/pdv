@@ -50,8 +50,9 @@ export const hideStatus = () => {
 };
 
 const showLoginScreen = () => {
-    // ESTA FUNÇÃO FOI NEUTRALIZADA NO FLUXO STAFF. 
-    // A tela de login é oculta via HTML/CSS.
+    // CORREÇÃO CRÍTICA: Se for modo Staff (index.html), esta função apenas esconde o status inicial
+    // e garante que o mainContent seja exibido, sem tentar forçar a exibição do formulário de login (que está oculto).
+    
     statusScreen = document.getElementById('statusScreen');
     mainContent = document.getElementById('mainContent');
     mainHeader = document.getElementById('mainHeader');
@@ -59,7 +60,7 @@ const showLoginScreen = () => {
 
     hideStatus();
     if (mainHeader) mainHeader.style.display = 'none';
-    if (mainContent) mainContent.style.display = 'block';
+    if (mainContent) mainContent.style.display = 'block'; // Garante que o container principal apareça
     if (appContainer) appContainer.style.transform = `translateX(0vw)`;
     document.body.classList.add('bg-dark-bg');
     document.body.classList.remove('bg-gray-900', 'logged-in');
@@ -226,7 +227,7 @@ window.openManagerAuthModal = (action, payload = null) => {
             <p class="text-base mb-3 text-dark-text">Insira a senha do gerente para prosseguir.</p>
             <input type="password" id="managerPasswordInput" placeholder="Senha" class="w-full p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text placeholder-dark-placeholder focus:ring-red-500 focus:border-red-500 text-base" maxlength="4" autocomplete="current-password">
             <div class="flex justify-end space-x-3 mt-4">
-                <button class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('managerModal').style.display='none'">Cancelar</button>
+                <button class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition text-base" onclick="document.getElementById('managerModal').style.display='none'">Cancelar</button>
                 <button id="authManagerBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-base">Autenticar</button>
             </div>
         </div>
