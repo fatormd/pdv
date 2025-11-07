@@ -606,16 +606,17 @@
     </script>
 
     <script>
-        // Config Firebase (copiado do client.html)
-        // Isso corrige o erro de permissão, pois agora o app.js sabe o ID correto do banco
-        window.__app_id = "pdv_fator_instance_001";
+        // Config Firebase
+        // Este é o ID do seu documento no Firestore (visto na captura de tela)
+        window.__app_id = "1:1097659747429:web:8ec0a7c3978c311dbe0a8c";
+        
         window.__firebase_config = JSON.stringify({
             apiKey: "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY",
             authDomain: "fator-pdv.firebaseapp.com",
             projectId: "fator-pdv",
             storageBucket: "fator-pdv.appspot.com",
             messagingSenderId: "1097659747429",
-            appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c" // Usando o appId do client.html
+            appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c" // Este é o App ID do projeto
         });
     </script>
     <script type="module" src="app.js"></script>
