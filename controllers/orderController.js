@@ -1,10 +1,12 @@
-// --- CONTROLLERS/ORDERCONTROLLER.JS (Painel 2 - CORRIGIDO) ---
+// --- CONTROLLERS/ORDERCONTROLLER.JS (ATUALIZADO com Obs Dinâmicas) ---
 import { getProducts, getCategories } from "/services/wooCommerceService.js";
 import { formatCurrency } from "/utils.js";
 import { saveSelectedItemsToFirebase } from "/services/firebaseService.js";
 import { currentTableId, selectedItems, userRole, currentOrderSnapshot, screens } from "/app.js"; 
-import { arrayUnion, serverTimestamp, doc, setDoc, updateDoc, arrayRemove } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { getKdsCollectionRef, getTableDocRef } from "/services/firebaseService.js";
+// ==== NOVO: Importa getDocs e query ====
+import { arrayUnion, serverTimestamp, doc, setDoc, updateDoc, arrayRemove, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+// ==== NOVO: Importa a nova referência ====
+import { getKdsCollectionRef, getTableDocRef, getQuickObsCollectionRef } from "/services/firebaseService.js";
 import { goToScreen } from "/app.js"; 
 
 
@@ -13,7 +15,7 @@ let obsModal, obsItemName, obsInput, saveObsBtn, cancelObsBtn, esperaSwitch;
 let searchProductInput, categoryFiltersContainer, menuItemsGrid;
 let openOrderList, openItemsCount, sendSelectedItemsBtn;
 let quickObsButtons;
-let clientPendingOrdersContainer; // NOVO: Container para pedidos pendentes do cliente
+let clientPendingOrdersContainer; 
 
 // Estado local do módulo
 let currentSearch = '';
@@ -23,18 +25,17 @@ let orderInitialized = false;
 
 // --- FUNÇÕES DE AÇÃO GERAL ---
 
-// Função mantida (aumenta item no carrinho do GARÇOM)
 export const increaseLocalItemQuantity = (itemId, noteKey) => {
+    // ... (sem alteração)
     const itemToCopy = selectedItems.findLast(item =>
         item.id == itemId && (item.note || '') === noteKey
     );
 
     if (itemToCopy) {
-        selectedItems.push({ ...itemToCopy }); // MUTATE (OK)
-        renderOrderScreen(currentOrderSnapshot); // Re-renderiza tudo
-        saveSelectedItemsToFirebase(currentTableId, selectedItems); // Salva no Firebase
+        selectedItems.push({ ...itemToCopy }); 
+        renderOrderScreen(currentOrderSnapshot); 
+        saveSelectedItemsToFirebase(currentTableId, selectedItems); 
     } else {
-        // Se não encontrar, adiciona um novo (caso raro)
         const products = getProducts();
         const product = products.find(p => p.id == itemId);
         if (product) {
@@ -48,8 +49,8 @@ export const increaseLocalItemQuantity = (itemId, noteKey) => {
 window.increaseLocalItemQuantity = increaseLocalItemQuantity;
 
 
-// Função mantida (diminui item no carrinho do GARÇOM)
 export const decreaseLocalItemQuantity = (itemId, noteKey) => {
+    // ... (sem alteração)
     let indexToRemove = -1;
     for (let i = selectedItems.length - 1; i >= 0; i--) {
         if (selectedItems[i].id == itemId && (selectedItems[i].note || '') === noteKey) {
@@ -59,9 +60,9 @@ export const decreaseLocalItemQuantity = (itemId, noteKey) => {
     }
 
     if (indexToRemove > -1) {
-        selectedItems.splice(indexToRemove, 1); // MUTATE (OK)
-        renderOrderScreen(currentOrderSnapshot); // Re-renderiza tudo
-        saveSelectedItemsToFirebase(currentTableId, selectedItems); // Salva no Firebase
+        selectedItems.splice(indexToRemove, 1); 
+        renderOrderScreen(currentOrderSnapshot); 
+        saveSelectedItemsToFirebase(currentTableId, selectedItems); 
     }
 };
 window.decreaseLocalItemQuantity = decreaseLocalItemQuantity;
@@ -70,6 +71,7 @@ window.decreaseLocalItemQuantity = decreaseLocalItemQuantity;
 // --- FUNÇÕES DE EXIBIÇÃO DE TELA E MODAL ---
 
 export const renderMenu = () => {
+    // ... (sem alteração)
     if (!menuItemsGrid || !categoryFiltersContainer) {
         return;
     }
@@ -77,14 +79,12 @@ export const renderMenu = () => {
     const products = getProducts();
     const categories = getCategories();
 
-    // 1. Renderiza Filtros de Categoria (se ainda não renderizados)
     if (categories.length > 0 && categoryFiltersContainer.innerHTML.trim() === '') {
         categoryFiltersContainer.innerHTML = categories.map(cat => {
             const isActive = cat.slug === currentCategoryFilter ? 'bg-pumpkin text-white' : 'bg-dark-input text-dark-text border border-gray-600';
             return `<button class="category-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap ${isActive}" data-category="${cat.slug || cat.id}">${cat.name}</button>`;
         }).join('');
     }
-     // Atualiza o estado ativo dos botões de categoria
      categoryFiltersContainer.querySelectorAll('.category-btn').forEach(btn => {
         const isActive = btn.dataset.category === currentCategoryFilter;
         btn.classList.toggle('bg-pumpkin', isActive);
@@ -95,8 +95,6 @@ export const renderMenu = () => {
         btn.classList.toggle('border-pumpkin', isActive);
     });
 
-
-    // 2. Filtra Produtos baseado no estado atual
     let filteredProducts = products;
     if (currentSearch) {
         const normalizedSearch = currentSearch.toLowerCase();
@@ -106,17 +104,12 @@ export const renderMenu = () => {
         filteredProducts = filteredProducts.filter(p => p.category === currentCategoryFilter);
     }
 
-    // 3. Renderiza Itens do Cardápio
     if (filteredProducts.length === 0) {
         menuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-red-400 italic">Nenhum produto encontrado.</div>`;
     } else {
-        
-        // ==== Layout do Card "Clean" (sem categoria) ====
         menuItemsGrid.innerHTML = filteredProducts.map(product => `
             <div class="product-card bg-dark-card border border-gray-700 p-4 rounded-xl shadow-md cursor-pointer hover:shadow-lg transition duration-150 flex flex-col justify-between" style="min-height: 140px;">
-                
                 <h4 class="font-bold text-base text-dark-text flex-grow">${product.name}</h4>
-                
                 <div class="flex justify-between items-center mt-2">
                     <span class="font-bold text-lg text-pumpkin">${formatCurrency(product.price)}</span>
                     <button class="add-item-btn add-icon-btn bg-green-600 text-white hover:bg-green-700 transition"
@@ -129,8 +122,8 @@ export const renderMenu = () => {
     }
 };
 
-// Renderiza a lista de itens selecionados (Carrinho do Garçom)
 const _renderSelectedItemsList = () => {
+    // ... (sem alteração)
     if (!openOrderList || !openItemsCount || !sendSelectedItemsBtn) return;
 
     const openItemsCountValue = selectedItems.length;
@@ -151,11 +144,10 @@ const _renderSelectedItemsList = () => {
             <div class="flex justify-between items-center bg-dark-input border border-gray-600 p-3 rounded-lg shadow-sm">
                 <div class="flex flex-col flex-grow min-w-0 mr-2">
                     <span class="font-semibold text-dark-text">${group.name} (${group.count}x)</span>
-                    
                     <span class="text-sm cursor-pointer text-indigo-300 hover:text-indigo-200" data-item-id="${group.id}" data-item-note-key="${group.note || ''}">
                         ${group.note ? `<span class="text-yellow-400">(${group.note.replace(' [EM ESPERA]', '')})</span>${group.note.includes('[EM ESPERA]') ? ' <i class="fas fa-pause-circle text-yellow-400"></i>' : ''}` : `(Adicionar Obs.)`}
                     </span>
-                    </div>
+                </div>
                 <div class="flex items-center space-x-2 flex-shrink-0">
                     <button class="qty-btn bg-red-600 text-white rounded-full h-8 w-8 flex items-center justify-center text-lg hover:bg-red-700 transition duration-150"
                             data-item-id="${group.id}" data-item-note-key="${group.note || ''}" data-action="decrease">
@@ -171,19 +163,17 @@ const _renderSelectedItemsList = () => {
     }
 };
 
-// ==================================================================
-//               NOVA FUNÇÃO: RENDERIZAR PEDIDOS PENDENTES DO CLIENTE
-// ==================================================================
 const _renderPendingClientOrders = (requestedOrders = []) => {
+    // ... (sem alteração)
     if (!clientPendingOrdersContainer) return;
 
     if (!requestedOrders || requestedOrders.length === 0) {
-        clientPendingOrdersContainer.innerHTML = ''; // Limpa se não houver pedidos
-        clientPendingOrdersContainer.classList.add('hidden'); // Esconde o container
+        clientPendingOrdersContainer.innerHTML = ''; 
+        clientPendingOrdersContainer.classList.add('hidden'); 
         return;
     }
 
-    clientPendingOrdersContainer.classList.remove('hidden'); // Mostra o container
+    clientPendingOrdersContainer.classList.remove('hidden'); 
 
     clientPendingOrdersContainer.innerHTML = `
         <h3 class="text-lg font-semibold text-yellow-400 mb-2 flex items-center">
@@ -216,26 +206,18 @@ const _renderPendingClientOrders = (requestedOrders = []) => {
         </div>
     `;
 
-    // Reanexa listeners para os botões de aprovar/rejeitar
     _attachPendingOrderListeners();
 };
 
-// ==================================================================
-//               FUNÇÃO PRINCIPAL DE RENDERIZAÇÃO (ATUALIZADA)
-// ==================================================================
 export const renderOrderScreen = (orderSnapshot) => {
-    // A lógica de atualização do array 'selectedItems' está no app.js.
-    // Esta função RENDERIZA o estado atual + os pedidos pendentes.
-    
-    _renderSelectedItemsList(); // Renderiza o carrinho do Garçom
-    _renderPendingClientOrders(orderSnapshot?.requestedOrders); // Renderiza os pedidos pendentes do cliente
-    renderMenu(); // Renderiza o cardápio
+    // ... (sem alteração)
+    _renderSelectedItemsList(); 
+    _renderPendingClientOrders(orderSnapshot?.requestedOrders); 
+    renderMenu(); 
 };
 
-// ==================================================================
-//               NOVAS FUNÇÕES: APROVAR/REJEITAR PEDIDO CLIENTE
-// ==================================================================
 export const handleApproveClientOrder = async (orderId) => {
+    // ... (sem alteração)
     if (!currentTableId || !currentOrderSnapshot || !orderId) return;
 
     const requestedOrders = currentOrderSnapshot.requestedOrders || [];
@@ -249,26 +231,18 @@ export const handleApproveClientOrder = async (orderId) => {
     const itemsToAdd = orderToApprove.items || [];
     if (itemsToAdd.length === 0) {
         alert("Erro: Pedido do cliente está vazio.");
-        return; // Ou apenas rejeita
+        return; 
     }
     
     try {
         const tableRef = getTableDocRef(currentTableId);
         
-        // Adiciona os itens aprovados ao carrinho do Garçom (selectedItems)
-        // Usa arrayUnion para garantir que não haja duplicatas exatas, 
-        // mas permite adicionar itens iguais com notas diferentes ou do mesmo tipo.
-        // A lógica de soma será feita no envio para KDS.
         await updateDoc(tableRef, {
             selectedItems: arrayUnion(...itemsToAdd), 
-            requestedOrders: arrayRemove(orderToApprove), // Remove o pedido pendente
-            // Se não houver mais pedidos pendentes, limpa a flag de alerta
+            requestedOrders: arrayRemove(orderToApprove), 
             clientOrderPending: requestedOrders.length > 1, 
-            waiterNotification: null // Limpa a notificação (opcional)
+            waiterNotification: null 
         });
-
-        // O listener onSnapshot no app.js atualizará 'selectedItems' localmente
-        // e chamará renderOrderScreen para atualizar a UI.
         
         alert(`Pedido do cliente aprovado e ${itemsToAdd.length} item(ns) adicionados ao carrinho.`);
 
@@ -277,10 +251,11 @@ export const handleApproveClientOrder = async (orderId) => {
         alert("Falha ao aprovar o pedido do cliente.");
     }
 };
-window.handleApproveClientOrder = handleApproveClientOrder; // Expor globalmente
+window.handleApproveClientOrder = handleApproveClientOrder; 
 
 
 export const handleRejectClientOrder = async (orderId) => {
+    // ... (sem alteração)
     if (!currentTableId || !currentOrderSnapshot || !orderId) return;
 
     const requestedOrders = currentOrderSnapshot.requestedOrders || [];
@@ -299,14 +274,10 @@ export const handleRejectClientOrder = async (orderId) => {
         const tableRef = getTableDocRef(currentTableId);
         
         await updateDoc(tableRef, {
-            requestedOrders: arrayRemove(orderToReject), // Remove o pedido pendente
-            // Se não houver mais pedidos pendentes, limpa a flag de alerta
+            requestedOrders: arrayRemove(orderToReject), 
             clientOrderPending: requestedOrders.length > 1, 
-            waiterNotification: null // Limpa a notificação (opcional)
+            waiterNotification: null 
         });
-
-        // O listener onSnapshot no app.js atualizará 'requestedOrders' localmente
-        // e chamará renderOrderScreen para atualizar a UI.
         
         alert("Pedido do cliente rejeitado.");
 
@@ -315,21 +286,19 @@ export const handleRejectClientOrder = async (orderId) => {
         alert("Falha ao rejeitar o pedido do cliente.");
     }
 };
-window.handleRejectClientOrder = handleRejectClientOrder; // Expor globalmente
+window.handleRejectClientOrder = handleRejectClientOrder; 
 
 
-// Função auxiliar para reanexar listeners dos botões de aprovação/rejeição
 const _attachPendingOrderListeners = () => {
+    // ... (sem alteração)
      clientPendingOrdersContainer?.querySelectorAll('.approve-client-order-btn').forEach(btn => {
          const orderId = btn.dataset.orderId;
-         // Remove listener antigo e adiciona novo para evitar duplicação
          const newBtn = btn.cloneNode(true);
          btn.parentNode.replaceChild(newBtn, btn);
          newBtn.addEventListener('click', () => handleApproveClientOrder(orderId));
      });
      clientPendingOrdersContainer?.querySelectorAll('.reject-client-order-btn').forEach(btn => {
          const orderId = btn.dataset.orderId;
-         // Remove listener antigo e adiciona novo para evitar duplicação
          const newBtn = btn.cloneNode(true);
          btn.parentNode.replaceChild(newBtn, btn);
          newBtn.addEventListener('click', () => handleRejectClientOrder(orderId));
@@ -338,11 +307,64 @@ const _attachPendingOrderListeners = () => {
 
 
 // ==================================================================
+//               OBSERVAÇÕES RÁPIDAS (NOVAS FUNÇÕES)
+// ==================================================================
+
+/**
+ * Renderiza os botões de observação rápida no container.
+ * @param {HTMLElement} buttonsContainer - O div#quickObsButtons.
+ * @param {Array} observations - Array de documentos { text: 'String' } do Firebase.
+ */
+const renderQuickObsButtons = (buttonsContainer, observations) => {
+    if (!buttonsContainer) return;
+
+    if (observations.length === 0) {
+        buttonsContainer.innerHTML = '<p class="text-xs text-dark-placeholder italic">Nenhuma obs. rápida cadastrada.</p>';
+        return;
+    }
+
+    buttonsContainer.innerHTML = observations.map(obs => {
+        const obsText = obs.text || 'Erro';
+        return `
+            <button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input text-dark-text rounded-full hover:bg-gray-600 transition" 
+                    data-obs="${obsText}">
+                ${obsText}
+            </button>
+        `;
+    }).join('');
+};
+
+/**
+ * Busca as observações rápidas do Firebase e chama o render.
+ * @param {HTMLElement} buttonsContainer - O div#quickObsButtons.
+ */
+const fetchQuickObservations = async (buttonsContainer) => {
+    if (!buttonsContainer) return;
+    try {
+        const obsCollectionRef = getQuickObsCollectionRef();
+        // Ordena por texto (alfabeticamente)
+        const q = query(obsCollectionRef, orderBy('text', 'asc')); 
+        const querySnapshot = await getDocs(q);
+        
+        const observations = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        renderQuickObsButtons(buttonsContainer, observations);
+
+    } catch (error) {
+        console.error("Erro ao buscar observações rápidas:", error);
+        if (buttonsContainer) {
+            buttonsContainer.innerHTML = '<p class="text-xs text-red-400">Erro ao carregar obs.</p>';
+        }
+    }
+};
+
+
+// ==================================================================
 //               FUNÇÕES RESTANTES (OBS, ADD ITEM, ENVIO KDS)
 // ==================================================================
 
-// Abertura do Modal de Observações (Apenas Staff)
 export const openObsModalForGroup = (itemId, noteKey) => {
+    // ... (sem alteração)
     const products = getProducts();
     const product = products.find(p => p.id == itemId);
 
@@ -357,7 +379,7 @@ export const openObsModalForGroup = (itemId, noteKey) => {
     obsInput.value = currentNoteCleaned;
 
     obsModal.dataset.itemId = itemId;
-    obsModal.dataset.originalNoteKey = noteKey; // Chave original
+    obsModal.dataset.originalNoteKey = noteKey; 
 
     esperaSwitch.checked = noteKey.toLowerCase().includes('espera');
 
@@ -366,11 +388,11 @@ export const openObsModalForGroup = (itemId, noteKey) => {
 
     obsModal.style.display = 'flex';
 };
-window.openObsModalForGroup = openObsModalForGroup; // Expor globalmente
+window.openObsModalForGroup = openObsModalForGroup; 
 
 
-// Adicionar Produto à Lista de Selecionados (chamado pelo botão + no cardápio)
 export const addItemToSelection = (product) => {
+    // ... (sem alteração)
     if (!currentTableId) {
         alert("Selecione ou abra uma mesa primeiro.");
         return;
@@ -389,17 +411,17 @@ export const addItemToSelection = (product) => {
         note: ''
     };
 
-    selectedItems.push(newItem); // MUTATE (OK)
+    selectedItems.push(newItem); 
 
-    renderOrderScreen(currentOrderSnapshot); // Atualiza a UI
-    saveSelectedItemsToFirebase(currentTableId, selectedItems); // Salva no Firebase
+    renderOrderScreen(currentOrderSnapshot); 
+    saveSelectedItemsToFirebase(currentTableId, selectedItems); 
 
-    openObsModalForGroup(product.id, ''); // Abre modal para o item recém-adicionado
+    openObsModalForGroup(product.id, ''); 
 };
 
 
-// Envia Pedidos ao KDS e Resumo (Função de Staff)
 export const handleSendSelectedItems = async () => {
+    // ... (sem alteração)
     if (!currentTableId || selectedItems.length === 0) return;
 
     if (!confirm(`Confirmar o envio de ${selectedItems.length} item(s) para a produção?`)) return;
@@ -456,25 +478,23 @@ export const handleSendSelectedItems = async () => {
         const newTotal = currentTotal + itemsToSendValue;
 
         await updateDoc(tableRef, {
-            sentItems: arrayUnion(...itemsForFirebase), // Adiciona itens enviados
-            selectedItems: itemsToHold,                // Atualiza selecionados (só os em espera)
-            total: newTotal,                           // ATUALIZA O TOTAL
-            lastKdsSentAt: serverTimestamp()           // Atualiza timestamp do último envio
+            sentItems: arrayUnion(...itemsForFirebase), 
+            selectedItems: itemsToHold,                
+            total: newTotal,                           
+            lastKdsSentAt: serverTimestamp()           
         });
         console.log("[Order] Mesa atualizada com sucesso.");
 
-        // Sucesso: Atualiza o estado local e UI
         selectedItems.length = 0;
         selectedItems.push(...itemsToHold);
         
-        renderOrderScreen(currentOrderSnapshot); // Re-renderiza
+        renderOrderScreen(currentOrderSnapshot); 
 
         alert(`Pedido enviado! ${itemsToHold.length > 0 ? `(${itemsToHold.length} itens retidos em espera)` : ''}`);
 
     } catch (e) {
         console.error("Erro ao enviar pedido:", e);
         alert("Falha ao enviar pedido ao KDS/Firebase. Tente novamente.");
-        // Restaura selectedItems em caso de falha
         selectedItems.length = 0;
         selectedItems.push(...itemsToSend, ...itemsToHold);
         renderOrderScreen(currentOrderSnapshot);
@@ -493,7 +513,7 @@ export const initOrderController = () => {
     openOrderList = document.getElementById('openOrderList');
     openItemsCount = document.getElementById('openItemsCount');
     sendSelectedItemsBtn = document.getElementById('sendSelectedItemsBtn');
-    clientPendingOrdersContainer = document.getElementById('clientPendingOrders'); // NOVO CONTAINER
+    clientPendingOrdersContainer = document.getElementById('clientPendingOrders'); 
 
     // Mapeia elementos do modal OBS
     obsModal = document.getElementById('obsModal');
@@ -505,15 +525,18 @@ export const initOrderController = () => {
     quickObsButtons = document.getElementById('quickObsButtons');
 
     // Validação de elementos essenciais
-    if (!searchProductInput || !categoryFiltersContainer || !menuItemsGrid || !openOrderList || !sendSelectedItemsBtn || !obsModal || !clientPendingOrdersContainer) {
+    if (!searchProductInput || !categoryFiltersContainer || !menuItemsGrid || !openOrderList || !sendSelectedItemsBtn || !obsModal || !clientPendingOrdersContainer || !quickObsButtons) { // Adicionado quickObsButtons
          console.error("[OrderController] Erro Fatal: Elementos críticos não encontrados. Abortando inicialização.");
          return; 
     }
 
+    // ==== NOVO: Busca os botões de OBS dinâmicos ====
+    fetchQuickObservations(quickObsButtons);
+
     // Listener para busca de produto
     searchProductInput.addEventListener('input', (e) => {
         currentSearch = e.target.value;
-        renderMenu(); // Re-renderiza o menu com o novo termo de busca
+        renderMenu(); 
     });
 
     // Listener para filtros de categoria (delegação de evento)
@@ -521,7 +544,7 @@ export const initOrderController = () => {
         const btn = e.target.closest('.category-btn');
         if (btn) {
             currentCategoryFilter = btn.dataset.category;
-            renderMenu(); // Re-renderiza o menu com o novo filtro
+            renderMenu(); 
         }
     });
 
@@ -529,7 +552,7 @@ export const initOrderController = () => {
     openOrderList.addEventListener('click', (e) => {
         const target = e.target;
         const qtyBtn = target.closest('.qty-btn'); 
-        const obsSpan = target.closest('span[data-item-id]'); // Clica na observação
+        const obsSpan = target.closest('span[data-item-id]'); 
 
         if (qtyBtn) {
             const itemId = qtyBtn.dataset.itemId;
@@ -582,9 +605,7 @@ export const initOrderController = () => {
             }
 
             let updated = false;
-            // Cria um novo array temporário com as atualizações
             const updatedItems = selectedItems.map(item => {
-                // Atualiza TODAS as ocorrências com a nota original para a nova nota
                 if (item.id == itemId && (item.note || '') === originalNoteKey) {
                     updated = true;
                     return { ...item, note: newNote };
@@ -592,7 +613,6 @@ export const initOrderController = () => {
                 return item;
             });
             
-            // Muta o array original 'selectedItems'
             selectedItems.length = 0; 
             selectedItems.push(...updatedItems);
 
@@ -614,8 +634,6 @@ export const initOrderController = () => {
             const currentNote = obsInput.value.trim();
 
             if (originalNoteKey === '' && currentNote === '') {
-                 // Se o item foi recém-adicionado (note original vazia) E o usuário não digitou nada
-                 // E cancelou, remove o último item adicionado com esse ID
                  let lastIndex = -1;
                  for (let i = selectedItems.length - 1; i >= 0; i--) {
                      if (selectedItems[i].id == itemId && selectedItems[i].note === '') {
@@ -624,17 +642,18 @@ export const initOrderController = () => {
                      }
                  }
                  if (lastIndex > -1) {
-                     selectedItems.splice(lastIndex, 1); // MUTATE (OK)
+                     selectedItems.splice(lastIndex, 1); 
                      console.log("Item recém-adicionado cancelado.");
                  }
             }
 
             obsModal.style.display = 'none';
-            renderOrderScreen(currentOrderSnapshot); // Re-renderiza
-            saveSelectedItemsToFirebase(currentTableId, selectedItems); // Salva
+            renderOrderScreen(currentOrderSnapshot); 
+            saveSelectedItemsToFirebase(currentTableId, selectedItems); 
         });
     }
 
+    // ==== ATUALIZADO: O listener agora usa delegação de evento ====
     if (quickObsButtons) {
         quickObsButtons.addEventListener('click', (e) => {
              const btn = e.target.closest('.quick-obs-btn');
