@@ -123,6 +123,10 @@
             <h2 id="current-table-number" class="text-xl font-bold text-dark-text ml-2">Fator MD</h2> 
         </div>
         <div class="flex items-center space-x-3">
+            
+            <button id="openCashierBtn" class="p-2 text-green-400 hover:text-green-300 transition hidden" title="Meu Caixa">
+                <i class="fas fa-cash-register text-lg"></i>
+            </button>
             <button id="openManagerPanelBtn" class="p-2 text-dark-placeholder hover:text-dark-text transition hidden" title="Painel Gerencial">
                 <i class="fas fa-shield-alt text-lg"></i>
             </button>
@@ -573,7 +577,8 @@
                         <label for="userEmailInput" class="block text-sm font-medium text-dark-placeholder mb-1">E-mail (Login)*</label>
                         <input type="email" id="userEmailInput" placeholder="email@exemplo.com" class="input-pdv w-full" required autocomplete="username">
                     </div>
-                     <div>
+                     
+                    <div>
                         <label for="userRoleSelect" class="block text-sm font-medium text-dark-placeholder mb-1">Função (Papel)*</label>
                         <select id="userRoleSelect" class="input-pdv w-full" required>
                             <option value="" disabled selected>Selecione a função</option>
