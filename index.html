@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fator PDV - Staff</title>
-
+    <title>Fator PDV - Login</title>
+    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-
+    
     <link rel="stylesheet" href="style.css">
 
     <script src="https://cdn.tailwindcss.com"></script>
-
+    
     <script>
         tailwind.config = {
             theme: {
@@ -36,9 +36,9 @@
         @media print {
 
             /* --- INÍCIO DA CORREÇÃO DEFINITIVA --- */
-
+            
             /* 1. Esconde tudo que tem a classe .print-hide */
-            .print-hide,
+            .print-hide, 
             header,
             #reviewActionBar {
                 display: none !important;
@@ -62,7 +62,7 @@
                 padding: 0 !important;
                 margin: 0 !important;
                 /* Reseta a transição que pode bugar a impressão */
-                transition: none !important;
+                transition: none !important; 
             }
             /* --- FIM DA CORREÇÃO DEFINITIVA --- */
 
@@ -82,13 +82,13 @@
                 display: block !important; /* Garante que esteja visível */
                 visibility: visible !important;
             }
-
+            
             /* 4. Força cores de texto específicas dentro do card */
             #paymentSummaryCard span, #paymentSummaryCard p, #paymentSummaryCard div, #paymentSummaryCard h2, #paymentSummaryCard label {
                 color: black !important;
             }
             #paymentSummaryCard .text-pumpkin {
-                 color: #333 !important;
+                 color: #333 !important; 
             }
             #paymentSummaryCard .text-indigo-400 {
                  color: #333 !important;
@@ -103,27 +103,9 @@
                   border-color: #ccc !important;
              }
         }
-
-        /* Opcional: Estilizar a barra de rolagem no modal de usuários */
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 8px; /* Largura da barra */
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: #1f2937; /* Fundo da trilha (cor do card escuro) */
-            border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background-color: #4b5563; /* Cor da barra (cinza mais escuro) */
-            border-radius: 10px;
-            border: 2px solid #1f2937; /* Espaço em volta da barra */
-        }
-         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background-color: #6b7280; /* Cor da barra ao passar o mouse */
-        }
-
     </style>
 </head>
-<body class="bg-dark-bg min-h-screen text-dark-text">
+<body class="bg-dark-bg min-h-screen text-dark-text"> 
 
     <div id="statusScreen" class="absolute inset-0 bg-dark-bg z-50 flex items-center justify-center p-6 print-hide" style="display: flex;">
         <div class="flex flex-col items-center p-8 max-w-sm w-full text-center">
@@ -138,7 +120,7 @@
             <button onclick="window.goToScreen('panelScreen')" class="px-3 py-1 text-2xl text-pumpkin hover:text-pumpkin-dark transition" title="Voltar ao Painel">
                 <i class="fas fa-th-large"></i>
             </button>
-            <h2 id="current-table-number" class="text-xl font-bold text-dark-text ml-2">Fator MD</h2>
+            <h2 id="current-table-number" class="text-xl font-bold text-dark-text ml-2">Fator MD</h2> 
         </div>
         <div class="flex items-center space-x-3">
             <button id="openManagerPanelBtn" class="p-2 text-dark-placeholder hover:text-dark-text transition hidden" title="Painel Gerencial">
@@ -151,7 +133,21 @@
     </header>
 
     <main id="mainContent" class="relative overflow-hidden" style="display: none;">
-        <div id="appContainer" class="flex transition-transform duration-300 ease-out" style="width: 400vw;">
+        <div id="appContainer" class="flex transition-transform duration-300 ease-out" style="width: 500vw;">
+            
+            <div id="loginScreen" class="w-screen flex-shrink-0 flex items-center justify-center p-4 bg-dark-bg print-hide">
+                 <div class="content-card bg-dark-card p-8 rounded-xl shadow-2xl w-full max-w-sm text-center">
+                    <h3 class="text-2xl font-bold text-pumpkin mb-6">Fator PDV - Staff</h3>
+                    <input type="email" id="loginEmail" placeholder="E-mail (Ex: agencia@fatormd.com)" class="input-pdv w-full p-4 mb-4 text-base">
+                    <input type="password" id="loginPassword" placeholder="Senha" class="input-pdv w-full p-4 mb-6 text-base">
+                    <div id="loginErrorMsg" class="text-red-400 text-sm mb-4" style="display: none;"></div>
+                    <div class="flex space-x-3">
+                        <button id="loginBtn" class="w-full bg-pumpkin text-white font-bold py-4 rounded-lg hover:bg-pumpkin-dark transition text-lg disabled:opacity-50">Entrar</button>
+                    </div>
+                    <p class="mt-4 text-xs text-dark-placeholder">Use 'garcom@fator.com' | Senha: 1234</p>
+                    <p class="mt-1 text-xs text-dark-placeholder">Use 'agencia@fatormd.com' | Senha: 1234 (Gerente)</p>
+                </div>
+            </div>
 
             <div id="panelScreen" class="flex-shrink-0 bg-dark-bg text-dark-text print-hide">
                  <div class="content-card p-4 mb-4">
@@ -190,7 +186,7 @@
             <div id="orderScreen" class="flex-shrink-0 bg-dark-bg text-dark-text print-hide">
                  <div class="flex items-center justify-between mb-4 -mt-4">
                     <div class="flex items-center text-green-400">
-                        <span id="order-screen-table-number" class="text-2xl font-semibold mr-3">Pedido</span>
+                        <span id="order-screen-table-number" class="text-2xl font-semibold mr-3">Pedido</span> 
                     </div>
                     <button id="goToPaymentBtn" class="rounded-full bg-green-600 p-3 text-white shadow-lg hover:bg-green-700 transition w-12 h-12 flex items-center justify-center" title="Ver Conta" onclick="window.goToScreen('paymentScreen')">
                         <i class="fas fa-receipt text-xl"></i>
@@ -201,17 +197,15 @@
                         <div class="flex justify-between items-center mb-4">
                             <h2 class="text-xl font-semibold text-dark-text mr-2">Pedido Atual (<span id="openItemsCount">0</span>)</h2>
                             <button id="sendSelectedItemsBtn" class="bg-green-600 text-white p-3 rounded-full shadow-lg hover:bg-green-700 transition duration-150 w-12 h-12 flex items-center justify-center text-xl disabled:opacity-50" title="Enviar Pedido para Produção">
-                                <i class="fas fa-paper-plane"></i>
+                                <i class="fas fa-paper-plane"></i> 
                             </button>
                         </div>
                         <div id="openOrderList" class="space-y-3 mb-4">
                             </div>
                     </div>
                 </div>
-                
                 <div id="clientPendingOrders" class="mt-6 mb-4 p-4 content-card bg-dark-card border border-yellow-500 hidden">
                     </div>
-
                 <div id="menuContainer" class="mt-6">
                     <div class="flex justify-between items-center mb-4 px-1">
                         <h2 class="text-xl font-bold text-dark-text">Cardápio</h2>
@@ -226,7 +220,7 @@
                          </div>
                 </div>
             </div>
-
+            
             <div id="paymentScreen" class="flex-shrink-0 bg-dark-bg text-dark-text">
                  <div class="flex items-center justify-between mb-4 -mt-4 print-hide">
                     <div class="flex items-center text-indigo-400">
@@ -237,49 +231,49 @@
                     </div>
                 </div>
 
-                <div id="paymentSummaryCard" class="content-card p-4 mb-6">
+                <div id="paymentSummaryCard" class="content-card p-4 mb-6"> 
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="text-xl font-semibold text-green-400">Resumo da Conta</h2>
                         <button id="printSummaryBtn" class="p-2 text-indigo-400 hover:text-indigo-300 transition print-hide" title="Imprimir Resumo">
                             <i class="fas fa-print text-lg"></i>
                         </button>
                     </div>
-                    <div id="reviewItemsList" class="space-y-3 pt-2 max-h-60 overflow-y-auto custom-scrollbar">
+                    <div id="reviewItemsList" class="space-y-3 pt-2 max-h-60 overflow-y-auto"> 
                          </div>
-
-                    <div class="content-card bg-dark-bg border border-dark-border p-4 mb-6 mt-6 hidden print-hide">
+                    
+                    <div class="content-card bg-dark-bg border border-dark-border p-4 mb-6 mt-6 hidden print-hide"> 
                         <div class="flex justify-between items-center mb-4">
                             <h2 class="text-lg font-semibold text-indigo-400">Divisão da Conta</h2>
-                             <button id="addSplitAccountBtn" class="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-bold opacity-50 cursor-not-allowed" disabled>
+                             <button id="addSplitAccountBtn" class="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-bold">
                                 + Dividir
                             </button>
                         </div>
                         <div id="paymentSplitsContainer" class="space-y-3">
-                           <p class="text-sm text-dark-placeholder italic">Nenhuma divisão criada.</p>
+                           <p class="text-sm text-dark-placeholder italic">Nenhuma divisão criada.</p> 
                         </div>
                     </div>
-
+                    
                     <div class="flex justify-between items-center border-t border-dark-border pt-4 mt-4">
-                        <span class="text-lg font-bold text-dark-text">SUBTOTAL:</span>
-                        <span class="text-xl font-bold text-indigo-400" id="orderSubtotalDisplayPayment">R$ 0,00</span>
+                        <span class="text-lg font-bold text-dark-text">SUBTOTAL:</span> 
+                        <span class="text-xl font-bold text-indigo-400" id="orderSubtotalDisplayPayment">R$ 0,00</span> 
                     </div>
                     <div class="flex justify-between items-center border-b border-dark-border pb-2">
-                        <span class="text-base font-bold text-green-400">SERVIÇO (10%):</span>
+                        <span class="text-base font-bold text-green-400">SERVIÇO (10%):</span> 
                         <div class="flex items-center space-x-2">
-                            <span class="text-base font-bold text-green-400" id="orderServiceTaxDisplayPayment">R$ 0,00</span>
+                            <span class="text-base font-bold text-green-400" id="orderServiceTaxDisplayPayment">R$ 0,00</span> 
                             <button id="toggleServiceTaxBtn" class="px-2 py-1 text-xs rounded-full transition duration-150 bg-gray-400 text-white opacity-50 print-hide" disabled>
                                 Aplicar
                             </button>
                         </div>
                     </div>
                     <div class="flex justify-between items-center border-b border-dark-border pb-2 pt-2">
-                        <span class="text-base font-bold text-indigo-400">VALOR POR PESSOA:</span>
+                        <span class="text-base font-bold text-indigo-400">VALOR POR PESSOA:</span> 
                         <div class="flex items-center space-x-2 print-hide">
-                            <span id="valuePerDinerDisplay" class="text-base font-bold text-indigo-400">R$ 0,00</span>
+                            <span id="valuePerDinerDisplay" class="text-base font-bold text-indigo-400">R$ 0,00</span> 
                             <button id="decreaseDinersBtn" class="p-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition w-8 h-8 flex items-center justify-center">
                                 <i class="fas fa-minus"></i>
                             </button>
-                            <input type="number" id="dinersSplitInput" class="w-12 p-1 text-sm input-pdv text-center bg-dark-input" min="1" value="1" readonly>
+                            <input type="number" id="dinersSplitInput" class="w-12 p-1 text-sm input-pdv text-center bg-dark-input" min="1" value="1" readonly> 
                              <button id="increaseDinersBtn" class="p-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition w-8 h-8 flex items-center justify-center">
                                 <i class="fas fa-plus"></i>
                             </button>
@@ -287,21 +281,21 @@
                         <span id="valuePerDinerDisplayPrint" class="text-base font-bold text-indigo-400 hidden print:block">R$ 0,00</span>
                     </div>
                     <div class="flex justify-between items-center pt-2">
-                        <span class="text-xl font-bold text-dark-text">TOTAL GERAL:</span>
-                        <span class="text-2xl font-extrabold text-indigo-400" id="orderTotalDisplayPayment">R$ 0,00</span>
+                        <span class="text-xl font-bold text-dark-text">TOTAL GERAL:</span> 
+                        <span class="text-2xl font-extrabold text-indigo-400" id="orderTotalDisplayPayment">R$ 0,00</span> 
                     </div>
                      <div class="flex justify-between items-center pt-4 mt-4 border-t border-dark-border">
-                        <span class="text-xl font-bold text-pumpkin">RESTANTE A PAGAR:</span>
-                        <span class="text-2xl font-extrabold text-pumpkin" id="remainingBalanceDisplay">R$ 0,00</span>
+                        <span class="text-xl font-bold text-pumpkin">RESTANTE A PAGAR:</span> 
+                        <span class="text-2xl font-extrabold text-pumpkin" id="remainingBalanceDisplay">R$ 0,00</span> 
                     </div>
                 </div>
-
+                
                 <div id="chargeInputs" class="content-card p-4 mb-6 print-hide">
-                    <h2 class="text-xl font-semibold text-pumpkin mb-4">Registrar Pagamento (Conta Principal)</h2>
-                    <div id="paymentSummaryList" class="mb-4 p-3 rounded-lg bg-dark-bg border border-dark-border max-h-40 overflow-y-auto custom-scrollbar">
+                    <h2 class="text-xl font-semibold text-pumpkin mb-4">Registrar Pagamento (Conta Principal)</h2> 
+                    <div id="paymentSummaryList" class="mb-4 p-3 rounded-lg bg-dark-bg border border-dark-border max-h-40 overflow-y-auto">
                         </div>
                     <div class="flex space-x-2 mb-3">
-                        <input type="text" id="customerSearchInput" placeholder="Buscar/Associar Cliente (CPF/Nome)" class="input-pdv w-full">
+                        <input type="text" id="customerSearchInput" placeholder="Buscar/Associar Cliente (CPF/Nome)" class="input-pdv w-full"> 
                         <button id="openCustomerRegBtn" class="p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition w-14">
                             <i class="fas fa-user-plus"></i>
                         </button>
@@ -320,8 +314,8 @@
                 </div>
 
                 <div class="content-card p-4 pt-0 mt-6 print-hide">
-                    <div class="flex space-x-2">
-                         <button id="openNfeModalBtn" class="w-1/2 bg-gray-600 text-white font-bold py-3 rounded-lg hover:bg-gray-500 transition" title="Emitir NF-e (Simulação)">
+                    <div class="flex space-x-2"> 
+                         <button id="openNfeModalBtn" class="w-1/2 bg-gray-600 text-white font-bold py-3 rounded-lg hover:bg-gray-500 transition" title="Emitir NF-e">
                             <i class="fas fa-receipt"></i> NF-e
                         </button>
                         <button id="finalizeOrderBtn" class="w-1/2 bg-pumpkin text-white font-bold py-3 rounded-lg hover:bg-pumpkin-dark transition disabled:opacity-50" disabled>
@@ -355,11 +349,11 @@
                     <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openSectorManagement')"> <i class="fas fa-map-signs text-3xl mb-2"></i> <h4 class="font-bold text-lg">Gerenciar Setores</h4> <p class="text-xs">Adicionar/remover setores das mesas</p> </div>
                     <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openQuickObsManagement')"> <i class="fas fa-comment-dots text-3xl mb-2"></i> <h4 class="font-bold text-lg">Obs. Rápidas</h4> <p class="text-xs">Adicionar/remover botões de obs.</p> </div>
                 </div>
-                </div>
-
-        </div>
+            </div>
+            
+        </div> 
     </main>
-
+    
     <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 id="obsItemName" class="text-xl font-bold mb-4 text-indigo-400">Adicionar Observação</h3>
@@ -393,7 +387,7 @@
             </div>
         </div>
     </div>
-
+    
     <div id="customAlertModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm text-center">
             <h3 class="text-xl font-bold mb-4 text-red-400" id="customAlertTitle">Aviso</h3>
@@ -403,10 +397,10 @@
             </button>
         </div>
     </div>
-
+    
     <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         </div>
-
+    
     <div id="calculatorModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-4 rounded-xl shadow-2xl w-full max-w-xs relative">
              <button id="closeCalcBtnX" class="absolute -top-2 -right-2 bg-red-600 text-white rounded-full h-8 w-8">&times;</button>
@@ -440,7 +434,7 @@
              <button id="confirmCalcBtn" class="w-full mt-3 p-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition">OK (Usar Valor)</button>
         </div>
     </div>
-
+    
     <div id="tableTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
             <h3 class="text-xl font-bold mb-4 text-pumpkin">Transferir Itens (Mesa Inteira/Parcial)</h3>
@@ -464,10 +458,10 @@
             </div>
         </div>
     </div>
-
+    
     <div id="customerRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-lg">
-        <h3 class="text-xl font-bold mb-4 text-indigo-400">Buscar / Cadastrar Cliente</h3>
+            <h3 class="text-xl font-bold mb-4 text-indigo-400">Buscar / Cadastrar Cliente</h3>
             <div class="mb-4">
                 <label for="customerSearchCpf" class="block text-sm font-medium text-dark-placeholder mb-1">Buscar por CPF / CNPJ</label>
                 <div class="flex space-x-2">
@@ -507,7 +501,7 @@
             </div>
         </div>
     </div>
-
+    
     <div id="reportsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
          <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
             <h3 class="text-xl font-bold mb-4 text-indigo-400">Relatórios</h3>
@@ -519,11 +513,11 @@
     <div id="nfeModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
             <h3 class="text-xl font-bold mb-4 text-indigo-400">Emissão de Nota Fiscal (NF-e/NFC-e)</h3>
-
+            
             <div id="nfeError" class="hidden p-3 rounded-lg bg-red-900 border border-red-700 text-red-200 mb-4">
                 <p id="nfeErrorMessage" class="font-semibold">Erro aqui</p>
             </div>
-
+            
             <div id="nfeDetails">
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-dark-placeholder mb-1">Cliente</label>
@@ -608,25 +602,21 @@
 
             </div> </div>
     </div>
-
     <div id="waiterRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"></div>
     <div id="selectiveTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"></div>
     <div id="productManagementModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"></div>
-
-
+    
     <p class="mt-8 text-center text-xs text-dark-placeholder print-hide" id="user-id-display">Usuário ID: Carregando...</p>
-
+    
     <script>
         window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`);
-        window.activateItemSelection = () => {};
+        window.activateItemSelection = () => {}; 
         // Placeholders para funções onclick da divisão (agora escondida)
         window.removeSplitAccount = (splitId) => { alert(`Remover Divisão ${splitId} (DEV)`)};
         window.openPaymentModalForSplit = (splitId) => { alert(`Pagar Conta Dividida ${splitId} (DEV)`); };
         window.openSplitTransferModal = (splitId, mode) => { alert(`Mover Itens Para/De ${splitId} (DEV)`); };
     </script>
-
-    <script type="module" src="app.js?v=5"></script>    
+    
+    <script type="module" src="app.js"></script>
 </body>
 </html>
-
-
