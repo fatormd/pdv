@@ -222,22 +222,34 @@ window.openManagerAuthModal = (action, payload = null) => {
     const managerModal = document.getElementById('managerModal');
     if (!managerModal) { console.error("Modal Gerente não encontrado!"); return; }
 
+    // ===== INÍCIO DA ATUALIZAÇÃO (Adiciona <form> e form=...) =====
     managerModal.innerHTML = `
         <div class="bg-dark-card border border-gray-600 p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 class="text-xl font-bold mb-4 text-red-400">Ação Gerencial Necessária</h3>
             <p class="text-base mb-3 text-dark-text">Insira a senha do gerente para prosseguir.</p>
-            <input type="password" id="managerPasswordInput" placeholder="Senha" class="w-full p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text placeholder-dark-placeholder focus:ring-red-500 focus:border-red-500 text-base" maxlength="4" autocomplete="current-password">
+            
+            <form id="managerAuthForm">
+                <input type="password" id="managerPasswordInput" placeholder="Senha" class="w-full p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text placeholder-dark-placeholder focus:ring-red-500 focus:border-red-500 text-base" maxlength="4" autocomplete="current-password">
+            </form>
+
             <div class="flex justify-end space-x-3 mt-4">
                 <button class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition text-base" onclick="document.getElementById('managerModal').style.display='none'">Cancelar</button>
-                <button id="authManagerBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-base">Autenticar</button>
+                <button id="authManagerBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-base" form="managerAuthForm">Autenticar</button>
             </div>
         </div>
     `;
+    // ===== FIM DA ATUALIZAÇÃO =====
+
     managerModal.style.display = 'flex';
     const input = document.getElementById('managerPasswordInput');
     const authBtn = document.getElementById('authManagerBtn');
 
-    if(authBtn && input) {
+    // ===== INÍCIO DA ATUALIZAÇÃO (Adiciona authForm e listener de submit) =====
+    const authForm = document.getElementById('managerAuthForm');
+
+    if(authBtn && input && authForm) {
+    // ===== FIM DA ATUALIZAÇÃO =====
+
         const handleAuthClick = async () => {
             if (input.value === '1234') { // ATENÇÃO: Senha 'chumbada' no código
                 managerModal.style.display = 'none';
@@ -264,6 +276,14 @@ window.openManagerAuthModal = (action, payload = null) => {
         };
 
         authBtn.onclick = handleAuthClick;
+
+        // ===== INÍCIO DA ATUALIZAÇÃO (Adiciona listener de submit) =====
+        authForm.addEventListener('submit', (e) => {
+            e.preventDefault(); // Impede o recarregamento da página
+            handleAuthClick();
+        });
+        // ===== FIM DA ATUALIZAÇÃO =====
+
         input.onkeydown = (e) => { if (e.key === 'Enter') handleAuthClick(); };
     }
 };
@@ -556,12 +576,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
              // FLUXO DE STAFF (RESTAURADO COM LOGIN AUTH)
              
+             // ===== INÍCIO DA ATUALIZAÇÃO (Adiciona listener de 'submit' ao form) =====
+             const loginForm = document.getElementById('loginForm');
              loginBtn = document.getElementById('loginBtn');
              loginPasswordInput = document.getElementById('loginPassword');
 
-             if (loginBtn) {
-                 loginBtn.addEventListener('click', handleStaffLogin);
+             if (loginForm) {
+                 loginForm.addEventListener('submit', handleStaffLogin);
              }
+             // ===== FIM DA ATUALIZAÇÃO =====
+             
+             // Listener de 'Enter' no campo de senha (mantido como fallback)
              if (loginPasswordInput) {
                  loginPasswordInput.addEventListener('keydown', (e) => {
                      if (e.key === 'Enter') {
