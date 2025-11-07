@@ -31,7 +31,8 @@ const FIREBASE_CONFIG = {
 };
 
 // --- VARIÁVEIS GLOBAIS ---
-export const screens = { 'loginScreen': 0, 'panelScreen': 1, 'orderScreen': 2, 'paymentScreen': 3, 'managerScreen': 4, 'clientOrderScreen': 0, 'clientPaymentScreen': 1};
+// CORREÇÃO CRÍTICA: Remove 'loginScreen' da contagem do Staff, Panel passa a ser 0.
+export const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2, 'managerScreen': 3, 'clientOrderScreen': 0, 'clientPaymentScreen': 1};
 export let currentTableId = null; export let selectedItems = []; export let currentOrderSnapshot = null;
 export let userRole = 'anonymous'; export let userId = null; export let unsubscribeTable = null;
 
@@ -50,8 +51,8 @@ export const hideStatus = () => {
 };
 
 const showLoginScreen = () => {
-    // CORREÇÃO CRÍTICA: Se for modo Staff (index.html), esta função apenas esconde o status inicial
-    // e garante que o mainContent seja exibido, sem tentar forçar a exibição do formulário de login (que está oculto).
+    // FUNÇÃO MODIFICADA: Não faz mais nada para o fluxo Staff, apenas esconde o status inicial
+    // e garante que o mainContent seja exibido, sem tentar forçar a exibição do formulário de login.
     
     statusScreen = document.getElementById('statusScreen');
     mainContent = document.getElementById('mainContent');
@@ -61,7 +62,8 @@ const showLoginScreen = () => {
     hideStatus();
     if (mainHeader) mainHeader.style.display = 'none';
     if (mainContent) mainContent.style.display = 'block'; // Garante que o container principal apareça
-    if (appContainer) appContainer.style.transform = `translateX(0vw)`;
+    // O appContainer deve ser corrigido para 400vw no index.html e iniciar em 0vw via goToScreen
+    if (appContainer) appContainer.style.transform = `translateX(0vw)`; 
     document.body.classList.add('bg-dark-bg');
     document.body.classList.remove('bg-gray-900', 'logged-in');
 };
@@ -118,8 +120,9 @@ export const goToScreen = async (screenId) => {
 
     // Lógicas de pré-navegação e limpeza de estado (apenas Staff)
     if (!isClientMode) {
+        // CORREÇÃO: Remove a menção a 'loginScreen' no cleanup do Staff
         if (currentTableId && screenId === 'panelScreen') { saveSelectedItemsToFirebase(currentTableId, selectedItems); }
-        if ((screenId === 'panelScreen' || screenId === 'loginScreen') && currentTableId && unsubscribeTable) {
+        if (screenId === 'panelScreen' && currentTableId && unsubscribeTable) {
             unsubscribeTable(); unsubscribeTable = null; currentTableId = null; currentOrderSnapshot = null; selectedItems.length = 0;
             const currentTableNumEl = document.getElementById('current-table-number');
             const paymentTableNumEl = document.getElementById('payment-table-number');
@@ -144,12 +147,13 @@ export const goToScreen = async (screenId) => {
     if (screenIndex !== undefined) {
         console.log(`[NAV] Navegando para ${screenId} (índice ${screenIndex})`);
         if (appContainer) appContainer.style.transform = `translateX(-${screenIndex * 100}vw)`;
-        if (mainContent && screenId !== 'loginScreen') mainContent.style.display = 'block';
+        // CORREÇÃO: Se a tela é a inicial, garante que o mainContent esteja visível
+        if (mainContent) mainContent.style.display = 'block';
 
         // Ajuste visual para Staff
         if (!isClientMode) {
             document.body.classList.toggle('bg-gray-900', screenId === 'managerScreen');
-            document.body.classList.toggle('bg-dark-bg', screenId !== 'managerScreen' && screenId !== 'loginScreen');
+            document.body.classList.toggle('bg-dark-bg', screenId !== 'managerScreen');
         }
 
     } else { console.error(`[NAV] Tentativa de navegar para tela inválida: ${screenId}`); }
@@ -420,7 +424,7 @@ const handleLogout = () => {
         signOut(authInstance).catch(error => console.error("Erro ao deslogar:", error));
     }
 
-    // Mostra a tela de login (o onAuthStateChanged também fará isso, mas garantimos aqui)
+    // Mostra a tela de login (não usada no fluxo Staff, mas mantida por segurança)
     showLoginScreen();
     const userIdDisplay = document.getElementById('user-id-display');
     if(userIdDisplay) userIdDisplay.textContent = 'Usuário ID: Carregando...';
@@ -444,7 +448,8 @@ const initStaffApp = async (staffName) => { // Aceita o nome como parâmetro
         fetchWooCommerceCategories(renderMenu).catch(e => console.error("[INIT Staff] Falha ao carregar categorias:", e));
 
         hideStatus();
-        hideLoginScreen();
+        hideLoginScreen(); // Apenas exibe o header e mainContent
+
         
         // Atualiza display do usuário
         const userIdDisplay = document.getElementById('user-id-display');
@@ -452,15 +457,14 @@ const initStaffApp = async (staffName) => { // Aceita o nome como parâmetro
 
         loadOpenTables(); // Carrega as mesas abertas
 
-        // MANTÉM CHAMADA DIRETA: A complexidade do login foi removida no DOMContentLoaded,
-        // então a navegação deve ser estável novamente.
-        await goToScreen('panelScreen'); // Vai para o painel inicial
+        // O 'panelScreen' agora é o índice 0. Vai diretamente para ele.
+        await goToScreen('panelScreen'); 
         console.log("[StaffApp] initStaffApp FINISHED."); 
 
     } catch (error) {
         console.error("Erro CRÍTICO durante initStaffApp:", error);
         alert(`Erro grave na inicialização: ${error.message}. Verifique o console.`);
-        showLoginScreen(); // Volta pro login em caso de erro grave
+        showLoginScreen(); // Volta pro login em caso de erro grave (obsoleto, mas seguro)
     }
 };
 
@@ -506,6 +510,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         initializeFirebase(dbInstance, authInstance, appIdentifier, functionsInstance);
         console.log("[APP] Firebase Initialized"); 
 
+        // DETECÇÃO DE MODO: Usa apenas a URL
         const isClientMode = window.location.pathname.includes('client.html');
         console.log(`[APP] Mode: ${isClientMode ? 'Client' : 'Staff'}`); 
 
@@ -523,7 +528,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                  window.increaseLocalItemQuantity = module.increaseLocalItemQuantity;
              }).catch(err => console.error("Failed to dynamically load client quantity functions:", err));
         } else {
-             // FLUXO DE INICIALIZAÇÃO STAFF (INÍCIO DIRETO)
+             // FLUXO DE INICIALIZAÇÃO STAFF (INÍCIO DIRETO EM MODO DESENVOLVIMENTO)
              
              // 1. Define um usuário padrão (GARÇOM) para o desenvolvimento
              userRole = 'garcom';
@@ -538,7 +543,6 @@ document.addEventListener('DOMContentLoaded', async () => {
              if (openManagerPanelBtn) openManagerPanelBtn.addEventListener('click', () => { window.openManagerAuthModal('goToManagerPanel'); });
              if (logoutBtnHeader) logoutBtnHeader.addEventListener('click', handleLogout);
              
-             // O código original de login por URL e fallback foi removido.
         }
 
     } catch (e) {
