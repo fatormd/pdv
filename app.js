@@ -452,14 +452,10 @@ const initStaffApp = async (staffName) => { // Aceita o nome como parâmetro
 
         loadOpenTables(); // Carrega as mesas abertas
 
-        // CORREÇÃO PARA BUG DE NAVEGAÇÃO: Adiciona um pequeno delay 
-        // para garantir que o DOM/CSS esteja estável para a transição (translateX).
-        setTimeout(async () => {
-             await goToScreen('panelScreen'); // Vai para o painel inicial
-             console.log("[StaffApp] initStaffApp FINISHED navigation.");
-        }, 50); 
-        
-        console.log("[StaffApp] initStaffApp FINISHED setup."); // Log ajustado
+        // MANTÉM CHAMADA DIRETA: A complexidade do login foi removida no DOMContentLoaded,
+        // então a navegação deve ser estável novamente.
+        await goToScreen('panelScreen'); // Vai para o painel inicial
+        console.log("[StaffApp] initStaffApp FINISHED."); 
 
     } catch (error) {
         console.error("Erro CRÍTICO durante initStaffApp:", error);
@@ -493,23 +489,7 @@ const initClientApp = async () => {
     }
 };
 
-// NOVO: Função para determinar o papel do usuário a partir da URL
-const determineRoleFromPath = () => {
-    const path = window.location.pathname.toLowerCase();
-    const isStaffPage = !path.includes('client.html');
-    
-    if (!isStaffPage) {
-        return { role: 'anonymous', name: null };
-    }
-
-    // Mapeamento de rotas (Exemplo: pdv.fatormd.com/garcom -> role: garcom)
-    if (path.includes('/garcom')) return { role: 'garcom', name: 'Garçom' };
-    if (path.includes('/gerente')) return { role: 'gerente', name: 'Gerente' };
-    
-    // Se for 'index.html' ou '/' (o default), assume Garçom
-    return { role: 'garcom', name: 'Garçom' }; 
-};
-
+// REMOVIDO: determineRoleFromPath
 
 // --- DOMContentLoaded (Ponto de entrada) ---
 document.addEventListener('DOMContentLoaded', async () => { 
@@ -543,36 +523,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                  window.increaseLocalItemQuantity = module.increaseLocalItemQuantity;
              }).catch(err => console.error("Failed to dynamically load client quantity functions:", err));
         } else {
-             // FLUXO DE INICIALIZAÇÃO STAFF (ACESSADO POR URL)
+             // FLUXO DE INICIALIZAÇÃO STAFF (INÍCIO DIRETO)
              
-             const staffEntry = determineRoleFromPath();
-             userRole = staffEntry.role;
+             // 1. Define um usuário padrão (GARÇOM) para o desenvolvimento
+             userRole = 'garcom';
+             userId = 'dev_user_garcom'; // ID fixo para evitar problemas de autenticação
              
-             if (userRole !== 'anonymous') {
-                 
-                 // 1. Limpeza agressiva da sessão anterior (resolve o problema do Chrome)
-                 const authInstance = auth;
-                 await signOut(authInstance).catch(() => {});
-                 
-                 // 2. Força um novo sign-in anônimo para obter um token limpo
-                 const userCredential = await signInAnonymously(authInstance);
-                 userId = userCredential.user.uid; 
-                 
-                 // 3. Inicializa o App com o papel e nome obtido
-                 console.log(`[APP] Initializing as ${userRole.toUpperCase()} via URL.`);
-                 await initStaffApp(staffEntry.name);
+             console.log(`[APP] Initializing as ${userRole.toUpperCase()} (DEV Mode).`);
+             await initStaffApp('Dev User'); // Chama initStaffApp com um nome fixo
 
-                 // Listeners do cabeçalho
-                 const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
-                 const logoutBtnHeader = document.getElementById('logoutBtnHeader');
-                 if (openManagerPanelBtn) openManagerPanelBtn.addEventListener('click', () => { window.openManagerAuthModal('goToManagerPanel'); });
-                 if (logoutBtnHeader) logoutBtnHeader.addEventListener('click', handleLogout);
-                 
-             } else {
-                 // Este bloco agora é inacessível, mas o código de fallback permanece
-                 // Caso o usuário tente acessar um link que não seja /garcom ou /gerente.
-                 showLoginScreen(); 
-             }
+             // Listeners do cabeçalho (mantidos)
+             const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
+             const logoutBtnHeader = document.getElementById('logoutBtnHeader');
+             if (openManagerPanelBtn) openManagerPanelBtn.addEventListener('click', () => { window.openManagerAuthModal('goToManagerPanel'); });
+             if (logoutBtnHeader) logoutBtnHeader.addEventListener('click', handleLogout);
+             
+             // O código original de login por URL e fallback foi removido.
         }
 
     } catch (e) {
