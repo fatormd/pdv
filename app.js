@@ -31,7 +31,7 @@ const FIREBASE_CONFIG = {
 };
 
 // --- VARIÁVEIS GLOBAIS ---
-// CORREÇÃO CRÍTICA: Remove 'loginScreen' da contagem do Staff, Panel passa a ser 0.
+// CORREÇÃO FINAL: O mapa de telas Staff agora começa em 0 com o Painel.
 export const screens = { 'panelScreen': 0, 'orderScreen': 1, 'paymentScreen': 2, 'managerScreen': 3, 'clientOrderScreen': 0, 'clientPaymentScreen': 1};
 export let currentTableId = null; export let selectedItems = []; export let currentOrderSnapshot = null;
 export let userRole = 'anonymous'; export let userId = null; export let unsubscribeTable = null;
@@ -51,8 +51,7 @@ export const hideStatus = () => {
 };
 
 const showLoginScreen = () => {
-    // FUNÇÃO MODIFICADA: Não faz mais nada para o fluxo Staff, apenas esconde o status inicial
-    // e garante que o mainContent seja exibido, sem tentar forçar a exibição do formulário de login.
+    // ESTA FUNÇÃO NÃO É MAIS USADA NO FLUXO STAFF (APENAS UM FALLBACK)
     
     statusScreen = document.getElementById('statusScreen');
     mainContent = document.getElementById('mainContent');
@@ -62,8 +61,7 @@ const showLoginScreen = () => {
     hideStatus();
     if (mainHeader) mainHeader.style.display = 'none';
     if (mainContent) mainContent.style.display = 'block'; // Garante que o container principal apareça
-    // O appContainer deve ser corrigido para 400vw no index.html e iniciar em 0vw via goToScreen
-    if (appContainer) appContainer.style.transform = `translateX(0vw)`; 
+    if (appContainer) appContainer.style.transform = `translateX(0vw)`;
     document.body.classList.add('bg-dark-bg');
     document.body.classList.remove('bg-gray-900', 'logged-in');
 };
@@ -120,7 +118,6 @@ export const goToScreen = async (screenId) => {
 
     // Lógicas de pré-navegação e limpeza de estado (apenas Staff)
     if (!isClientMode) {
-        // CORREÇÃO: Remove a menção a 'loginScreen' no cleanup do Staff
         if (currentTableId && screenId === 'panelScreen') { saveSelectedItemsToFirebase(currentTableId, selectedItems); }
         if (screenId === 'panelScreen' && currentTableId && unsubscribeTable) {
             unsubscribeTable(); unsubscribeTable = null; currentTableId = null; currentOrderSnapshot = null; selectedItems.length = 0;
