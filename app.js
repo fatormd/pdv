@@ -1,6 +1,7 @@
-// --- APP.JS (VERSÃO RESTAURADA COM LOGIN) ---
+// --- APP.JS (VERSÃO FINAL COM FIREBASE AUTH) ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, onAuthStateChanged, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+// ATUALIZADO: Importa as funções de Auth necessárias
+import { getAuth, onAuthStateChanged, signOut, signInAnonymously, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapshot, writeBatch, arrayRemove, arrayUnion, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { getFunctions } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
 
@@ -9,18 +10,16 @@ import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, auth, 
 import { fetchWooCommerceProducts, fetchWooCommerceCategories } from '/services/wooCommerceService.js';
 import { formatCurrency, formatElapsedTime } from '/utils.js';
 
-// --- IMPORTS ESTÁTICOS PARA CONTROLADORES CORE (Garantia de Funcionamento) ---
+// --- IMPORTS ESTÁTICOS ... (sem alteração) ---
 import { initPanelController, loadOpenTables, renderTableFilters, handleAbrirMesa, handleSearchTable, openTableMergeModal } from '/controllers/panelController.js';
 import { initOrderController, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity, openObsModalForGroup, renderMenu } from '/controllers/orderController.js';
 import { initPaymentController, renderPaymentSummary, deletePayment, handleMassActionRequest, handleFinalizeOrder, handleMassDeleteConfirmed, executeDeletePayment, openTableTransferModal, handleConfirmTableTransfer } from '/controllers/paymentController.js';
 import { initManagerController, handleGerencialAction } from '/controllers/managerController.js';
 import { initUserManagementController, openUserManagementModal } from '/controllers/userManagementController.js';
-
-// ATUALIZADO: Importa apenas o INIT e o RENDER da TELA DE PEDIDO (não o menu)
 import { initClientOrderController, renderClientOrderScreen } from '/controllers/clientOrderController.js';
 
 
-// --- CONFIGURAÇÃO ---
+// --- CONFIGURAÇÃO ... (sem alteração) ---
 const FIREBASE_CONFIG = {
     apiKey: "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY",
     authDomain: "fator-pdv.firebaseapp.com",
@@ -30,21 +29,20 @@ const FIREBASE_CONFIG = {
     appId: "1:1097659747429:web:8ec0a7c39777c311dbe0a8c"
 };
 
-// --- VARIÁVEIS GLOBAIS ---
-// ATUALIZADO: O mapa de telas Staff agora inclui 'loginScreen' como índice 0
+// --- VARIÁVEIS GLOBAIS ... (mapa de telas igual ao index.html) ---
 export const screens = { 
     'loginScreen': 0, 
     'panelScreen': 1, 
     'orderScreen': 2, 
     'paymentScreen': 3, 
     'managerScreen': 4,
-    'clientOrderScreen': 0, // Telas do cliente (separadas)
+    'clientOrderScreen': 0, 
     'clientPaymentScreen': 1
 };
 export let currentTableId = null; export let selectedItems = []; export let currentOrderSnapshot = null;
 export let userRole = 'anonymous'; export let userId = null; export let unsubscribeTable = null;
 
-// --- ELEMENTOS UI ---
+// --- ELEMENTOS UI ... (sem alteração) ---
 let statusScreen, mainContent, appContainer, loginScreen, mainHeader;
 let loginBtn, loginEmailInput, loginPasswordInput, loginErrorMsg;
 let clientLoginModal;
@@ -59,7 +57,6 @@ export const hideStatus = () => {
 };
 
 const showLoginScreen = () => {
-    // Esta função mostra a tela de login
     statusScreen = document.getElementById('statusScreen');
     mainContent = document.getElementById('mainContent');
     mainHeader = document.getElementById('mainHeader');
@@ -67,9 +64,8 @@ const showLoginScreen = () => {
 
     hideStatus();
     if (mainHeader) mainHeader.style.display = 'none';
-    if (mainContent) mainContent.style.display = 'block'; // Garante que o container principal apareça
+    if (mainContent) mainContent.style.display = 'block';
     
-    // ATUALIZADO: Navega para a tela de login (índice 0)
     goToScreen('loginScreen'); 
 
     document.body.classList.add('bg-dark-bg');
@@ -87,51 +83,24 @@ const hideLoginScreen = () => {
     const logoutBtn = document.getElementById('logoutBtnHeader');
     const managerBtn = document.getElementById('openManagerPanelBtn');
     if (logoutBtn) logoutBtn.classList.remove('hidden');
-    // Mostra botão de gerente APENAS se for Gerente
     if (managerBtn) {
         managerBtn.classList.toggle('hidden', userRole !== 'gerente');
     }
 };
 
-// --- FUNÇÃO DE AUTENTICAÇÃO VIA FIRESTORE (CORE) ---
-const authenticateUserFromFirestore = async (email, password) => {
-    // Esta função consulta o Firestore para validar o usuário
-    try {
-        if (!db) throw new Error("Conexão com banco de dados indisponível.");
-        if (!appId) throw new Error("appId não está definido no firebaseService.");
+// --- FUNÇÃO DE AUTENTICAÇÃO (REMOVIDA) ---
+// const authenticateUserFromFirestore = ... (REMOVIDA)
 
-        const usersCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'users');
-        const userDocRef = doc(usersCollectionRef, email); // Email como ID
-        const docSnap = await getDoc(userDocRef);
 
-        if (docSnap.exists()) {
-            const userData = docSnap.data();
-            if (!userData.isActive) { return null; } // Falha silenciosa (usuário inativo)
-            if (userData.password === password) { // Valida a senha em texto plano
-                return { email: userData.email, name: userData.name, role: userData.role };
-            }
-            return null; // Falha silenciosa (senha errada)
-        } else { return null; } // Falha silenciosa (email não existe)
-    } catch (error) {
-        console.error("[AUTH Firestore] Erro ao verificar usuário:", error);
-        return null; // Falha (erro de conexão, etc)
-    }
-};
-
-/**
- * Navega entre as telas do SPA.
- */
+// --- FUNÇÃO goToScreen (sem alteração) ---
 export const goToScreen = async (screenId) => {
     if (!appContainer) appContainer = document.getElementById('appContainer');
     if (!mainContent) mainContent = document.getElementById('mainContent');
     const isClientMode = window.location.pathname.includes('client.html');
 
-    // Lógicas de pré-navegação e limpeza de estado (apenas Staff)
     if (!isClientMode) {
-        // ATUALIZADO: Não salva itens ao voltar para 'loginScreen'
         if (currentTableId && screenId === 'panelScreen') { saveSelectedItemsToFirebase(currentTableId, selectedItems); }
         
-        // Limpa estado ao voltar para o painel ou para o login
         if ((screenId === 'panelScreen' || screenId === 'loginScreen') && currentTableId && unsubscribeTable) {
             unsubscribeTable(); unsubscribeTable = null; currentTableId = null; currentOrderSnapshot = null; selectedItems.length = 0;
             const currentTableNumEl = document.getElementById('current-table-number');
@@ -143,7 +112,6 @@ export const goToScreen = async (screenId) => {
         }
     }
 
-    // Reseta botão finalizar (apenas Staff)
     if (screenId === 'panelScreen' || screenId === 'loginScreen') {
         const finalizeBtn = document.getElementById('finalizeOrderBtn');
         if (finalizeBtn && !finalizeBtn.innerHTML.includes('fa-check-circle')) {
@@ -152,15 +120,13 @@ export const goToScreen = async (screenId) => {
         }
     }
 
-    const screenIndex = isClientMode ? screens[screenId] : screens[screenId]; // Usa o mapa correto
+    const screenIndex = isClientMode ? screens[screenId] : screens[screenId];
 
     if (screenIndex !== undefined) {
         console.log(`[NAV] Navegando para ${screenId} (índice ${screenIndex})`);
         if (appContainer) appContainer.style.transform = `translateX(-${screenIndex * 100}vw)`;
-        // CORREÇÃO: Se a tela é a inicial, garante que o mainContent esteja visível
         if (mainContent) mainContent.style.display = 'block';
 
-        // Ajuste visual para Staff
         if (!isClientMode) {
             document.body.classList.toggle('bg-gray-900', screenId === 'managerScreen');
             document.body.classList.toggle('bg-dark-bg', screenId !== 'managerScreen');
@@ -170,16 +136,16 @@ export const goToScreen = async (screenId) => {
 };
 window.goToScreen = goToScreen;
 
+// --- handleTableTransferConfirmed (sem alteração) ---
 export const handleTableTransferConfirmed = async (originTableId, targetTableId, itemsToTransfer, newDiners = 0, newSector = '') => {
-    // ... (Esta função está OK, sem alterações necessárias) ...
-    if (!originTableId || !targetTableId || itemsToTransfer.length === 0) { /* ... */ return; }
-    if (originTableId === targetTableId) { /* ... */ return; }
+    if (!originTableId || !targetTableId || itemsToTransfer.length === 0) { return; }
+    if (originTableId === targetTableId) { return; }
 
     const originTableRef = getTableDocRef(originTableId);
     const targetTableRef = getTableDocRef(targetTableId);
 
     const dbInstance = db;
-    if (!dbInstance) { /* ... */ return; }
+    if (!dbInstance) { return; }
     const batch = writeBatch(dbInstance);
 
     try {
@@ -187,7 +153,7 @@ export const handleTableTransferConfirmed = async (originTableId, targetTableId,
         const targetTableIsOpen = targetSnap.exists() && targetSnap.data().status?.toLowerCase() === 'open';
 
         if (!targetTableIsOpen) {
-            if (!newDiners || !newSector) { /* ... */ return; }
+            if (!newDiners || !newSector) { return; }
             batch.set(targetTableRef, {
                  tableNumber: parseInt(targetTableId), diners: newDiners, sector: newSector,
                  status: 'open', createdAt: serverTimestamp(),
@@ -217,11 +183,8 @@ export const handleTableTransferConfirmed = async (originTableId, targetTableId,
 };
 window.handleTableTransferConfirmed = handleTableTransferConfirmed;
 
-/**
- * Abre o modal de autenticação para ações gerenciais e delega a ação.
- */
+// --- openManagerAuthModal (sem alteração) ---
 window.openManagerAuthModal = (action, payload = null) => {
-    // ... (Esta função está OK, sem alterações necessárias) ...
     if (userRole !== 'gerente') {
         alert("Acesso negado. Apenas o perfil 'Gerente' pode realizar esta ação.");
         return;
@@ -282,18 +245,17 @@ window.openManagerAuthModal = (action, payload = null) => {
 };
 window.openManagerAuthModal = openManagerAuthModal;
 
-// --- WRAPPERS GLOBAIS PARA ONCLICKS ---
+// --- WRAPPERS GLOBAIS ... (sem alteração) ---
 window.deletePayment = (timestamp) => window.openManagerAuthModal('deletePayment', timestamp);
 window.handleMassActionRequest = (action) => { if(action === 'delete') window.openManagerAuthModal('executeMassDelete'); else if (action === 'transfer') window.openManagerAuthModal('executeMassTransfer'); };
-window.openObsModalForGroup = openObsModalForGroup;
+window.openObsModalForGroup = openObsModalForGroup; 
 window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`);
-window.openNfeModal = () => { /* Lógica para abrir modal NFe */ };
-window.openNfeModal = openNfeModal;
+window.openNfeModal = () => { /* Lógica para abrir modal NFe */ }; 
+window.openNfeModal = openNfeModal; 
 
 
-// --- LÓGICA DE LISTENER DA MESA ---
+// --- LÓGICA DE LISTENER DA MESA (sem alteração) ---
 export const setTableListener = (tableId, isClientMode = false) => {
-    // ... (Esta função está OK, sem alterações necessárias) ...
     if (unsubscribeTable) unsubscribeTable();
     const tableRef = getTableDocRef(tableId);
 
@@ -317,20 +279,20 @@ export const setTableListener = (tableId, isClientMode = false) => {
 
             if (JSON.stringify(firebaseSelectedItems) !== JSON.stringify(selectedItems)) {
                  if (!isClientMode || (isClientMode && selectedItems.length === 0)){
-                     console.log("[Listener] Syncing selectedItems from Firebase.");
-                     selectedItems.length = 0;
-                     selectedItems.push(...firebaseSelectedItems);
+                     console.log("[Listener] Syncing selectedItems from Firebase."); 
+                     selectedItems.length = 0; 
+                     selectedItems.push(...firebaseSelectedItems); 
                  } else {
-                     console.log("[Listener] Client has local items, not syncing from Firebase.");
+                     console.log("[Listener] Client has local items, not syncing from Firebase."); 
                  }
             }
 
             if (isClientMode) {
-                 renderClientOrderScreen();
-                 renderPaymentSummary(currentTableId, currentOrderSnapshot);
+                 renderClientOrderScreen(); 
+                 renderPaymentSummary(currentTableId, currentOrderSnapshot); 
             } else {
-                 renderOrderScreen(currentOrderSnapshot);
-                 renderPaymentSummary(currentTableId, currentOrderSnapshot);
+                 renderOrderScreen(currentOrderSnapshot); 
+                 renderPaymentSummary(currentTableId, currentOrderSnapshot); 
             }
 
         } else {
@@ -351,21 +313,21 @@ export const setTableListener = (tableId, isClientMode = false) => {
         console.error(`[APP] Erro no listener da mesa ${tableId}:`, error);
          if (unsubscribeTable) unsubscribeTable(); unsubscribeTable = null;
          alert("Erro ao sincronizar com a mesa. Voltando ao painel.");
-         goToScreen('panelScreen'); // ATENÇÃO: Se o login falhar (permissão), isso pode causar um loop.
+         goToScreen('panelScreen');
     });
 };
 
+// --- setCurrentTable (sem alteração) ---
 export const setCurrentTable = (tableId, isClientMode = false) => {
-    // ... (Esta função está OK, sem alterações necessárias) ...
     if (currentTableId === tableId && unsubscribeTable) {
         console.log(`[APP] Already listening to table ${tableId}. Forcing re-render.`);
         if(currentOrderSnapshot){
              if (isClientMode) {
-                 renderClientOrderScreen();
-                 renderPaymentSummary(currentTableId, currentOrderSnapshot);
+                 renderClientOrderScreen(); 
+                 renderPaymentSummary(currentTableId, currentOrderSnapshot); 
              } else {
-                 renderOrderScreen(currentOrderSnapshot);
-                 renderPaymentSummary(currentTableId, currentOrderSnapshot);
+                 renderOrderScreen(currentOrderSnapshot); 
+                 renderPaymentSummary(currentTableId, currentOrderSnapshot); 
              }
         } else {
              console.warn(`[APP] No currentOrderSnapshot for table ${tableId} to re-render.`);
@@ -375,8 +337,8 @@ export const setCurrentTable = (tableId, isClientMode = false) => {
 
     console.log(`[APP] Setting current table to ${tableId} (ClientMode: ${isClientMode})`);
     currentTableId = tableId;
-    selectedItems.length = 0;
-    currentOrderSnapshot = null;
+    selectedItems.length = 0; 
+    currentOrderSnapshot = null; 
 
     if (isClientMode) {
          const clientTableNumEl = document.getElementById('client-table-number');
@@ -395,6 +357,7 @@ export const setCurrentTable = (tableId, isClientMode = false) => {
     setTableListener(tableId, isClientMode);
 };
 
+// --- selectTableAndStartListener (sem alteração) ---
 export const selectTableAndStartListener = async (tableId) => {
     try {
         await goToScreen('orderScreen'); // Navega para a tela de pedido
@@ -404,7 +367,7 @@ export const selectTableAndStartListener = async (tableId) => {
 window.selectTableAndStartListener = selectTableAndStartListener;
 
 
-// --- LÓGICA DE LOGIN (RESTAURADA E CORRIGIDA) ---
+// --- LÓGICA DE LOGIN (ATUALIZADA PARA FIREBASE AUTH) ---
 const handleStaffLogin = async (event) => {
     if(event) event.preventDefault();
 
@@ -428,31 +391,29 @@ const handleStaffLogin = async (event) => {
         return;
     }
 
-    // Desabilita o botão e mostra "Entrando..."
     loginBtn.disabled = true;
     loginBtn.textContent = 'Entrando...';
     loginErrorMsg.style.display = 'none';
 
     try {
-        // Tenta autenticar usando a função que já existe
-        const userData = await authenticateUserFromFirestore(email, password);
+        // A NOVA LÓGICA DE LOGIN: Usa o Firebase Auth
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        
+        // Se chegar aqui, o login foi sucesso.
+        // O listener 'onAuthStateChanged' (no DOMContentLoaded)
+        // irá detectar esta mudança e chamar o initStaffApp.
+        console.log("Login com Firebase Auth bem-sucedido!", userCredential.user);
 
-        if (userData) {
-            // SUCESSO!
-            userId = userData.email;
-            userRole = userData.role;
-            await initStaffApp(userData.name); // Inicia o app
+    } catch (error) {
+        // CORRIGINDO O BUG DO LOGIN SILENCIOSO
+        console.error("Erro no login Firebase Auth:", error.code, error.message);
+        if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+            loginErrorMsg.textContent = "E-mail ou senha inválidos.";
+        } else if (error.code === 'auth/invalid-email') {
+            loginErrorMsg.textContent = "Formato de e-mail inválido.";
         } else {
-            // FALHA! (Aqui está a correção do bug)
-            loginErrorMsg.textContent = "E-mail ou senha inválidos, ou usuário inativo.";
-            loginErrorMsg.style.display = 'block';
-            loginBtn.disabled = false;
-            loginBtn.textContent = 'Entrar';
+            loginErrorMsg.textContent = "Erro de conexão. Tente novamente.";
         }
-    } catch (e) {
-        // FALHA DE CONEXÃO!
-        console.error("Erro no login:", e);
-        loginErrorMsg.textContent = "Erro de conexão. Tente novamente.";
         loginErrorMsg.style.display = 'block';
         loginBtn.disabled = false;
         loginBtn.textContent = 'Entrar';
@@ -465,13 +426,13 @@ const handleLogout = () => {
     userId = null; currentTableId = null; selectedItems.length = 0; userRole = 'anonymous'; currentOrderSnapshot = null;
     if (unsubscribeTable) { unsubscribeTable(); unsubscribeTable = null; }
 
-    // Desloga do Firebase Auth (se estivermos usando)
+    // Desloga do Firebase Auth
     const authInstance = auth;
-    if (authInstance && authInstance.currentUser) {
+    if (authInstance) {
         signOut(authInstance).catch(error => console.error("Erro ao deslogar:", error));
     }
 
-    // ATUALIZADO: Mostra a tela de login
+    // Mostra a tela de login
     showLoginScreen();
     const userIdDisplay = document.getElementById('user-id-display');
     if(userIdDisplay) userIdDisplay.textContent = 'Usuário ID: Carregando...';
@@ -496,7 +457,6 @@ const initStaffApp = async (staffName) => { // Aceita o nome como parâmetro
 
         hideStatus();
         hideLoginScreen(); // Apenas exibe o header e mainContent
-
         
         // Atualiza display do usuário
         const userIdDisplay = document.getElementById('user-id-display');
@@ -504,7 +464,6 @@ const initStaffApp = async (staffName) => { // Aceita o nome como parâmetro
 
         loadOpenTables(); // Carrega as mesas abertas
 
-        // ATUALIZADO: Vai para o 'panelScreen' (índice 1)
         await goToScreen('panelScreen'); 
         console.log("[StaffApp] initStaffApp FINISHED."); 
 
@@ -515,8 +474,8 @@ const initStaffApp = async (staffName) => { // Aceita o nome como parâmetro
     }
 };
 
+// --- initClientApp (sem alteração) ---
 const initClientApp = async () => {
-    // ... (Esta função está OK, sem alterações necessárias) ...
     console.log("[ClientApp] initClientApp CALLED"); 
     try {
         initClientOrderController();
@@ -571,13 +530,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                  window.increaseLocalItemQuantity = module.increaseLocalItemQuantity;
              }).catch(err => console.error("Failed to dynamically load client quantity functions:", err));
         } else {
-             // FLUXO DE STAFF (RESTAURADO COM LOGIN)
+             // FLUXO DE STAFF (RESTAURADO COM LOGIN AUTH)
              
-             // Mapeia os elementos de login do index.html
              loginBtn = document.getElementById('loginBtn');
              loginPasswordInput = document.getElementById('loginPassword');
 
-             // Adiciona os listeners para o botão de login e a tecla Enter
              if (loginBtn) {
                  loginBtn.addEventListener('click', handleStaffLogin);
              }
@@ -590,13 +547,36 @@ document.addEventListener('DOMContentLoaded', async () => {
              }
 
              // Inicia o observador de autenticação
-             // (Necessário se você mudar para o Firebase Auth real no futuro)
-             onAuthStateChanged(authInstance, (user) => {
-                 if (user) {
-                     // Usuário está logado (pelo Firebase Auth)
-                     // AINDA NÃO USADO, pois usamos auth manual
+             onAuthStateChanged(authInstance, async (user) => {
+                 if (user && !user.isAnonymous) {
+                     // --- USUÁRIO STAFF LOGADO! ---
+                     console.log("[APP] Usuário Staff autenticado:", user.email);
+                     
+                     // Agora, precisamos buscar o 'role' e o 'name' no Firestore.
+                     const usersCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'users');
+                     const userDocRef = doc(usersCollectionRef, user.email); // Usa email como ID
+                     const docSnap = await getDoc(userDocRef);
+
+                     if (docSnap.exists()) {
+                         const userData = docSnap.data();
+                         if (!userData.isActive) {
+                             alert("Sua conta foi desativada. Contate o gerente.");
+                             handleLogout();
+                             return;
+                         }
+                         
+                         userId = user.email;
+                         userRole = userData.role;
+                         await initStaffApp(userData.name); // Inicia o app com nome e role corretos!
+                     } else {
+                         // Usuário autenticado mas sem registro no Firestore?
+                         alert("Erro: Usuário autenticado, mas não encontrado no banco de dados. Contate o suporte.");
+                         handleLogout();
+                     }
+                 } else if (user && user.isAnonymous) {
+                     // É o cliente. Ignora no app de staff.
                  } else {
-                     // Usuário NÃO está logado, MOSTRA A TELA DE LOGIN
+                     // --- NINGUÉM LOGADO ---
                      console.log("[APP] Usuário não autenticado, mostrando tela de login.");
                      showLoginScreen();
                  }
