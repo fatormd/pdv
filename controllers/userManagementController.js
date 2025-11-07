@@ -1,11 +1,18 @@
-// --- CONTROLLERS/USERMANAGEMENTCONTROLLER.JS (ATUALIZADO SEM SENHA) ---
-import { db, appId } from '/services/firebaseService.js';
+// --- CONTROLLERS/USERMANAGEMENTCONTROLLER.JS (ATUALIZADO COM CLOUD FUNCTIONS) ---
+
+// ===== INÍCIO DA ATUALIZAÇÃO =====
+import { db, appId, functions } from '/services/firebaseService.js';
+// Importa a função httpsCallable
+import { httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
+// ===== FIM DA ATUALIZAÇÃO =====
+
 import { collection, getDocs, doc, setDoc, getDoc, deleteDoc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // --- VARIÁVEIS DE ELEMENTOS ---
 let userManagementModal, userListContainer, showUserFormBtn;
 let userForm, userFormTitle, userIdInput, userNameInput, userEmailInput, userRoleSelect, userIsActiveCheckbox;
-// REMOVIDO: userPasswordInput
+// ===== ATUALIZAÇÃO: Mapeia o campo de senha =====
+let userPasswordInput, passwordHint, userPasswordContainer;
 let cancelUserFormBtn, saveUserBtn, userFormError;
 
 let isUserManagementInitialized = false;
@@ -65,26 +72,40 @@ const fetchUsers = async () => {
 };
 
 const showUserForm = (userToEdit = null) => {
-     // ATUALIZADO: Remove userPasswordInput da verificação
-     if (!userForm || !userFormTitle || !userIdInput || !userNameInput || !userEmailInput || !userRoleSelect || !userIsActiveCheckbox || !userFormError) { return; }
+     // ===== ATUALIZAÇÃO: Adiciona campos de senha à verificação =====
+     if (!userForm || !userFormTitle || !userIdInput || !userNameInput || !userEmailInput || !userRoleSelect || !userIsActiveCheckbox || !userFormError || !userPasswordInput || !passwordHint || !userPasswordContainer) { return; }
      userFormError.style.display = 'none';
 
      if (userToEdit) {
+         // --- MODO EDIÇÃO ---
          userFormTitle.textContent = "Editar Usuário";
          userIdInput.value = userToEdit.id;
          userNameInput.value = userToEdit.name;
          userEmailInput.value = userToEdit.email;
-         userEmailInput.readOnly = true;
-         // REMOVIDO: Lógica do password
+         userEmailInput.readOnly = true; // Não permite alterar e-mail (que é o ID)
+         
+         // Lógica do campo de senha
+         userPasswordContainer.style.display = 'none'; // Esconde senha por padrão na edição
+         userPasswordInput.value = '';
+         userPasswordInput.required = false;
+         // passwordHint.style.display = 'block'; // Mostra a dica
+         
          userRoleSelect.value = userToEdit.role;
          userIsActiveCheckbox.checked = userToEdit.isActive;
      } else {
+         // --- MODO CRIAÇÃO ---
          userFormTitle.textContent = "Adicionar Novo Usuário";
-         userIdInput.value = '';
+         userIdInput.value = ''; // ID está vazio (indica novo usuário)
          userNameInput.value = '';
          userEmailInput.value = '';
          userEmailInput.readOnly = false;
-         // REMOVIDO: Lógica do password
+         
+         // Lógica do campo de senha
+         userPasswordContainer.style.display = 'block'; // Mostra campo de senha
+         userPasswordInput.value = '';
+         userPasswordInput.required = true; // Senha é obrigatória ao criar
+         passwordHint.style.display = 'none'; // Esconde a dica
+         
          userRoleSelect.value = '';
          userIsActiveCheckbox.checked = true;
      }
@@ -93,83 +114,102 @@ const showUserForm = (userToEdit = null) => {
 };
 const hideUserForm = () => { if(userForm) userForm.style.display = 'none'; };
 
+// ===== FUNÇÃO handleSaveUser TOTALMENTE REESCRITA =====
 const handleSaveUser = async (event) => {
     event.preventDefault();
     if (!saveUserBtn || !userFormError) { return; }
 
-    const originalEmail = userIdInput.value;
+    const originalEmail = userIdInput.value; // Vazio se for novo, preenchido se for edição
     const name = userNameInput.value.trim();
     const email = userEmailInput.value.trim().toLowerCase();
-    // REMOVIDO: const password = userPasswordInput.value;
+    const password = userPasswordInput.value;
     const role = userRoleSelect.value;
     const isActive = userIsActiveCheckbox.checked;
 
-    // ATUALIZADO: Remove password da verificação
+    const isNewUser = !originalEmail;
+
+    // Validação
     if (!name || !email || !role) {
-        userFormError.textContent = "Preencha todos os campos obrigatórios (*).";
+        userFormError.textContent = "Nome, E-mail e Função são obrigatórios.";
+        userFormError.style.display = 'block';
+        return;
+    }
+    if (isNewUser && (!password || password.length < 6)) {
+        userFormError.textContent = "Senha é obrigatória (mínimo 6 caracteres) para novos usuários.";
         userFormError.style.display = 'block';
         return;
     }
 
-    saveUserBtn.disabled = true; saveUserBtn.textContent = 'Salvando...'; userFormError.style.display = 'none';
+    saveUserBtn.disabled = true; 
+    saveUserBtn.textContent = 'Salvando...'; 
+    userFormError.style.display = 'none';
 
     try {
-        const usersCollectionRef = getUsersCollectionRef();
-        const userDocRef = doc(usersCollectionRef, email);
+        if (isNewUser) {
+            // --- FLUXO DE CRIAÇÃO (Chama Cloud Function) ---
+            const createNewUser = httpsCallable(functions, 'createNewUser');
+            const result = await createNewUser({
+                email: email,
+                password: password,
+                name: name,
+                role: role,
+                isActive: isActive
+            });
+            alert(result.data.message); // Exibe sucesso
 
-        if (!originalEmail) { // Novo usuário
-            const docSnap = await getDoc(userDocRef);
-            if (docSnap.exists()) throw new Error(`O e-mail ${email} já está cadastrado.`);
-        } else if (originalEmail !== email) { // Tentativa de mudar email
-             throw new Error("Não é permitido alterar o e-mail (login) do usuário.");
-        }
-
-        const userData = { name, email, role, isActive, updatedAt: serverTimestamp() };
-        // REMOVIDO: if (password) userData.password = password; 
-        
-        let finalData;
-        if (!originalEmail) {
-            finalData = { ...userData, createdAt: serverTimestamp() };
         } else {
-             const existingDoc = await getDoc(userDocRef);
-             const existingData = existingDoc.data() || {};
-             finalData = { ...existingData, ...userData };
-             if (!existingData.createdAt) finalData.createdAt = serverTimestamp();
+            // --- FLUXO DE EDIÇÃO (Chama Cloud Function) ---
+            // (Nota: Esta função 'updateUser' não altera senha, apenas dados do perfil)
+            const updateUser = httpsCallable(functions, 'updateUser');
+            const result = await updateUser({
+                originalEmail: originalEmail, // Usa o e-mail original como ID
+                name: name,
+                role: role,
+                isActive: isActive
+            });
+            alert(result.data.message); // Exibe sucesso
         }
 
-        await setDoc(userDocRef, finalData);
         hideUserForm();
         await fetchUsers(); // Recarrega lista
 
     } catch (error) {
-        console.error("Erro ao salvar usuário:", error);
-        userFormError.textContent = `Erro: ${error.message}`;
+        console.error("Erro ao salvar usuário via Cloud Function:", error);
+        // Exibe a mensagem de erro vinda da Cloud Function
+        userFormError.textContent = `Erro: ${error.message}`; 
         userFormError.style.display = 'block';
     } finally {
         if(saveUserBtn){ saveUserBtn.disabled = false; saveUserBtn.textContent = 'Salvar Usuário'; }
     }
 };
 
+// ===== FUNÇÃO handleDeleteUser TOTALMENTE REESCRITA =====
 const handleDeleteUser = async (email, name) => {
     if (!email || !name) return;
-    if (!confirm(`Tem certeza que deseja EXCLUIR o usuário "${name}" (${email})? Esta ação não pode ser desfeita.`)) { return; }
+    if (!confirm(`Tem certeza que deseja EXCLUIR o usuário "${name}" (${email})? Esta ação excluirá o login (Auth) e o perfil (Firestore) e não pode ser desfeita.`)) { 
+        return; 
+    }
 
     try {
-        const usersCollectionRef = getUsersCollectionRef();
-        const userDocRef = doc(usersCollectionRef, email);
-        await deleteDoc(userDocRef);
-        await fetchUsers();
+        const deleteUser = httpsCallable(functions, 'deleteUser');
+        const result = await deleteUser({ email: email });
+        
+        alert(result.data.message);
+        await fetchUsers(); // Recarrega a lista
+        
     } catch (error) {
-        console.error("Erro ao excluir usuário:", error);
+        console.error("Erro ao excluir usuário via Cloud Function:", error);
         alert(`Falha ao excluir usuário: ${error.message}`);
     }
 };
 
 // --- FUNÇÕES DE INICIALIZAÇÃO E LISTENERS ---
 const attachUserListActionListeners = () => {
+    // Limpa listeners antigos para evitar duplicação
     document.querySelectorAll('.edit-user-btn').forEach(btn => { btn.replaceWith(btn.cloneNode(true)); });
     document.querySelectorAll('.delete-user-btn').forEach(btn => { btn.replaceWith(btn.cloneNode(true)); });
 
+    // Reanexa listeners
     document.querySelectorAll('.edit-user-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const email = e.currentTarget.dataset.userEmail;
@@ -199,7 +239,12 @@ export const initUserManagementController = () => {
     userIdInput = document.getElementById('userIdInput');
     userNameInput = document.getElementById('userNameInput');
     userEmailInput = document.getElementById('userEmailInput');
-    // REMOVIDO: userPasswordInput = document.getElementById('userPasswordInput');
+    
+    // ===== ATUALIZAÇÃO: Mapeia campos de senha =====
+    userPasswordInput = document.getElementById('userPasswordInput');
+    userPasswordContainer = document.getElementById('userPasswordContainer');
+    passwordHint = document.getElementById('passwordHint');
+    
     userRoleSelect = document.getElementById('userRoleSelect');
     userIsActiveCheckbox = document.getElementById('userIsActiveCheckbox');
     cancelUserFormBtn = document.getElementById('cancelUserFormBtn');
@@ -207,7 +252,8 @@ export const initUserManagementController = () => {
     userFormError = document.getElementById('userFormError');
 
     // Validação CRÍTICA
-    if (!userManagementModal || !userListContainer || !showUserFormBtn || !userForm || !saveUserBtn || !cancelUserFormBtn) {
+    // ===== ATUALIZAÇÃO: Adiciona campos de senha à validação =====
+    if (!userManagementModal || !userListContainer || !showUserFormBtn || !userForm || !saveUserBtn || !cancelUserFormBtn || !userPasswordInput) {
         console.error("[UserMgmtController] Erro Fatal: Elementos essenciais do modal não encontrados. Abortando inicialização.");
         return;
     }
