@@ -69,17 +69,7 @@ window.decreaseLocalItemQuantity = decreaseLocalItemQuantity;
 
 // --- FUNÇÕES DE EXIBIÇÃO DE TELA E MODAL ---
 
-//
-// /===================================================\
-// | INÍCIO DA ATUALIZAÇÃO (Adicionado 'export')       |
-// \===================================================/
-//
 export const renderMenu = () => {
-//
-// /===================================================\
-// | FIM DA ATUALIZAÇÃO                                |
-// \===================================================/
-//
     if (!menuItemsGrid || !categoryFiltersContainer) {
         return;
     }
@@ -120,10 +110,13 @@ export const renderMenu = () => {
     if (filteredProducts.length === 0) {
         menuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-red-400 italic">Nenhum produto encontrado.</div>`;
     } else {
+        
+        // ==== INÍCIO DA ALTERAÇÃO (Layout do Card) ====
         menuItemsGrid.innerHTML = filteredProducts.map(product => `
-            <div class="product-card bg-dark-card border border-gray-700 p-4 rounded-xl shadow-md cursor-pointer hover:shadow-lg transition duration-150">
-                <h4 class="font-bold text-base text-dark-text">${product.name}</h4>
-                <p class="text-xs text-dark-placeholder">${product.category}</p>
+            <div class="product-card bg-dark-card border border-gray-700 p-4 rounded-xl shadow-md cursor-pointer hover:shadow-lg transition duration-150 flex flex-col justify-between" style="min-height: 140px;">
+                
+                <h4 class="font-bold text-base text-dark-text flex-grow">${product.name}</h4>
+                
                 <div class="flex justify-between items-center mt-2">
                     <span class="font-bold text-lg text-pumpkin">${formatCurrency(product.price)}</span>
                     <button class="add-item-btn add-icon-btn bg-green-600 text-white hover:bg-green-700 transition"
@@ -133,6 +126,7 @@ export const renderMenu = () => {
                 </div>
             </div>
         `).join('');
+        // ==== FIM DA ALTERAÇÃO ====
     }
 };
 
@@ -159,7 +153,7 @@ const _renderSelectedItemsList = () => {
                 <div class="flex flex-col flex-grow min-w-0 mr-2">
                     <span class="font-semibold text-dark-text">${group.name} (${group.count}x)</span>
                     <span class="text-sm cursor-pointer text-indigo-300 hover:text-indigo-200" data-item-id="${group.id}" data-item-note-key="${group.note || ''}">
-                        ${group.note ? `<span class="text-yellow-400">(${group.note.replace(' [EM ESPERA]', '')})</span>${group.note.includes('[EM ESPERA]') ? ' <i class="fas fa-pause-circle text-yellow-400"></i>' : ''}` : `(Adicionar Obs.)`}
+                        ${group.note ? `<span class="text-yellow-400">(${group.note.replace(' [EM ESPERA]', '')})</span>${group.note.includes('[EM ESPERA]') ? ' <i class="fas fa-pause-circle text-yellow-400"></i>' : `(Adicionar Obs.)`}
                     </span>
                 </div>
                 <div class="flex items-center space-x-2 flex-shrink-0">
