@@ -604,7 +604,20 @@
         window.openPaymentModalForSplit = (splitId) => { alert(`Pagar Conta Dividida ${splitId} (DEV)`); };
         window.openSplitTransferModal = (splitId, mode) => { alert(`Mover Itens Para/De ${splitId} (DEV)`); };
     </script>
-    
+
+    <script>
+        // Config Firebase (copiado do client.html)
+        // Isso corrige o erro de permissão, pois agora o app.js sabe o ID correto do banco
+        window.__app_id = "pdv_fator_instance_001";
+        window.__firebase_config = JSON.stringify({
+            apiKey: "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY",
+            authDomain: "fator-pdv.firebaseapp.com",
+            projectId: "fator-pdv",
+            storageBucket: "fator-pdv.appspot.com",
+            messagingSenderId: "1097659747429",
+            appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c" // Usando o appId do client.html
+        });
+    </script>
     <script type="module" src="app.js"></script>
 </body>
 </html>
