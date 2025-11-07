@@ -452,8 +452,14 @@ const initStaffApp = async (staffName) => { // Aceita o nome como parâmetro
 
         loadOpenTables(); // Carrega as mesas abertas
 
-        await goToScreen('panelScreen'); // Vai para o painel inicial
-        console.log("[StaffApp] initStaffApp FINISHED"); 
+        // CORREÇÃO PARA BUG DE NAVEGAÇÃO: Adiciona um pequeno delay 
+        // para garantir que o DOM/CSS esteja estável para a transição (translateX).
+        setTimeout(async () => {
+             await goToScreen('panelScreen'); // Vai para o painel inicial
+             console.log("[StaffApp] initStaffApp FINISHED navigation.");
+        }, 50); 
+        
+        console.log("[StaffApp] initStaffApp FINISHED setup."); // Log ajustado
 
     } catch (error) {
         console.error("Erro CRÍTICO durante initStaffApp:", error);
