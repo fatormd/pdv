@@ -24,6 +24,8 @@ export const getTablesCollectionRef = () => collection(db, 'artifacts', appId, '
 export const getTableDocRef = (tableNumber) => doc(db, 'artifacts', appId, 'public', 'data', 'tables', tableNumber.toString());
 export const getKdsCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'kds_orders');
 export const getCustomersCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'customers');
+// ==== NOVO ====
+export const getQuickObsCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'quick_obs');
 
 
 // Funções básicas de persistência (serão usadas pelos Controllers)
