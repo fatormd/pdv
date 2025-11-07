@@ -180,10 +180,12 @@ export const fetchWooCommerceCategories = async (renderCategoryFiltersCallback) 
         // Chama a Cloud Function
         const categories = await callWooProxy({
             method: 'GET',
-            endpoint: 'products/categories?per_page=100' // Garante buscar todas
+            // ==== ALTERAÇÃO 1: Adiciona ordenação pela ordem do menu do WooCommerce ====
+            endpoint: 'products/categories?per_page=100&orderby=menu_order&order=asc'
         });
 
-        WOOCOMMERCE_CATEGORIES = [{ id: 'all', name: 'Todos', slug: 'all' }, ...categories
+        // ==== ALTERAÇÃO 2: Muda "Todos" para "Novidades" ====
+        WOOCOMMERCE_CATEGORIES = [{ id: 'all', name: 'Novidades', slug: 'all' }, ...categories
             .filter(c => c.count > 0) // Opcional: Filtra categorias sem produtos
             .map(c => ({ id: c.id, name: c.name, slug: c.slug }))
         ];
@@ -192,6 +194,7 @@ export const fetchWooCommerceCategories = async (renderCategoryFiltersCallback) 
     } catch (error) {
          console.error("[Woo] Falha ao buscar categorias (via proxy):", error.message);
          alert(`Erro ao carregar categorias: ${error.message}`);
-         return [{ id: 'all', name: 'Todos', slug: 'all' }]; // Retorna pelo menos 'Todos'
+         // ==== ALTERAÇÃO 2 (fallback): Muda "Todos" para "Novidades" ====
+         return [{ id: 'all', name: 'Novidades', slug: 'all' }]; // Retorna pelo menos 'Novidades'
     }
 };
