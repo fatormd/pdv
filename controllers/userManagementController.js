@@ -1,10 +1,11 @@
-// --- CONTROLLERS/USERMANAGEMENTCONTROLLER.JS (Completo e Estável) ---
+// --- CONTROLLERS/USERMANAGEMENTCONTROLLER.JS (ATUALIZADO SEM SENHA) ---
 import { db, appId } from '/services/firebaseService.js';
 import { collection, getDocs, doc, setDoc, getDoc, deleteDoc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // --- VARIÁVEIS DE ELEMENTOS ---
 let userManagementModal, userListContainer, showUserFormBtn;
-let userForm, userFormTitle, userIdInput, userNameInput, userEmailInput, userPasswordInput, userRoleSelect, userIsActiveCheckbox;
+let userForm, userFormTitle, userIdInput, userNameInput, userEmailInput, userRoleSelect, userIsActiveCheckbox;
+// REMOVIDO: userPasswordInput
 let cancelUserFormBtn, saveUserBtn, userFormError;
 
 let isUserManagementInitialized = false;
@@ -64,7 +65,8 @@ const fetchUsers = async () => {
 };
 
 const showUserForm = (userToEdit = null) => {
-     if (!userForm || !userFormTitle || !userIdInput || !userNameInput || !userEmailInput || !userPasswordInput || !userRoleSelect || !userIsActiveCheckbox || !userFormError) { return; }
+     // ATUALIZADO: Remove userPasswordInput da verificação
+     if (!userForm || !userFormTitle || !userIdInput || !userNameInput || !userEmailInput || !userRoleSelect || !userIsActiveCheckbox || !userFormError) { return; }
      userFormError.style.display = 'none';
 
      if (userToEdit) {
@@ -73,9 +75,7 @@ const showUserForm = (userToEdit = null) => {
          userNameInput.value = userToEdit.name;
          userEmailInput.value = userToEdit.email;
          userEmailInput.readOnly = true;
-         userPasswordInput.value = '';
-         userPasswordInput.placeholder = "Deixe em branco para não alterar";
-         userPasswordInput.required = false;
+         // REMOVIDO: Lógica do password
          userRoleSelect.value = userToEdit.role;
          userIsActiveCheckbox.checked = userToEdit.isActive;
      } else {
@@ -84,9 +84,7 @@ const showUserForm = (userToEdit = null) => {
          userNameInput.value = '';
          userEmailInput.value = '';
          userEmailInput.readOnly = false;
-         userPasswordInput.value = '';
-         userPasswordInput.placeholder = "Senha";
-         userPasswordInput.required = true;
+         // REMOVIDO: Lógica do password
          userRoleSelect.value = '';
          userIsActiveCheckbox.checked = true;
      }
@@ -102,11 +100,12 @@ const handleSaveUser = async (event) => {
     const originalEmail = userIdInput.value;
     const name = userNameInput.value.trim();
     const email = userEmailInput.value.trim().toLowerCase();
-    const password = userPasswordInput.value;
+    // REMOVIDO: const password = userPasswordInput.value;
     const role = userRoleSelect.value;
     const isActive = userIsActiveCheckbox.checked;
 
-    if (!name || !email || !role || (!originalEmail && !password)) {
+    // ATUALIZADO: Remove password da verificação
+    if (!name || !email || !role) {
         userFormError.textContent = "Preencha todos os campos obrigatórios (*).";
         userFormError.style.display = 'block';
         return;
@@ -126,7 +125,7 @@ const handleSaveUser = async (event) => {
         }
 
         const userData = { name, email, role, isActive, updatedAt: serverTimestamp() };
-        if (password) userData.password = password; // Senha em texto plano
+        // REMOVIDO: if (password) userData.password = password; 
         
         let finalData;
         if (!originalEmail) {
@@ -200,14 +199,14 @@ export const initUserManagementController = () => {
     userIdInput = document.getElementById('userIdInput');
     userNameInput = document.getElementById('userNameInput');
     userEmailInput = document.getElementById('userEmailInput');
-    userPasswordInput = document.getElementById('userPasswordInput');
+    // REMOVIDO: userPasswordInput = document.getElementById('userPasswordInput');
     userRoleSelect = document.getElementById('userRoleSelect');
     userIsActiveCheckbox = document.getElementById('userIsActiveCheckbox');
     cancelUserFormBtn = document.getElementById('cancelUserFormBtn');
     saveUserBtn = document.getElementById('saveUserBtn');
     userFormError = document.getElementById('userFormError');
 
-    // Validação CRÍTICA (o erro anterior)
+    // Validação CRÍTICA
     if (!userManagementModal || !userListContainer || !showUserFormBtn || !userForm || !saveUserBtn || !cancelUserFormBtn) {
         console.error("[UserMgmtController] Erro Fatal: Elementos essenciais do modal não encontrados. Abortando inicialização.");
         return;
