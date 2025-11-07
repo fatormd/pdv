@@ -123,7 +123,7 @@ export const renderMenu = () => {
         menuItemsGrid.innerHTML = filteredProducts.map(product => `
             <div class="product-card bg-dark-card border border-gray-700 p-4 rounded-xl shadow-md cursor-pointer hover:shadow-lg transition duration-150">
                 <h4 class="font-bold text-base text-dark-text">${product.name}</h4>
-                <p class="text-xs text-dark-placeholder">${product.category} (${product.sector})</p>
+                <p class="text-xs text-dark-placeholder">${product.category}</p>
                 <div class="flex justify-between items-center mt-2">
                     <span class="font-bold text-lg text-pumpkin">${formatCurrency(product.price)}</span>
                     <button class="add-item-btn add-icon-btn bg-green-600 text-white hover:bg-green-700 transition"
