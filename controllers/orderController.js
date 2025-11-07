@@ -1,4 +1,4 @@
-// --- CONTROLLERS/ORDERCONTROLLER.JS (Painel 2 - Atualizado com Aprovação Cliente) ---
+// --- CONTROLLERS/ORDERCONTROLLER.JS (Painel 2 - CORRIGIDO) ---
 import { getProducts, getCategories } from "/services/wooCommerceService.js";
 import { formatCurrency } from "/utils.js";
 import { saveSelectedItemsToFirebase } from "/services/firebaseService.js";
@@ -111,7 +111,7 @@ export const renderMenu = () => {
         menuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-red-400 italic">Nenhum produto encontrado.</div>`;
     } else {
         
-        // ==== INÍCIO DA ALTERAÇÃO (Layout do Card) ====
+        // ==== Layout do Card "Clean" (sem categoria) ====
         menuItemsGrid.innerHTML = filteredProducts.map(product => `
             <div class="product-card bg-dark-card border border-gray-700 p-4 rounded-xl shadow-md cursor-pointer hover:shadow-lg transition duration-150 flex flex-col justify-between" style="min-height: 140px;">
                 
@@ -126,7 +126,6 @@ export const renderMenu = () => {
                 </div>
             </div>
         `).join('');
-        // ==== FIM DA ALTERAÇÃO ====
     }
 };
 
@@ -152,10 +151,11 @@ const _renderSelectedItemsList = () => {
             <div class="flex justify-between items-center bg-dark-input border border-gray-600 p-3 rounded-lg shadow-sm">
                 <div class="flex flex-col flex-grow min-w-0 mr-2">
                     <span class="font-semibold text-dark-text">${group.name} (${group.count}x)</span>
+                    
                     <span class="text-sm cursor-pointer text-indigo-300 hover:text-indigo-200" data-item-id="${group.id}" data-item-note-key="${group.note || ''}">
-                        ${group.note ? `<span class="text-yellow-400">(${group.note.replace(' [EM ESPERA]', '')})</span>${group.note.includes('[EM ESPERA]') ? ' <i class="fas fa-pause-circle text-yellow-400"></i>' : `(Adicionar Obs.)`}
+                        ${group.note ? `<span class="text-yellow-400">(${group.note.replace(' [EM ESPERA]', '')})</span>${group.note.includes('[EM ESPERA]') ? ' <i class="fas fa-pause-circle text-yellow-400"></i>' : ''}` : `(Adicionar Obs.)`}
                     </span>
-                </div>
+                    </div>
                 <div class="flex items-center space-x-2 flex-shrink-0">
                     <button class="qty-btn bg-red-600 text-white rounded-full h-8 w-8 flex items-center justify-center text-lg hover:bg-red-700 transition duration-150"
                             data-item-id="${group.id}" data-item-note-key="${group.note || ''}" data-action="decrease">
