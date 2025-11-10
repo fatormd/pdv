@@ -123,11 +123,12 @@ export const renderClientMenu = () => {
     }
 
     if (filteredProducts.length === 0) {
+        // Esta é a linha que está aparecendo
         clientMenuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-dark-placeholder italic">Nenhum produto encontrado com os filtros atuais.</div>`;
     } else {
         
         // ===== INÍCIO DA ATUALIZAÇÃO (Alinhamento Simples) =====
-        // Remove 'auto-rows-fr' para deixar a altura automática
+        // Remove 'auto-rows-fr' para deixar a altura automática, mas mantém gap-4
         clientMenuItemsGrid.className = "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 overflow-y-auto custom-scrollbar pb-4";
         // ===== FIM DA ATUALIZAÇÃO =====
         
@@ -694,17 +695,22 @@ export const initClientOrderController = () => {
         });
     }
 
-
-    // Busca os dados iniciais do WooCommerce
+    // ===== INÍCIO DA ATUALIZAÇÃO (Corrige Race Condition) =====
     console.log("[ClientOrderController] Fetching WooCommerce data...");
-    fetchWooCommerceProducts(renderClientMenu)
-        .then(() => console.log("[ClientOrderController] Products fetched successfully."))
-        .catch(e => console.error("[ClientController INIT] Falha CRÍTICA ao carregar produtos:", e));
-
-    fetchWooCommerceCategories(renderClientMenu)
-        .then(() => console.log("[ClientOrderController] Categories fetched successfully."))
-        .catch(e => console.error("[ClientController INIT] Falha CRÍTICA ao carregar categorias:", e));
-
+    
+    // Espera que AMBOS (produtos e categorias) terminem de carregar
+    Promise.all([
+        fetchWooCommerceProducts(null), // Carrega produtos, mas não renderiza ainda
+        fetchWooCommerceCategories(null) // Carrega categorias, mas não renderiza ainda
+    ]).then(() => {
+        // SÓ ENTÃO renderiza o menu UMA VEZ com todos os dados
+        renderClientMenu(); 
+        console.log("[ClientOrderController] Products and Categories fetched successfully.");
+    }).catch(e => {
+        console.error("[ClientController INIT] Falha CRÍTICA ao carregar dados:", e);
+        alert("Erro ao carregar o cardápio. Tente recarregar a página.");
+    });
+    // ===== FIM DA ATUALIZAÇÃO =====
 
     clientInitialized = true; 
     console.log("[ClientOrderController] initClientOrderController FINISHED.");
