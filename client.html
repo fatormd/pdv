@@ -49,12 +49,9 @@
             display: flex; /* Habilita flexbox */
             flex-direction: column; /* Organiza conteúdo verticalmente */
             
-            /* ===== INÍCIO DA ATUALIZAÇÃO ===== */
-            /* Remove altura fixa e adiciona overflow para a tela inteira rolar */
-            /* height: 100%; */ /* REMOVIDO */
+            /* ===== ATUALIZAÇÃO: Permite que a tela inteira role ===== */
             overflow-y: auto;
             overflow-x: hidden;
-            /* ===== FIM DA ATUALIZAÇÃO ===== */
         }
         @media (min-width: 768px) { /* md breakpoint */
             #clientOrderScreen, #clientPaymentScreen {
@@ -118,8 +115,9 @@
                                 <i class="fas fa-check-circle"></i>
                             </button>
                         </div>
-                        <div id="openOrderListClient" class="space-y-2 md:space-y-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                            <div class="text-sm md:text-base text-dark-placeholder italic p-2">Nenhum item selecionado.</div>
+                        
+                        <div id="openOrderListClient" class="space-y-2 md:space-y-3">
+                        <div class="text-sm md:text-base text-dark-placeholder italic p-2">Nenhum item selecionado.</div>
                         </div>
                     </div>
                 </div>
