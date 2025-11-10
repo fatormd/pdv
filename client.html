@@ -48,7 +48,13 @@
             padding: 1rem; /* Padding padrão */
             display: flex; /* Habilita flexbox */
             flex-direction: column; /* Organiza conteúdo verticalmente */
-            height: 100%; /* Ocupa a altura do appContainer */
+            
+            /* ===== INÍCIO DA ATUALIZAÇÃO ===== */
+            /* Remove altura fixa e adiciona overflow para a tela inteira rolar */
+            /* height: 100%; */ /* REMOVIDO */
+            overflow-y: auto;
+            overflow-x: hidden;
+            /* ===== FIM DA ATUALIZAÇÃO ===== */
         }
         @media (min-width: 768px) { /* md breakpoint */
             #clientOrderScreen, #clientPaymentScreen {
@@ -94,7 +100,7 @@
     <main id="mainContent" class="relative overflow-hidden">
         <div id="appContainer" class="flex transition-transform duration-300 ease-out">
 
-            <div id="clientOrderScreen" class="w-screen flex-shrink-0 flex flex-col h-full">
+            <div id="clientOrderScreen" class="w-screen flex-shrink-0 flex flex-col">
                 <div class="flex items-center justify-between mb-4 md:mb-6 flex-shrink-0">
                     <div class="flex items-center text-green-400">
                         <span class="text-xl md:text-2xl font-semibold mr-3" id="client-table-number">Cardápio Digital</span>
@@ -118,7 +124,8 @@
                     </div>
                 </div>
 
-                <div id="menuContainerClient" class="flex flex-col flex-grow overflow-hidden"> <div class="flex justify-between items-center mb-3 md:mb-4 px-1 flex-shrink-0">
+                <div id="menuContainerClient" class="flex flex-col"> 
+                    <div class="flex justify-between items-center mb-3 md:mb-4 px-1 flex-shrink-0">
                         <h2 class="text-lg md:text-xl font-bold text-dark-text">Cardápio</h2>
                         <div class="relative">
                             <input type="text" id="searchProductInputClient" placeholder="Buscar..." class="pr-8 input-pdv text-sm w-32 md:w-48 lg:w-64">
@@ -128,10 +135,13 @@
                     <div id="categoryFiltersClient" class="flex space-x-2 overflow-x-auto pb-3 mb-4 px-1 flex-shrink-0">
                         </div>
 
-                    <div id="menuItemsGridClient" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1 overflow-y-auto custom-scrollbar pb-4"> <div class="col-span-full text-center p-6 text-dark-placeholder italic">Carregando cardápio...</div>
+                    <div id="menuItemsGridClient" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1 pb-4"> 
+                        <div class="col-span-full text-center p-6 text-dark-placeholder italic">Carregando cardápio...</div>
                     </div>
                 </div>
-            </div> <div id="clientPaymentScreen" class="w-screen flex-shrink-0 flex flex-col h-full">
+            </div> 
+            
+            <div id="clientPaymentScreen" class="w-screen flex-shrink-0 flex flex-col">
                  <div class="flex items-center justify-between mb-4 md:mb-6 flex-shrink-0 print-hide">
                     <div class="flex items-center text-indigo-400">
                         <button id="backToOrderFromPaymentBtn" class="mr-2 text-2xl md:text-3xl p-2 hover:text-indigo-300 transition" title="Voltar para o Pedido" onclick="window.goToScreen('clientOrderScreen')">
@@ -147,8 +157,8 @@
                      <span class="text-xl md:text-2xl font-semibold mr-3" id="payment-table-number-print">Conta da Mesa Selecionada</span>
                  </div>
 
-
-                <div class="flex-grow overflow-y-auto custom-scrollbar pb-4 pr-1"> <div class="content-card p-3 md:p-4 mb-6 rounded-lg bg-dark-card border border-dark-border">
+                <div class="flex-grow pb-4 pr-1"> 
+                    <div class="content-card p-3 md:p-4 mb-6 rounded-lg bg-dark-card border border-dark-border">
                         <h2 class="text-lg md:text-xl font-semibold text-green-400 mb-3 md:mb-4">Resumo da Conta</h2>
                         <div id="reviewItemsList" class="space-y-2 md:space-y-3 pt-2 mb-4 max-h-72 overflow-y-auto pr-2 custom-scrollbar">
                              <div class="text-sm md:text-base text-dark-placeholder italic p-2">Nenhum item na conta para revisão.</div>
@@ -188,7 +198,10 @@
                         </button>
                         <p class="mt-3 md:mt-4 text-xs md:text-sm text-dark-placeholder text-center">O pagamento deve ser efetuado com o garçom.</p>
                     </div>
-                </div> </div> </div> </main>
+                </div> 
+            </div> 
+        </div> 
+    </main>
 
     <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         <div class="bg-dark-card border border-dark-border p-4 md:p-6 rounded-xl shadow-2xl w-full max-w-sm">
@@ -215,7 +228,7 @@
     <div id="customAlertModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         </div>
 
-    <div id="associationModal" class="fixed inset-0 bg-gray-900 bg-opacity-7Garante que o container ocupe a altura75 flex items-center justify-center z-50 p-4" style="display: none;">
+    <div id="associationModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4" style="display: none;">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
             <h3 class="text-xl font-bold mb-4 text-pumpkin">Associar à Mesa</h3>
             <p class="text-base mb-4 text-dark-text">Para enviar seu pedido, precisamos saber qual é a sua mesa e um contato.</p>

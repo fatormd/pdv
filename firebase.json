@@ -3,6 +3,7 @@
     "rules": "firestore.rules"
   },
   "hosting": {
+	"site": "fator-pdv",
     "public": ".",
     "ignore": [
       "firebase.json",

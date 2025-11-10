@@ -123,20 +123,19 @@ export const renderClientMenu = () => {
     }
 
     if (filteredProducts.length === 0) {
-        // Esta é a linha que está aparecendo
         clientMenuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-dark-placeholder italic">Nenhum produto encontrado com os filtros atuais.</div>`;
     } else {
         
         // ===== INÍCIO DA ATUALIZAÇÃO (Alinhamento Simples) =====
-        // Remove 'auto-rows-fr' para deixar a altura automática, mas mantém gap-4
-        clientMenuItemsGrid.className = "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 overflow-y-auto custom-scrollbar pb-4";
+        // Remove 'overflow-y-auto' e 'custom-scrollbar', mas mantém o alinhamento e o espaçamento
+        clientMenuItemsGrid.className = "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-4 auto-rows-fr";
         // ===== FIM DA ATUALIZAÇÃO =====
         
         clientMenuItemsGrid.innerHTML = filteredProducts.map(product => {
             const productDataString = JSON.stringify(product).replace(/'/g, '&#39;');
 
             return `
-            <div class="product-card bg-dark-card border border-dark-border rounded-xl shadow-md overflow-hidden flex flex-col mb-1">
+            <div class="product-card bg-dark-card border border-dark-border rounded-xl shadow-md overflow-hidden flex flex-col mb-1 h-full">
 
                 <img src="${product.image}" alt="${product.name}" class="w-full h-56 md:h-64 object-cover cursor-pointer info-img-trigger" data-product='${productDataString}'>
 
@@ -272,7 +271,7 @@ const fetchQuickObservations = async (buttonsContainer) => {
     try {
         const obsCollectionRef = getQuickObsCollectionRef();
         // Ordena por texto (alfabeticamente)
-        const q = query(obsCollectionRef, orderBy('text', 'asc')); 
+        const q = query(obsCollectionjRef, orderBy('text', 'asc')); 
         const querySnapshot = await getDocs(q);
         
         const observations = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -694,6 +693,7 @@ export const initClientOrderController = () => {
             }
         });
     }
+
 
     // ===== INÍCIO DA ATUALIZAÇÃO (Corrige Race Condition) =====
     console.log("[ClientOrderController] Fetching WooCommerce data...");
