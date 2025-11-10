@@ -125,6 +125,12 @@ export const renderClientMenu = () => {
     if (filteredProducts.length === 0) {
         clientMenuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-dark-placeholder italic">Nenhum produto encontrado com os filtros atuais.</div>`;
     } else {
+        
+        // ===== INÍCIO DA ATUALIZAÇÃO (Alinhamento Simples) =====
+        // Remove 'auto-rows-fr' para deixar a altura automática
+        clientMenuItemsGrid.className = "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 overflow-y-auto custom-scrollbar pb-4";
+        // ===== FIM DA ATUALIZAÇÃO =====
+        
         clientMenuItemsGrid.innerHTML = filteredProducts.map(product => {
             const productDataString = JSON.stringify(product).replace(/'/g, '&#39;');
 

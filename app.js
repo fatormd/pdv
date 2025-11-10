@@ -111,7 +111,11 @@ const hideLoginScreen = () => {
 export const goToScreen = async (screenId) => {
     if (!appContainer) appContainer = document.getElementById('appContainer');
     if (!mainContent) mainContent = document.getElementById('mainContent');
-    const isClientMode = window.location.pathname.includes('client.html');
+    
+    // ===== INÍCIO DA ATUALIZAÇÃO =====
+    // Verifica o modo pela URL (CORRIGIDO)
+    const isClientMode = window.location.pathname.includes('/client');
+    // ===== FIM DA ATUALIZAÇÃO =====
 
     // Lógicas de pré-navegação e limpeza de estado (apenas Staff)
     if (!isClientMode) {
@@ -518,20 +522,24 @@ const initStaffApp = async (staffName) => { // Aceita o nome como parâmetro
     }
 };
 
-// --- initClientApp (sem alteração) ---
+// --- initClientApp (ATUALIZADO PARA CORRIGIR RACE CONDITION) ---
 const initClientApp = async () => {
     console.log("[ClientApp] initClientApp CALLED"); 
     try {
-        initClientOrderController();
-
-        clientLoginModal = document.getElementById('associationModal');
-        if (clientLoginModal) clientLoginModal.style.display = 'none';
-
+        // ===== INÍCIO DA ATUALIZAÇÃO =====
+        // PASSO 1: Autenticar PRIMEIRO
         const authInstance = auth;
         if (authInstance && !authInstance.currentUser) {
              await signInAnonymously(authInstance); // Essencial para o client.html
              console.log("[ClientApp] Signed in anonymously."); 
         }
+
+        // PASSO 2: AGORA inicializar o controller (que depende de estar logado)
+        initClientOrderController();
+        // ===== FIM DA ATUALIZAÇÃO =====
+
+        clientLoginModal = document.getElementById('associationModal');
+        if (clientLoginModal) clientLoginModal.style.display = 'none';
 
         console.log("[ClientApp] initClientApp FINISHED"); 
     } catch (error) {
@@ -556,9 +564,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         initializeFirebase(dbInstance, authInstance, appIdentifier, functionsInstance);
         console.log("[APP] Firebase Initialized"); 
 
+        // ===== INÍCIO DA ATUALIZAÇÃO (Lógica de Detecção de Modo) =====
         // DETECÇÃO DE MODO
-        const isClientMode = window.location.pathname.includes('client.html');
+        // CORREÇÃO: Procura por '/client' em vez de 'client.html'
+        const isClientMode = window.location.pathname.includes('/client');
         console.log(`[APP] Mode: ${isClientMode ? 'Client' : 'Staff'}`); 
+        // ===== FIM DA ATUALIZAÇÃO =====
+
 
         // Mapeamento UI
         statusScreen = document.getElementById('statusScreen');

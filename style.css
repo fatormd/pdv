@@ -233,8 +233,15 @@ body:not(.logged-in) #mainContent {
 #paymentSummaryList span.font-semibold { color: #e5e7eb; }
 
 
+/* ===== INÍCIO DA ATUALIZAÇÃO ===== */
 /* Cardápio */
-.product-card { background-color: #1f2937; border-color: #374151; }
+.product-card { 
+    background-color: #1f2937; 
+    border-color: #374151; 
+    /* REMOVIDO: min-height: 140px; */
+}
+/* ===== FIM DA ATUALIZAÇÃO ===== */
+
 .product-card h4 { color: #e5e7eb; }
 .product-card p { color: #9ca3af; }
 .product-card span.font-bold { color: #ff7518; }
