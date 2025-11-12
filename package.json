@@ -1,5 +1,8 @@
 {
   "dependencies": {
     "firebase-tools": "^14.24.0"
+  },
+  "scripts": {
+    "serve": "firebase emulators:start --only hosting"
   }
 }
