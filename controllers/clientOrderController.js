@@ -1,4 +1,4 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (CORREÇÃO FINAL 5 - LAYOUT CARD 2.0) ---
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (COM BUSCA E CORREÇÕES) ---
 
 import { db, auth, getQuickObsCollectionRef, appId } from "/services/firebaseService.js";
 import { formatCurrency } from "/utils.js";
@@ -16,12 +16,15 @@ let currentOrderSnapshot = null; // Snapshot da mesa
 let selectedItems = []; // Itens do carrinho local
 let quickObsCache = []; // Cache das observações rápidas
 let currentCategoryFilter = 'all';
+const ESPERA_KEY = "(EM ESPERA)"; // Chave para o status de espera
 
 // --- Elementos da DOM ---
 let clientMenuContainer, clientCategoryFilters, sendOrderBtn, clientCartCount;
 let associationModal, activateAndSendBtn, googleLoginBtn, phoneLoginBtn, phoneVerifyStep, phoneInput, sendSmsBtn, recaptchaContainer, smsCodeInput, verifySmsBtn, tableDataStep, activateTableNumber, activateDiners;
 let authActionBtn, clientUserName, clientTableNumber, loggedInStep, loggedInUserName, assocErrorMsg;
 let statusScreen, mainContent, appContainer;
+// ===== NOVO: Variável da Barra de Busca =====
+let searchProductInputClient; 
 
 // Elementos do Modal de Observação (Cliente)
 let clientObsModal, clientObsText, clientQuickObsButtons, clientConfirmObsBtn, clientCancelObsBtn;
@@ -45,6 +48,9 @@ export const initClientOrderController = () => {
     statusScreen = document.getElementById('statusScreen');
     mainContent = document.getElementById('mainContent');
     appContainer = document.getElementById('appContainer');
+    
+    // ===== NOVO: Mapeamento da Barra de Busca =====
+    searchProductInputClient = document.getElementById('searchProductInputClient');
 
     // Mapeamento do Modal de Associação
     associationModal = document.getElementById('associationModal');
@@ -72,11 +78,12 @@ export const initClientOrderController = () => {
     clientObsModal = document.getElementById('clientObsModal'); 
     clientObsText = document.getElementById('clientObsText'); 
     clientQuickObsButtons = document.getElementById('clientQuickObsButtons'); 
-    clientConfirmObsBtn = document.getElementById('clientConfirmObsBtn'); 
+    clientConfirmObsBtn = document.getElementById('clientConfirmObsBtn'); // Corrigido (tinha typo)
     clientCancelObsBtn = document.getElementById('clientCancelObsBtn'); 
 
     if (!clientObsModal || !clientObsText || !clientQuickObsButtons || !clientConfirmObsBtn || !clientCancelObsBtn) {
         console.error("[ClientOrder] Erro Fatal: Elementos do modal de observação não encontrados.");
+        return; 
     }
 
     // Listener para os botões rápidos (delegação de evento)
@@ -86,7 +93,6 @@ export const initClientOrderController = () => {
             if (btn && clientObsText) {
                 const obsText = btn.dataset.obs;
                 let currentValue = clientObsText.value.trim();
-                // Adiciona vírgula e espaço se já houver texto
                 if (currentValue && !currentValue.endsWith(',') && !currentValue.endsWith(' ')) {
                     currentValue += ', ';
                 } else if (currentValue && (currentValue.endsWith(',') || currentValue.endsWith(' '))) {
@@ -97,15 +103,28 @@ export const initClientOrderController = () => {
         });
     }
 
-    // Listener para CONFIRMAR observação
+    // Listener para CONFIRMAR observação (Com lógica de "Espera")
     if (clientConfirmObsBtn) {
         clientConfirmObsBtn.addEventListener('click', () => {
             const itemId = clientObsModal.dataset.itemId;
             const originalNoteKey = clientObsModal.dataset.originalNoteKey;
             let newNote = clientObsText.value.trim();
+            
+            const esperaSwitch = document.getElementById('esperaSwitch');
+            const isEspera = esperaSwitch.checked;
+            const regexEspera = new RegExp(ESPERA_KEY.replace('(', '\\(').replace(')', '\\)'), 'ig');
+            const hasKey = newNote.toUpperCase().includes(ESPERA_KEY);
+
+            if (isEspera && !hasKey) {
+                newNote = newNote ? `${ESPERA_KEY} ${newNote}` : ESPERA_KEY;
+            } else if (!isEspera && hasKey) {
+                newNote = newNote.replace(regexEspera, '').trim();
+                newNote = newNote.replace(/,,/g, ',').replace(/^,/, '').trim();
+            }
+            
+            newNote = newNote.trim(); 
 
             let updated = false;
-            // Atualiza o item no carrinho local (selectedItems)
             const updatedItems = selectedItems.map(item => {
                 if (item.id == itemId && (item.note || '') === originalNoteKey) {
                     updated = true;
@@ -119,7 +138,7 @@ export const initClientOrderController = () => {
 
             if (updated) {
                 clientObsModal.style.display = 'none';
-                renderClientOrderScreen(); // Atualiza o carrinho do CLIENTE
+                renderClientOrderScreen();
             } else {
                 console.warn("Nenhum item encontrado para atualizar a observação.");
                 clientObsModal.style.display = 'none';
@@ -127,27 +146,11 @@ export const initClientOrderController = () => {
         });
     }
 
-    // Listener para CANCELAR observação
+    // Listener para CANCELAR observação (Corrigido para não remover o item)
     if (clientCancelObsBtn) {
         clientCancelObsBtn.addEventListener('click', () => {
-            const itemId = clientObsModal.dataset.itemId;
-            const originalNoteKey = clientObsModal.dataset.originalNoteKey;
-            const currentNote = clientObsText.value.trim();
-
-            if (originalNoteKey === '' && currentNote === '') {
-                 let lastIndex = -1;
-                 for (let i = selectedItems.length - 1; i >= 0; i--) {
-                     if (selectedItems[i].id == itemId && selectedItems[i].note === '') {
-                         lastIndex = i;
-                         break;
-                     }
-                 }
-                 if (lastIndex > -1) {
-                     selectedItems.splice(lastIndex, 1); 
-                 }
-            }
             clientObsModal.style.display = 'none';
-            renderClientOrderScreen(); // Atualiza o carrinho do CLIENTE
+            renderClientOrderScreen(); 
         });
     }
     // ==== FIM DA LÓGICA DO MODAL ====
@@ -173,7 +176,6 @@ export const initClientOrderController = () => {
                 addItemToCart(product);
             }
             
-            // Ativa o botão de informação
             if (infoBtn && infoBtn.dataset.product) {
                  const product = JSON.parse(infoBtn.dataset.product.replace(/'/g, "&#39;"));
                  openProductInfoModal(product);
@@ -210,6 +212,14 @@ export const initClientOrderController = () => {
             }
         });
     }
+    
+    // ===== NOVO: Listener da Barra de Busca =====
+    if (searchProductInputClient) {
+        // Chama a função renderMenu() toda vez que o usuário digita
+        searchProductInputClient.addEventListener('input', renderMenu);
+    }
+    // ===== FIM DO NOVO LISTENER =====
+
 
     // Gerencia o estado de autenticação
     setupAuthStateObserver();
@@ -229,9 +239,7 @@ export const initClientOrderController = () => {
 function setupAuthStateObserver() {
     onAuthStateChanged(auth, (user) => {
         if (user) {
-            // Usuário está logado
             if (user.isAnonymous) {
-                // Logado como anônimo (provavelmente após ativar mesa)
                 currentClientUser = {
                     uid: user.uid,
                     name: `Mesa ${currentTableId}`,
@@ -239,7 +247,6 @@ function setupAuthStateObserver() {
                 };
                 updateAuthUI(currentClientUser);
             } else {
-                // Logado com Google ou Celular
                 currentClientUser = {
                     uid: user.uid,
                     name: user.displayName || user.phoneNumber || "Cliente",
@@ -251,7 +258,6 @@ function setupAuthStateObserver() {
                 checkAndRegisterCustomer(user);
             }
         } else {
-            // Usuário está deslogado
             currentClientUser = null;
             updateAuthUI(null);
             signInAnonymously(auth).catch(error => {
@@ -272,25 +278,18 @@ function updateAuthUI(user) {
     }
     
     if (user && !user.isAnonymous) {
-        // Logado (Google/Celular)
         clientUserName.textContent = user.name;
         authActionBtn.textContent = "Sair";
         authActionBtn.classList.add('text-red-400');
-        
-        // No modal
         loggedInStep.style.display = 'block';
         loggedInUserName.textContent = user.name;
         phoneVerifyStep.style.display = 'none';
         const authButtons = document.getElementById('authButtons');
         if (authButtons) authButtons.style.display = 'none';
-        
     } else {
-        // Deslogado ou Anônimo
         clientUserName.textContent = "Visitante";
         authActionBtn.textContent = "Entrar";
         authActionBtn.classList.remove('text-red-400');
-        
-        // No modal
         loggedInStep.style.display = 'none';
         phoneVerifyStep.style.display = 'none';
         const authButtons = document.getElementById('authButtons');
@@ -303,16 +302,12 @@ function updateAuthUI(user) {
  */
 function handleAuthActionClick() {
     if (currentClientUser && !currentClientUser.isAnonymous) {
-        // Usuário está logado, então "Sair"
         auth.signOut().then(() => {
             console.log("Usuário deslogado.");
             showToast("Você saiu da sua conta.");
-            // O observer (setupAuthStateObserver) vai pegar o signOut
-            // e fazer o login anônimo automaticamente.
         });
     } else {
-        // Usuário está anônimo ou deslogado, então "Entrar"
-        openAssociationModal('authOnly'); // Abre o modal apenas para autenticação
+        openAssociationModal('authOnly');
     }
 }
 
@@ -321,13 +316,11 @@ function handleAuthActionClick() {
  */
 async function loadMenu() {
     try {
-        // 1. CHAMA AS FUNÇÕES DE FETCH E ESPERA ELAS TERMINAREM
         console.log("[ClientOrder] Buscando categorias...");
         const categories = await fetchWooCommerceCategories();
         console.log("[ClientOrder] Buscando produtos...");
         const products = await fetchWooCommerceProducts();
         
-        // 2. AGORA QUE TERMINOU, RENDERIZA AS CATEGORIAS
         if (categories.length > 0 && clientCategoryFilters) {
              clientCategoryFilters.innerHTML = categories.map(cat => {
                 const isActive = cat.slug === currentCategoryFilter ? 'bg-brand-primary text-white' : 'bg-dark-input text-dark-text border border-gray-600';
@@ -335,10 +328,8 @@ async function loadMenu() {
              }).join('');
         }
         
-        // 3. RENDERIZA OS PRODUTOS (que agora existem)
         renderMenu(); 
         
-        // 4. ESCONDE A TELA DE LOADING
         if (statusScreen) statusScreen.style.display = 'none';
         if (mainContent) mainContent.style.display = 'block';
         
@@ -352,7 +343,6 @@ async function loadMenu() {
 /**
  * Renderiza os produtos no menu.
  */
-// ==== INÍCIO DA CORREÇÃO (LAYOUT 2.0) ====
 function renderMenu() {
     if (!clientMenuContainer) return;
     
@@ -367,15 +357,39 @@ function renderMenu() {
         });
     }
 
-    const products = getProducts(); // Agora getProducts() retorna a lista completa
+    const products = getProducts();
     let filteredProducts = products;
     
+    // 1. Filtro por Categoria (existente)
     if (currentCategoryFilter !== 'all') {
         filteredProducts = products.filter(p => p.category === currentCategoryFilter);
     }
     
+    // ===== 2. NOVO: Filtro por Barra de Busca =====
+    let searchTerm = '';
+    // (usamos a variável global 'searchProductInputClient' definida na init)
+    if (searchProductInputClient) { 
+         searchTerm = searchProductInputClient.value.trim().toLowerCase();
+    }
+
+    if (searchTerm) {
+        // Filtra os produtos que já foram filtrados pela categoria
+        filteredProducts = filteredProducts.filter(p => 
+            p.name.toLowerCase().includes(searchTerm) // Verifica se o nome do produto inclui o texto
+        );
+    }
+    // ===== FIM DO FILTRO DE BUSCA =====
+    
+    
+    // 3. Renderização (com mensagens de "nenhum resultado" atualizadas)
     if (filteredProducts.length === 0) {
-        clientMenuContainer.innerHTML = `<div class="col-span-full text-center p-6 text-red-400 italic">Nenhum produto nesta categoria.</div>`;
+        if (searchTerm && currentCategoryFilter === 'all') {
+            clientMenuContainer.innerHTML = `<div class="col-span-full text-center p-6 text-yellow-400 italic">Nenhum produto encontrado para "${searchTerm}".</div>`;
+        } else if (searchTerm && currentCategoryFilter !== 'all') {
+            clientMenuContainer.innerHTML = `<div class="col-span-full text-center p-6 text-yellow-400 italic">Nenhum produto para "${searchTerm}" nesta categoria.</div>`;
+        } else {
+             clientMenuContainer.innerHTML = `<div class="col-span-full text-center p-6 text-red-400 italic">Nenhum produto nesta categoria.</div>`;
+        }
     } else {
         // ATUALIZADO: Novo HTML para o card (Layout 2.0)
         clientMenuContainer.innerHTML = filteredProducts.map(product => `
@@ -405,7 +419,6 @@ function renderMenu() {
         `).join('');
     }
 }
-// ==== FIM DA CORREÇÃO ====
 
 /**
  * Adiciona um item ao carrinho local (selectedItems) e abre o modal de observação.
@@ -476,33 +489,29 @@ function openProductInfoModal(product) {
     const nameEl = document.getElementById('infoProductName');
     const priceEl = document.getElementById('infoProductPrice');
     const descEl = document.getElementById('infoProductDescription');
-    const addBtn = document.getElementById('infoProductAddBtn'); // Botão "Quero esse"
+    const addBtn = document.getElementById('infoProductAddBtn');
 
     if (!modal || !img || !nameEl || !priceEl || !descEl || !addBtn || !imgLink) {
         console.error("Elementos do modal de informação do produto não encontrados!");
         return;
     }
 
-    // Popula o modal com os dados do produto
     img.src = product.image || 'https://placehold.co/600x400/1f2937/d1d5db?text=Produto';
     img.alt = product.name;
     imgLink.href = product.image || '#';
     nameEl.textContent = product.name;
     priceEl.textContent = formatCurrency(product.price);
-    descEl.innerHTML = product.description; // Usa .innerHTML para renderizar HTML da descrição do Woo
+    descEl.innerHTML = product.description; 
 
-    // Configura o botão "Quero esse" dentro do modal
-    // Remove listeners antigos clonando o botão para evitar duplicação
     const newAddBtn = addBtn.cloneNode(true);
     addBtn.parentNode.replaceChild(newAddBtn, addBtn);
     
     newAddBtn.onclick = () => {
         addItemToCart(product);
-        modal.style.display = 'none'; // Fecha o modal após adicionar
+        modal.style.display = 'none'; 
         showToast(`${product.name} adicionado ao carrinho!`);
     };
 
-    // Exibe o modal
     modal.style.display = 'flex';
 }
 
@@ -513,18 +522,26 @@ function openProductInfoModal(product) {
 function openClientObsModal(itemId, noteKey) {
     const products = getProducts();
     const product = products.find(p => p.id == itemId);
+    const esperaSwitch = document.getElementById('esperaSwitch'); // Pega o switch
 
-    if (!clientObsModal || !clientObsText || !product) {
-        console.error("Erro: Elementos do modal OBS ou produto não encontrados.");
+    if (!clientObsModal || !clientObsText || !product || !esperaSwitch) {
+        console.error("Erro: Elementos do modal OBS, switch ou produto não encontrados.");
         return;
     }
 
-    // Popula o modal (sem a opção 'EM ESPERA' do staff)
+    const regexEspera = new RegExp(ESPERA_KEY.replace('(', '\\(').replace(')', '\\)'), 'ig');
+    const isEspera = regexEspera.test(noteKey);
+    
+    let cleanNote = noteKey.replace(regexEspera, '').trim();
+    if (cleanNote.startsWith(',')) cleanNote = cleanNote.substring(1).trim();
+
+    // Popula o modal
     clientObsModal.querySelector('h3').textContent = product.name;
-    clientObsText.value = noteKey;
+    clientObsText.value = cleanNote; // Define a nota limpa
+    esperaSwitch.checked = isEspera; // Define o estado do switch
 
     clientObsModal.dataset.itemId = itemId;
-    clientObsModal.dataset.originalNoteKey = noteKey; 
+    clientObsModal.dataset.originalNoteKey = noteKey; // Salva a nota original (com a tag)
 
     clientObsModal.style.display = 'flex';
 }
@@ -533,7 +550,7 @@ function openClientObsModal(itemId, noteKey) {
  * Renderiza o carrinho do cliente (chamado pela renderClientOrderScreen).
  */
 function _renderClientCart() {
-    const cartItemsList = document.getElementById('client-cart-items-list'); // Container na tela principal
+    const cartItemsList = document.getElementById('client-cart-items-list');
     if (!cartItemsList) return;
 
     if (selectedItems.length === 0) {
@@ -546,27 +563,46 @@ function _renderClientCart() {
             return acc;
         }, {});
 
-        cartItemsList.innerHTML = Object.values(groupedItems).map(group => `
+        cartItemsList.innerHTML = Object.values(groupedItems).map(group => {
+            const note = group.note || '';
+            const regexEspera = new RegExp(ESPERA_KEY.replace('(', '\\(').replace(')', '\\)'), 'ig');
+            const isEspera = regexEspera.test(note);
+            let displayNote = note.replace(regexEspera, '').trim();
+            if (displayNote.startsWith(',')) displayNote = displayNote.substring(1).trim();
+
+            let noteHtml = '';
+            if (isEspera) {
+                noteHtml = `<span class="text-yellow-400 font-semibold">${ESPERA_KEY}</span>`;
+                if (displayNote) {
+                    noteHtml += ` <span class="text-yellow-400">(${displayNote})</span>`;
+                }
+            } else if (displayNote) {
+                noteHtml = `<span class="text-yellow-400">(${displayNote})</span>`;
+            } else {
+                noteHtml = `(Adicionar Obs.)`;
+            }
+
+            return `
             <div class="flex justify-between items-center bg-dark-input p-3 rounded-lg shadow-sm">
                 <div class="flex flex-col flex-grow min-w-0 mr-2">
                     <span class="font-semibold text-white">${group.name} (${group.count}x)</span>
                     <span class="text-sm cursor-pointer text-brand-primary hover:text-brand-primary-dark obs-span" 
-                          data-item-id="${group.id}" data-item-note-key="${group.note || ''}">
-                        ${group.note ? `<span class="text-yellow-400">(${group.note})</span>` : `(Adicionar Obs.)`}
+                          data-item-id="${group.id}" data-item-note-key="${note}">
+                        ${noteHtml}
                     </span>
                 </div>
                 <div class="flex items-center space-x-2 flex-shrink-0">
                     <button class="qty-btn bg-red-600 text-white rounded-full h-8 w-8"
-                            data-item-id="${group.id}" data-item-note-key="${group.note || ''}" data-action="decrease">
+                            data-item-id="${group.id}" data-item-note-key="${note}" data-action="decrease">
                         <i class="fas fa-minus pointer-events-none"></i>
                     </button>
                     <button class="qty-btn bg-green-600 text-white rounded-full h-8 w-8"
-                            data-item-id="${group.id}" data-item-note-key="${group.note || ''}" data-action="increase">
+                            data-item-id="${group.id}" data-item-note-key="${note}" data-action="increase">
                         <i class="fas fa-plus pointer-events-none"></i>
                     </button>
                 </div>
             </div>
-        `).join('');
+        `}).join('');
     }
 }
 
@@ -591,10 +627,8 @@ function handleSendOrderClick() {
     if (selectedItems.length === 0) return;
 
     if (currentTableId) {
-        // Se a mesa já está ativa, apenas envia o pedido
         sendOrderToFirebase();
     } else {
-        // Se a mesa não está ativa, abre o modal para ativar
         openAssociationModal('sendOrder');
     }
 }
@@ -605,21 +639,18 @@ function handleSendOrderClick() {
 function openAssociationModal(mode = 'sendOrder') {
     if (!associationModal) return;
 
-    // Reseta o modal
     assocErrorMsg.style.display = 'none';
     if (phoneInput) phoneInput.value = '';
     if (smsCodeInput) smsCodeInput.value = '';
     if (smsCodeInput) smsCodeInput.style.display = 'none';
     if (verifySmsBtn) verifySmsBtn.style.display = 'none';
     
-    // Se o usuário já está logado (não anônimo)
     if (currentClientUser && !currentClientUser.isAnonymous) {
         if(loggedInStep) loggedInStep.style.display = 'block';
         if(loggedInUserName) loggedInUserName.textContent = currentClientUser.name;
         if (phoneVerifyStep) phoneVerifyStep.style.display = 'none';
         const authButtons = document.getElementById('authButtons');
         if (authButtons) authButtons.style.display = 'none';
-        
     } else {
         if(loggedInStep) loggedInStep.style.display = 'none';
         if (phoneVerifyStep) phoneVerifyStep.style.display = 'none';
@@ -627,12 +658,11 @@ function openAssociationModal(mode = 'sendOrder') {
         if (authButtons) authButtons.style.display = 'block';
     }
 
-    // Configura o modal para o modo
     if (mode === 'sendOrder') {
         if(tableDataStep) tableDataStep.style.display = 'block';
         activateAndSendBtn.textContent = "Confirmar e Enviar";
         activateAndSendBtn.dataset.mode = 'sendOrder';
-    } else { // mode === 'authOnly'
+    } else { 
         if(tableDataStep) tableDataStep.style.display = 'none';
         activateAndSendBtn.textContent = "Confirmar Login";
         activateAndSendBtn.dataset.mode = 'authOnly';
@@ -653,13 +683,11 @@ async function handleActivationAndSend() {
     }
     
     if (mode === 'authOnly') {
-         // Apenas autenticação, o usuário não quer enviar pedido
          associationModal.style.display = 'none';
          showToast(`Login como ${currentClientUser.name} confirmado!`);
          return;
     }
 
-    // --- Modo 'sendOrder' ---
     const tableNumber = activateTableNumber.value;
     const diners = parseInt(activateDiners.value) || 1;
     
@@ -676,11 +704,9 @@ async function handleActivationAndSend() {
         const tableDoc = await getDoc(tableRef);
 
         if (tableDoc.exists() && tableDoc.data().status === 'open') {
-            // Mesa existe e está aberta
             currentTableId = tableNumber;
-            currentDiners = diners; // O cliente pode estar se juntando
+            currentDiners = diners; 
             
-            // Associa o cliente à mesa (se logado)
             if (!currentClientUser.isAnonymous) {
                  await updateDoc(tableRef, {
                      clientName: currentClientUser.name,
@@ -691,12 +717,9 @@ async function handleActivationAndSend() {
             
             clientTableNumber.textContent = `Mesa ${currentTableId}`;
             
-            // Envia o pedido
             await sendOrderToFirebase();
             associationModal.style.display = 'none';
-            
         } else {
-            // Mesa não existe ou está fechada
             showAssocError("Mesa não encontrada ou não está aberta. Peça a um garçom para abrir a mesa.");
         }
         
@@ -728,7 +751,7 @@ async function sendOrderToFirebase() {
             name: currentClientUser?.name,
             phone: currentClientUser?.phone
         },
-        items: selectedItems.map(item => ({ ...item })) // Copia os itens
+        items: selectedItems.map(item => ({ ...item })) 
     };
 
     try {
@@ -740,9 +763,8 @@ async function sendOrderToFirebase() {
             waiterNotification: "Novo Pedido do Cliente"
         });
 
-        // Limpa o carrinho local
         selectedItems.length = 0;
-        renderClientOrderScreen(); // Atualiza a UI (carrinho vazio)
+        renderClientOrderScreen(); 
         
         showToast("Pedido enviado! Um garçom irá confirmar em breve.");
         
@@ -770,7 +792,6 @@ function showAssocError(message) {
  * Renderiza botões de observação rápida no modal DO CLIENTE.
  */
 function renderClientQuickObsButtons(observations) {
-    // A variável 'clientQuickObsButtons' já foi mapeada na init
     if (!clientQuickObsButtons) return;
 
     if (observations.length === 0) {
@@ -794,25 +815,21 @@ function renderClientQuickObsButtons(observations) {
  */
 export const fetchQuickObservations = async () => {
     try {
-        // Se já temos em cache, apenas renderiza e retorna
         if (quickObsCache.length > 0) {
             renderClientQuickObsButtons(quickObsCache); 
             return quickObsCache;
         }
         
-        // Busca do Firebase
         const q = query(getQuickObsCollectionRef(), orderBy('text', 'asc'));
         const querySnapshot = await getDocs(q);
         quickObsCache = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
-        // Renderiza os botões pela primeira vez
         renderClientQuickObsButtons(quickObsCache);
         
         return quickObsCache;
         
     } catch (e) {
         console.error("Erro ao buscar observações rápidas:", e);
-        // Tenta renderizar o erro no modal
         const buttonsContainer = document.getElementById('clientQuickObsButtons'); 
         if (buttonsContainer) buttonsContainer.innerHTML = '<p class="text-xs text-red-400">Erro ao carregar obs.</p>';
         return [];
@@ -833,7 +850,6 @@ function signInWithGoogle() {
         .then((result) => {
             const user = result.user;
             showToast(`Bem-vindo, ${user.displayName}!`);
-            // O observer (setupAuthStateObserver) vai pegar o login
         })
         .catch((error) => {
             console.error("Erro no login com Google:", error);
@@ -846,11 +862,9 @@ function signInWithGoogle() {
  */
 function showPhoneVerifyStep() {
     phoneVerifyStep.style.display = 'block';
-    // Configura o reCAPTCHA
     window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
       'size': 'invisible',
       'callback': (response) => {
-        // reCAPTCHA resolvido, pode enviar SMS
         console.log("reCAPTCHA resolvido.");
       }
     });
@@ -861,7 +875,7 @@ function showPhoneVerifyStep() {
  */
 function sendSmsCode() {
     const appVerifier = window.recaptchaVerifier;
-    const phoneNumber = "+55" + phoneInput.value.replace(/\D/g, ''); // Formato E.164 (Brasil)
+    const phoneNumber = "+55" + phoneInput.value.replace(/\D/g, ''); 
     
     if (phoneNumber.length < 13) {
          showAssocError("Número de celular inválido. Inclua o DDD.");
@@ -882,7 +896,6 @@ function sendSmsCode() {
         .catch((error) => {
             console.error("Erro ao enviar SMS:", error);
             showAssocError("Falha ao enviar SMS. Tente novamente.");
-            // Reseta o reCAPTCHA
              if (window.recaptchaVerifier) {
                  window.recaptchaVerifier.render().then(widgetId => {
                     grecaptcha.reset(widgetId);
@@ -911,7 +924,6 @@ function verifySmsCode() {
         .then((result) => {
             const user = result.user;
             showToast(`Bem-vindo, ${user.phoneNumber}!`);
-            // O observer (setupAuthStateObserver) vai pegar o login
         })
         .catch((error) => {
             console.error("Erro ao verificar código:", error);
@@ -929,25 +941,22 @@ function verifySmsCode() {
 async function checkAndRegisterCustomer(user) {
     if (!user || user.isAnonymous) return;
     
-    // Usa o telefone (se disponível) ou UID como ID
     const customerId = user.phoneNumber ? user.phoneNumber.replace("+55", "") : user.uid;
     const customerRef = doc(db, 'artifacts', appId, 'public', 'data', 'customers', customerId);
 
     try {
         const docSnap = await getDoc(customerRef);
         if (!docSnap.exists()) {
-            // Cria um novo cliente
             await setDoc(customerRef, {
                 uid: user.uid,
                 name: user.displayName || `Cliente ${customerId}`,
                 phone: user.phoneNumber || null,
                 email: user.email || null,
-                doc: customerId, // CPF/CNPJ (aqui usamos o ID)
-                createdAt: serverTimestamp() // Esta linha agora funciona
+                doc: customerId, 
+                createdAt: serverTimestamp() 
             });
             console.log("Novo cliente registrado no Firestore:", customerId);
         } else {
-            // (Opcional) Atualiza o UID se o cliente já existia pelo telefone
              if (docSnap.data().uid !== user.uid) {
                  await updateDoc(customerRef, { uid: user.uid });
              }
