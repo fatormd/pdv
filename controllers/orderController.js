@@ -14,7 +14,7 @@ import { goToScreen } from "/app.js";
 let obsModal, obsItemName, obsInput, saveObsBtn, cancelObsBtn, esperaSwitch;
 let searchProductInput, categoryFiltersContainer, menuItemsGrid;
 let openOrderList, openItemsCount, sendSelectedItemsBtn;
-let quickObsButtons;
+let quickObsButtons; // Container dos botões
 let clientPendingOrdersContainer; 
 
 // Estado local do módulo
