@@ -200,7 +200,13 @@ function renderSentItems(sentItems) {
  * Renderiza os totais da conta
  */
 function renderTotals(tableData) {
-    const subtotal = tableData.total || 0;
+    // ================== INÍCIO DA CORREÇÃO ==================
+    // Calcula o subtotal manualmente a partir dos sentItems, igual o painel staff faz.
+    // Isso ignora o 'tableData.total' que pode estar dessincronizado.
+    const sentItems = tableData.sentItems || [];
+    const subtotal = sentItems.reduce((sum, item) => sum + (item.price || 0), 0);
+    // =================== FIM DA CORREÇÃO ====================
+    
     const serviceTax = (tableData.serviceTaxApplied && tableData.status !== 'closed') ? subtotal * 0.1 : 0;
     const total = subtotal + serviceTax;
 
