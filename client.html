@@ -25,13 +25,16 @@
                         'dark-text': '#d1d5db',
                         'dark-placeholder': '#6b7280',
                         'dark-border': '#374151',
+                        
+                        // CORREÇÃO: Adiciona as cores 'brand' que o JS espera
+                        'brand-primary': '#ff7518', // Laranja Pumpkin
+                        'brand-primary-dark': '#e46815',
                     },
                 }
             }
         }
     </script>
     <style>
-        /* CSS específicos do cliente agora herdam o tema dark */
         #appContainer {
             width: 200vw !important; /* Para a transição entre telas */
             height: 100%; /* Garante que o container ocupe a altura */
@@ -42,47 +45,35 @@
         .header-bar {
             display: none !important; /* Esconde header do Staff */
         }
-
-        /* Ajusta o padding base das telas do cliente */
         #clientOrderScreen, #clientPaymentScreen {
-            padding: 1rem; /* Padding padrão */
-            display: flex; /* Habilita flexbox */
-            flex-direction: column; /* Organiza conteúdo verticalmente */
-            
-            /* ===== ATUALIZAÇÃO: Permite que a tela inteira role ===== */
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
             overflow-y: auto;
             overflow-x: hidden;
         }
-        @media (min-width: 768px) { /* md breakpoint */
+        @media (min-width: 768px) {
             #clientOrderScreen, #clientPaymentScreen {
-                padding: 1.5rem; /* Mais padding em telas maiores */
+                padding: 1.5rem;
             }
         }
-        @media (min-width: 1024px) { /* lg breakpoint */
+        @media (min-width: 1024px) {
             #clientOrderScreen, #clientPaymentScreen {
                 padding: 2rem;
             }
         }
-
-        /* Garante scroll suave na horizontal para categorias */
         #categoryFiltersClient::-webkit-scrollbar { height: 4px; }
         #categoryFiltersClient::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 10px; }
-
-         /* Scroll suave (usado no grid de menu e listas) */
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #1f2937; border-radius: 10px;}
         .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #4b5563; border-radius: 10px; border: 1px solid #1f2937;}
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #6b7280;}
-
-        /* Garante que a tela ocupe a altura restante */
         #mainContent {
-             height: 100vh; /* Ocupa a altura total da viewport */
+             height: 100vh;
         }
         body.client-mode #mainContent {
-            height: 100vh; /* Garante altura total no modo cliente */
+            height: 100vh;
         }
-        
-        /* Adicionado CSS para o Switch (copiado de style.css) */
         .switch-obs { position: relative; display: inline-block; width: 50px; height: 28px; }
         .switch-obs input { opacity: 0; width: 0; height: 0; }
         .slider-obs { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #4b5563; transition: .4s; border-radius: 34px; }
@@ -94,6 +85,11 @@
 </head>
 <body class="bg-dark-bg text-dark-text min-h-screen client-mode">
 
+    <div id="statusScreen" class="fixed inset-0 bg-dark-bg z-[5000] flex justify-center items-center p-4" style="display: flex;">
+        <i class="fas fa-spinner fa-spin text-4xl text-brand-primary"></i>
+    </div>
+    <span id="client-user-name" class="hidden"></span>
+    <button id="authActionBtn" class="hidden"></button>
     <main id="mainContent" class="relative overflow-hidden">
         <div id="appContainer" class="flex transition-transform duration-300 ease-out">
 
@@ -110,13 +106,13 @@
                 <div id="orderingInputsClient" class="mb-6 md:mb-8 flex-shrink-0">
                     <div class="p-3 md:p-4 content-card rounded-lg bg-dark-card border border-dark-border">
                         <div class="flex justify-between items-center mb-3 md:mb-4">
-                            <h2 class="text-lg md:text-xl font-semibold text-dark-text mr-2">Seu Pedido (<span id="openItemsCountClient">0</span>)</h2>
-                            <button id="sendClientOrderBtn" class="bg-green-600 text-white p-2 md:p-3 rounded-full shadow-lg hover:bg-green-700 transition w-10 h-10 md:w-12 md:h-12 flex items-center justify-center text-lg md:text-xl disabled:opacity-50" title="Enviar Pedido para Confirmação">
+                            <h2 class="text-lg md:text-xl font-semibold text-dark-text mr-2">Seu Pedido (<span id="client-cart-count">0</span>)</h2>
+                            <button id="sendOrderBtn" class="bg-green-600 text-white p-2 md:p-3 rounded-full shadow-lg hover:bg-green-700 transition w-10 h-10 md:w-12 md:h-12 flex items-center justify-center text-lg md:text-xl disabled:opacity-50" title="Enviar Pedido para Confirmação">
                                 <i class="fas fa-check-circle"></i>
                             </button>
                         </div>
                         
-                        <div id="openOrderListClient" class="space-y-2 md:space-y-3">
+                        <div id="client-cart-items-list" class="space-y-2 md:space-y-3">
                         <div class="text-sm md:text-base text-dark-placeholder italic p-2">Nenhum item selecionado.</div>
                         </div>
                     </div>
@@ -130,10 +126,10 @@
                             <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-dark-placeholder"></i>
                         </div>
                     </div>
-                    <div id="categoryFiltersClient" class="flex space-x-2 overflow-x-auto pb-3 mb-4 px-1 flex-shrink-0">
+                    <div id="client-category-filters" class="flex space-x-2 overflow-x-auto pb-3 mb-4 px-1 flex-shrink-0">
                         </div>
 
-                    <div id="menuItemsGridClient" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1 pb-4"> 
+                    <div id="client-menu-container" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1 pb-4"> 
                         <div class="col-span-full text-center p-6 text-dark-placeholder italic">Carregando cardápio...</div>
                     </div>
                 </div>
@@ -201,13 +197,13 @@
         </div> 
     </main>
 
-    <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+    <div id="clientObsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         <div class="bg-dark-card border border-dark-border p-4 md:p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 id="obsItemName" class="text-lg md:text-xl font-bold mb-4 text-indigo-400">Adicionar Observação</h3>
             
-            <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-4">
+            <div id="clientQuickObsButtons" class="flex flex-wrap gap-2 mb-4">
                  </div>
-            <textarea id="obsInput" rows="2" placeholder="Ex: Sem cebola, ponto da carne..." class="w-full p-3 input-pdv text-sm md:text-base"></textarea>
+            <textarea id="clientObsText" rows="2" placeholder="Ex: Sem cebola, ponto da carne..." class="w-full p-3 input-pdv text-sm md:text-base"></textarea>
             
             <div class="flex items-center justify-between mt-3 mb-4">
                  <span class="text-dark-text font-semibold">Item em Espera?</span>
@@ -218,8 +214,8 @@
             </div>
             
             <div class="flex justify-end space-x-2 md:space-x-3 mt-4">
-                <button id="cancelObsBtn" class="px-3 py-2 md:px-4 md:py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm md:text-base">Cancelar</button>
-                <button id="saveObsBtn" class="px-3 py-2 md:px-4 md:py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm md:text-base">Salvar</button>
+                <button id="clientCancelObsBtn" class="px-3 py-2 md:px-4 md:py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm md:text-base">Cancelar</button>
+                <button id="clientConfirmObsBtn" class="px-3 py-2 md:px-4 md:py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm md:text-base">Salvar</button>
             </div>
         </div>
     </div>
@@ -227,21 +223,40 @@
         </div>
 
     <div id="associationModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4" style="display: none;">
-        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
-            <h3 class="text-xl font-bold mb-4 text-pumpkin">Associar à Mesa</h3>
-            <p class="text-base mb-4 text-dark-text">Para enviar seu pedido, precisamos saber qual é a sua mesa e um contato.</p>
+        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm">
+            <h3 class="text-xl font-bold mb-4 text-white">Ativar Mesa e Enviar Pedido</h3>
             
-            <div class="space-y-4">
-                <input type="number" id="assocTableNumber" placeholder="Nº da Mesa*" class="input-pdv w-full" inputmode="numeric">
-                <input type="tel" id="assocPhone" placeholder="Seu Telefone/WhatsApp (com DDD)*" class="input-pdv w-full" inputmode="tel">
-                <input type="text" id="assocName" placeholder="Seu Nome (Opcional)" class="input-pdv w-full">
+            <div id="authButtons" class="space-y-3 mb-4">
+                <button id="googleLoginBtn" class="w-full py-3 px-4 bg-red-600 text-white rounded-lg font-semibold flex items-center justify-center"><i class="fab fa-google mr-2"></i> Entrar com Google</button>
+                <button id="phoneLoginBtn" class="w-full py-3 px-4 bg-green-600 text-white rounded-lg font-semibold flex items-center justify-center"><i class="fas fa-phone mr-2"></i> Entrar com Celular</button>
             </div>
-            
-            <p id="assocErrorMsg" class="text-red-400 text-sm mt-3" style="display: none;">Mensagem de erro aqui</p>
-            
+
+            <div id="phoneVerifyStep" class="space-y-3 mb-4" style="display: none;">
+                <label class="text-sm text-dark-text" for="phoneInput">Seu Celular (com DDD)</label>
+                <input type="tel" id="phoneInput" class="w-full p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text" placeholder="Ex: 11912345678">
+                <button id="sendSmsBtn" class="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold">Enviar Código SMS</button>
+                <div id="recaptcha-container"></div> <input type="tel" id="smsCodeInput" class="w-full p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text" placeholder="Código de 6 dígitos" style="display: none;">
+                <button id="verifySmsBtn" class="w-full py-3 bg-green-600 text-white rounded-lg font-semibold" style="display: none;">Verificar Código</button>
+            </div>
+
+            <div id="tableDataStep" class="space-y-3" style="display: block;">
+                <label class="text-sm text-dark-text" for="activateTableNumber">Número da Mesa</label>
+                <input type="number" id="activateTableNumber" class="w-full p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text" placeholder="Informe o número da mesa">
+                
+                <label class="text-sm text-dark-text" for="activateDiners">Nº de Pessoas (Opcional)</label>
+                <input type="number" id="activateDiners" class="w-full p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text" placeholder="1" value="1">
+            </div>
+
+            <div id="loggedInStep" class="my-4 p-3 bg-dark-input rounded-lg" style="display: none;">
+                <span class="text-sm text-dark-text">Logado como:</span>
+                <span id="loggedInUserName" class="text-base font-semibold text-white"></span>
+            </div>
+
+            <p id="assocErrorMsg" class="text-red-400 text-sm mt-3" style="display: none;">Mensagem de erro aqui.</p>
+
             <div class="flex justify-end space-x-3 mt-6">
-                <button id="assocCancelBtn" class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition">Cancelar</button>
-                <button id="assocSendOrderBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">Associar e Enviar</button>
+                <button class="px-5 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition text-base font-medium" onclick="document.getElementById('associationModal').style.display='none'">Cancelar</button>
+                <button id="activateAndSendBtn" class="px-5 py-3 bg-brand-primary text-white rounded-lg hover:bg-brand-primary-dark transition text-base font-medium">Confirmar e Enviar</button>
             </div>
         </div>
     </div>
@@ -302,19 +317,17 @@
              } else { console.error(`[NAV CLIENT] Invalid screen ID: ${screenId}`); }
         };
         window.openKdsStatusModal = () => {};
-        // window.openProductInfoModal = () => {}; // Definido dinamicamente
         window.handleTableTransferConfirmed = () => {};
 
-        // ==== INÍCIO DA CORREÇÃO: Usa o app_id correto do Firebase ====
-        // Config Firebase (mantida)
-        window.__app_id = "1:1097659747429:web:8ec0a7c3978c311dbe0a8c";
+        // ==== INÍCIO DA CORREÇÃO: IDs do Firebase alinhados com app.js ====
+        window.__app_id = "1:1097659747429:web:8ec0a7c39777c311dbe0a8c";
         window.__firebase_config = JSON.stringify({
             apiKey: "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY",
             authDomain: "fator-pdv.firebaseapp.com",
             projectId: "fator-pdv",
             storageBucket: "fator-pdv.appspot.com",
             messagingSenderId: "1097659747429",
-            appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c" // Corrigido appId se necessário
+            appId: "1:1097659747429:web:8ec0a7c39777c311dbe0a8c"
         });
         // ==== FIM DA CORREÇÃO ====
     </script>

@@ -59,6 +59,53 @@ export const hideStatus = () => {
     }
 };
 
+// =======================================================
+// ================ INÍCIO DA CORREÇÃO ===================
+//
+// Adicione esta função aqui.
+//
+/**
+ * Exibe uma notificação toast na tela.
+ * @param {string} message - A mensagem a ser exibida.
+ * @param {boolean} [isError=false] - Se true, estiliza o toast como um erro.
+ */
+export const showToast = (message, isError = false) => {
+    try {
+        const toast = document.createElement('div');
+        toast.textContent = message;
+        
+        // Estilização base (Tailwind)
+        toast.className = 'fixed bottom-5 right-5 p-4 rounded-lg shadow-lg text-white z-[9999] transition-opacity duration-300 ease-out';
+        
+        // Cor de fundo
+        toast.style.backgroundColor = isError 
+            ? 'rgb(220, 38, 38)'  // Vermelho (bg-red-600)
+            : 'rgb(22, 163, 74)'; // Verde (bg-green-600)
+        
+        document.body.appendChild(toast);
+        
+        // Faz o toast desaparecer após 3 segundos
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            // Remove o elemento da DOM após a transição
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 300); // 300ms = duração da transição
+        }, 3000); // 3000ms = 3 segundos visível
+
+    } catch (e) {
+        // Fallback caso a criação do toast falhe
+        console.error("Falha ao mostrar toast:", e);
+        // Usa o 'alert' como alternativa
+        alert(message);
+    }
+};
+// ================ FIM DA CORREÇÃO ====================
+// =======================================================
+
+
 const showLoginScreen = () => {
     // Esta função mostra a tela de login
     statusScreen = document.getElementById('statusScreen');

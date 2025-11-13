@@ -1,13 +1,11 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (CORREÇÃO FINAL 2) ---
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (CORREÇÃO FINAL 5 - LAYOUT CARD 2.0) ---
 
-// ==== CORREÇÃO 1: Adiciona 'appId' ao import do firebaseService ====
 import { db, auth, getQuickObsCollectionRef, appId } from "/services/firebaseService.js";
 import { formatCurrency } from "/utils.js";
-import { getProducts, getCategories } from "/services/wooCommerceService.js";
-import { onSnapshot, doc, updateDoc, arrayUnion, arrayRemove, setDoc, getDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getProducts, getCategories, fetchWooCommerceProducts, fetchWooCommerceCategories } from "/services/wooCommerceService.js";
+import { onSnapshot, doc, updateDoc, arrayUnion, arrayRemove, setDoc, getDoc, getDocs, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { GoogleAuthProvider, signInWithPopup, signInAnonymously, RecaptchaVerifier, signInWithPhoneNumber, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-// ==== CORREÇÃO 2: Remove 'appId' do import do app.js ====
 import { showToast } from "/app.js";
 
 // --- Variáveis de Estado do Cliente ---
@@ -71,11 +69,11 @@ export const initClientOrderController = () => {
     // =================================================================
 
     // Mapeia elementos do modal de Observação do client.html
-    clientObsModal = document.getElementById('obsModal');
-    clientObsText = document.getElementById('obsText');
-    clientQuickObsButtons = document.getElementById('quickObsButtons'); // O container dos botões
-    clientConfirmObsBtn = document.getElementById('confirmObsBtn');
-    clientCancelObsBtn = document.getElementById('cancelObsBtn');
+    clientObsModal = document.getElementById('clientObsModal'); 
+    clientObsText = document.getElementById('clientObsText'); 
+    clientQuickObsButtons = document.getElementById('clientQuickObsButtons'); 
+    clientConfirmObsBtn = document.getElementById('confirmObsBtn'); 
+    clientCancelObsBtn = document.getElementById('clientCancelObsBtn'); 
 
     if (!clientObsModal || !clientObsText || !clientQuickObsButtons || !clientConfirmObsBtn || !clientCancelObsBtn) {
         console.error("[ClientOrder] Erro Fatal: Elementos do modal de observação não encontrados.");
@@ -174,8 +172,11 @@ export const initClientOrderController = () => {
                 const product = JSON.parse(addBtn.dataset.product.replace(/'/g, "&#39;"));
                 addItemToCart(product);
             }
-            if (infoBtn) {
-                 // Lógica para abrir modal de info (se existir)
+            
+            // Ativa o botão de informação
+            if (infoBtn && infoBtn.dataset.product) {
+                 const product = JSON.parse(infoBtn.dataset.product.replace(/'/g, "&#39;"));
+                 openProductInfoModal(product);
             }
         });
     }
@@ -214,7 +215,7 @@ export const initClientOrderController = () => {
     setupAuthStateObserver();
     
     // Busca os produtos
-    loadMenu();
+    loadMenu(); 
 
     // Busca as observações rápidas
     fetchQuickObservations(); 
@@ -255,7 +256,7 @@ function setupAuthStateObserver() {
             updateAuthUI(null);
             signInAnonymously(auth).catch(error => {
                  console.error("Erro no login anônimo inicial:", error);
-                 statusScreen.innerHTML = '<p class="text-red-400">Erro ao conectar. Tente recarregar a página.</p>';
+                 if (statusScreen) statusScreen.innerHTML = '<p class="text-red-400">Erro ao conectar. Tente recarregar a página.</p>';
             });
         }
     });
@@ -265,6 +266,11 @@ function setupAuthStateObserver() {
  * Atualiza a UI com base no estado de login.
  */
 function updateAuthUI(user) {
+    if (!clientUserName || !authActionBtn || !loggedInStep || !loggedInUserName || !phoneVerifyStep) {
+        console.warn("[ClientOrder] Elementos de UI de autenticação não encontrados. UI não será atualizada.");
+        return;
+    }
+    
     if (user && !user.isAnonymous) {
         // Logado (Google/Celular)
         clientUserName.textContent = user.name;
@@ -275,7 +281,8 @@ function updateAuthUI(user) {
         loggedInStep.style.display = 'block';
         loggedInUserName.textContent = user.name;
         phoneVerifyStep.style.display = 'none';
-        document.getElementById('authButtons').style.display = 'none';
+        const authButtons = document.getElementById('authButtons');
+        if (authButtons) authButtons.style.display = 'none';
         
     } else {
         // Deslogado ou Anônimo
@@ -286,7 +293,8 @@ function updateAuthUI(user) {
         // No modal
         loggedInStep.style.display = 'none';
         phoneVerifyStep.style.display = 'none';
-        document.getElementById('authButtons').style.display = 'block';
+        const authButtons = document.getElementById('authButtons');
+        if (authButtons) authButtons.style.display = 'block';
     }
 }
 
@@ -313,43 +321,53 @@ function handleAuthActionClick() {
  */
 async function loadMenu() {
     try {
-        const categories = await getCategories();
-        const products = await getProducts();
+        // 1. CHAMA AS FUNÇÕES DE FETCH E ESPERA ELAS TERMINAREM
+        console.log("[ClientOrder] Buscando categorias...");
+        const categories = await fetchWooCommerceCategories();
+        console.log("[ClientOrder] Buscando produtos...");
+        const products = await fetchWooCommerceProducts();
         
-        if (categories.length > 0) {
+        // 2. AGORA QUE TERMINOU, RENDERIZA AS CATEGORIAS
+        if (categories.length > 0 && clientCategoryFilters) {
              clientCategoryFilters.innerHTML = categories.map(cat => {
                 const isActive = cat.slug === currentCategoryFilter ? 'bg-brand-primary text-white' : 'bg-dark-input text-dark-text border border-gray-600';
                 return `<button class="category-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap ${isActive}" data-category="${cat.slug || cat.id}">${cat.name}</button>`;
              }).join('');
         }
         
-        renderMenu(); // Renderiza os produtos
+        // 3. RENDERIZA OS PRODUTOS (que agora existem)
+        renderMenu(); 
         
-        statusScreen.style.display = 'none';
-        mainContent.style.display = 'block';
+        // 4. ESCONDE A TELA DE LOADING
+        if (statusScreen) statusScreen.style.display = 'none';
+        if (mainContent) mainContent.style.display = 'block';
         
     } catch (error) {
         console.error("Erro ao carregar menu:", error);
-        statusScreen.innerHTML = '<p class="text-red-400">Erro ao carregar o cardápio. Verifique sua conexão.</p>';
+        if (statusScreen) statusScreen.innerHTML = '<p class="text-red-400">Erro ao carregar o cardápio. Verifique sua conexão.</p>';
     }
 }
+
 
 /**
  * Renderiza os produtos no menu.
  */
+// ==== INÍCIO DA CORREÇÃO (LAYOUT 2.0) ====
 function renderMenu() {
     if (!clientMenuContainer) return;
     
     // Atualiza o estado dos botões de categoria
-    clientCategoryFilters.querySelectorAll('.category-btn').forEach(btn => {
-        const isActive = btn.dataset.category === currentCategoryFilter;
-        btn.classList.toggle('bg-brand-primary', isActive);
-        btn.classList.toggle('text-white', isActive);
-        btn.classList.toggle('bg-dark-input', !isActive);
-        btn.classList.toggle('text-dark-text', !isActive);
-    });
+    if (clientCategoryFilters) {
+        clientCategoryFilters.querySelectorAll('.category-btn').forEach(btn => {
+            const isActive = btn.dataset.category === currentCategoryFilter;
+            btn.classList.toggle('bg-brand-primary', isActive);
+            btn.classList.toggle('text-white', isActive);
+            btn.classList.toggle('bg-dark-input', !isActive);
+            btn.classList.toggle('text-dark-text', !isActive);
+        });
+    }
 
-    const products = getProducts();
+    const products = getProducts(); // Agora getProducts() retorna a lista completa
     let filteredProducts = products;
     
     if (currentCategoryFilter !== 'all') {
@@ -359,23 +377,35 @@ function renderMenu() {
     if (filteredProducts.length === 0) {
         clientMenuContainer.innerHTML = `<div class="col-span-full text-center p-6 text-red-400 italic">Nenhum produto nesta categoria.</div>`;
     } else {
+        // ATUALIZADO: Novo HTML para o card (Layout 2.0)
         clientMenuContainer.innerHTML = filteredProducts.map(product => `
-            <div class="product-card bg-dark-card border border-gray-700 p-4 rounded-xl shadow-md flex flex-col justify-between" style="min-height: 140px;">
-                <div>
-                    <h4 class="font-bold text-base text-white">${product.name}</h4>
-                    <p class="text-sm text-dark-text mb-2">${product.description || ''}</p>
-                </div>
-                <div class="flex justify-between items-center mt-2">
-                    <span class="font-bold text-lg text-brand-primary">${formatCurrency(product.price)}</span>
-                    <button class="add-item-btn add-icon-btn bg-brand-primary text-white hover:bg-brand-primary-dark transition"
+            <div class="product-card bg-dark-card border border-gray-700 rounded-xl shadow-md flex flex-col overflow-hidden">
+                <img src="${product.image}" alt="${product.name}" class="w-full h-32 object-cover">
+                
+                <div class="p-4 flex flex-col flex-grow">
+                    <h4 class="font-semibold text-base text-white mb-2 min-h-[2.5rem]">${product.name}</h4>
+                    
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="font-bold text-lg text-brand-primary">${formatCurrency(product.price)}</span>
+                        
+                        <button class="add-item-btn bg-brand-primary text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-brand-primary-dark transition"
+                                data-product='${JSON.stringify(product).replace(/'/g, '&#39;')}'>
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+
+                    <div class="flex-grow"></div>
+                    
+                    <button class="info-item-btn w-full bg-dark-input text-dark-text font-semibold py-2 rounded-lg hover:bg-gray-600 transition text-sm"
                             data-product='${JSON.stringify(product).replace(/'/g, '&#39;')}'>
-                        <i class="fas fa-plus text-lg"></i>
+                        Descrição
                     </button>
                 </div>
             </div>
         `).join('');
     }
 }
+// ==== FIM DA CORREÇÃO ====
 
 /**
  * Adiciona um item ao carrinho local (selectedItems) e abre o modal de observação.
@@ -432,6 +462,50 @@ function decreaseCartItemQuantity(itemId, noteKey) {
         renderClientOrderScreen(); 
     }
 }
+
+/**
+ * Abre o modal de informações do produto.
+ */
+function openProductInfoModal(product) {
+    if (!product) return;
+
+    // Mapeia os elementos do modal
+    const modal = document.getElementById('productInfoModal');
+    const img = document.getElementById('infoProductImage');
+    const imgLink = document.getElementById('infoProductImageLink');
+    const nameEl = document.getElementById('infoProductName');
+    const priceEl = document.getElementById('infoProductPrice');
+    const descEl = document.getElementById('infoProductDescription');
+    const addBtn = document.getElementById('infoProductAddBtn'); // Botão "Quero esse"
+
+    if (!modal || !img || !nameEl || !priceEl || !descEl || !addBtn || !imgLink) {
+        console.error("Elementos do modal de informação do produto não encontrados!");
+        return;
+    }
+
+    // Popula o modal com os dados do produto
+    img.src = product.image || 'https://placehold.co/600x400/1f2937/d1d5db?text=Produto';
+    img.alt = product.name;
+    imgLink.href = product.image || '#';
+    nameEl.textContent = product.name;
+    priceEl.textContent = formatCurrency(product.price);
+    descEl.innerHTML = product.description; // Usa .innerHTML para renderizar HTML da descrição do Woo
+
+    // Configura o botão "Quero esse" dentro do modal
+    // Remove listeners antigos clonando o botão para evitar duplicação
+    const newAddBtn = addBtn.cloneNode(true);
+    addBtn.parentNode.replaceChild(newAddBtn, addBtn);
+    
+    newAddBtn.onclick = () => {
+        addItemToCart(product);
+        modal.style.display = 'none'; // Fecha o modal após adicionar
+        showToast(`${product.name} adicionado ao carrinho!`);
+    };
+
+    // Exibe o modal
+    modal.style.display = 'flex';
+}
+
 
 /**
  * Abre o modal de observação para o cliente.
@@ -499,7 +573,7 @@ function _renderClientCart() {
 /**
  * Renderiza a tela principal do cliente (carrinho e contagem).
  */
-function renderClientOrderScreen() {
+export function renderClientOrderScreen() {
     if (clientCartCount) {
         clientCartCount.textContent = selectedItems.length;
     }
@@ -533,30 +607,33 @@ function openAssociationModal(mode = 'sendOrder') {
 
     // Reseta o modal
     assocErrorMsg.style.display = 'none';
-    phoneInput.value = '';
-    smsCodeInput.value = '';
-    smsCodeInput.style.display = 'none';
-    verifySmsBtn.style.display = 'none';
+    if (phoneInput) phoneInput.value = '';
+    if (smsCodeInput) smsCodeInput.value = '';
+    if (smsCodeInput) smsCodeInput.style.display = 'none';
+    if (verifySmsBtn) verifySmsBtn.style.display = 'none';
     
     // Se o usuário já está logado (não anônimo)
     if (currentClientUser && !currentClientUser.isAnonymous) {
-        loggedInStep.style.display = 'block';
-        loggedInUserName.textContent = currentClientUser.name;
-        phoneVerifyStep.style.display = 'none';
-        document.getElementById('authButtons').style.display = 'none';
+        if(loggedInStep) loggedInStep.style.display = 'block';
+        if(loggedInUserName) loggedInUserName.textContent = currentClientUser.name;
+        if (phoneVerifyStep) phoneVerifyStep.style.display = 'none';
+        const authButtons = document.getElementById('authButtons');
+        if (authButtons) authButtons.style.display = 'none';
+        
     } else {
-        loggedInStep.style.display = 'none';
-        phoneVerifyStep.style.display = 'none';
-        document.getElementById('authButtons').style.display = 'block';
+        if(loggedInStep) loggedInStep.style.display = 'none';
+        if (phoneVerifyStep) phoneVerifyStep.style.display = 'none';
+        const authButtons = document.getElementById('authButtons');
+        if (authButtons) authButtons.style.display = 'block';
     }
 
     // Configura o modal para o modo
     if (mode === 'sendOrder') {
-        tableDataStep.style.display = 'block';
+        if(tableDataStep) tableDataStep.style.display = 'block';
         activateAndSendBtn.textContent = "Confirmar e Enviar";
         activateAndSendBtn.dataset.mode = 'sendOrder';
     } else { // mode === 'authOnly'
-        tableDataStep.style.display = 'none';
+        if(tableDataStep) tableDataStep.style.display = 'none';
         activateAndSendBtn.textContent = "Confirmar Login";
         activateAndSendBtn.dataset.mode = 'authOnly';
     }
@@ -736,7 +813,7 @@ export const fetchQuickObservations = async () => {
     } catch (e) {
         console.error("Erro ao buscar observações rápidas:", e);
         // Tenta renderizar o erro no modal
-        const buttonsContainer = document.getElementById('quickObsButtons');
+        const buttonsContainer = document.getElementById('clientQuickObsButtons'); 
         if (buttonsContainer) buttonsContainer.innerHTML = '<p class="text-xs text-red-400">Erro ao carregar obs.</p>';
         return [];
     }
@@ -866,7 +943,7 @@ async function checkAndRegisterCustomer(user) {
                 phone: user.phoneNumber || null,
                 email: user.email || null,
                 doc: customerId, // CPF/CNPJ (aqui usamos o ID)
-                createdAt: serverTimestamp()
+                createdAt: serverTimestamp() // Esta linha agora funciona
             });
             console.log("Novo cliente registrado no Firestore:", customerId);
         } else {
