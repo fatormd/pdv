@@ -26,7 +26,6 @@
                         'dark-placeholder': '#6b7280',
                         'dark-border': '#374151',
                         
-                        // CORREÇÃO: Adiciona as cores 'brand' que o JS espera
                         'brand-primary': '#ff7518', // Laranja Pumpkin
                         'brand-primary-dark': '#e46815',
                     },
@@ -80,6 +79,33 @@
         .slider-obs:before { background-color: white; height: 20px; width: 20px; left: 4px; bottom: 4px; border-radius: 50%; position: absolute; content: ""; transition: .4s;}
         input:checked + .slider-obs { background-color: #fbbf24; }
         input:checked + .slider-obs:before { transform: translateX(22px); }
+
+        /* ===== NOVOS ESTILOS PARA AS ABAS DE CRM ===== */
+        .crm-tab-btn {
+            padding: 0.75rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #9ca3af; /* gray-400 */
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .crm-tab-btn:hover {
+            color: #d1d5db; /* gray-300 */
+        }
+        .crm-tab-btn.active {
+            color: #ff7518; /* pumpkin */
+            border-bottom-color: #ff7518;
+        }
+        .crm-tab-content {
+            display: none;
+            padding: 1rem;
+            background-color: #111827; /* dark-bg */
+            border-radius: 0 0 0.5rem 0.5rem;
+        }
+        .crm-tab-content.active {
+            display: block;
+        }
+        /* ===== FIM DOS NOVOS ESTILOS ===== */
 
     </style>
 </head>
@@ -151,11 +177,13 @@
                      <span class="text-xl md:text-2xl font-semibold mr-3" id="payment-table-number-print">Conta da Mesa Selecionada</span>
                  </div>
 
-                <div class="flex-grow pb-4 pr-1"> 
+                <div class="flex-grow pb-4 pr-1 overflow-y-auto custom-scrollbar"> 
+                    
                     <div class="content-card p-3 md:p-4 mb-6 rounded-lg bg-dark-card border border-dark-border">
-                        <h2 class="text-lg md:text-xl font-semibold text-green-400 mb-3 md:mb-4">Resumo da Conta</h2>
+                        <h2 class="text-lg md:text-xl font-semibold text-green-400 mb-3 md:mb-4">Itens Confirmados (Conferência)</h2>
+                        
                         <div id="reviewItemsList" class="space-y-2 md:space-y-3 pt-2 mb-4 max-h-72 overflow-y-auto pr-2 custom-scrollbar">
-                             <div class="text-sm md:text-base text-dark-placeholder italic p-2">Nenhum item na conta para revisão.</div>
+                             <div class="text-sm md:text-base text-dark-placeholder italic p-2">Carregando itens confirmados pelo garçom...</div>
                         </div>
                         <div class="border-t border-dark-border pt-3 md:pt-4 mt-3 md:mt-4 space-y-2">
                             <div class="flex justify-between items-center">
@@ -192,9 +220,60 @@
                         </button>
                         <p class="mt-3 md:mt-4 text-xs md:text-sm text-dark-placeholder text-center">O pagamento deve ser efetuado com o garçom.</p>
                     </div>
-                </div> 
-            </div> 
-        </div> 
+
+                    <div id="crmClientSection" class="content-card mt-6 rounded-lg bg-dark-card border border-dark-border print-hide" style="display: none;"> <div class="p-3 md:p-4">
+                            <h2 class="text-lg md:text-xl font-semibold text-pumpkin mb-3"><i class="fas fa-star mr-2"></i> Cliente da Casa</h2>
+                        </div>
+                        
+                        <div class="border-b border-dark-border flex">
+                            <button class="crm-tab-btn active" data-tab="crm-pontos">
+                                <i class="fas fa-coins mr-1"></i> Pontos
+                            </button>
+                            <button class="crm-tab-btn" data-tab="crm-vouchers">
+                                <i class="fas fa-ticket-alt mr-1"></i> Vouchers
+                            </button>
+                            <button class="crm-tab-btn" data-tab="crm-historico">
+                                <i class="fas fa-history mr-1"></i> Histórico
+                            </button>
+                        </div>
+
+                        <div>
+                            <div id="crm-pontos" class="crm-tab-content active">
+                                <div class="text-center p-4">
+                                    <p class="text-sm text-dark-placeholder mb-1">Seu Saldo</p>
+                                    <p class="text-4xl font-bold text-pumpkin" id="crm-points-balance">... <i class="fas fa-spinner fa-spin text-2xl"></i></p>
+                                    <p class="text-xs text-dark-placeholder mt-1">pontos</p>
+                                </div>
+                                <hr class="border-dark-border my-4">
+                                <div>
+                                    <h4 class="font-semibold text-dark-text mb-3">Vouchers Disponíveis para Resgate</h4>
+                                    <div id="crm-vouchers-disponiveis" class="space-y-2">
+                                        <p class="text-sm text-dark-placeholder italic">Carregando vouchers...</p>
+                                        </div>
+                                </div>
+                            </div>
+
+                            <div id="crm-vouchers" class="crm-tab-content">
+                                <h4 class="font-semibold text-dark-text mb-3">Seus Vouchers Ativos</h4>
+                                <div id="crm-vouchers-ativos" class="space-y-2">
+                                    <p class="text-sm text-dark-placeholder italic">Nenhum voucher ativo no momento.</p>
+                                    </div>
+                            </div>
+
+                            <div id="crm-historico" class="crm-tab-content">
+                                <h4 class="font-semibold text-dark-text mb-3">Histórico de Pedidos</h4>
+                                <div id="crm-order-history" class="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-2 mb-4">
+                                    <p class="text-sm text-dark-placeholder italic">Carregando histórico...</p>
+                                    </div>
+                                <hr class="border-dark-border my-3">
+                                <h4 class="font-semibold text-dark-text mb-3">Vouchers Utilizados</h4>
+                                <div id="crm-vouchers-usados" class="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-2">
+                                    <p class="text-sm text-dark-placeholder italic">Nenhum voucher utilizado.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    </div> </div> </div> 
     </main>
 
     <div id="clientObsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
@@ -224,32 +303,37 @@
 
     <div id="associationModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4" style="display: none;">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm">
-            <h3 class="text-xl font-bold mb-4 text-white">Ativar Mesa e Enviar Pedido</h3>
+            
+            <h3 id="assocModalTitle" class="text-xl font-bold mb-4 text-white">Identifique-se para Pedir</h3>
             
             <div id="authButtons" class="space-y-3 mb-4">
                 <button id="googleLoginBtn" class="w-full py-3 px-4 bg-red-600 text-white rounded-lg font-semibold flex items-center justify-center"><i class="fab fa-google mr-2"></i> Entrar com Google</button>
-                <button id="phoneLoginBtn" class="w-full py-3 px-4 bg-green-600 text-white rounded-lg font-semibold flex items-center justify-center"><i class="fas fa-phone mr-2"></i> Entrar com Celular</button>
-            </div>
-
-            <div id="phoneVerifyStep" class="space-y-3 mb-4" style="display: none;">
-                <label class="text-sm text-dark-text" for="phoneInput">Seu Celular (com DDD)</label>
-                <input type="tel" id="phoneInput" class="w-full p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text" placeholder="Ex: 11912345678">
-                <button id="sendSmsBtn" class="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold">Enviar Código SMS</button>
-                <div id="recaptcha-container"></div> <input type="tel" id="smsCodeInput" class="w-full p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text" placeholder="Código de 6 dígitos" style="display: none;">
-                <button id="verifySmsBtn" class="w-full py-3 bg-green-600 text-white rounded-lg font-semibold" style="display: none;">Verificar Código</button>
-            </div>
-
-            <div id="tableDataStep" class="space-y-3" style="display: block;">
-                <label class="text-sm text-dark-text" for="activateTableNumber">Número da Mesa</label>
-                <input type="number" id="activateTableNumber" class="w-full p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text" placeholder="Informe o número da mesa">
-                
-                <label class="text-sm text-dark-text" for="activateDiners">Nº de Pessoas (Opcional)</label>
-                <input type="number" id="activateDiners" class="w-full p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text" placeholder="1" value="1">
             </div>
 
             <div id="loggedInStep" class="my-4 p-3 bg-dark-input rounded-lg" style="display: none;">
                 <span class="text-sm text-dark-text">Logado como:</span>
                 <span id="loggedInUserName" class="text-base font-semibold text-white"></span>
+            </div>
+
+            <div id="registrationStep" class="space-y-3" style="display: none;">
+                <p class="text-sm text-yellow-400">É sua primeira vez aqui! Complete seu cadastro para continuar:</p>
+                <div>
+                    <label class="text-sm text-dark-text" for="registerWhatsApp">Seu WhatsApp (com DDD)</label>
+                    <input type="tel" id="registerWhatsApp" class="w-full p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text" placeholder="Ex: 11912345678">
+                </div>
+                <div>
+                    <label class="text-sm text-dark-text" for="registerDOB">Data de Nascimento</label>
+                    <input type="date" id="registerDOB" class="w-full p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text" placeholder="YYYY-MM-DD">
+                </div>
+                <p id="registerErrorMsg" class="text-red-400 text-sm" style="display: none;"></p>
+                <button id="confirmRegisterBtn" class="w-full py-3 bg-green-600 text-white rounded-lg font-semibold">Confirmar Cadastro</button>
+            </div>
+
+            <div id="tableDataStep" class="space-y-3" style="display: none;">
+                <label class="text-sm text-dark-text" for="activateTableNumber">Número da Mesa</label>
+                <input type="number" id="activateTableNumber" class="w-full p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text" placeholder="Informe o número da mesa">
+                
+                <input type="number" id="activateDiners" class="w-full p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text" placeholder="1" value="1" style="display: none;">
             </div>
 
             <p id="assocErrorMsg" class="text-red-400 text-sm mt-3" style="display: none;">Mensagem de erro aqui.</p>
@@ -293,11 +377,10 @@
     <p class="mt-8 text-center text-xs text-dark-placeholder" id="user-id-display">.</p>
 
     <script>
-        // NOVO: Função para imprimir o resumo da conta no modo cliente
+        // Função para imprimir o resumo da conta no modo cliente
         window.printSummaryClient = () => {
              const valuePerDinerText = document.getElementById('valuePerDinerDisplay')?.textContent || 'R$ 0,00';
              const tableNumber = document.getElementById('payment-table-number')?.textContent || 'Mesa Selecionada';
-             // Atualiza o valor por pessoa (escondido) e o cabeçalho de impressão
              const valuePrintEl = document.getElementById('valuePerDinerDisplayPrint');
              const tableNumPrintEl = document.getElementById('payment-table-number-print');
              if(valuePrintEl) valuePrintEl.textContent = valuePerDinerText;
@@ -305,31 +388,42 @@
              window.print();
         };
         
-        // Placeholders (mantidos)
+        // Placeholders
         window.openManagerAuthModal = () => {};
+        
+        // ===== ATUALIZADO: window.goToScreen AGORA VAI CHAMAR OS CONTROLADORES =====
         window.goToScreen = (screenId) => {
              const appContainer = document.getElementById('appContainer');
              const clientScreens = { 'clientOrderScreen': 0, 'clientPaymentScreen': 1 };
              const index = clientScreens[screenId];
+             
              if (appContainer && index !== undefined) {
                   console.log(`[NAV CLIENT] Going to ${screenId} (index ${index})`);
                   appContainer.style.transform = `translateX(-${index * 100}vw)`;
-             } else { console.error(`[NAV CLIENT] Invalid screen ID: ${screenId}`); }
+                  
+                  // Dispara um evento customizado para notificar os controladores
+                  const event = new CustomEvent('screenChanged', { detail: { screenId: screenId } });
+                  window.dispatchEvent(event);
+                  
+             } else { 
+                  console.error(`[NAV CLIENT] Invalid screen ID: ${screenId}`); 
+             }
         };
+        // ===== FIM DA ATUALIZAÇÃO =====
+
         window.openKdsStatusModal = () => {};
         window.handleTableTransferConfirmed = () => {};
 
-// ==== INÍCIO DA CORREÇÃO: IDs do Firebase alinhados com app.js ====
-        window.__app_id = "1:1097659747429:web:8ec0a7c3978c311dbe0a8c"; // <-- CORRIGIDO
+        // IDs do Firebase Corrigidos
+        window.__app_id = "1:1097659747429:web:8ec0a7c3978c311dbe0a8c";
         window.__firebase_config = JSON.stringify({
             apiKey: "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY",
             authDomain: "fator-pdv.firebaseapp.com",
             projectId: "fator-pdv",
             storageBucket: "fator-pdv.appspot.com",
             messagingSenderId: "1097659747429",
-            appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c" // <-- CORRIGIDO
+            appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c"
         });
-        // ==== FIM DA CORREÇÃO ====
     </script>
 
     <script type="module" src="app.js"></script>

@@ -1,4 +1,4 @@
-// --- APP.JS (VERSÃO FINAL COM FIREBASE AUTH) ---
+// --- APP.JS (VERSÃO FINAL COM FIREBASE AUTH E NOVO CONTROLADOR DE PAGAMENTO) ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 // ATUALIZADO: Importa as funções de Auth necessárias
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -17,8 +17,10 @@ import { initPaymentController, renderPaymentSummary, deletePayment, handleMassA
 import { initManagerController, handleGerencialAction } from '/controllers/managerController.js';
 import { initUserManagementController, openUserManagementModal } from '/controllers/userManagementController.js';
 
-// ATUALIZADO: Importa apenas o INIT e o RENDER da TELA DE PEDIDO (não o menu)
+// ATUALIZADO: Importa os dois controladores do cliente
 import { initClientOrderController, renderClientOrderScreen } from '/controllers/clientOrderController.js';
+// ===== ADIÇÃO 1: Importa o novo controlador de pagamento =====
+import { initClientPaymentController } from '/controllers/clientPaymentController.js';
 
 
 // --- CONFIGURAÇÃO ---
@@ -32,7 +34,6 @@ const FIREBASE_CONFIG = {
 };
 
 // --- VARIÁVEIS GLOBAIS ---
-// ATUALIZADO: O mapa de telas Staff agora inclui 'loginScreen' como índice 0
 export const screens = { 
     'loginScreen': 0, 
     'panelScreen': 1, 
@@ -60,10 +61,8 @@ export const hideStatus = () => {
 };
 
 // =======================================================
-// ================ INÍCIO DA CORREÇÃO ===================
-//
-// Adicione esta função aqui.
-//
+// ===== ADIÇÃO 2: Função showToast (Estava faltando) =====
+// =======================================================
 /**
  * Exibe uma notificação toast na tela.
  * @param {string} message - A mensagem a ser exibida.
@@ -82,7 +81,13 @@ export const showToast = (message, isError = false) => {
             ? 'rgb(220, 38, 38)'  // Vermelho (bg-red-600)
             : 'rgb(22, 163, 74)'; // Verde (bg-green-600)
         
+        toast.style.opacity = '0'; // Começa invisível para o fade-in
         document.body.appendChild(toast);
+        
+        // Fade-in
+        setTimeout(() => {
+            toast.style.opacity = '1';
+        }, 10);
         
         // Faz o toast desaparecer após 3 segundos
         setTimeout(() => {
@@ -98,11 +103,11 @@ export const showToast = (message, isError = false) => {
     } catch (e) {
         // Fallback caso a criação do toast falhe
         console.error("Falha ao mostrar toast:", e);
-        // Usa o 'alert' como alternativa
         alert(message);
     }
 };
-// ================ FIM DA CORREÇÃO ====================
+// =======================================================
+// ================ FIM DA ADIÇÃO 2 ====================
 // =======================================================
 
 
@@ -117,7 +122,6 @@ const showLoginScreen = () => {
     if (mainHeader) mainHeader.style.display = 'none';
     if (mainContent) mainContent.style.display = 'block'; // Garante que o container principal apareça
     
-    // ATUALIZADO: Navega para a tela de login (índice 0)
     goToScreen('loginScreen'); 
 
     document.body.classList.add('bg-dark-bg');
@@ -134,22 +138,15 @@ const hideLoginScreen = () => {
 
     const logoutBtn = document.getElementById('logoutBtnHeader');
     const managerBtn = document.getElementById('openManagerPanelBtn');
-    
-    // ==== INÍCIO DA CORREÇÃO ====
-    const cashierBtn = document.getElementById('openCashierBtn'); // Mapeia o botão de caixa
+    const cashierBtn = document.getElementById('openCashierBtn'); 
 
     if (logoutBtn) logoutBtn.classList.remove('hidden');
-    if (cashierBtn) cashierBtn.classList.remove('hidden'); // Exibe o botão de caixa para todos os staff
-    // ==== FIM DA CORREÇÃO ====
+    if (cashierBtn) cashierBtn.classList.remove('hidden'); 
     
-    // Mostra botão de gerente APENAS se for Gerente
     if (managerBtn) {
         managerBtn.classList.toggle('hidden', userRole !== 'gerente');
     }
 };
-
-// --- FUNÇÃO DE AUTENTICAÇÃO (REMOVIDA) ---
-// const authenticateUserFromFirestore = ... (REMOVIDA - Não é mais necessária)
 
 
 /**
@@ -159,17 +156,12 @@ export const goToScreen = async (screenId) => {
     if (!appContainer) appContainer = document.getElementById('appContainer');
     if (!mainContent) mainContent = document.getElementById('mainContent');
     
-    // ===== INÍCIO DA ATUALIZAÇÃO =====
-    // Verifica o modo pela URL (CORRIGIDO)
     const isClientMode = window.location.pathname.includes('/client');
-    // ===== FIM DA ATUALIZAÇÃO =====
 
     // Lógicas de pré-navegação e limpeza de estado (apenas Staff)
     if (!isClientMode) {
-        // ATUALIZADO: Não salva itens ao voltar para 'loginScreen'
         if (currentTableId && screenId === 'panelScreen') { saveSelectedItemsToFirebase(currentTableId, selectedItems); }
         
-        // Limpa estado ao voltar para o painel ou para o login
         if ((screenId === 'panelScreen' || screenId === 'loginScreen') && currentTableId && unsubscribeTable) {
             unsubscribeTable(); unsubscribeTable = null; currentTableId = null; currentOrderSnapshot = null; selectedItems.length = 0;
             const currentTableNumEl = document.getElementById('current-table-number');
@@ -195,7 +187,6 @@ export const goToScreen = async (screenId) => {
     if (screenIndex !== undefined) {
         console.log(`[NAV] Navegando para ${screenId} (índice ${screenIndex})`);
         if (appContainer) appContainer.style.transform = `translateX(-${screenIndex * 100}vw)`;
-        // CORREÇÃO: Se a tela é a inicial, garante que o mainContent esteja visível
         if (mainContent) mainContent.style.display = 'block';
 
         // Ajuste visual para Staff
@@ -203,6 +194,14 @@ export const goToScreen = async (screenId) => {
             document.body.classList.toggle('bg-gray-900', screenId === 'managerScreen');
             document.body.classList.toggle('bg-dark-bg', screenId !== 'managerScreen');
         }
+        
+        // ===== ADIÇÃO 4: Dispara o evento de mudança de tela =====
+        if (isClientMode) {
+            // Dispara um evento customizado para notificar os controladores do cliente
+            const event = new CustomEvent('screenChanged', { detail: { screenId: screenId } });
+            window.dispatchEvent(event);
+        }
+        // ===== FIM DA ADIÇÃO 4 =====
 
     } else { console.error(`[NAV] Tentativa de navegar para tela inválida: ${screenId}`); }
 };
@@ -273,7 +272,6 @@ window.openManagerAuthModal = (action, payload = null) => {
     const managerModal = document.getElementById('managerModal');
     if (!managerModal) { console.error("Modal Gerente não encontrado!"); return; }
 
-    // ===== INÍCIO DA ATUALIZAÇÃO (Adiciona <form> e form=...) =====
     managerModal.innerHTML = `
         <div class="bg-dark-card border border-gray-600 p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 class="text-xl font-bold mb-4 text-red-400">Ação Gerencial Necessária</h3>
@@ -289,18 +287,13 @@ window.openManagerAuthModal = (action, payload = null) => {
             </div>
         </div>
     `;
-    // ===== FIM DA ATUALIZAÇÃO =====
 
     managerModal.style.display = 'flex';
     const input = document.getElementById('managerPasswordInput');
     const authBtn = document.getElementById('authManagerBtn');
-
-    // ===== INÍCIO DA ATUALIZAÇÃO (Adiciona authForm e listener de submit) =====
     const authForm = document.getElementById('managerAuthForm');
 
     if(authBtn && input && authForm) {
-    // ===== FIM DA ATUALIZAÇÃO =====
-
         const handleAuthClick = async () => {
             if (input.value === '1234') { // ATENÇÃO: Senha 'chumbada' no código
                 managerModal.style.display = 'none';
@@ -327,14 +320,10 @@ window.openManagerAuthModal = (action, payload = null) => {
         };
 
         authBtn.onclick = handleAuthClick;
-
-        // ===== INÍCIO DA ATUALIZAÇÃO (Adiciona listener de submit) =====
         authForm.addEventListener('submit', (e) => {
-            e.preventDefault(); // Impede o recarregamento da página
+            e.preventDefault(); 
             handleAuthClick();
         });
-        // ===== FIM DA ATUALIZAÇÃO =====
-
         input.onkeydown = (e) => { if (e.key === 'Enter') handleAuthClick(); };
     }
 };
@@ -384,8 +373,10 @@ export const setTableListener = (tableId, isClientMode = false) => {
             }
 
             if (isClientMode) {
+                 // ===== ATUALIZAÇÃO: O renderPaymentSummary não é mais chamado aqui =====
+                 // Ele agora é chamado pelo clientPaymentController
                  renderClientOrderScreen();
-                 renderPaymentSummary(currentTableId, currentOrderSnapshot);
+                 // renderPaymentSummary(currentTableId, currentOrderSnapshot); // REMOVIDO
             } else {
                  renderOrderScreen(currentOrderSnapshot);
                  renderPaymentSummary(currentTableId, currentOrderSnapshot);
@@ -420,7 +411,7 @@ export const setCurrentTable = (tableId, isClientMode = false) => {
         if(currentOrderSnapshot){
              if (isClientMode) {
                  renderClientOrderScreen();
-                 renderPaymentSummary(currentTableId, currentOrderSnapshot);
+                 // renderPaymentSummary(currentTableId, currentOrderSnapshot); // REMOVIDO
              } else {
                  renderOrderScreen(currentOrderSnapshot);
                  renderPaymentSummary(currentTableId, currentOrderSnapshot);
@@ -491,16 +482,10 @@ const handleStaffLogin = async (event) => {
     loginErrorMsg.style.display = 'none';
 
     try {
-        // A NOVA LÓGICA DE LOGIN: Usa o Firebase Auth
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        
-        // Se chegar aqui, o login foi sucesso.
-        // O listener 'onAuthStateChanged' (no DOMContentLoaded)
-        // irá detectar esta mudança e chamar o initStaffApp.
         console.log("Login com Firebase Auth bem-sucedido!", userCredential.user);
 
     } catch (error) {
-        // CORRIGINDO O BUG DO LOGIN SILENCIOSO
         console.error("Erro no login Firebase Auth:", error.code, error.message);
         if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
             loginErrorMsg.textContent = "E-mail ou senha inválidos.";
@@ -573,17 +558,19 @@ const initStaffApp = async (staffName) => { // Aceita o nome como parâmetro
 const initClientApp = async () => {
     console.log("[ClientApp] initClientApp CALLED"); 
     try {
-        // ===== INÍCIO DA ATUALIZAÇÃO =====
         // PASSO 1: Autenticar PRIMEIRO
         const authInstance = auth;
         if (authInstance && !authInstance.currentUser) {
-             await signInAnonymously(authInstance); // Essencial para o client.html
+             await signInAnonymously(authInstance); 
              console.log("[ClientApp] Signed in anonymously."); 
         }
 
-        // PASSO 2: AGORA inicializar o controller (que depende de estar logado)
+        // PASSO 2: AGORA inicializar os controllers
         initClientOrderController();
-        // ===== FIM DA ATUALIZAÇÃO =====
+        
+        // ===== ADIÇÃO 3: Inicializa o novo controlador =====
+        initClientPaymentController();
+        // ===== FIM DA ADIÇÃO 3 =====
 
         clientLoginModal = document.getElementById('associationModal');
         if (clientLoginModal) clientLoginModal.style.display = 'none';
@@ -611,13 +598,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         initializeFirebase(dbInstance, authInstance, appIdentifier, functionsInstance);
         console.log("[APP] Firebase Initialized"); 
 
-        // ===== INÍCIO DA ATUALIZAÇÃO (Lógica de Detecção de Modo) =====
         // DETECÇÃO DE MODO
-        // CORREÇÃO: Procura por '/client' em vez de 'client.html'
         const isClientMode = window.location.pathname.includes('/client');
         console.log(`[APP] Mode: ${isClientMode ? 'Client' : 'Staff'}`); 
-        // ===== FIM DA ATUALIZAÇÃO =====
-
 
         // Mapeamento UI
         statusScreen = document.getElementById('statusScreen');
@@ -626,16 +609,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         mainHeader = document.getElementById('mainHeader');
 
         if (isClientMode) {
-            // Fluxo do cliente (mantido)
+            // Fluxo do cliente
             initClientApp(); 
             import('/controllers/clientOrderController.js').then(module => {
                  window.decreaseLocalItemQuantity = module.decreaseLocalItemQuantity;
                  window.increaseLocalItemQuantity = module.increaseLocalItemQuantity;
              }).catch(err => console.error("Failed to dynamically load client quantity functions:", err));
         } else {
-             // FLUXO DE STAFF (RESTAURADO COM LOGIN AUTH)
-             
-             // ===== INÍCIO DA ATUALIZAÇÃO (Adiciona listener de 'submit' ao form) =====
+             // FLUXO DE STAFF
              const loginForm = document.getElementById('loginForm');
              loginBtn = document.getElementById('loginBtn');
              loginPasswordInput = document.getElementById('loginPassword');
@@ -643,9 +624,7 @@ document.addEventListener('DOMContentLoaded', async () => {
              if (loginForm) {
                  loginForm.addEventListener('submit', handleStaffLogin);
              }
-             // ===== FIM DA ATUALIZAÇÃO =====
              
-             // Listener de 'Enter' no campo de senha (mantido como fallback)
              if (loginPasswordInput) {
                  loginPasswordInput.addEventListener('keydown', (e) => {
                      if (e.key === 'Enter') {
@@ -660,9 +639,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                      // --- USUÁRIO STAFF LOGADO! ---
                      console.log("[APP] Usuário Staff autenticado:", user.email);
                      
-                     // Agora, precisamos buscar o 'role' e o 'name' no Firestore.
                      const usersCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'users');
-                     const userDocRef = doc(usersCollectionRef, user.email); // Usa email como ID
+                     const userDocRef = doc(usersCollectionRef, user.email);
                      const docSnap = await getDoc(userDocRef);
 
                      if (docSnap.exists()) {
@@ -675,9 +653,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                          
                          userId = user.email;
                          userRole = userData.role;
-                         await initStaffApp(userData.name); // Inicia o app com nome e role corretos!
+                         await initStaffApp(userData.name); 
                      } else {
-                         // Usuário autenticado mas sem registro no Firestore?
                          alert("Erro: Usuário autenticado, mas não encontrado no banco de dados. Contate o suporte.");
                          handleLogout();
                      }
@@ -690,22 +667,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                  }
              });
 
-             // Listeners do cabeçalho (mantidos)
+             // Listeners do cabeçalho
              const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
              const logoutBtnHeader = document.getElementById('logoutBtnHeader');
-             
-             // ==== INÍCIO DA CORREÇÃO (Mapeia o botão de caixa aqui também) ====
              const cashierBtn = document.getElementById('openCashierBtn');
+             
              if (cashierBtn) {
-                 // Adiciona um listener (mesmo que seja só um alerta por enquanto)
                  cashierBtn.addEventListener('click', () => {
                      alert("Módulo de 'Meu Caixa' em desenvolvimento.");
-                     // No futuro, você pode chamar uma função como:
-                     // window.openManagerAuthModal('openCashManagement');
-                     // ou uma função específica do garçom
                  });
              }
-             // ==== FIM DA CORREÇÃO ====
 
              if (openManagerPanelBtn) openManagerPanelBtn.addEventListener('click', () => { window.openManagerAuthModal('goToManagerPanel'); });
              if (logoutBtnHeader) logoutBtnHeader.addEventListener('click', handleLogout);
