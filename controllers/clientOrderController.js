@@ -72,7 +72,7 @@ export const initClientOrderController = () => {
     clientObsModal = document.getElementById('clientObsModal'); 
     clientObsText = document.getElementById('clientObsText'); 
     clientQuickObsButtons = document.getElementById('clientQuickObsButtons'); 
-    clientConfirmObsBtn = document.getElementById('confirmObsBtn'); 
+    clientConfirmObsBtn = document.getElementById('clientConfirmObsBtn'); 
     clientCancelObsBtn = document.getElementById('clientCancelObsBtn'); 
 
     if (!clientObsModal || !clientObsText || !clientQuickObsButtons || !clientConfirmObsBtn || !clientCancelObsBtn) {
