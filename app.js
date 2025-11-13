@@ -8,7 +8,7 @@ import { getFunctions } from "https://www.gstatic.com/firebasejs/11.6.1/firebase
 // Importações dos Serviços e Utils
 import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, auth, db, functions, appId } from '/services/firebaseService.js';
 import { fetchWooCommerceProducts, fetchWooCommerceCategories } from '/services/wooCommerceService.js';
-import { formatCurrency, formatElapsedTime } from '/utils.js';
+import { formatCurrency, formatElapsedTime, getNumericValueFromCurrency, maskPhoneNumber } from '/utils.js'; // Importa tudo do utils
 
 // --- IMPORTS ESTÁTICOS PARA CONTROLADORES CORE (Garantia de Funcionamento) ---
 import { initPanelController, loadOpenTables, renderTableFilters, handleAbrirMesa, handleSearchTable, openTableMergeModal } from '/controllers/panelController.js';
@@ -60,7 +60,7 @@ export const hideStatus = () => {
 };
 
 // =======================================================
-// ===== CORREÇÃO 1: Função showToast (Estava faltando) =====
+// Função showToast (Corrigida)
 // =======================================================
 export const showToast = (message, isError = false) => {
     try {
@@ -99,9 +99,6 @@ export const showToast = (message, isError = false) => {
         alert(message);
     }
 };
-// =======================================================
-// ================ FIM DA CORREÇÃO 1 ====================
-// =======================================================
 
 
 const showLoginScreen = () => {
@@ -140,10 +137,6 @@ const hideLoginScreen = () => {
         managerBtn.classList.toggle('hidden', userRole !== 'gerente');
     }
 };
-
-// --- FUNÇÃO DE AUTENTICAÇÃO (REMOVIDA) ---
-// const authenticateUserFromFirestore = ... (REMOVIDA - Não é mais necessária)
-
 
 /**
  * Navega entre as telas do SPA.
@@ -367,8 +360,9 @@ export const setTableListener = (tableId, isClientMode = false) => {
             }
 
             if (isClientMode) {
-                 renderClientOrderScreen();
-                 // renderPaymentSummary(currentTableId, currentOrderSnapshot); // Removido
+                 // ===== CORREÇÃO: Passa o snapshot para o controlador da tela de pedido =====
+                 renderClientOrderScreen(currentOrderSnapshot);
+                 // ===== FIM DA CORREÇÃO =====
             } else {
                  renderOrderScreen(currentOrderSnapshot);
                  renderPaymentSummary(currentTableId, currentOrderSnapshot);
@@ -402,8 +396,8 @@ export const setCurrentTable = (tableId, isClientMode = false) => {
         console.log(`[APP] Already listening to table ${tableId}. Forcing re-render.`);
         if(currentOrderSnapshot){
              if (isClientMode) {
-                 renderClientOrderScreen();
-                 // renderPaymentSummary(currentTableId, currentOrderSnapshot); // Removido
+                 // ===== CORREÇÃO: Passa o snapshot para o controlador da tela de pedido =====
+                 renderClientOrderScreen(currentOrderSnapshot);
              } else {
                  renderOrderScreen(currentOrderSnapshot);
                  renderPaymentSummary(currentTableId, currentOrderSnapshot);
@@ -435,9 +429,8 @@ export const setCurrentTable = (tableId, isClientMode = false) => {
 
     setTableListener(tableId, isClientMode);
 };
-// ===== CORREÇÃO 2: Expõe a função para a window =====
+// Expõe a função para a window (Corrigido)
 window.setCurrentTable = setCurrentTable;
-// ===== FIM DA CORREÇÃO 2 =====
 
 
 export const selectTableAndStartListener = async (tableId) => {

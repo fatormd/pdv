@@ -134,7 +134,7 @@ export const initClientOrderController = () => {
 
             if (updated) {
                 clientObsModal.style.display = 'none';
-                renderClientOrderScreen();
+                renderClientOrderScreen(); // Re-renderiza localmente (sem snapshot)
             } else {
                 console.warn("Nenhum item encontrado para atualizar a observação.");
                 clientObsModal.style.display = 'none';
@@ -146,7 +146,7 @@ export const initClientOrderController = () => {
     if (clientCancelObsBtn) {
         clientCancelObsBtn.addEventListener('click', () => {
             clientObsModal.style.display = 'none';
-            renderClientOrderScreen(); 
+            renderClientOrderScreen(); // Re-renderiza localmente (sem snapshot)
         });
     }
 
@@ -567,17 +567,34 @@ function _renderClientCart() {
 
 /**
  * Renderiza a tela principal do cliente (carrinho e contagem).
+ * ===== ATUALIZAÇÃO: Aceita 'tableData' para desabilitar o botão =====
  */
-export function renderClientOrderScreen() {
+export function renderClientOrderScreen(tableData) {
     if (clientCartCount) {
         clientCartCount.textContent = selectedItems.length;
     }
+    
+    // ===== INÍCIO DA LÓGICA DE DESABILITAR O BOTÃO =====
     if (sendOrderBtn) {
-        sendOrderBtn.disabled = selectedItems.length === 0;
+        // Verifica se a notificação de fechamento de conta existe
+        const billRequested = tableData?.waiterNotification?.includes('fechamento');
+        
+        if (billRequested) {
+            sendOrderBtn.disabled = true;
+            sendOrderBtn.innerHTML = '<i class="fas fa-hourglass-half"></i>'; // Ícone de aguardando
+            sendOrderBtn.title = 'Aguardando fechamento da conta...';
+        } else {
+            // Lógica normal
+            sendOrderBtn.disabled = selectedItems.length === 0;
+            sendOrderBtn.innerHTML = '<i class="fas fa-check-circle"></i>';
+            sendOrderBtn.title = 'Enviar Pedido para Confirmação';
+        }
     }
+    // ===== FIM DA LÓGICA DE DESABILITAR O BOTÃO =====
     
     _renderClientCart();
 }
+
 
 /**
  * Lida com o clique em "Enviar Pedido".
@@ -799,7 +816,7 @@ async function sendOrderToFirebase() {
         });
 
         selectedItems.length = 0;
-        renderClientOrderScreen(); 
+        renderClientOrderScreen(); // Re-renderiza localmente
         
         showToast("Pedido enviado! Um garçom irá confirmar em breve.");
         

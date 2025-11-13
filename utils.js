@@ -1,4 +1,4 @@
-// --- utils.js (COM AS NOVAS FUNÇÕES) ---
+// --- utils.js (COM TODAS AS FUNÇÕES CORRIGIDAS) ---
 
 // Formata um valor numérico para BRL
 export const formatCurrency = (value) => {
@@ -14,13 +14,9 @@ export const formatElapsedTime = (timestamp) => {
     return `${minutes} min`;
 };
 
-// =======================================================
-// ===== NOVAS FUNÇÕES ADICIONADAS ABAIXO =====
-// =======================================================
-
 /**
  * Converte uma string de moeda (ex: "R$ 50,00") para um número (ex: 50.00)
- * Esta função corrige o erro 'getNumericValueFromCurrency'
+ * (Corrige o bug do wooCommerceService.js)
  */
 export const getNumericValueFromCurrency = (currencyString) => {
     if (!currencyString) return 0;
@@ -35,7 +31,7 @@ export const getNumericValueFromCurrency = (currencyString) => {
 
 /**
  * Mascara um número de telefone, exibindo apenas o DDD e os últimos 4 dígitos.
- * (Esta é a função para o seu pedido de privacidade do staff)
+ * (Corrige a privacidade do staff no orderController.js)
  */
 export const maskPhoneNumber = (phone) => {
     if (!phone) return null;
@@ -65,4 +61,21 @@ export const maskPhoneNumber = (phone) => {
     
     // Se for muito curto, retorna como está (não deve acontecer)
     return phone;
+};
+
+// =======================================================
+// ===== ADIÇÃO: Função 'calculateItemsValue' (Faltando) =====
+// (Corrige o bug do paymentController.js)
+// =======================================================
+/**
+ * Calcula o valor total de um array de itens (somando o campo 'price').
+ */
+export const calculateItemsValue = (itemsArray) => {
+    if (!itemsArray || !Array.isArray(itemsArray)) return 0;
+    
+    return itemsArray.reduce((total, item) => {
+        // Garante que o preço é um número antes de somar
+        const price = parseFloat(item.price) || 0;
+        return total + price;
+    }, 0);
 };
