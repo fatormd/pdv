@@ -1,4 +1,4 @@
-// --- APP.JS (VERSÃO FINAL COM FIREBASE AUTH E NOVO CONTROLADOR DE PAGAMENTO) ---
+// --- APP.JS (VERSÃO FINAL COM FIREBASE AUTH) ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 // ATUALIZADO: Importa as funções de Auth necessárias
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -19,7 +19,6 @@ import { initUserManagementController, openUserManagementModal } from '/controll
 
 // ATUALIZADO: Importa os dois controladores do cliente
 import { initClientOrderController, renderClientOrderScreen } from '/controllers/clientOrderController.js';
-// ===== ADIÇÃO 1: Importa o novo controlador de pagamento =====
 import { initClientPaymentController } from '/controllers/clientPaymentController.js';
 
 
@@ -61,13 +60,8 @@ export const hideStatus = () => {
 };
 
 // =======================================================
-// ===== ADIÇÃO 2: Função showToast (Estava faltando) =====
+// Função showToast (Corrigida)
 // =======================================================
-/**
- * Exibe uma notificação toast na tela.
- * @param {string} message - A mensagem a ser exibida.
- * @param {boolean} [isError=false] - Se true, estiliza o toast como um erro.
- */
 export const showToast = (message, isError = false) => {
     try {
         const toast = document.createElement('div');
@@ -101,14 +95,10 @@ export const showToast = (message, isError = false) => {
         }, 3000); // 3000ms = 3 segundos visível
 
     } catch (e) {
-        // Fallback caso a criação do toast falhe
         console.error("Falha ao mostrar toast:", e);
         alert(message);
     }
 };
-// =======================================================
-// ================ FIM DA ADIÇÃO 2 ====================
-// =======================================================
 
 
 const showLoginScreen = () => {
@@ -147,7 +137,6 @@ const hideLoginScreen = () => {
         managerBtn.classList.toggle('hidden', userRole !== 'gerente');
     }
 };
-
 
 /**
  * Navega entre as telas do SPA.
@@ -195,13 +184,11 @@ export const goToScreen = async (screenId) => {
             document.body.classList.toggle('bg-dark-bg', screenId !== 'managerScreen');
         }
         
-        // ===== ADIÇÃO 4: Dispara o evento de mudança de tela =====
+        // Dispara o evento de mudança de tela (para o clientPaymentController)
         if (isClientMode) {
-            // Dispara um evento customizado para notificar os controladores do cliente
             const event = new CustomEvent('screenChanged', { detail: { screenId: screenId } });
             window.dispatchEvent(event);
         }
-        // ===== FIM DA ADIÇÃO 4 =====
 
     } else { console.error(`[NAV] Tentativa de navegar para tela inválida: ${screenId}`); }
 };
@@ -373,10 +360,8 @@ export const setTableListener = (tableId, isClientMode = false) => {
             }
 
             if (isClientMode) {
-                 // ===== ATUALIZAÇÃO: O renderPaymentSummary não é mais chamado aqui =====
-                 // Ele agora é chamado pelo clientPaymentController
                  renderClientOrderScreen();
-                 // renderPaymentSummary(currentTableId, currentOrderSnapshot); // REMOVIDO
+                 // renderPaymentSummary(currentTableId, currentOrderSnapshot); // Removido
             } else {
                  renderOrderScreen(currentOrderSnapshot);
                  renderPaymentSummary(currentTableId, currentOrderSnapshot);
@@ -411,7 +396,7 @@ export const setCurrentTable = (tableId, isClientMode = false) => {
         if(currentOrderSnapshot){
              if (isClientMode) {
                  renderClientOrderScreen();
-                 // renderPaymentSummary(currentTableId, currentOrderSnapshot); // REMOVIDO
+                 // renderPaymentSummary(currentTableId, currentOrderSnapshot); // Removido
              } else {
                  renderOrderScreen(currentOrderSnapshot);
                  renderPaymentSummary(currentTableId, currentOrderSnapshot);
@@ -443,6 +428,10 @@ export const setCurrentTable = (tableId, isClientMode = false) => {
 
     setTableListener(tableId, isClientMode);
 };
+// ===== CORREÇÃO 2: Expõe a função para a window =====
+window.setCurrentTable = setCurrentTable;
+// ===== FIM DA CORREÇÃO 2 =====
+
 
 export const selectTableAndStartListener = async (tableId) => {
     try {

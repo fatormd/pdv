@@ -80,7 +80,7 @@
         input:checked + .slider-obs { background-color: #fbbf24; }
         input:checked + .slider-obs:before { transform: translateX(22px); }
 
-        /* ===== NOVOS ESTILOS PARA AS ABAS DE CRM ===== */
+        /* Estilos para as Abas de CRM */
         .crm-tab-btn {
             padding: 0.75rem 1rem;
             font-size: 0.875rem;
@@ -105,7 +105,14 @@
         .crm-tab-content.active {
             display: block;
         }
-        /* ===== FIM DOS NOVOS ESTILOS ===== */
+        /* Esconde a barra de rolagem das abas */
+        .crm-tabs-container::-webkit-scrollbar {
+            display: none;
+        }
+        .crm-tabs-container {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
 
     </style>
 </head>
@@ -225,14 +232,14 @@
                             <h2 class="text-lg md:text-xl font-semibold text-pumpkin mb-3"><i class="fas fa-star mr-2"></i> Cliente da Casa</h2>
                         </div>
                         
-                        <div class="border-b border-dark-border flex">
-                            <button class="crm-tab-btn active" data-tab="crm-pontos">
+                        <div class="border-b border-dark-border flex overflow-x-auto crm-tabs-container">
+                            <button class="crm-tab-btn active whitespace-nowrap" data-tab="crm-pontos">
                                 <i class="fas fa-coins mr-1"></i> Pontos
                             </button>
-                            <button class="crm-tab-btn" data-tab="crm-vouchers">
+                            <button class="crm-tab-btn whitespace-nowrap" data-tab="crm-vouchers">
                                 <i class="fas fa-ticket-alt mr-1"></i> Vouchers
                             </button>
-                            <button class="crm-tab-btn" data-tab="crm-historico">
+                            <button class="crm-tab-btn whitespace-nowrap" data-tab="crm-historico">
                                 <i class="fas fa-history mr-1"></i> Histórico
                             </button>
                         </div>
@@ -241,7 +248,7 @@
                             <div id="crm-pontos" class="crm-tab-content active">
                                 <div class="text-center p-4">
                                     <p class="text-sm text-dark-placeholder mb-1">Seu Saldo</p>
-                                    <p class="text-4xl font-bold text-pumpkin" id="crm-points-balance">... <i class="fas fa-spinner fa-spin text-2xl"></i></p>
+                                    <p class="text-3xl md:text-4xl font-bold text-pumpkin" id="crm-points-balance">... <i class="fas fa-spinner fa-spin text-2xl"></i></p>
                                     <p class="text-xs text-dark-placeholder mt-1">pontos</p>
                                 </div>
                                 <hr class="border-dark-border my-4">
@@ -249,7 +256,7 @@
                                     <h4 class="font-semibold text-dark-text mb-3">Vouchers Disponíveis para Resgate</h4>
                                     <div id="crm-vouchers-disponiveis" class="space-y-2">
                                         <p class="text-sm text-dark-placeholder italic">Carregando vouchers...</p>
-                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -257,14 +264,14 @@
                                 <h4 class="font-semibold text-dark-text mb-3">Seus Vouchers Ativos</h4>
                                 <div id="crm-vouchers-ativos" class="space-y-2">
                                     <p class="text-sm text-dark-placeholder italic">Nenhum voucher ativo no momento.</p>
-                                    </div>
+                                </div>
                             </div>
 
                             <div id="crm-historico" class="crm-tab-content">
                                 <h4 class="font-semibold text-dark-text mb-3">Histórico de Pedidos</h4>
                                 <div id="crm-order-history" class="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-2 mb-4">
                                     <p class="text-sm text-dark-placeholder italic">Carregando histórico...</p>
-                                    </div>
+                                </div>
                                 <hr class="border-dark-border my-3">
                                 <h4 class="font-semibold text-dark-text mb-3">Vouchers Utilizados</h4>
                                 <div id="crm-vouchers-usados" class="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-2">
@@ -391,30 +398,28 @@
         // Placeholders
         window.openManagerAuthModal = () => {};
         
-        // ===== ATUALIZADO: window.goToScreen AGORA VAI CHAMAR OS CONTROLADORES =====
-        window.goToScreen = (screenId) => {
-             const appContainer = document.getElementById('appContainer');
-             const clientScreens = { 'clientOrderScreen': 0, 'clientPaymentScreen': 1 };
-             const index = clientScreens[screenId];
-             
-             if (appContainer && index !== undefined) {
-                  console.log(`[NAV CLIENT] Going to ${screenId} (index ${index})`);
-                  appContainer.style.transform = `translateX(-${index * 100}vw)`;
-                  
-                  // Dispara um evento customizado para notificar os controladores
-                  const event = new CustomEvent('screenChanged', { detail: { screenId: screenId } });
-                  window.dispatchEvent(event);
-                  
-             } else { 
-                  console.error(`[NAV CLIENT] Invalid screen ID: ${screenId}`); 
-             }
-        };
-        // ===== FIM DA ATUALIZAÇÃO =====
+        // O app.js agora define a função window.goToScreen, então este é apenas um fallback
+        if (!window.goToScreen) {
+            window.goToScreen = (screenId) => {
+                 const appContainer = document.getElementById('appContainer');
+                 const clientScreens = { 'clientOrderScreen': 0, 'clientPaymentScreen': 1 };
+                 const index = clientScreens[screenId];
+                 
+                 if (appContainer && index !== undefined) {
+                      console.log(`[NAV CLIENT] Going to ${screenId} (index ${index})`);
+                      appContainer.style.transform = `translateX(-${index * 100}vw)`;
+                      const event = new CustomEvent('screenChanged', { detail: { screenId: screenId } });
+                      window.dispatchEvent(event);
+                 } else { 
+                      console.error(`[NAV CLIENT] Invalid screen ID: ${screenId}`); 
+                 }
+            };
+        }
 
         window.openKdsStatusModal = () => {};
         window.handleTableTransferConfirmed = () => {};
 
-        // IDs do Firebase Corrigidos
+        // IDs do Firebase (Corretos)
         window.__app_id = "1:1097659747429:web:8ec0a7c3978c311dbe0a8c";
         window.__firebase_config = JSON.stringify({
             apiKey: "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY",

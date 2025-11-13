@@ -1,21 +1,21 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (COM AUTO-ABERTURA DE MESA) ---
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (COM CORREÇÃO DE REFERENCEERROR) ---
 
-// ===== Imports Atualizadas: Adicionado 'getTablesCollectionRef' e 'where'
 import { db, auth, getQuickObsCollectionRef, appId, getTablesCollectionRef } from "/services/firebaseService.js";
 import { formatCurrency } from "/utils.js";
 import { getProducts, getCategories, fetchWooCommerceProducts, fetchWooCommerceCategories } from "/services/wooCommerceService.js";
-// ===== Imports Atualizadas: Adicionado 'query', 'where', 'getDocs', 'setDoc', 'serverTimestamp'
-import { onSnapshot, doc, updateDoc, arrayUnion, arrayRemove, setDoc, getDoc, getDocs, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+// Importação corrigida (com 'orderBy')
+import { onSnapshot, doc, updateDoc, arrayUnion, arrayRemove, setDoc, getDoc, getDocs, query, where, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { GoogleAuthProvider, signInWithPopup, signInAnonymously, RecaptchaVerifier, signInWithPhoneNumber, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-import { showToast } from "/app.js";
+// Importa 'showToast' do app.js (como definido no seu app.js)
+import { showToast } from "/app.js"; 
 
-// --- Variáveis de Estado do Cliente ---
-let currentTableId = null;
-let currentDiners = 1; 
-let currentClientUser = null; 
-let currentOrderSnapshot = null; 
-let selectedItems = []; 
+
+// --- Variáveis de Estado (Locais) ---
+// O estado global (currentTableId) é importado do app.js
+import { currentTableId } from "/app.js";
+
+let selectedItems = []; // Itens do carrinho local
 let quickObsCache = []; 
 let currentCategoryFilter = 'all';
 const ESPERA_KEY = "(EM ESPERA)"; 
@@ -29,6 +29,11 @@ let statusScreen, mainContent, appContainer;
 let searchProductInputClient; 
 let registrationStep, registerWhatsApp, registerDOB, confirmRegisterBtn, registerErrorMsg;
 let clientObsModal, clientObsText, clientQuickObsButtons, clientConfirmObsBtn, clientCancelObsBtn;
+
+// ===== CORREÇÃO: Readicionando a variável que foi apagada acidentalmente =====
+let localCurrentTableId = null;
+// ===== FIM DA CORREÇÃO =====
+let localCurrentClientUser = null; // O 'user' logado é local para este controller
 
 // --- Inicialização ---
 
@@ -207,7 +212,7 @@ export const initClientOrderController = () => {
         searchProductInputClient.addEventListener('input', renderMenu);
     }
 
-    // Gerencia o estado de autenticação
+    // Gerencia o estado de autenticação (agora no app.js, mas a UI ainda é local)
     setupAuthStateObserver();
     
     // Busca os produtos
@@ -224,38 +229,18 @@ export const initClientOrderController = () => {
  */
 function setupAuthStateObserver() {
     onAuthStateChanged(auth, (user) => {
-        if (user) {
-            if (user.isAnonymous) {
-                currentClientUser = {
-                    uid: user.uid,
-                    name: `Mesa ${currentTableId}`,
-                    isAnonymous: true
-                };
-                updateAuthUI(currentClientUser);
-            } else {
-                currentClientUser = {
-                    uid: user.uid,
-                    name: user.displayName || "Cliente",
-                    email: user.email,
-                    phone: user.phoneNumber, 
-                    isAnonymous: false
-                };
-                updateAuthUI(currentClientUser);
-                checkAndRegisterCustomer(user);
-            }
-        } else {
-            currentClientUser = null;
-            updateAuthUI(null);
-            signInAnonymously(auth).catch(error => {
-                 console.error("Erro no login anônimo inicial:", error);
-                 if (statusScreen) statusScreen.innerHTML = '<p class="text-red-400">Erro ao conectar. Tente recarregar a página.</p>';
-            });
+        localCurrentClientUser = user; // Atualiza o user local
+        updateAuthUI(user); // Atualiza a UI local (header, etc.)
+        
+        // Se o usuário logou (não anônimo), verifica o cadastro
+        if (user && !user.isAnonymous) {
+            checkAndRegisterCustomer(user);
         }
     });
 }
 
 /**
- * Atualiza a UI com base no estado de login. (Simplificado)
+ * Atualiza a UI com base no estado de login.
  */
 function updateAuthUI(user) {
     if (!clientUserName || !authActionBtn || !loggedInStep || !loggedInUserName) {
@@ -266,11 +251,11 @@ function updateAuthUI(user) {
     const authButtons = document.getElementById('authButtons');
 
     if (user && !user.isAnonymous) {
-        clientUserName.textContent = user.name;
+        clientUserName.textContent = user.displayName || user.name || "Cliente";
         authActionBtn.textContent = "Sair";
         authActionBtn.classList.add('text-red-400');
         loggedInStep.style.display = 'block';
-        loggedInUserName.textContent = user.name;
+        loggedInUserName.textContent = user.displayName || user.name || "Cliente";
         if (authButtons) authButtons.style.display = 'none';
     } else {
         clientUserName.textContent = "Visitante";
@@ -287,8 +272,8 @@ function updateAuthUI(user) {
  * Ação do botão "Entrar" / "Sair".
  */
 function handleAuthActionClick() {
-    if (currentClientUser && !currentClientUser.isAnonymous) {
-        auth.signOut().then(() => {
+    if (localCurrentClientUser && !localCurrentClientUser.isAnonymous) {
+        signOut(auth).then(() => {
             console.log("Usuário deslogado.");
             showToast("Você saiu da sua conta.");
         });
@@ -599,8 +584,9 @@ export function renderClientOrderScreen() {
  */
 function handleSendOrderClick() {
     if (selectedItems.length === 0) return;
-
-    if (currentTableId) {
+    
+    // Usa a variável 'localCurrentTableId' definida neste arquivo
+    if (localCurrentTableId) { 
         sendOrderToFirebase();
     } else {
         openAssociationModal('sendOrder');
@@ -619,12 +605,12 @@ function openAssociationModal(mode = 'sendOrder') {
     if (tableDataStep) tableDataStep.style.display = 'none';
     if (registrationStep) registrationStep.style.display = 'none';
     
-    // Mostra/Esconde botões de login
+    const user = localCurrentClientUser;
     const authButtons = document.getElementById('authButtons');
-    if (currentClientUser && !currentClientUser.isAnonymous) {
+    
+    if (user && !user.isAnonymous) {
         if (authButtons) authButtons.style.display = 'none';
-        // A lógica de qual step (table ou register) mostrar
-        // já foi definida pela função checkAndRegisterCustomer
+        // A lógica de qual step mostrar é tratada pelo checkAndRegisterCustomer
     } else {
         if (authButtons) authButtons.style.display = 'block';
     }
@@ -648,26 +634,25 @@ function openAssociationModal(mode = 'sendOrder') {
 
 /**
  * Lida com a confirmação final do modal (Ativar e Enviar).
- * AGORA INCLUI A LÓGICA DE AUTO-ABERTURA DE MESA.
  */
 async function handleActivationAndSend() {
     const mode = activateAndSendBtn.dataset.mode;
+    const user = localCurrentClientUser;
     
-    if (!currentClientUser) {
+    if (!user) {
         showAssocError("Você não está autenticado. Por favor, faça login.");
         return;
     }
     
-    // Modo "Apenas Login" (não envia pedido)
     if (mode === 'authOnly') {
          associationModal.style.display = 'none';
-         showToast(`Login como ${currentClientUser.name} confirmado!`);
+         showToast(`Login como ${user.displayName} confirmado!`);
          return;
     }
 
     // --- Modo 'sendOrder' ---
     const tableNumber = activateTableNumber.value;
-    const clientId = currentClientUser.uid; // A "Chave" de segurança
+    const clientId = user.uid;
     
     if (!tableNumber) {
         showAssocError("Por favor, insira o número da mesa.");
@@ -686,18 +671,14 @@ async function handleActivationAndSend() {
             const tableData = tableDoc.data();
             
             if (tableData.status === 'open') {
-                // A mesa está aberta. Verifica se pertence ao cliente.
                 if (tableData.clientId === clientId) {
-                    // Sim, é o cliente reconectando.
                     console.log(`Cliente ${clientId} reconectando à Mesa ${tableNumber}.`);
-                    currentTableId = tableNumber;
-                    // Envia o pedido (pula para o finally e depois sendOrder)
+                    localCurrentTableId = tableNumber; 
+                    window.setCurrentTable(tableNumber, true); // Seta no app.js
                 } else {
-                    // Não, é outro cliente tentando pegar a mesa.
                     throw new Error("Mesa já está em uso por outro cliente.");
                 }
             } else {
-                // A mesa existe, mas está 'closed', 'merged', etc.
                 throw new Error("Mesa está fechada. Peça a um garçom para reabri-la.");
             }
             
@@ -705,7 +686,6 @@ async function handleActivationAndSend() {
             // ----- CENÁRIO B: A MESA NÃO EXISTE (AUTO-ABERTURA) -----
             console.log(`Tentativa de auto-abertura da Mesa ${tableNumber} por ${clientId}.`);
             
-            // 1. Verifica se este cliente JÁ TEM outra mesa aberta
             const tablesCollection = getTablesCollectionRef();
             const q = query(tablesCollection, 
                             where('status', '==', 'open'), 
@@ -714,51 +694,42 @@ async function handleActivationAndSend() {
             const querySnapshot = await getDocs(q);
             
             if (!querySnapshot.empty) {
-                // SIM, ele já tem uma mesa. Bloqueia.
                 const existingTable = querySnapshot.docs[0].id;
                 throw new Error(`Você já está ativo na Mesa ${existingTable}. Não é possível abrir duas mesas.`);
             }
             
-            // 2. Cliente está livre. Pode abrir a nova mesa.
             console.log(`Abrindo nova Mesa ${tableNumber} para ${clientId}...`);
-            
-            // Busca os dados do cliente (WhatsApp) para salvar na mesa
             const customerData = await getCustomerData(clientId);
             
             const newTableData = {
                 tableNumber: parseInt(tableNumber, 10),
-                diners: 1, // Padrão
-                sector: 'Auto-Abertura', // Setor especial
+                diners: 1, 
+                sector: 'Auto-Abertura', 
                 status: 'open',
                 createdAt: serverTimestamp(),
                 total: 0,
                 sentItems: [],
                 payments: [],
                 serviceTaxApplied: true,
-                selectedItems: [], // Carrinho local (será enviado depois)
-                
-                // Dados do Cliente
+                selectedItems: [], 
                 clientId: clientId,
-                clientName: customerData.name || currentClientUser.name,
+                clientName: customerData.name || user.displayName,
                 clientWhatsapp: customerData.whatsapp || null
-                // Note: 'accessPin' não é mais necessário
             };
             
-            // Cria o documento da mesa
             await setDoc(tableRef, newTableData);
-            
-            currentTableId = tableNumber;
-            // O pedido será enviado
+            localCurrentTableId = tableNumber;
+            window.setCurrentTable(tableNumber, true); // Seta no app.js
         }
         
-        // ----- SUCESSO (Se chegou aqui, ou reconectou ou abriu a mesa) -----
-        clientTableNumber.textContent = `Mesa ${currentTableId}`;
+        // ----- SUCESSO -----
+        clientTableNumber.textContent = `Mesa ${localCurrentTableId}`;
         await sendOrderToFirebase();
         associationModal.style.display = 'none';
         
     } catch (e) {
         console.error("Erro ao ativar/abrir mesa:", e);
-        showAssocError(e.message); // Mostra o erro amigável (ex: "Mesa já em uso")
+        showAssocError(e.message); 
     } finally {
         activateAndSendBtn.disabled = false;
         activateAndSendBtn.textContent = "Confirmar e Enviar";
@@ -794,26 +765,32 @@ async function getCustomerData(uid) {
  * Envia o pedido (carrinho) para o Firebase.
  */
 async function sendOrderToFirebase() {
-    if (!currentTableId || selectedItems.length === 0) {
+    const tableId = localCurrentTableId;
+    const user = localCurrentClientUser;
+
+    if (!tableId || selectedItems.length === 0) {
         alert("Nenhum item ou mesa selecionada.");
         return;
     }
 
     const orderId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     
+    // Pega o 'phone' do usuário local, que foi atualizado pelo checkAndRegisterCustomer
+    const clientPhone = user.phone || null;
+
     const newOrderRequest = {
         orderId: orderId,
         requestedAt: new Date().toISOString(),
         clientInfo: {
-            uid: currentClientUser?.uid,
-            name: currentClientUser?.name,
-            phone: currentClientUser?.phone // 'phone' agora vem do doc 'customers'
+            uid: user?.uid,
+            name: user?.displayName,
+            phone: clientPhone 
         },
         items: selectedItems.map(item => ({ ...item })) 
     };
 
     try {
-        const tableRef = doc(db, 'artifacts', appId, 'public', 'data', 'tables', currentTableId);
+        const tableRef = doc(db, 'artifacts', appId, 'public', 'data', 'tables', tableId);
         
         await updateDoc(tableRef, {
             requestedOrders: arrayUnion(newOrderRequest),
@@ -878,6 +855,7 @@ export const fetchQuickObservations = async () => {
             return quickObsCache;
         }
         
+        // Esta linha agora funciona por causa da importação corrigida
         const q = query(getQuickObsCollectionRef(), orderBy('text', 'asc'));
         const querySnapshot = await getDocs(q);
         quickObsCache = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -923,7 +901,8 @@ function signInWithGoogle() {
  * Salva os dados de registro (WhatsApp e Data de Nasc.) no Firestore.
  */
 async function handleCustomerRegistration() {
-    if (!currentClientUser) {
+    const user = localCurrentClientUser;
+    if (!user) {
         showToast("Erro: Usuário não autenticado.", true);
         return;
     }
@@ -947,18 +926,19 @@ async function handleCustomerRegistration() {
     confirmRegisterBtn.textContent = "Salvando...";
 
     try {
-        const customerId = currentClientUser.uid;
+        const customerId = user.uid;
         const customerRef = doc(db, 'artifacts', appId, 'public', 'data', 'customers', customerId);
         
         const customerData = {
-            uid: currentClientUser.uid,
-            name: currentClientUser.name, 
-            email: currentClientUser.email || null, 
+            uid: user.uid,
+            name: user.displayName || `Cliente ${user.uid.substring(0, 5)}`, 
+            email: user.email || null, 
             phone: null, 
             whatsapp: whatsapp,
             dob: dob,
             doc: customerId, 
-            createdAt: serverTimestamp()
+            createdAt: serverTimestamp(),
+            points: 0 // Inicia com 0 pontos
         };
 
         await setDoc(customerRef, customerData, { merge: true });
@@ -994,7 +974,8 @@ async function checkAndRegisterCustomer(user) {
             // ----- CLIENTE JÁ CADASTRADO -----
             console.log("Cliente já cadastrado:", customerId);
             
-            currentClientUser.phone = docSnap.data().whatsapp; 
+            // Atualiza o 'phone' do usuário local para o WhatsApp
+            localCurrentClientUser.phone = docSnap.data().whatsapp; 
 
             if(registrationStep) registrationStep.style.display = 'none';
             if(tableDataStep) tableDataStep.style.display = 'block';
@@ -1006,13 +987,13 @@ async function checkAndRegisterCustomer(user) {
             if(tableDataStep) tableDataStep.style.display = 'none';
             if(registrationStep) registrationStep.style.display = 'block';
             
-            // Se o documento não existir, cria um básico
             if (!docSnap.exists()) {
                  await setDoc(customerRef, {
                     uid: user.uid,
                     name: user.displayName || `Cliente ${user.uid.substring(0, 5)}`,
                     email: user.email || null, 
-                    createdAt: serverTimestamp()
+                    createdAt: serverTimestamp(),
+                    points: 0 // Inicia com 0 pontos
                  }, { merge: true });
             }
         }
