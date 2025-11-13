@@ -1,6 +1,7 @@
-// --- CONTROLLERS/ORDERCONTROLLER.JS (ATUALIZADO com Obs Dinâmicas) ---
+// --- CONTROLLERS/ORDERCONTROLLER.JS (ATUALIZADO com Obs Dinâmicas e Telefone Mascarado) ---
 import { getProducts, getCategories } from "/services/wooCommerceService.js";
-import { formatCurrency } from "/utils.js";
+// ===== ATUALIZAÇÃO 1: Importa a nova função 'maskPhoneNumber' =====
+import { formatCurrency, formatElapsedTime, maskPhoneNumber } from "/utils.js";
 import { saveSelectedItemsToFirebase } from "/services/firebaseService.js";
 import { currentTableId, selectedItems, userRole, currentOrderSnapshot, screens } from "/app.js"; 
 // ==== NOVO: Importa getDocs e query ====
@@ -26,7 +27,7 @@ let orderInitialized = false;
 // --- FUNÇÕES DE AÇÃO GERAL ---
 
 export const increaseLocalItemQuantity = (itemId, noteKey) => {
-    // ... (sem alteração)
+    // ... (seu código original sem alteração)
     const itemToCopy = selectedItems.findLast(item =>
         item.id == itemId && (item.note || '') === noteKey
     );
@@ -50,7 +51,7 @@ window.increaseLocalItemQuantity = increaseLocalItemQuantity;
 
 
 export const decreaseLocalItemQuantity = (itemId, noteKey) => {
-    // ... (sem alteração)
+    // ... (seu código original sem alteração)
     let indexToRemove = -1;
     for (let i = selectedItems.length - 1; i >= 0; i--) {
         if (selectedItems[i].id == itemId && (selectedItems[i].note || '') === noteKey) {
@@ -71,7 +72,7 @@ window.decreaseLocalItemQuantity = decreaseLocalItemQuantity;
 // --- FUNÇÕES DE EXIBIÇÃO DE TELA E MODAL ---
 
 export const renderMenu = () => {
-    // ... (sem alteração)
+    // ... (seu código original sem alteração)
     if (!menuItemsGrid || !categoryFiltersContainer) {
         return;
     }
@@ -123,7 +124,7 @@ export const renderMenu = () => {
 };
 
 const _renderSelectedItemsList = () => {
-    // ... (sem alteração)
+    // ... (seu código original sem alteração)
     if (!openOrderList || !openItemsCount || !sendSelectedItemsBtn) return;
 
     const openItemsCountValue = selectedItems.length;
@@ -164,7 +165,7 @@ const _renderSelectedItemsList = () => {
 };
 
 const _renderPendingClientOrders = (requestedOrders = []) => {
-    // ... (sem alteração)
+    // ... (seu código original sem alteração)
     if (!clientPendingOrdersContainer) return;
 
     if (!requestedOrders || requestedOrders.length === 0) {
@@ -175,15 +176,21 @@ const _renderPendingClientOrders = (requestedOrders = []) => {
 
     clientPendingOrdersContainer.classList.remove('hidden'); 
 
+    // ===== ATUALIZAÇÃO 2: Pega o telefone e mascara =====
     clientPendingOrdersContainer.innerHTML = `
         <h3 class="text-lg font-semibold text-yellow-400 mb-2 flex items-center">
             <i class="fas fa-bell mr-2 animate-pulse"></i> Pedidos Pendentes do Cliente
         </h3>
         <div class="space-y-3">
-            ${requestedOrders.map((order, index) => `
+            ${requestedOrders.map((order, index) => {
+                // Pega o telefone e mascara aqui
+                const phone = order.clientInfo?.phone || null;
+                const maskedPhone = maskPhoneNumber(phone) || 'N/A'; // Usa a função
+                
+                return `
                 <div class="bg-indigo-900 border border-indigo-700 p-3 rounded-lg shadow-md">
                     <div class="flex justify-between items-center mb-2">
-                        <span class="text-sm text-indigo-300">Cliente: ${order.clientInfo?.name || 'Cliente'} (${order.clientInfo?.phone || 'N/A'})</span>
+                        <span class="text-sm text-indigo-300">Cliente: ${order.clientInfo?.name || 'Cliente'} (${maskedPhone})</span>
                         <span class="text-xs text-gray-400">${new Date(order.requestedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
                     <ul class="list-disc list-inside space-y-1 pl-2 mb-3">
@@ -202,7 +209,7 @@ const _renderPendingClientOrders = (requestedOrders = []) => {
                         </button>
                     </div>
                 </div>
-            `).join('')}
+            `}).join('')}
         </div>
     `;
 
@@ -210,14 +217,14 @@ const _renderPendingClientOrders = (requestedOrders = []) => {
 };
 
 export const renderOrderScreen = (orderSnapshot) => {
-    // ... (sem alteração)
+    // ... (seu código original sem alteração)
     _renderSelectedItemsList(); 
     _renderPendingClientOrders(orderSnapshot?.requestedOrders); 
     renderMenu(); 
 };
 
 export const handleApproveClientOrder = async (orderId) => {
-    // ... (sem alteração)
+    // ... (seu código original sem alteração)
     if (!currentTableId || !currentOrderSnapshot || !orderId) return;
 
     const requestedOrders = currentOrderSnapshot.requestedOrders || [];
@@ -255,7 +262,7 @@ window.handleApproveClientOrder = handleApproveClientOrder;
 
 
 export const handleRejectClientOrder = async (orderId) => {
-    // ... (sem alteração)
+    // ... (seu código original sem alteração)
     if (!currentTableId || !currentOrderSnapshot || !orderId) return;
 
     const requestedOrders = currentOrderSnapshot.requestedOrders || [];
@@ -290,7 +297,7 @@ window.handleRejectClientOrder = handleRejectClientOrder;
 
 
 const _attachPendingOrderListeners = () => {
-    // ... (sem alteração)
+    // ... (seu código original sem alteração)
      clientPendingOrdersContainer?.querySelectorAll('.approve-client-order-btn').forEach(btn => {
          const orderId = btn.dataset.orderId;
          const newBtn = btn.cloneNode(true);
@@ -316,6 +323,7 @@ const _attachPendingOrderListeners = () => {
  * @param {Array} observations - Array de documentos { text: 'String' } do Firebase.
  */
 const renderQuickObsButtons = (buttonsContainer, observations) => {
+    // ... (seu código original sem alteração)
     if (!buttonsContainer) return;
 
     if (observations.length === 0) {
@@ -339,6 +347,7 @@ const renderQuickObsButtons = (buttonsContainer, observations) => {
  * @param {HTMLElement} buttonsContainer - O div#quickObsButtons.
  */
 const fetchQuickObservations = async (buttonsContainer) => {
+    // ... (seu código original sem alteração)
     if (!buttonsContainer) return;
     try {
         const obsCollectionRef = getQuickObsCollectionRef();
@@ -364,7 +373,7 @@ const fetchQuickObservations = async (buttonsContainer) => {
 // ==================================================================
 
 export const openObsModalForGroup = (itemId, noteKey) => {
-    // ... (sem alteração)
+    // ... (seu código original sem alteração)
     const products = getProducts();
     const product = products.find(p => p.id == itemId);
 
@@ -392,7 +401,7 @@ window.openObsModalForGroup = openObsModalForGroup;
 
 
 export const addItemToSelection = (product) => {
-    // ... (sem alteração)
+    // ... (seu código original sem alteração)
     if (!currentTableId) {
         alert("Selecione ou abra uma mesa primeiro.");
         return;
@@ -421,7 +430,7 @@ export const addItemToSelection = (product) => {
 
 
 export const handleSendSelectedItems = async () => {
-    // ... (sem alteração)
+    // ... (seu código original sem alteração)
     if (!currentTableId || selectedItems.length === 0) return;
 
     if (!confirm(`Confirmar o envio de ${selectedItems.length} item(s) para a produção?`)) return;
@@ -434,7 +443,7 @@ export const handleSendSelectedItems = async () => {
              alert("Nenhum item pronto para envio (todos estão marcados como 'Em Espera'). Os itens foram salvos na mesa.");
              saveSelectedItemsToFirebase(currentTableId, itemsToHold);
         } else {
-            alert("Nenhum item para enviar.");
+             alert("Nenhum item para enviar.");
         }
         return;
     }
@@ -479,9 +488,9 @@ export const handleSendSelectedItems = async () => {
 
         await updateDoc(tableRef, {
             sentItems: arrayUnion(...itemsForFirebase), 
-            selectedItems: itemsToHold,                
-            total: newTotal,                           
-            lastKdsSentAt: serverTimestamp()           
+            selectedItems: itemsToHold,            
+            total: newTotal,                      
+            lastKdsSentAt: serverTimestamp()          
         });
         console.log("[Order] Mesa atualizada com sucesso.");
 
@@ -572,16 +581,16 @@ export const initOrderController = () => {
 
      // Listener para adicionar item (delegação no menuItemsGrid)
      menuItemsGrid.addEventListener('click', (e) => {
-        const addBtn = e.target.closest('.add-item-btn');
-        if (addBtn && addBtn.dataset.product) {
-            try {
-                const productData = JSON.parse(addBtn.dataset.product.replace(/&#39;/g, "'"));
-                addItemToSelection(productData);
-            } catch (err) {
-                console.error("Erro ao parsear dados do produto:", err);
-            }
-        }
-    });
+         const addBtn = e.target.closest('.add-item-btn');
+         if (addBtn && addBtn.dataset.product) {
+             try {
+                 const productData = JSON.parse(addBtn.dataset.product.replace(/&#39;/g, "'"));
+                 addItemToSelection(productData);
+             } catch (err) {
+                 console.error("Erro ao parsear dados do produto:", err);
+             }
+         }
+     });
 
     // Listener para botão de enviar pedido
     sendSelectedItemsBtn.addEventListener('click', handleSendSelectedItems);
@@ -667,7 +676,7 @@ export const initOrderController = () => {
                  }
                  obsInput.value = (currentValue + obsText).trim();
              }
-        });
+         });
     }
 
     orderInitialized = true;

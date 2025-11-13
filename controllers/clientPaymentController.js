@@ -1,11 +1,12 @@
-// --- CONTROLLERS/CLIENTPAYMENTCONTROLLER.JS (CORRIGIDO) ---
+// --- CONTROLLERS/CLIENTPAYMENTCONTROLLER.JS (COMPLETO E CORRIGIDO) ---
 
-// ===== ATENÇÃO: Importa de 'firebaseService.js' e o 'app.js' global =====
+// Importa do 'firebaseService.js' e o 'app.js' global
 import { db, auth, getTableDocRef, appId } from "/services/firebaseService.js";
 import { formatCurrency } from "/utils.js";
-// O 'currentTableId' global é exportado pelo app.js
-import { currentTableId } from "/app.js"; 
-import { onSnapshot, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+// O 'currentTableId' e 'showToast' globais são exportados pelo app.js (corrigido)
+import { currentTableId, showToast } from "/app.js"; 
+// ===== ATUALIZAÇÃO: Importa 'updateDoc' para o botão de fechar conta =====
+import { onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
 // --- Variáveis de Estado ---
@@ -35,6 +36,13 @@ export const initClientPaymentController = () => {
     orderSubtotalDisplay = document.getElementById('orderSubtotalDisplayPayment');
     orderServiceTaxDisplay = document.getElementById('orderServiceTaxDisplayPayment');
     orderTotalDisplayPayment = document.getElementById('orderTotalDisplayPayment');
+
+    // ===== NOVO: Mapeia o botão de solicitar conta =====
+    const requestBillBtn = document.getElementById('requestBillBtn');
+    if (requestBillBtn) {
+        requestBillBtn.onclick = handleRequestBill;
+    }
+    // ===== FIM DA NOVIDADE =====
 
 
     // ---- Lógica das Abas do CRM ----
@@ -104,9 +112,9 @@ function startListeners() {
     stopListeners();
 
     // 1. Listener do Cliente (para o CRM)
+    // As regras do 'firestore.rules' agora permitem esta leitura
     if (currentClientUser && !unsubscribeCustomer) {
         console.log("[ClientPayment] Iniciando listener para Cliente:", currentClientUser.uid);
-        // Usa o 'appId' global importado do firebaseService
         const customerRef = doc(db, 'artifacts', appId, 'public', 'data', 'customers', currentClientUser.uid);
         
         unsubscribeCustomer = onSnapshot(customerRef, (doc) => {
@@ -122,6 +130,7 @@ function startListeners() {
     }
 
     // 2. Listener da Mesa (para Itens e Totais)
+    // As regras do 'firestore.rules' agora permitem esta leitura
     // Usa o 'currentTableId' global importado do app.js
     if (currentTableId && !unsubscribeTable) { 
         console.log("[ClientPayment] Iniciando listener para Mesa:", currentTableId);
@@ -144,7 +153,6 @@ function startListeners() {
         });
     } else {
         console.warn("[ClientPayment] Não foi possível iniciar listener: tableId ou user não definidos.", "TableID:", currentTableId, "User:", currentClientUser);
-        // Limpa a tela se não houver mesa
         renderSentItems([]);
         renderTotals({});
     }
@@ -173,15 +181,19 @@ function renderSentItems(sentItems) {
         return acc;
     }, {});
 
+    // ===== REFINAMENTO DE RESPONSIVIDADE (Mobile-first) =====
+    // Em telas pequenas (mobile), o preço fica abaixo do nome (flex-col).
+    // Em telas médias (md), o preço fica ao lado (flex-row).
     reviewItemsList.innerHTML = Object.values(groupedItems).map(item => `
-        <div class="flex justify-between items-center bg-dark-input p-3 rounded-lg">
-            <div class="flex-grow min-w-0 mr-2">
-                <span class="font-semibold text-white truncate">${item.name} (${item.count}x)</span>
+        <div class="flex flex-col md:flex-row md:justify-between md:items-center bg-dark-input p-3 rounded-lg">
+            <div class="flex-grow min-w-0 mr-2 w-full">
+                <span class="font-semibold text-white">${item.name} (${item.count}x)</span>
                 ${item.note ? `<p class="text-xs text-yellow-400 truncate">(${item.note})</p>` : ''}
             </div>
-            <span class="text-base font-semibold text-dark-text ml-2 flex-shrink-0">${formatCurrency(item.totalPrice)}</span>
+            <span class="text-base font-semibold text-dark-text mt-1 md:mt-0 md:ml-2 flex-shrink-0">${formatCurrency(item.totalPrice)}</span>
         </div>
     `).join('');
+    // ===== FIM DO REFINAMENTO =====
 }
 
 /**
@@ -217,8 +229,6 @@ function renderCrmData(customerData) {
     if (pointsBalanceEl) {
         pointsBalanceEl.textContent = customerData.points || 0; // Mostra 0 se for undefined
     }
-
-    // TODO: Renderizar as outras abas (Vouchers Disponíveis, Ativos, Histórico)
     
     const vouchersDisponiveisEl = document.getElementById('crm-vouchers-disponiveis');
     if (vouchersDisponiveisEl) {
@@ -234,4 +244,41 @@ function renderCrmData(customerData) {
      if (orderHistoryEl) {
          orderHistoryEl.innerHTML = `<p class="text-sm text-dark-placeholder italic">Lógica de histórico em construção.</p>`;
      }
+}
+
+// ==================================================================
+//               NOVA FEATURE: Solicitar Fechamento de Conta
+// ==================================================================
+async function handleRequestBill() {
+    const btn = document.getElementById('requestBillBtn');
+    
+    if (!currentTableId || !currentClientUser) {
+        showToast("Erro: Mesa ou cliente não identificados.", true);
+        return;
+    }
+
+    if (!confirm("Deseja realmente solicitar o fechamento da conta? Um garçom será notificado.")) {
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Solicitando...';
+
+    try {
+        const tableRef = getTableDocRef(currentTableId);
+        // Notifica o garçom e ativa o "sino" de alerta no painel de staff
+        await updateDoc(tableRef, {
+            waiterNotification: "Cliente solicitou fechamento de conta",
+            clientOrderPending: true // Usa o mesmo campo dos pedidos para o alerta visual
+        });
+        
+        showToast("Solicitação enviada! Um garçom virá até sua mesa.");
+        btn.innerHTML = '<i class="fas fa-check"></i> Solicitação Enviada';
+
+    } catch (e) {
+        console.error("Erro ao solicitar fechamento:", e);
+        showToast("Erro ao enviar solicitação. Tente novamente.", true);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-cash-register"></i> SOLICITAR FECHAMENTO DE CONTA';
+    }
 }

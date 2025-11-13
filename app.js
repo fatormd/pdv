@@ -60,7 +60,7 @@ export const hideStatus = () => {
 };
 
 // =======================================================
-// Função showToast (Corrigida)
+// ===== CORREÇÃO 1: Função showToast (Estava faltando) =====
 // =======================================================
 export const showToast = (message, isError = false) => {
     try {
@@ -99,6 +99,9 @@ export const showToast = (message, isError = false) => {
         alert(message);
     }
 };
+// =======================================================
+// ================ FIM DA CORREÇÃO 1 ====================
+// =======================================================
 
 
 const showLoginScreen = () => {
@@ -137,6 +140,10 @@ const hideLoginScreen = () => {
         managerBtn.classList.toggle('hidden', userRole !== 'gerente');
     }
 };
+
+// --- FUNÇÃO DE AUTENTICAÇÃO (REMOVIDA) ---
+// const authenticateUserFromFirestore = ... (REMOVIDA - Não é mais necessária)
+
 
 /**
  * Navega entre as telas do SPA.
@@ -556,10 +563,7 @@ const initClientApp = async () => {
 
         // PASSO 2: AGORA inicializar os controllers
         initClientOrderController();
-        
-        // ===== ADIÇÃO 3: Inicializa o novo controlador =====
         initClientPaymentController();
-        // ===== FIM DA ADIÇÃO 3 =====
 
         clientLoginModal = document.getElementById('associationModal');
         if (clientLoginModal) clientLoginModal.style.display = 'none';

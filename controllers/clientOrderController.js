@@ -1,9 +1,9 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (COM CORREÇÃO DE REFERENCEERROR) ---
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (COM CORREÇÃO DE IMPORT E REFERENCEERROR) ---
 
 import { db, auth, getQuickObsCollectionRef, appId, getTablesCollectionRef } from "/services/firebaseService.js";
 import { formatCurrency } from "/utils.js";
 import { getProducts, getCategories, fetchWooCommerceProducts, fetchWooCommerceCategories } from "/services/wooCommerceService.js";
-// Importação corrigida (com 'orderBy')
+// ===== CORREÇÃO: Adicionado 'orderBy' à importação =====
 import { onSnapshot, doc, updateDoc, arrayUnion, arrayRemove, setDoc, getDoc, getDocs, query, where, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { GoogleAuthProvider, signInWithPopup, signInAnonymously, RecaptchaVerifier, signInWithPhoneNumber, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
