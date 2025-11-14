@@ -3,10 +3,10 @@ import { functions, auth } from "/services/firebaseService.js";
 import { httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
 import { openUserManagementModal } from "/controllers/userManagementController.js";
 
-// ==== CORREÇÃO/ATUALIZAÇÃO DE IMPORTS: Adiciona 'db' (instância do Firestore) e 'appId' ====
-import { getQuickObsCollectionRef, db, appId } from "/services/firebaseService.js"; 
+// ==== IMPORT CORRIGIDO: Importa getVouchersCollectionRef do service ====
+import { getQuickObsCollectionRef, getVouchersCollectionRef } from "/services/firebaseService.js"; 
 import { 
-    getFirestore, collection, getDocs, query, orderBy, doc, setDoc, deleteDoc, updateDoc, FieldValue, serverTimestamp
+    getDocs, query, orderBy, doc, setDoc, deleteDoc, updateDoc, FieldValue, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { formatCurrency } from "/utils.js";
 
@@ -18,13 +18,9 @@ let managerModal; // Container do modal
 let managerAuthCallback; // Guarda a ação que precisa de autenticação
 
 
-// --- REFERÊNCIAS DO FIREBASE (CORREÇÃO DE INICIALIZAÇÃO) ---
-const firestore = db; // Usa a instância 'db' já inicializada em firebaseService.js
-const getVouchersCollectionRef = () => {
-    // CORREÇÃO FINAL: Define o caminho completo com todos os segmentos de coleção/documento
-    // Isso garante que a sintaxe v9 seja estritamente seguida: collection(db, 'col1', 'doc1', 'col2', ...)
-    return collection(firestore, 'artifacts', appId, 'public', 'data', 'vouchers'); 
-};
+// --- REFERÊNCIAS DO FIREBASE ---
+// NÃO DEFINIMOS NADA AQUI PARA EVITAR O ERRO DE INICIALIZAÇÃO
+// As funções getVouchersCollectionRef e getQuickObsCollectionRef são importadas do services/firebaseService.js
 // --- FIM REFERÊNCIAS DO FIREBASE ---
 
 
@@ -148,6 +144,7 @@ const fetchVouchers = async () => {
     if (!voucherListContainer) return;
     voucherListContainer.innerHTML = '<p class="text-sm text-yellow-400 italic">Buscando vouchers...</p>';
     try {
+        // CORRIGIDO: Usa a função importada
         const q = query(getVouchersCollectionRef(), orderBy('points', 'asc'));
         const querySnapshot = await getDocs(q);
         
@@ -181,7 +178,7 @@ window.openVoucherManagementModal = openVoucherManagementModal;
  */
 const handleSaveVoucher = async (e) => {
     e.preventDefault();
-    // Usa um ID de documento aleatório se não estiver em modo de edição
+    // CORRIGIDO: Usa a função importada
     const id = document.getElementById('voucherIdInput').value || doc(getVouchersCollectionRef()).id; 
     const name = document.getElementById('voucherNameInput').value;
     const points = parseInt(document.getElementById('voucherPointsInput').value);

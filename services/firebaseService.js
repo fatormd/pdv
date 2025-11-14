@@ -26,6 +26,8 @@ export const getKdsCollectionRef = () => collection(db, 'artifacts', appId, 'pub
 export const getCustomersCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'customers');
 // ==== NOVO ====
 export const getQuickObsCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'quick_obs');
+// ==== ADICIONADO: Coleção de Regras de Vouchers ====
+export const getVouchersCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'vouchers');
 
 
 // Funções básicas de persistência (serão usadas pelos Controllers)
