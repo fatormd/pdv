@@ -1,6 +1,5 @@
-// --- CONTROLLERS/PANELCONTROLLER.JS (Atualizado com Alerta de Conta) ---
+// --- CONTROLLERS/PANELCONTROLLER.JS (Atualizado: Ícone de Impressão como Ação Direta) ---
 import { getTablesCollectionRef, getTableDocRef, db } from "/services/firebaseService.js";
-// ===== ATUALIZAÇÃO: Importa 'updateDoc' =====
 import { query, where, orderBy, onSnapshot, getDoc, setDoc, updateDoc, serverTimestamp, writeBatch, arrayUnion, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { formatCurrency, formatElapsedTime } from "/utils.js";
 import { goToScreen, currentTableId, selectedItems, unsubscribeTable, currentOrderSnapshot, setCurrentTable, userRole, selectTableAndStartListener } from "/app.js";
@@ -31,7 +30,6 @@ export const renderTableFilters = () => {
         `;
     }).join('');
 
-    // Reanexa os estilos ativos após a renderização
      sectorFiltersContainer.querySelectorAll('.sector-btn').forEach(btn => {
         const isActive = btn.dataset.sector === currentSectorFilter;
         btn.classList.toggle('bg-pumpkin', isActive);
@@ -52,28 +50,23 @@ const renderTables = (docs) => {
 
     openTablesList.innerHTML = '';
     let count = 0;
-    currentTablesSnapshot = docs; // Atualiza o estado global das mesas
+    currentTablesSnapshot = docs; 
 
     docs.forEach(doc => {
         const table = doc.data();
         const tableId = doc.id;
 
-        // Filtra status OPEN ou MERGED
         if (table.status?.toLowerCase() === 'open' || table.status?.toLowerCase() === 'merged') {
             count++;
             const total = table.total || 0;
             
-            // ===== NOVAS VARIÁVEIS DE ALERTA =====
             const isBillRequested = table.billRequested === true;
             const isClientPending = table.clientOrderPending === true;
-            // ======================================
-
             const isMerged = table.status?.toLowerCase() === 'merged';
 
             let cardColorClasses = 'bg-dark-card border-gray-700 text-dark-text hover:bg-gray-700';
             let attentionIconHtml = '';
 
-            // ====== LÓGICA DE COR ATUALIZADA (com prioridade) ======
             if (isMerged) {
                  cardColorClasses = 'bg-yellow-900 border-yellow-700 text-yellow-200 hover:bg-yellow-800';
                  attentionIconHtml = `<i class="fas fa-link attention-icon text-yellow-300" title="Agrupada: Mestra ${table.masterTable}"></i>`;
@@ -81,23 +74,24 @@ const renderTables = (docs) => {
             // 1. Prioridade Máxima: Solicitação de Conta (Verde)
             else if (isBillRequested) {
                  cardColorClasses = 'bg-green-900 border-green-700 text-white hover:bg-green-800 ring-2 ring-green-400 animate-pulse';
-                 attentionIconHtml = `<i class="fas fa-cash-register attention-icon text-green-400 animate-pulse" title="Cliente solicitou a conta!"></i>`;
+                 // O ícone agora é um botão que chama a lógica de confirmação e leva para a tela de pagamento.
+                 // Adicionamos a classe 'bill-request-icon' para a exclusão do listener principal.
+                 attentionIconHtml = `<button class="attention-icon-btn bill-request-icon" data-table-id="${tableId}" onclick="window.handleBillRequestConfirmation('${tableId}')" title="Cliente solicitou a conta! Clique para imprimir.">
+                                        <i class="fas fa-print text-xl text-green-400 animate-pulse"></i>
+                                     </button>`;
             }
             // 2. Prioridade Média: Solicitação de Pedido (Azul/Amarelo)
             else if (isClientPending) {
                  cardColorClasses = 'bg-indigo-900 border-yellow-400 text-white hover:bg-indigo-800 ring-2 ring-yellow-400 animate-pulse';
                  attentionIconHtml = `<i class="fas fa-bell attention-icon text-yellow-400 animate-pulse" title="Pedido Cliente Pendente"></i>`;
             }
-            // 3. Status normal (Vermelho = ocupada, Verde = livre)
             else if (total > 0) {
                  cardColorClasses = 'bg-red-900 border-red-700 text-red-200 hover:bg-red-800';
             } else {
                  cardColorClasses = 'bg-green-900 border-green-700 text-green-200 hover:bg-green-800';
             }
-            // =========================================================
 
             const hasAguardandoItem = (table.selectedItems || []).some(item => item.note?.toLowerCase().includes('espera'));
-            // Só mostra 'em espera' se não houver um alerta mais importante
             if (!isBillRequested && !isClientPending && hasAguardandoItem) {
                  attentionIconHtml = `<i class="fas fa-exclamation-triangle attention-icon" title="Itens em Espera"></i>`;
             }
@@ -139,40 +133,27 @@ const renderTables = (docs) => {
     openTablesCount.textContent = count;
     if (count === 0) openTablesList.innerHTML = `<div class="col-span-full text-sm text-dark-placeholder italic p-4 content-card bg-dark-card border border-gray-700">Nenhuma mesa aberta/agrupada no setor "${currentSectorFilter}".</div>`;
 
-    // ===== ATUALIZAÇÃO NO LISTENER DE CLIQUE =====
     document.querySelectorAll('.table-card-panel').forEach(card => {
         const newCard = card.cloneNode(true);
         card.parentNode.replaceChild(newCard, card);
         
         newCard.addEventListener('click', (e) => {
-            // Ignora o clique se for nos ícones
-            if (e.target.closest('.kds-status-icon-btn') || e.target.closest('.attention-icon') || e.target.closest('.merge-icon-btn')) return;
-            
+            // Exclui cliques em qualquer ícone/botão (incluindo o novo ícone de impressão)
+            if (e.target.closest('.kds-status-icon-btn') || e.target.closest('.attention-icon') || e.target.closest('.merge-icon-btn') || e.target.closest('.bill-request-icon')) return; 
+
             const tableId = newCard.dataset.tableId;
-            if (!tableId) return;
-
-            // Encontra os dados completos da mesa a partir do snapshot
-            const tableDoc = currentTablesSnapshot.find(doc => doc.id === tableId);
-            const tableData = tableDoc ? tableDoc.data() : null;
-
-            // Se a conta foi solicitada, chama a nova função de confirmação
-            if (tableData && tableData.billRequested === true) {
-                handleBillRequestConfirmation(tableId);
-            } 
-            // Se for um pedido pendente, vai para a tela de pedido (comportamento padrão)
-            else {
+            if (tableId) {
+                // Comportamento Padrão: Sempre vai para a tela de Pedido (OrderScreen) se não clicou no ícone
                 selectTableAndStartListener(tableId);
             }
         });
     });
-    // =============================================
 };
 
 export const loadOpenTables = () => {
     if (unsubscribeTables) { unsubscribeTables(); unsubscribeTables = null; }
     const tablesCollection = getTablesCollectionRef();
     let q;
-    // Query para pegar mesas 'open' OU 'merged'
     if (currentSectorFilter === 'Todos') q = query(tablesCollection, where('status', 'in', ['open', 'merged']), orderBy('tableNumber', 'asc'));
     else q = query(tablesCollection, where('status', 'in', ['open', 'merged']), where('sector', '==', currentSectorFilter), orderBy('tableNumber', 'asc'));
 
@@ -247,53 +228,43 @@ export const handleSearchTable = async () => {
 };
 
 // ==================================================================
-//               NOVA FUNÇÃO: Confirmação de Fechamento de Conta
+//               FUNÇÃO DO CLIQUE NO ÍCONE (Ação Direta)
 // ==================================================================
 /**
- * Lida com o clique em um card de mesa que solicitou a conta.
- * Pergunta ao garçom se deseja imprimir/ver a conta.
+ * Lida com o clique no ícone de impressão (Solicitação de Conta).
+ * Executa ação imediata: limpa alerta, seleciona mesa e vai para tela de pagamento.
+ * Expõe a função para ser chamada via 'onclick' do HTML.
  */
 async function handleBillRequestConfirmation(tableId) {
     if (!tableId) return;
 
     const tableRef = getTableDocRef(tableId);
     
-    // Pergunta ao garçom
-    if (confirm(`Cliente da Mesa ${tableId} solicitou o fechamento da conta.\n\nDeseja abrir o resumo para impressão?`)) {
-        
-        try {
-            // 1. Confirma o recebimento (limpa a flag)
-            await updateDoc(tableRef, {
-                billRequested: false, // Limpa a flag
-                waiterNotification: null // Limpa a notificação
-            });
+    try {
+        // 1. Confirma o recebimento (limpa a flag)
+        await updateDoc(tableRef, {
+            billRequested: false, // Limpa a flag
+            waiterNotification: null // Limpa a notificação
+        });
 
-            // 2. Carrega a mesa (globalmente no app.js)
-            selectTableAndStartListener(tableId);
-            
-            // 3. Leva o garçom direto para a tela de pagamento
-            goToScreen('paymentScreen');
-            
-            // Nota: A impressão pode ser acionada manualmente pelo garçom
-            // na tela de pagamento, que agora está visível.
-
-        } catch (e) {
-            console.error("Erro ao confirmar recebimento da conta:", e);
-            alert("Erro ao processar a solicitação. Tente novamente.");
-        }
+        // 2. Carrega a mesa (globalmente no app.js)
+        selectTableAndStartListener(tableId);
         
-    } else {
-        // Usuário cancelou. Não faz nada, a notificação permanece ativa.
+        // 3. Leva o garçom direto para a tela de pagamento
+        goToScreen('paymentScreen');
+        
+    } catch (e) {
+        console.error("Erro ao confirmar recebimento da conta:", e);
+        alert("Erro ao processar a solicitação. Tente novamente.");
     }
 }
-
+window.handleBillRequestConfirmation = handleBillRequestConfirmation; // Torna a função acessível pelo HTML
 
 // ==================================================================
 //               LÓGICA DE AGRUPAMENTO DE MESAS
 // ==================================================================
 
 export const openTableMergeModal = () => {
-    // ... (código original sem alteração)
     const managerModal = document.getElementById('managerModal');
     if (!managerModal) return;
 
@@ -351,7 +322,6 @@ export const openTableMergeModal = () => {
 window.openTableMergeModal = openTableMergeModal; 
 
 export const handleConfirmTableMerge = async () => {
-    // ... (código original sem alteração)
     const masterTableId = document.getElementById('masterTableSelect').value;
     const sourceTableCheckboxes = document.querySelectorAll('#sourceTablesCheckboxes input[type="checkbox"]:checked');
     const errorMsgEl = document.getElementById('mergeErrorMsg');
@@ -453,9 +423,7 @@ export const handleConfirmTableMerge = async () => {
     }
 };
 
-// Função de inicialização do Controller
 export const initPanelController = () => {
-    // ... (código original sem alteração)
     if (panelInitialized) return;
     console.log("[PanelController] Inicializando...");
 
@@ -465,7 +433,7 @@ export const initPanelController = () => {
     const mesaInput = document.getElementById('mesaInput');
     const pessoasInput = document.getElementById('pessoasInput');
     const sectorInput = document.getElementById('sectorInput');
-    const abrirMesaRealBtn = document.getElementById('abrirMesaBtn'); // Para checkInputs
+    const abrirMesaRealBtn = document.getElementById('abrirMesaBtn'); 
 
     if (abrirMesaBtn) abrirMesaBtn.addEventListener('click', handleAbrirMesa);
     else console.error("[PanelController] Botão 'abrirMesaBtn' não encontrado.");

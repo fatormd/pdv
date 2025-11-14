@@ -1,17 +1,32 @@
-// --- CONTROLLERS/MANAGERCONTROLLER.JS (ATUALIZADO) ---
+// --- CONTROLLERS/MANAGERCONTROLLER.JS (COMPLETO COM VOUCHER MANAGEMENT E CORREÇÃO FINAL DE INICIALIZAÇÃO) ---
 import { functions, auth } from "/services/firebaseService.js";
 import { httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
 import { openUserManagementModal } from "/controllers/userManagementController.js";
 
-// ==== INÍCIO DA ADIÇÃO ====
-// Importa as funções do Firestore e a referência da coleção que criamos
-import { getQuickObsCollectionRef } from "/services/firebaseService.js";
-import { getDocs, query, orderBy, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-// ==== FIM DA ADIÇÃO ====
+// ==== CORREÇÃO/ATUALIZAÇÃO DE IMPORTS: Adiciona 'db' (instância do Firestore) e 'appId' ====
+import { getQuickObsCollectionRef, db, appId } from "/services/firebaseService.js"; 
+import { 
+    getFirestore, collection, getDocs, query, orderBy, doc, setDoc, deleteDoc, updateDoc, FieldValue, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { formatCurrency } from "/utils.js";
 
+// ==== VARIÁVEIS ADICIONADAS PARA VOUCHERS ====
+let voucherManagementModal, voucherListContainer, voucherForm;
+// ==== FIM VARIÁVEIS ADICIONADAS ====
 
 let managerModal; // Container do modal
 let managerAuthCallback; // Guarda a ação que precisa de autenticação
+
+
+// --- REFERÊNCIAS DO FIREBASE (CORREÇÃO DE INICIALIZAÇÃO) ---
+const firestore = db; // Usa a instância 'db' já inicializada em firebaseService.js
+const getVouchersCollectionRef = () => {
+    // CORREÇÃO FINAL: Define o caminho completo com todos os segmentos de coleção/documento
+    // Isso garante que a sintaxe v9 seja estritamente seguida: collection(db, 'col1', 'doc1', 'col2', ...)
+    return collection(firestore, 'artifacts', appId, 'public', 'data', 'vouchers'); 
+};
+// --- FIM REFERÊNCIAS DO FIREBASE ---
+
 
 /**
  * Abre o modal de autenticação de gerente.
@@ -23,7 +38,7 @@ export const openManagerAuthModal = (actionCallback) => {
          return;
     }
     
-    managerAuthCallback = actionCallback; // Salva a ação (ex: 'openQuickObsManagement')
+    managerAuthCallback = actionCallback; // Salva a ação (ex: 'openQuickObsManagement' ou 'openVoucherManagement')
 
     const authModalHTML = `
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm text-center">
@@ -48,7 +63,6 @@ export const openManagerAuthModal = (actionCallback) => {
     document.getElementById('cancelManagerAuthBtn').onclick = () => managerModal.style.display = 'none';
     document.getElementById('managerAuthForm').onsubmit = handleManagerAuthSubmit;
 };
-// Torna a função acessível globalmente (para os botões onclick)
 window.openManagerAuthModal = openManagerAuthModal;
 
 
@@ -75,13 +89,6 @@ const handleManagerAuthSubmit = async (e) => {
     errorMsg.style.display = 'none';
 
     try {
-        // Tenta reautenticar (valida a senha)
-        // Esta é uma maneira de verificar a senha sem uma função de backend,
-        // mas requer que o usuário já esteja logado.
-        
-        // ** NOTA: Esta lógica de verificação de senha é complexa e
-        //    idealmente seria feita por uma Cloud Function. 
-        //    Vamos usar a lógica do seu app (chamar a função)
         
         const verifyManagerPassword = httpsCallable(functions, 'verifyManagerPassword');
         const result = await verifyManagerPassword({ password: password });
@@ -105,9 +112,140 @@ const handleManagerAuthSubmit = async (e) => {
     }
 };
 
+// ==================================================================
+//               FUNÇÕES DE VOUCHER MANAGEMENT
+// ==================================================================
+
+/**
+ * Renderiza a lista de vouchers na modal.
+ */
+const renderVouchers = (vouchers) => {
+    if (!voucherListContainer) return;
+
+    if (vouchers.length === 0) {
+        voucherListContainer.innerHTML = '<p class="text-sm text-dark-placeholder italic">Nenhuma regra de voucher cadastrada.</p>';
+        return;
+    }
+
+    voucherListContainer.innerHTML = vouchers.map(v => `
+        <div class="flex justify-between items-center bg-dark-input p-3 rounded-lg mb-2">
+            <div>
+                <h4 class="font-bold text-dark-text">${v.name}</h4>
+                <p class="text-sm text-indigo-400">${v.points} pontos por ${formatCurrency(v.value)}</p>
+            </div>
+            <button class="text-red-400 hover:text-red-500 transition" 
+                    onclick="window.handleDeleteVoucher('${v.id}')">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    `).join('');
+};
+
+/**
+ * Busca os vouchers do Firestore.
+ */
+const fetchVouchers = async () => {
+    if (!voucherListContainer) return;
+    voucherListContainer.innerHTML = '<p class="text-sm text-yellow-400 italic">Buscando vouchers...</p>';
+    try {
+        const q = query(getVouchersCollectionRef(), orderBy('points', 'asc'));
+        const querySnapshot = await getDocs(q);
+        
+        const vouchers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        renderVouchers(vouchers);
+        return vouchers;
+
+    } catch (error) {
+        console.error("Erro ao buscar vouchers:", error);
+        voucherListContainer.innerHTML = '<p class="text-sm text-red-400">Erro ao carregar vouchers.</p>';
+        return [];
+    }
+};
+
+/**
+ * Abre a modal de gerenciamento de vouchers.
+ */
+const openVoucherManagementModal = async () => {
+    if (!voucherManagementModal) return;
+    if(managerModal) managerModal.style.display = 'none'; // Fecha o modal de autenticação
+    voucherManagementModal.style.display = 'flex';
+    if(voucherForm) voucherForm.style.display = 'none'; // Esconde o form por padrão
+    await fetchVouchers();
+};
+window.openVoucherManagementModal = openVoucherManagementModal;
+
+
+/**
+ * Salva ou atualiza um voucher.
+ */
+const handleSaveVoucher = async (e) => {
+    e.preventDefault();
+    // Usa um ID de documento aleatório se não estiver em modo de edição
+    const id = document.getElementById('voucherIdInput').value || doc(getVouchersCollectionRef()).id; 
+    const name = document.getElementById('voucherNameInput').value;
+    const points = parseInt(document.getElementById('voucherPointsInput').value);
+    const value = parseFloat(document.getElementById('voucherValueInput').value);
+    const errorEl = document.getElementById('voucherFormError');
+    const saveBtn = document.getElementById('saveVoucherBtn');
+
+    if (points <= 0 || value <= 0) {
+        errorEl.textContent = 'Pontos e valor de desconto devem ser maiores que zero.';
+        errorEl.style.display = 'block';
+        return;
+    }
+    errorEl.style.display = 'none';
+    saveBtn.disabled = true;
+
+    try {
+        const voucherRef = doc(getVouchersCollectionRef(), id);
+        await setDoc(voucherRef, {
+            id,
+            name,
+            points,
+            value,
+            createdAt: serverTimestamp() 
+        }, { merge: true });
+
+        document.getElementById('voucherForm').reset();
+        document.getElementById('voucherForm').style.display = 'none';
+        await fetchVouchers();
+        alert(`Voucher ${name} salvo com sucesso!`);
+
+    } catch (e) {
+        console.error("Erro ao salvar voucher:", e);
+        errorEl.textContent = 'Falha ao salvar voucher.';
+        errorEl.style.display = 'block';
+    } finally {
+        saveBtn.disabled = false;
+    }
+};
+
+/**
+ * Exclui um voucher.
+ */
+const handleDeleteVoucher = async (id) => {
+    if (!confirm("Tem certeza que deseja EXCLUIR esta regra de voucher?")) return;
+    
+    try {
+        const voucherRef = doc(getVouchersCollectionRef(), id);
+        await deleteDoc(voucherRef);
+        await fetchVouchers();
+        alert("Voucher excluído com sucesso.");
+    } catch (e) {
+        console.error("Erro ao excluir voucher:", e);
+        alert("Falha ao excluir voucher.");
+    }
+};
+window.handleDeleteVoucher = handleDeleteVoucher; 
 
 // ==================================================================
-//            GERENCIAR OBSERVAÇÕES RÁPIDAS (NOVO)
+//        FIM FUNÇÕES DE VOUCHER MANAGEMENT
+// ==================================================================
+
+
+// ==================================================================
+//               GERENCIAR OBSERVAÇÕES RÁPIDAS (EXISTENTE)
 // ==================================================================
 
 /**
@@ -197,7 +335,6 @@ const handleAddQuickObs = async (newText, inputElement) => {
     
     try {
         // Cria uma referência de documento baseada no próprio texto (para evitar duplicatas)
-        // Isso é mais seguro que um ID aleatório
         const docId = newText.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
         if (docId.length === 0) {
              alert("Texto inválido para criar um ID.");
@@ -295,6 +432,9 @@ export const handleGerencialAction = (action, payload) => {
         case 'openQuickObsManagement':
             openQuickObsManagement(); // Chama a nova função
             break;
+        case 'openVoucherManagement': // <--- NOVO CASE
+            openVoucherManagementModal();
+            break;
         // ==== FIM ATUALIZAÇÃO ====
             
         case 'openTableMerge':
@@ -325,6 +465,23 @@ export const initManagerController = () => {
              managerModal.style.display = 'none';
          }
     });
+
+    // ==== Mapeamento de elementos do Voucher Management ====
+    voucherManagementModal = document.getElementById('voucherManagementModal'); 
+    voucherListContainer = document.getElementById('voucherListContainer');     
+    voucherForm = document.getElementById('voucherForm');                       
+    const showVoucherFormBtn = document.getElementById('showVoucherFormBtn'); 
+    // ==== FIM Mapeamento ====
+
+    // ==== LISTENERS DO NOVO FORM DE VOUCHER ====
+    if (voucherForm) voucherForm.addEventListener('submit', handleSaveVoucher);
+    if (showVoucherFormBtn) showVoucherFormBtn.addEventListener('click', () => { 
+        voucherForm.style.display = 'block'; 
+        voucherForm.reset();
+        document.getElementById('voucherFormTitle').textContent = 'Novo Voucher';
+        document.getElementById('saveVoucherBtn').textContent = 'Salvar Voucher';
+    });
+    // ==== FIM LISTENERS DO NOVO FORM DE VOUCHER ====
 
     console.log("[ManagerController] Inicializado.");
 };

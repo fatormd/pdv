@@ -1,10 +1,10 @@
-// --- CONTROLLERS/PAYMENTCONTROLLER.JS (Completo e Estável) ---
+// --- CONTROLLERS/PAYMENTCONTROLLER.JS (Final - Não precisa ser alterado se já está com Date.now() e increment) ---
 import { currentTableId, currentOrderSnapshot, userId } from "/app.js";
 import { formatCurrency, calculateItemsValue, getNumericValueFromCurrency } from "/utils.js";
 import { getTableDocRef, getCustomersCollectionRef, db } from "/services/firebaseService.js";
 import {
     updateDoc, arrayUnion, arrayRemove, writeBatch, getFirestore, getDoc, serverTimestamp,
-    collection, query, where, getDocs, addDoc, setDoc, doc
+    collection, query, where, getDocs, addDoc, setDoc, doc, increment
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { createWooCommerceOrder } from "/services/wooCommerceService.js";
 
@@ -204,7 +204,7 @@ const renderRegisteredPayments = (payments) => {
         return `
         <div class="flex justify-between items-center py-2 border-b border-dark-border last:border-b-0">
             <div class="flex items-center space-x-2">
-                <i class="fas ${p.method === 'Dinheiro' ? 'fa-money-bill-wave' : p.method === 'Pix' ? 'fa-qrcode' : 'fa-credit-card'} text-green-400"></i>
+                <i class="fas ${p.method === 'Dinheiro' ? 'fa-money-bill-wave' : p.method === 'Pix' ? 'fa-qrcode' : p.method === 'Voucher' ? 'fa-ticket-alt' : 'fa-credit-card'} text-green-400"></i>
                 <span class="font-semibold text-dark-text">${p.method}</span>
             </div>
             <div class="flex items-center space-x-3">
@@ -551,10 +551,38 @@ export const handleFinalizeOrder = async () => {
         const wooOrder = await createWooCommerceOrder(currentOrderSnapshot);
         
         const tableRef = getTableDocRef(currentTableId);
-        // Exclui o documento da mesa
-        await doc(getFirestore(), tableRef.path).delete(); 
+        const clientId = currentOrderSnapshot.clientId; 
+        const pointsEarned = Math.floor(totalDaConta); 
         
-        alert(`Pedido enviado ao WooCommerce (ID: ${wooOrder.id}). Mesa ${currentTableId} fechada com sucesso.`);
+        const batch = writeBatch(getFirestore());
+
+        // 1. Exclui o documento da mesa
+        batch.delete(tableRef); 
+        
+        // 2. Lógica de CRM (Pontos e Histórico)
+        if (clientId) {
+            const customerRef = doc(getCustomersCollectionRef(), clientId);
+            
+            batch.update(customerRef, {
+                points: increment(pointsEarned), 
+                lastVisit: serverTimestamp(),
+                // Adicionar o registro do pedido ao histórico (Array de Mapas)
+                orderHistory: arrayUnion({ 
+                    orderId: wooOrder.id,
+                    total: totalDaConta,
+                    points: pointsEarned,
+                    date: Date.now() // CORRIGIDO
+                })
+            });
+        }
+        
+        await batch.commit();
+
+        const successMessage = clientId 
+            ? `Pedido enviado ao WooCommerce (ID: ${wooOrder.id}). Mesa ${currentTableId} fechada. ${pointsEarned} pontos adicionados ao cliente!`
+            : `Pedido enviado ao WooCommerce (ID: ${wooOrder.id}). Mesa ${currentTableId} fechada com sucesso.`;
+            
+        alert(successMessage);
         
         window.goToScreen('panelScreen'); 
     

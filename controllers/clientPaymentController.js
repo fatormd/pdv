@@ -1,12 +1,12 @@
-// --- CONTROLLERS/CLIENTPAYMENTCONTROLLER.JS (COMPLETO E CORRIGIDO) ---
+// --- CONTROLLERS/CLIENTPAYMENTCONTROLLER.JS (COMPLETO E CORRIGIDO - COM CRM DINÂMICO) ---
 
 // Importa do 'firebaseService.js' e o 'app.js' global
-import { db, auth, getTableDocRef, appId } from "/services/firebaseService.js";
+import { db, auth, getTableDocRef, appId, getCustomersCollectionRef } from "/services/firebaseService.js";
 import { formatCurrency } from "/utils.js";
-// O 'currentTableId' e 'showToast' globais são exportados pelo app.js (corrigido)
+// O 'currentTableId' e 'showToast' globals são exportados pelo app.js (corrigido)
 import { currentTableId, showToast } from "/app.js"; 
-// ===== ATUALIZAÇÃO: Importa 'updateDoc' para o botão de fechar conta =====
-import { onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+// ===== ATUALIZAÇÃO: Adiciona writeBatch, increment, getDocs, query, orderBy e collection =====
+import { onSnapshot, doc, updateDoc, arrayUnion, serverTimestamp, writeBatch, increment, getDocs, query, orderBy, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
 // --- Variáveis de Estado ---
@@ -14,11 +14,21 @@ let currentClientUser = null;
 let unsubscribeTable = null; // Listener da Mesa
 let unsubscribeCustomer = null; // Listener do Cliente
 let paymentInitialized = false;
+let VOUCHER_RULES_CACHE = []; // NOVO: Cache para regras de voucher
 
 // --- Elementos da DOM ---
 let reviewItemsList, crmClientSection;
 let orderSubtotalDisplay, orderServiceTaxDisplay, orderTotalDisplayPayment;
 let paymentTableNumber;
+
+// --- REFERÊNCIAS DO FIREBASE ---
+const firestore = db; // <--- CORREÇÃO: Usa a instância 'db' já inicializada
+const getVouchersCollectionRef = () => {
+    // CORREÇÃO: Passa os segmentos de caminho explicitamente para a função collection()
+    return collection(firestore, 'artifacts', appId, 'public', 'data', 'vouchers'); 
+};
+// --- FIM REFERÊNCIAS DO FIREBASE ---
+
 
 /**
  * Inicializa o controlador da tela de pagamento do cliente.
@@ -37,12 +47,11 @@ export const initClientPaymentController = () => {
     orderServiceTaxDisplay = document.getElementById('orderServiceTaxDisplayPayment');
     orderTotalDisplayPayment = document.getElementById('orderTotalDisplayPayment');
 
-    // ===== NOVO: Mapeia o botão de solicitar conta =====
+    // ===== Mapeia o botão de solicitar conta =====
     const requestBillBtn = document.getElementById('requestBillBtn');
     if (requestBillBtn) {
         requestBillBtn.onclick = handleRequestBill;
     }
-    // ===== FIM DA NOVIDADE =====
 
 
     // ---- Lógica das Abas do CRM ----
@@ -105,6 +114,22 @@ function stopListeners() {
 }
 
 /**
+ * Busca as regras de vouchers do Firestore para o cliente.
+ */
+async function fetchVoucherRules() {
+    try {
+        const q = query(getVouchersCollectionRef(), orderBy('points', 'asc'));
+        const snapshot = await getDocs(q);
+        VOUCHER_RULES_CACHE = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        return VOUCHER_RULES_CACHE;
+    } catch (e) {
+        console.error("Erro ao buscar regras de vouchers para o cliente:", e);
+        return [];
+    }
+}
+
+
+/**
  * Inicia os listeners da mesa e do cliente (se não estiverem ativos).
  */
 function startListeners() {
@@ -112,17 +137,15 @@ function startListeners() {
     stopListeners();
 
     // 1. Listener do Cliente (para o CRM)
-    // As regras do 'firestore.rules' agora permitem esta leitura
     if (currentClientUser && !unsubscribeCustomer) {
         console.log("[ClientPayment] Iniciando listener para Cliente:", currentClientUser.uid);
-        const customerRef = doc(db, 'artifacts', appId, 'public', 'data', 'customers', currentClientUser.uid);
+        const customerRef = doc(getCustomersCollectionRef(), currentClientUser.uid);
         
         unsubscribeCustomer = onSnapshot(customerRef, (doc) => {
             if (doc.exists()) {
-                renderCrmData(doc.data());
+                fetchVoucherRules().then(() => renderCrmData(doc.data())); // Busca regras e renderiza
             } else {
-                console.log("[ClientPayment] Documento do cliente não encontrado.");
-                renderCrmData({ points: 0 }); // Mostra 0 pontos se não houver doc
+                fetchVoucherRules().then(() => renderCrmData({ points: 0 }));
             }
         }, (error) => {
             console.error("[ClientPayment] Erro no listener do cliente:", error);
@@ -130,8 +153,6 @@ function startListeners() {
     }
 
     // 2. Listener da Mesa (para Itens e Totais)
-    // As regras do 'firestore.rules' agora permitem esta leitura
-    // Usa o 'currentTableId' global importado do app.js
     if (currentTableId && !unsubscribeTable) { 
         console.log("[ClientPayment] Iniciando listener para Mesa:", currentTableId);
         const tableRef = getTableDocRef(currentTableId);
@@ -200,13 +221,11 @@ function renderSentItems(sentItems) {
  * Renderiza os totais da conta
  */
 function renderTotals(tableData) {
-    // ================== INÍCIO DA CORREÇÃO ==================
+    // ================== CORREÇÃO DE BUG: SUBTOTAL ==================
     // Calcula o subtotal manualmente a partir dos sentItems, igual o painel staff faz.
-    // Isso ignora o 'tableData.total' que pode estar dessincronizado.
     const sentItems = tableData.sentItems || [];
     const subtotal = sentItems.reduce((sum, item) => sum + (item.price || 0), 0);
-    // =================== FIM DA CORREÇÃO ====================
-    
+    // ===============================================================
     const serviceTax = (tableData.serviceTaxApplied && tableData.status !== 'closed') ? subtotal * 0.1 : 0;
     const total = subtotal + serviceTax;
 
@@ -233,23 +252,149 @@ function renderCrmData(customerData) {
     // Aba 1: Pontos
     const pointsBalanceEl = document.getElementById('crm-points-balance');
     if (pointsBalanceEl) {
-        pointsBalanceEl.textContent = customerData.points || 0; // Mostra 0 se for undefined
+        pointsBalanceEl.textContent = customerData.points || 0; 
     }
     
+    // Vouchers Disponíveis (AGORA DINÂMICO)
     const vouchersDisponiveisEl = document.getElementById('crm-vouchers-disponiveis');
     if (vouchersDisponiveisEl) {
-        vouchersDisponiveisEl.innerHTML = `<p class="text-sm text-dark-placeholder italic">Lógica de vouchers em construção.</p>`;
+        const availableVouchers = VOUCHER_RULES_CACHE.filter(v => (customerData.points || 0) >= v.points);
+
+        if (availableVouchers.length > 0) {
+            vouchersDisponiveisEl.innerHTML = availableVouchers.map(v => `
+                <div class="p-3 bg-indigo-900 border border-indigo-700 rounded-lg">
+                    <p class="font-semibold text-white">${v.name}</p>
+                    <p class="text-xs text-indigo-300">Resgate por ${v.points} pontos.</p>
+                    <button class="resgate-voucher-btn px-3 py-1 mt-2 bg-pumpkin text-white rounded-md hover:bg-pumpkin-dark transition text-xs font-semibold" 
+                            data-voucher-id="${v.id}" 
+                            data-points-cost="${v.points}" 
+                            data-discount-value="${v.value}"
+                            data-voucher-name="${v.name}">
+                        Resgatar Agora
+                    </button>
+                </div>
+            `).join('');
+            _attachCrmListeners(); 
+        } else {
+             vouchersDisponiveisEl.innerHTML = `<p class="text-sm text-dark-placeholder italic">Você precisa de mais pontos para resgatar vouchers.</p>`;
+        }
     }
     
+    // Vouchers Ativos (placeholder)
     const vouchersAtivosEl = document.getElementById('crm-vouchers-ativos');
     if (vouchersAtivosEl) {
-         vouchersAtivosEl.innerHTML = `<p class="text-sm text-dark-placeholder italic">Lógica de vouchers em construção.</p>`;
+         vouchersAtivosEl.innerHTML = `<p class="text-sm text-dark-placeholder italic">Nenhum voucher aplicado à sua conta no momento.</p>`;
     }
     
+    // Histórico de Pedidos
     const orderHistoryEl = document.getElementById('crm-order-history');
-     if (orderHistoryEl) {
-         orderHistoryEl.innerHTML = `<p class="text-sm text-dark-placeholder italic">Lógica de histórico em construção.</p>`;
-     }
+    const history = customerData.orderHistory || [];
+    
+    if (orderHistoryEl) {
+        if (history.length > 0) {
+            // Ordena os pedidos mais recentes primeiro
+            history.sort((a, b) => (b.date || 0) - (a.date || 0)); // 'date' é um número (timestamp)
+            
+            orderHistoryEl.innerHTML = history.map(order => {
+                const date = order.date ? new Date(order.date).toLocaleDateString('pt-BR') : 'N/A';
+                return `
+                    <div class="border-b border-gray-700 pb-2">
+                        <p class="text-sm font-semibold text-dark-text">${formatCurrency(order.total)}</p>
+                        <p class="text-xs text-dark-placeholder">Em ${date} (${order.points} pts)</p>
+                    </div>
+                `;
+            }).join('');
+        } else {
+             orderHistoryEl.innerHTML = `<p class="text-sm text-dark-placeholder italic">Nenhum pedido registrado ainda.</p>`;
+        }
+    }
+    
+    // Vouchers Utilizados (placeholder)
+    const vouchersUsadosEl = document.getElementById('crm-vouchers-usados');
+    if (vouchersUsadosEl) {
+         vouchersUsadosEl.innerHTML = `<p class="text-sm text-dark-placeholder italic">Nenhum histórico de vouchers resgatados.</p>`;
+    }
+}
+
+/**
+ * Resgate REAL do voucher.
+ */
+async function handleVoucherResgate(e) {
+    const btn = e.target.closest('.resgate-voucher-btn');
+    if (!btn) return;
+
+    const voucherId = btn.dataset.voucherId;
+    const POINTS_DEBIT = parseInt(btn.dataset.pointsCost);
+    const DISCOUNT_VALUE = parseFloat(btn.dataset.discountValue);
+    const voucherName = btn.dataset.voucherName;
+
+    if (!currentClientUser) {
+        showToast("Faça login para resgatar vouchers.", true);
+        return;
+    }
+    if (!currentTableId) {
+        showToast("Associe-se a uma mesa primeiro.", true);
+        return;
+    }
+
+    const currentPoints = document.getElementById('crm-points-balance')?.textContent ? parseInt(document.getElementById('crm-points-balance').textContent) : 0;
+
+    if (currentPoints < POINTS_DEBIT) {
+         showToast(`Você precisa de ${POINTS_DEBIT} pontos para resgatar este voucher. Saldo atual: ${currentPoints}.`, true);
+         return;
+    }
+
+    if (!confirm(`Confirmar resgate do voucher ${voucherName} por ${POINTS_DEBIT} pontos? (R$ ${DISCOUNT_VALUE.toFixed(2)} de desconto será aplicado na conta)`)) return;
+    
+    try {
+        const batch = writeBatch(firestore); 
+        const customerRef = doc(getCustomersCollectionRef(), currentClientUser.uid);
+        const tableRef = getTableDocRef(currentTableId);
+
+        // 1. Debitar Pontos do Cliente e Registrar Resgate
+        batch.update(customerRef, {
+            points: increment(-POINTS_DEBIT),
+            vouchersUsed: arrayUnion({
+                voucherId: voucherId,
+                name: voucherName,
+                value: DISCOUNT_VALUE,
+                pointsDebited: POINTS_DEBIT,
+                date: Date.now()
+            })
+        });
+
+        // 2. Aplicar Desconto na Mesa (como um pagamento/desconto 'Voucher')
+        const paymentData = {
+            method: 'Voucher',
+            value: formatCurrency(DISCOUNT_VALUE), // R$ 10,00 formatado
+            timestamp: Date.now(),
+            byUser: currentClientUser.displayName || 'Cliente CRM' 
+        };
+        
+        batch.update(tableRef, {
+            payments: arrayUnion(paymentData)
+        });
+
+        await batch.commit();
+
+        showToast(`Resgate de R$ ${DISCOUNT_VALUE.toFixed(2)} concluído! ${POINTS_DEBIT} pontos debitados e desconto aplicado na Mesa.`, false);
+
+    } catch (e) {
+        console.error("Erro ao resgatar voucher:", e);
+        showToast(`Falha ao resgatar voucher. Erro: ${e.message}`, true);
+    }
+}
+
+/**
+ * Anexa listeners ao painel CRM.
+ */
+function _attachCrmListeners() {
+    document.querySelectorAll('.resgate-voucher-btn').forEach(btn => {
+        // Evita anexar múltiplas vezes
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        newBtn.addEventListener('click', handleVoucherResgate);
+    });
 }
 
 // ==================================================================
@@ -275,7 +420,8 @@ async function handleRequestBill() {
         // Notifica o garçom e ativa o "sino" de alerta no painel de staff
         await updateDoc(tableRef, {
             waiterNotification: "Cliente solicitou fechamento de conta",
-            clientOrderPending: true // Usa o mesmo campo dos pedidos para o alerta visual
+            billRequested: true,     // Sinal verde para o painel staff
+            clientOrderPending: false // Limpa o sinal antigo
         });
         
         showToast("Solicitação enviada! Um garçom virá até sua mesa.");
