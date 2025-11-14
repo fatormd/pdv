@@ -1,11 +1,11 @@
 // --- CONTROLLERS/CLIENTPAYMENTCONTROLLER.JS (COMPLETO E CORRIGIDO - COM CRM DINÂMICO) ---
 
 // Importa do 'firebaseService.js' e o 'app.js' global
-import { db, auth, getTableDocRef, appId, getCustomersCollectionRef } from "/services/firebaseService.js";
+// ===== ATUALIZAÇÃO 1: Importa 'getVouchersCollectionRef' (e outras) do firebaseService =====
+import { db, auth, getTableDocRef, appId, getCustomersCollectionRef, getVouchersCollectionRef } from "/services/firebaseService.js";
 import { formatCurrency } from "/utils.js";
 // O 'currentTableId' e 'showToast' globals são exportados pelo app.js (corrigido)
 import { currentTableId, showToast } from "/app.js"; 
-// ===== ATUALIZAÇÃO: Adiciona writeBatch, increment, getDocs, query, orderBy e collection =====
 import { onSnapshot, doc, updateDoc, arrayUnion, serverTimestamp, writeBatch, increment, getDocs, query, orderBy, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
@@ -21,13 +21,10 @@ let reviewItemsList, crmClientSection;
 let orderSubtotalDisplay, orderServiceTaxDisplay, orderTotalDisplayPayment;
 let paymentTableNumber;
 
-// --- REFERÊNCIAS DO FIREBASE ---
-const firestore = db; // <--- CORREÇÃO: Usa a instância 'db' já inicializada
-const getVouchersCollectionRef = () => {
-    // CORREÇÃO: Passa os segmentos de caminho explicitamente para a função collection()
-    return collection(firestore, 'artifacts', appId, 'public', 'data', 'vouchers'); 
-};
-// --- FIM REFERÊNCIAS DO FIREBASE ---
+// ===== ATUALIZAÇÃO 2: Remove as definições locais redundantes =====
+// (const firestore = db; FOI REMOVIDA)
+// (const getVouchersCollectionRef = () => { ... } FOI REMOVIDA)
+// A função 'getVouchersCollectionRef' agora é importada corretamente do firebaseService.
 
 
 /**
@@ -47,7 +44,7 @@ export const initClientPaymentController = () => {
     orderServiceTaxDisplay = document.getElementById('orderServiceTaxDisplayPayment');
     orderTotalDisplayPayment = document.getElementById('orderTotalDisplayPayment');
 
-    // ===== Mapeia o botão de solicitar conta =====
+    // Mapeia o botão de solicitar conta
     const requestBillBtn = document.getElementById('requestBillBtn');
     if (requestBillBtn) {
         requestBillBtn.onclick = handleRequestBill;
@@ -118,6 +115,7 @@ function stopListeners() {
  */
 async function fetchVoucherRules() {
     try {
+        // Agora usa a função 'getVouchersCollectionRef' importada
         const q = query(getVouchersCollectionRef(), orderBy('points', 'asc'));
         const snapshot = await getDocs(q);
         VOUCHER_RULES_CACHE = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -202,9 +200,6 @@ function renderSentItems(sentItems) {
         return acc;
     }, {});
 
-    // ===== REFINAMENTO DE RESPONSIVIDADE (Mobile-first) =====
-    // Em telas pequenas (mobile), o preço fica abaixo do nome (flex-col).
-    // Em telas médias (md), o preço fica ao lado (flex-row).
     reviewItemsList.innerHTML = Object.values(groupedItems).map(item => `
         <div class="flex flex-col md:flex-row md:justify-between md:items-center bg-dark-input p-3 rounded-lg">
             <div class="flex-grow min-w-0 mr-2 w-full">
@@ -214,18 +209,16 @@ function renderSentItems(sentItems) {
             <span class="text-base font-semibold text-dark-text mt-1 md:mt-0 md:ml-2 flex-shrink-0">${formatCurrency(item.totalPrice)}</span>
         </div>
     `).join('');
-    // ===== FIM DO REFINAMENTO =====
 }
 
 /**
  * Renderiza os totais da conta
  */
 function renderTotals(tableData) {
-    // ================== CORREÇÃO DE BUG: SUBTOTAL ==================
-    // Calcula o subtotal manualmente a partir dos sentItems, igual o painel staff faz.
+    // Calcula o subtotal manualmente a partir dos sentItems
     const sentItems = tableData.sentItems || [];
     const subtotal = sentItems.reduce((sum, item) => sum + (item.price || 0), 0);
-    // ===============================================================
+    
     const serviceTax = (tableData.serviceTaxApplied && tableData.status !== 'closed') ? subtotal * 0.1 : 0;
     const total = subtotal + serviceTax;
 
@@ -347,7 +340,8 @@ async function handleVoucherResgate(e) {
     if (!confirm(`Confirmar resgate do voucher ${voucherName} por ${POINTS_DEBIT} pontos? (R$ ${DISCOUNT_VALUE.toFixed(2)} de desconto será aplicado na conta)`)) return;
     
     try {
-        const batch = writeBatch(firestore); 
+        // ===== ATUALIZAÇÃO 3: Usa 'db' (importado) em vez de 'firestore' (removido) =====
+        const batch = writeBatch(db); 
         const customerRef = doc(getCustomersCollectionRef(), currentClientUser.uid);
         const tableRef = getTableDocRef(currentTableId);
 
@@ -397,9 +391,9 @@ function _attachCrmListeners() {
     });
 }
 
-// ==================================================================
-//               NOVA FEATURE: Solicitar Fechamento de Conta
-// ==================================================================
+/**
+ * Lida com a solicitação de fechamento de conta.
+ */
 async function handleRequestBill() {
     const btn = document.getElementById('requestBillBtn');
     
