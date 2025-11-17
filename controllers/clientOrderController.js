@@ -1,43 +1,49 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (COM CORREÇÃO DE IMPORT E REFERENCEERROR) ---
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (COM AUTO-ABERTURA DE MESA) ---
 
-import { db, auth, getQuickObsCollectionRef, appId, getTablesCollectionRef } from "/services/firebaseService.js";
+// ===== CORREÇÃO CRÍTICA: Adiciona getTableDocRef e getCustomersCollectionRef =====
+import { db, auth, getQuickObsCollectionRef, appId, getTablesCollectionRef, getTableDocRef, getCustomersCollectionRef } from "/services/firebaseService.js";
 import { formatCurrency } from "/utils.js";
 import { getProducts, getCategories, fetchWooCommerceProducts, fetchWooCommerceCategories } from "/services/wooCommerceService.js";
-// ===== CORREÇÃO: Adicionado 'orderBy' à importação =====
-import { onSnapshot, doc, updateDoc, arrayUnion, arrayRemove, setDoc, getDoc, getDocs, query, where, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { GoogleAuthProvider, signInWithPopup, signInAnonymously, RecaptchaVerifier, signInWithPhoneNumber, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+// ===== CORREÇÃO: Adiciona setDoc (para criar a mesa) =====
+import { onSnapshot, doc, updateDoc, arrayUnion, arrayRemove, setDoc, getDoc, getDocs, query, where, serverTimestamp, orderBy, increment, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+// Importações completas do Auth
+import { GoogleAuthProvider, signInWithPopup, signInAnonymously, RecaptchaVerifier, signInWithPhoneNumber, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-// Importa 'showToast' do app.js (como definido no seu app.js)
-import { showToast } from "/app.js"; 
+// Importa do app.js
+import { showToast, currentTableId, setCurrentTable } from "/app.js"; 
 
 
 // --- Variáveis de Estado (Locais) ---
-// O estado global (currentTableId) é importado do app.js
-import { currentTableId } from "/app.js";
-
 let selectedItems = []; // Itens do carrinho local
 let quickObsCache = []; 
 let currentCategoryFilter = 'all';
 const ESPERA_KEY = "(EM ESPERA)"; 
+let orderControllerInitialized = false;
+
+// --- NOVO: Variáveis do Novo Fluxo ---
+let localCurrentTableId = null;    // ID da mesa ativa
+let localCurrentClientUser = null; // Guarda o usuário logado (Google)
+let tempUserData = null;           // Guarda dados do Google temporariamente antes do cadastro
 
 // --- Elementos da DOM ---
 let clientMenuContainer, clientCategoryFilters, sendOrderBtn, clientCartCount;
-let associationModal, activateAndSendBtn, googleLoginBtn;
-let tableDataStep, activateTableNumber, activateDiners;
+let associationModal, activateAndSendBtn, googleLoginBtn, activationForm;
+let activateTableNumber;
 let authActionBtn, clientUserName, clientTableNumber, loggedInStep, loggedInUserName, assocErrorMsg;
 let statusScreen, mainContent, appContainer;
 let searchProductInputClient; 
-let registrationStep, registerWhatsApp, registerDOB, confirmRegisterBtn, registerErrorMsg;
 let clientObsModal, clientObsText, clientQuickObsButtons, clientConfirmObsBtn, clientCancelObsBtn;
 
-// ===== CORREÇÃO: Readicionando a variável que foi apagada acidentalmente =====
-let localCurrentTableId = null;
-// ===== FIM DA CORREÇÃO =====
-let localCurrentClientUser = null; // O 'user' logado é local para este controller
+// --- NOVO: Elementos das Abas e do Novo Modal ---
+let tabButtons, tabContents;
+let customerRegistrationModal, customerRegistrationForm, saveRegistrationBtn;
+let regCustomerName, regCustomerEmail, regCustomerWhatsapp, regCustomerBirthday, regErrorMsg;
+
 
 // --- Inicialização ---
 
 export const initClientOrderController = () => {
+    if (orderControllerInitialized) return;
     console.log("[ClientOrder] Inicializando...");
 
     // Mapeamento dos elementos principais
@@ -45,30 +51,54 @@ export const initClientOrderController = () => {
     clientCategoryFilters = document.getElementById('client-category-filters');
     sendOrderBtn = document.getElementById('sendOrderBtn');
     clientCartCount = document.getElementById('client-cart-count');
-    authActionBtn = document.getElementById('authActionBtn');
-    clientUserName = document.getElementById('client-user-name');
-    clientTableNumber = document.getElementById('client-table-number');
+    authActionBtn = document.getElementById('authActionBtn'); // Botão Entrar/Sair no Header
+    clientUserName = document.getElementById('client-user-name'); // Nome no Header
+    clientTableNumber = document.getElementById('client-table-number'); // Nº da Mesa no Header
     statusScreen = document.getElementById('statusScreen');
     mainContent = document.getElementById('mainContent');
     appContainer = document.getElementById('appContainer');
     searchProductInputClient = document.getElementById('searchProductInputClient');
 
-    // Mapeamento do Modal de Associação
+    // Mapeamento do Modal de Associação (Login)
     associationModal = document.getElementById('associationModal');
-    activateAndSendBtn = document.getElementById('activateAndSendBtn');
+    activationForm = document.getElementById('activationForm'); // Form da Aba Mesa
+    activateAndSendBtn = document.getElementById('activateAndSendBtn'); // Botão "Enviar Pedido" do modal
     googleLoginBtn = document.getElementById('googleLoginBtn');
-    tableDataStep = document.getElementById('tableDataStep');
-    activateTableNumber = document.getElementById('activateTableNumber');
-    loggedInStep = document.getElementById('loggedInStep');
-    loggedInUserName = document.getElementById('loggedInUserName');
+    loggedInStep = document.getElementById('loggedInStep'); // Div "Logado como:"
+    loggedInUserName = document.getElementById('loggedInUserName'); // Texto "Logado como:"
     assocErrorMsg = document.getElementById('assocErrorMsg');
+    activateTableNumber = document.getElementById('activateTableNumber'); // Input do Nº da Mesa
     
-    // Mapeamento do Registro
-    registrationStep = document.getElementById('registrationStep');
-    registerWhatsApp = document.getElementById('registerWhatsApp');
-    registerDOB = document.getElementById('registerDOB');
-    confirmRegisterBtn = document.getElementById('confirmRegisterBtn');
-    registerErrorMsg = document.getElementById('registerErrorMsg');
+    // ==================================================================
+    //               NOVA LÓGICA DE ABAS E CADASTRO
+    // ==================================================================
+
+    // Mapeamento das Abas
+    tabButtons = document.querySelectorAll('.client-tab-btn');
+    tabContents = document.querySelectorAll('.client-tab-content');
+
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const tabName = button.dataset.tab;
+            showTab(tabName);
+        });
+    });
+
+    // Mapeamento do Novo Modal de Cadastro
+    customerRegistrationModal = document.getElementById('customerRegistrationModal');
+    customerRegistrationForm = document.getElementById('customerRegistrationForm');
+    saveRegistrationBtn = document.getElementById('saveRegistrationBtn');
+    regCustomerName = document.getElementById('regCustomerName');
+    regCustomerEmail = document.getElementById('regCustomerEmail');
+    regCustomerWhatsapp = document.getElementById('regCustomerWhatsapp');
+    regCustomerBirthday = document.getElementById('regCustomerBirthday');
+    regErrorMsg = document.getElementById('regErrorMsg');
+
+    // Listener para o form do novo modal
+    if(customerRegistrationForm) {
+        customerRegistrationForm.addEventListener('submit', handleNewCustomerRegistration);
+    }
+    // ==================================================================
     
     // Mapeamento do Modal Obs
     clientObsModal = document.getElementById('clientObsModal'); 
@@ -77,102 +107,111 @@ export const initClientOrderController = () => {
     clientConfirmObsBtn = document.getElementById('clientConfirmObsBtn');
     clientCancelObsBtn = document.getElementById('clientCancelObsBtn'); 
 
-    if (!clientObsModal || !clientObsText || !clientQuickObsButtons || !clientConfirmObsBtn || !clientCancelObsBtn) {
-        console.error("[ClientOrder] Erro Fatal: Elementos do modal de observação não encontrados.");
-        return; 
-    }
-
-    // Listener Modal Obs: Botões Rápidos
-    if (clientQuickObsButtons) {
-        clientQuickObsButtons.addEventListener('click', (e) => {
-            const btn = e.target.closest('.quick-obs-btn');
-            if (btn && clientObsText) {
-                const obsText = btn.dataset.obs;
-                let currentValue = clientObsText.value.trim();
-                if (currentValue && !currentValue.endsWith(',') && !currentValue.endsWith(' ')) {
-                    currentValue += ', ';
-                } else if (currentValue && (currentValue.endsWith(',') || currentValue.endsWith(' '))) {
-                    currentValue += ' ';
+    if (clientObsModal) { // Verifica se os elementos do modal existem
+        // Listener Modal Obs: Botões Rápidos
+        if (clientQuickObsButtons) {
+            clientQuickObsButtons.addEventListener('click', (e) => {
+                const btn = e.target.closest('.quick-obs-btn');
+                if (btn && clientObsText) {
+                    const obsText = btn.dataset.obs;
+                    let currentValue = clientObsText.value.trim();
+                    if (currentValue && !currentValue.endsWith(',') && !currentValue.endsWith(' ')) {
+                        currentValue += ', ';
+                    } else if (currentValue && (currentValue.endsWith(',') || currentValue.endsWith(' '))) {
+                        currentValue += ' ';
+                    }
+                    clientObsText.value = (currentValue + obsText).trim();
                 }
-                clientObsText.value = (currentValue + obsText).trim();
-            }
-        });
-    }
-
-    // Listener Modal Obs: Confirmar
-    if (clientConfirmObsBtn) {
-        clientConfirmObsBtn.addEventListener('click', () => {
-            const itemId = clientObsModal.dataset.itemId;
-            const originalNoteKey = clientObsModal.dataset.originalNoteKey;
-            let newNote = clientObsText.value.trim();
-            
-            const esperaSwitch = document.getElementById('esperaSwitch');
-            const isEspera = esperaSwitch.checked;
-            const regexEspera = new RegExp(ESPERA_KEY.replace('(', '\\(').replace(')', '\\)'), 'ig');
-            const hasKey = newNote.toUpperCase().includes(ESPERA_KEY);
-
-            if (isEspera && !hasKey) {
-                newNote = newNote ? `${ESPERA_KEY} ${newNote}` : ESPERA_KEY;
-            } else if (!isEspera && hasKey) {
-                newNote = newNote.replace(regexEspera, '').trim();
-                newNote = newNote.replace(/,,/g, ',').replace(/^,/, '').trim();
-            }
-            
-            newNote = newNote.trim(); 
-
-            let updated = false;
-            const updatedItems = selectedItems.map(item => {
-                if (item.id == itemId && (item.note || '') === originalNoteKey) {
-                    updated = true;
-                    return { ...item, note: newNote };
-                }
-                return item;
             });
-            
-            selectedItems.length = 0; 
-            selectedItems.push(...updatedItems);
+        }
 
-            if (updated) {
+        // Listener Modal Obs: Confirmar
+        if (clientConfirmObsBtn) {
+            clientConfirmObsBtn.addEventListener('click', () => {
+                const itemId = clientObsModal.dataset.itemId;
+                const originalNoteKey = clientObsModal.dataset.originalNoteKey;
+                let newNote = clientObsText.value.trim();
+                
+                const esperaSwitch = document.getElementById('esperaSwitch');
+                const isEspera = esperaSwitch.checked;
+                const regexEspera = new RegExp(ESPERA_KEY.replace('(', '\\(').replace(')', '\\)'), 'ig');
+                const hasKey = newNote.toUpperCase().includes(ESPERA_KEY);
+
+                if (isEspera && !hasKey) {
+                    newNote = newNote ? `${ESPERA_KEY} ${newNote}` : ESPERA_KEY;
+                } else if (!isEspera && hasKey) {
+                    newNote = newNote.replace(regexEspera, '').trim();
+                    newNote = newNote.replace(/,,/g, ',').replace(/^,/, '').trim();
+                }
+                
+                newNote = newNote.trim(); 
+
+                let updated = false;
+                const updatedItems = selectedItems.map(item => {
+                    if (item.id == itemId && (item.note || '') === originalNoteKey) {
+                        updated = true;
+                        return { ...item, note: newNote };
+                    }
+                    return item;
+                });
+                
+                selectedItems.length = 0; 
+                selectedItems.push(...updatedItems);
+
+                if (updated) {
+                    clientObsModal.style.display = 'none';
+                    renderClientOrderScreen(); // Re-renderiza localmente (sem snapshot)
+                } else {
+                    console.warn("Nenhum item encontrado para atualizar a observação.");
+                    clientObsModal.style.display = 'none';
+                }
+            });
+        }
+
+        // Listener Modal Obs: Cancelar
+        if (clientCancelObsBtn) {
+            clientCancelObsBtn.addEventListener('click', () => {
                 clientObsModal.style.display = 'none';
                 renderClientOrderScreen(); // Re-renderiza localmente (sem snapshot)
-            } else {
-                console.warn("Nenhum item encontrado para atualizar a observação.");
-                clientObsModal.style.display = 'none';
-            }
-        });
+            });
+        }
+    } else {
+        console.warn("[ClientOrder] Modal de Observação (clientObsModal) não encontrado.");
     }
 
-    // Listener Modal Obs: Cancelar
-    if (clientCancelObsBtn) {
-        clientCancelObsBtn.addEventListener('click', () => {
-            clientObsModal.style.display = 'none';
-            renderClientOrderScreen(); // Re-renderiza localmente (sem snapshot)
-        });
-    }
 
     // Listeners principais (Login, Envio)
     if (sendOrderBtn) sendOrderBtn.onclick = handleSendOrderClick;
     if (authActionBtn) authActionBtn.onclick = handleAuthActionClick;
     if (googleLoginBtn) googleLoginBtn.onclick = signInWithGoogle;
-    if (activateAndSendBtn) activateAndSendBtn.onclick = handleActivationAndSend;
-    if (confirmRegisterBtn) {
-        confirmRegisterBtn.onclick = handleCustomerRegistration;
+    if (activationForm) activationForm.onsubmit = handleActivationAndSend; // Lida com o "Enviar Pedido"
+    
+    // Botão Cancelar do Modal de Associação
+    const cancelBtn = document.getElementById('cancelActivationBtn');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            closeAssociationModal();
+        });
     }
+
 
     // Delegação de eventos para o menu
     if (clientMenuContainer) {
         clientMenuContainer.addEventListener('click', (e) => {
-            const addBtn = e.target.closest('.add-item-btn');
-            const infoBtn = e.target.closest('.info-item-btn');
+            const card = e.target.closest('.product-card');
+            if (!card) return;
 
-            if (addBtn && addBtn.dataset.product) {
-                const product = JSON.parse(addBtn.dataset.product.replace(/'/g, "&#39;"));
-                addItemToCart(product);
-            }
-            
-            if (infoBtn && infoBtn.dataset.product) {
-                 const product = JSON.parse(infoBtn.dataset.product.replace(/'/g, "&#39;"));
+            // Pega o produto do Cache
+            const product = getProducts().find(p => p.id == card.dataset.productId);
+            if (!product) return;
+
+            // Se o clique foi no botão de info, mostra info
+            if (e.target.closest('.info-item-btn')) {
                  openProductInfoModal(product);
+            } else {
+            // Qualquer outro clique no card adiciona ao carrinho
+                 addItemToCart(product);
             }
         });
     }
@@ -212,7 +251,7 @@ export const initClientOrderController = () => {
         searchProductInputClient.addEventListener('input', renderMenu);
     }
 
-    // Gerencia o estado de autenticação (agora no app.js, mas a UI ainda é local)
+    // Gerencia o estado de autenticação
     setupAuthStateObserver();
     
     // Busca os produtos
@@ -221,6 +260,7 @@ export const initClientOrderController = () => {
     // Busca as observações rápidas
     fetchQuickObservations(); 
     
+    orderControllerInitialized = true;
     console.log("[ClientOrder] Inicializado com sucesso.");
 };
 
@@ -229,56 +269,73 @@ export const initClientOrderController = () => {
  */
 function setupAuthStateObserver() {
     onAuthStateChanged(auth, (user) => {
-        localCurrentClientUser = user; // Atualiza o user local
-        updateAuthUI(user); // Atualiza a UI local (header, etc.)
-        
-        // Se o usuário logou (não anônimo), verifica o cadastro
         if (user && !user.isAnonymous) {
-            checkAndRegisterCustomer(user);
+            // --- USUÁRIO LOGADO COM GOOGLE ---
+            console.log("[ClientOrder] Usuário Google Autenticado:", user.displayName);
+            localCurrentClientUser = user; // Armazena o usuário
+            tempUserData = { // Salva dados temporários
+                uid: user.uid,
+                name: user.displayName,
+                email: user.email,
+                photoURL: user.photoURL
+            };
+            updateAuthUI(user); // Atualiza o header (Nome, "Sair")
+            // Verifica se o usuário já tem cadastro completo
+            checkCustomerRegistration(user); 
+        
+        } else if (user && user.isAnonymous) {
+             // --- USUÁRIO ANÔNIMO (JÁ ASSOCIADO A UMA MESA) ---
+             console.log("[ClientOrder] Usuário Anônimo Autenticado (Mesa Ativa).");
+             // Isso acontece DEPOIS do handleActivationAndSend.
+             // O localCurrentClientUser (Google) ainda está na memória.
+             closeAssociationModal();
+             closeCustomerRegistrationModal();
+        } else {
+            // --- USUÁRIO DESLOGADO ---
+            console.log("[ClientOrder] Nenhum usuário autenticado.");
+            localCurrentClientUser = null;
+            tempUserData = null;
+            updateAuthUI(null); // Limpa a UI do header (Visitante, "Entrar")
+            updateCustomerInfo(null, false); // Limpa o "Logado como:" no modal
+            
+            // Se não estiver em uma mesa, abre o modal de login
+            if (!currentTableId) {
+                openAssociationModal();
+            }
         }
     });
 }
 
 /**
- * Atualiza a UI com base no estado de login.
+ * Atualiza a UI (do Header) com base no estado de login.
  */
 function updateAuthUI(user) {
-    if (!clientUserName || !authActionBtn || !loggedInStep || !loggedInUserName) {
-        console.warn("[ClientOrder] Elementos de UI de autenticação não encontrados. UI não será atualizada.");
-        return;
-    }
-    
-    const authButtons = document.getElementById('authButtons');
-
-    if (user && !user.isAnonymous) {
-        clientUserName.textContent = user.displayName || user.name || "Cliente";
-        authActionBtn.textContent = "Sair";
-        authActionBtn.classList.add('text-red-400');
-        loggedInStep.style.display = 'block';
-        loggedInUserName.textContent = user.displayName || user.name || "Cliente";
-        if (authButtons) authButtons.style.display = 'none';
-    } else {
-        clientUserName.textContent = "Visitante";
-        authActionBtn.textContent = "Entrar";
-        authActionBtn.classList.remove('text-red-400');
-        loggedInStep.style.display = 'none';
-        if (authButtons) authButtons.style.display = 'block';
-        if (tableDataStep) tableDataStep.style.display = 'none';
-        if (registrationStep) registrationStep.style.display = 'none';
+    // Validação suave, já que o header do client.html não tem mais esses IDs
+    if (clientUserName && authActionBtn) {
+        if (user && !user.isAnonymous) {
+            clientUserName.textContent = user.displayName || user.name || "Cliente";
+            authActionBtn.textContent = "Sair";
+            authActionBtn.classList.add('text-red-400');
+        } else {
+            clientUserName.textContent = "Visitante";
+            authActionBtn.textContent = "Entrar";
+            authActionBtn.classList.remove('text-red-400');
+        }
     }
 }
 
 /**
- * Ação do botão "Entrar" / "Sair".
+ * Ação do botão "Entrar" / "Sair" do Header (SE ELE EXISTIR).
  */
 function handleAuthActionClick() {
-    if (localCurrentClientUser && !localCurrentClientUser.isAnonymous) {
+    if (localCurrentClientUser) { // Se está logado com Google
         signOut(auth).then(() => {
             console.log("Usuário deslogado.");
             showToast("Você saiu da sua conta.");
+            // O onAuthStateChanged vai lidar com a abertura do modal
         });
-    } else {
-        openAssociationModal('authOnly');
+    } else { // Se está deslogado
+        openAssociationModal();
     }
 }
 
@@ -302,7 +359,7 @@ async function loadMenu() {
         renderMenu(); 
         
         if (statusScreen) statusScreen.style.display = 'none';
-        if (mainContent) mainContent.style.display = 'block';
+        if (mainContent) mainContent.style.display = 'flex'; // 'flex' é o display do container
         
     } catch (error) {
         console.error("Erro ao carregar menu:", error);
@@ -346,16 +403,11 @@ function renderMenu() {
     }
     
     if (filteredProducts.length === 0) {
-        if (searchTerm && currentCategoryFilter === 'all') {
-            clientMenuContainer.innerHTML = `<div class="col-span-full text-center p-6 text-yellow-400 italic">Nenhum produto encontrado para "${searchTerm}".</div>`;
-        } else if (searchTerm && currentCategoryFilter !== 'all') {
-            clientMenuContainer.innerHTML = `<div class="col-span-full text-center p-6 text-yellow-400 italic">Nenhum produto para "${searchTerm}" nesta categoria.</div>`;
-        } else {
-             clientMenuContainer.innerHTML = `<div class="col-span-full text-center p-6 text-red-400 italic">Nenhum produto nesta categoria.</div>`;
-        }
+        clientMenuContainer.innerHTML = `<div class="col-span-full text-center p-6 text-yellow-400 italic">Nenhum produto encontrado.</div>`;
     } else {
         clientMenuContainer.innerHTML = filteredProducts.map(product => `
-            <div class="product-card bg-dark-card border border-gray-700 rounded-xl shadow-md flex flex-col overflow-hidden">
+            <!-- Card de Produto - Pega o ID para o clique -->
+            <div class="product-card bg-dark-card border border-dark-border rounded-xl shadow-md flex flex-col overflow-hidden" data-product-id="${product.id}">
                 <img src="${product.image}" alt="${product.name}" class="w-full h-32 object-cover">
                 
                 <div class="p-4 flex flex-col flex-grow">
@@ -364,16 +416,16 @@ function renderMenu() {
                     <div class="flex justify-between items-center mb-3">
                         <span class="font-bold text-lg text-brand-primary">${formatCurrency(product.price)}</span>
                         
-                        <button class="add-item-btn bg-brand-primary text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-brand-primary-dark transition"
-                                data-product='${JSON.stringify(product).replace(/'/g, '&#39;')}'>
+                        <!-- Botão Adicionar (só visual, clique é no card) -->
+                        <button class="add-item-btn bg-brand-primary text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-brand-primary-dark transition pointer-events-none">
                             <i class="fas fa-plus"></i>
                         </button>
                     </div>
 
                     <div class="flex-grow"></div>
                     
-                    <button class="info-item-btn w-full bg-dark-input text-dark-text font-semibold py-2 rounded-lg hover:bg-gray-600 transition text-sm"
-                            data-product='${JSON.stringify(product).replace(/'/g, '&#39;')}'>
+                    <!-- Botão Descrição -->
+                    <button class="info-item-btn w-full bg-dark-input text-dark-text font-semibold py-2 rounded-lg hover:bg-gray-600 transition text-sm">
                         Descrição
                     </button>
                 </div>
@@ -513,7 +565,7 @@ function _renderClientCart() {
     if (!cartItemsList) return;
 
     if (selectedItems.length === 0) {
-        cartItemsList.innerHTML = `<p class="text-dark-placeholder italic p-4 text-center">Seu carrinho está vazio.</p>`;
+        cartItemsList.innerHTML = `<div class="text-sm md:text-base text-dark-placeholder italic p-2">Nenhum item selecionado.</div>`;
     } else {
         const groupedItems = selectedItems.reduce((acc, item) => {
             const key = `${item.id}-${item.note || ''}`;
@@ -567,30 +619,25 @@ function _renderClientCart() {
 
 /**
  * Renderiza a tela principal do cliente (carrinho e contagem).
- * ===== ATUALIZAÇÃO: Aceita 'tableData' para desabilitar o botão =====
  */
 export function renderClientOrderScreen(tableData) {
     if (clientCartCount) {
         clientCartCount.textContent = selectedItems.length;
     }
     
-    // ===== INÍCIO DA LÓGICA DE DESABILITAR O BOTÃO =====
     if (sendOrderBtn) {
-        // Verifica se a notificação de fechamento de conta existe
         const billRequested = tableData?.waiterNotification?.includes('fechamento');
         
         if (billRequested) {
             sendOrderBtn.disabled = true;
-            sendOrderBtn.innerHTML = '<i class="fas fa-hourglass-half"></i>'; // Ícone de aguardando
+            sendOrderBtn.innerHTML = '<i class="fas fa-hourglass-half"></i>';
             sendOrderBtn.title = 'Aguardando fechamento da conta...';
         } else {
-            // Lógica normal
             sendOrderBtn.disabled = selectedItems.length === 0;
             sendOrderBtn.innerHTML = '<i class="fas fa-check-circle"></i>';
             sendOrderBtn.title = 'Enviar Pedido para Confirmação';
         }
     }
-    // ===== FIM DA LÓGICA DE DESABILITAR O BOTÃO =====
     
     _renderClientCart();
 }
@@ -600,48 +647,246 @@ export function renderClientOrderScreen(tableData) {
  * Lida com o clique em "Enviar Pedido".
  */
 function handleSendOrderClick() {
-    if (selectedItems.length === 0) return;
+    if (selectedItems.length === 0) {
+        showToast("Seu carrinho está vazio.", true);
+        return;
+    }
     
-    // Usa a variável 'localCurrentTableId' definida neste arquivo
-    if (localCurrentTableId) { 
-        sendOrderToFirebase();
+    // Se não há mesa, abre o modal de associação
+    if (!localCurrentTableId && !currentTableId) { 
+        openAssociationModal();
     } else {
-        openAssociationModal('sendOrder');
+        // Se já tem mesa, envia o pedido
+        sendOrderToFirebase();
+    }
+}
+
+// ==================================================================
+//               LÓGICA DE ABAS, AUTENTICAÇÃO E ATIVAÇÃO (ATUALIZADA)
+// ==================================================================
+
+/**
+ * Mostra uma aba específica no modal de associação.
+ * @param {string} tabName - O 'data-tab' da aba (ex: 'mesa', 'retirada')
+ */
+function showTab(tabName) {
+    if(!tabContents || !tabButtons) return;
+    // Esconde todos os conteúdos
+    tabContents.forEach(content => {
+        content.style.display = 'none';
+        content.classList.remove('active');
+    });
+    // Remove 'active' de todos os botões
+    tabButtons.forEach(button => {
+        button.classList.remove('active');
+    });
+
+    // Mostra o conteúdo e o botão da aba selecionada
+    const activeContent = document.getElementById(`tab-content-${tabName}`);
+    const activeButton = document.querySelector(`.client-tab-btn[data-tab="${tabName}"]`);
+    
+    if (activeContent) {
+        activeContent.style.display = 'block';
+        activeContent.classList.add('active');
+    }
+    if (activeButton) {
+        activeButton.classList.add('active');
     }
 }
 
 /**
- * Abre o modal de associação de mesa/login.
+ * Abre o modal de associação (login) e reseta para a aba 'mesa'.
  */
-function openAssociationModal(mode = 'sendOrder') {
-    if (!associationModal) return;
+function openAssociationModal() {
+    if (associationModal) {
+        if(assocErrorMsg) assocErrorMsg.style.display = 'none';
+        associationModal.style.display = 'flex';
+        showTab('mesa'); // Garante que a aba 'mesa' é a padrão
+        if (activateTableNumber) {
+            activateTableNumber.focus();
+        }
+    }
+}
 
-    // Reseta todos os steps e erros
-    assocErrorMsg.style.display = 'none';
-    if (registerErrorMsg) registerErrorMsg.style.display = 'none';
-    if (tableDataStep) tableDataStep.style.display = 'none';
-    if (registrationStep) registrationStep.style.display = 'none';
-    
-    const user = localCurrentClientUser;
-    const authButtons = document.getElementById('authButtons');
-    
-    if (user && !user.isAnonymous) {
-        if (authButtons) authButtons.style.display = 'none';
-        // A lógica de qual step mostrar é tratada pelo checkAndRegisterCustomer
+/**
+ * Fecha o modal de associação.
+ */
+function closeAssociationModal() {
+    if (associationModal) {
+        associationModal.style.display = 'none';
+    }
+}
+
+/**
+ * Abre o novo modal de cadastro.
+ */
+function openCustomerRegistrationModal() {
+    if (customerRegistrationModal && tempUserData) {
+        // Preenche o modal com os dados do Google
+        regCustomerName.textContent = tempUserData.name || 'Nome não encontrado';
+        regCustomerEmail.textContent = tempUserData.email || 'Email não encontrado';
+        regCustomerWhatsapp.value = ''; // Limpa campos
+        regCustomerBirthday.value = ''; // Limpa campos
+        if(regErrorMsg) regErrorMsg.style.display = 'none';
+        
+        // Mostra o modal
+        customerRegistrationModal.style.display = 'flex';
+        // Esconde o modal de associação
+        associationModal.style.display = 'none';
     } else {
-        if (authButtons) authButtons.style.display = 'block';
+        console.error("Não foi possível abrir o modal de registro. tempUserData:", tempUserData);
+    }
+}
+
+/**
+ * Fecha o modal de cadastro.
+ */
+function closeCustomerRegistrationModal() {
+    if (customerRegistrationModal) {
+        customerRegistrationModal.style.display = 'none';
+    }
+}
+
+
+/**
+ * Inicia o fluxo de login com Google.
+ */
+async function signInWithGoogle(e) {
+    e.preventDefault(); // Previne o submit do form
+    const provider = new GoogleAuthProvider();
+    try {
+        const result = await signInWithPopup(auth, provider);
+        // O listener 'onAuthStateChanged' vai pegar o resultado e continuar o fluxo.
+        console.log("Login com Google bem-sucedido, aguardando onAuthStateChanged...");
+    } catch (error) {
+        console.error("Erro no login com Google:", error);
+        showAssocError("Erro ao tentar logar com Google.");
+    }
+}
+
+/**
+ * Verifica se o usuário do Google já tem cadastro completo no Firestore.
+ * Se não tiver, abre o modal de cadastro.
+ * @param {object} user - O objeto User do Firebase Auth.
+ */
+async function checkCustomerRegistration(user) {
+    const customerRef = doc(getCustomersCollectionRef(), user.uid);
+    try {
+        const docSnap = await getDoc(customerRef);
+        if (docSnap.exists() && docSnap.data().phone) { // Verifica se tem 'phone' (whatsapp)
+            // Usuário existe E tem whatsapp (cadastro completo)
+            console.log("Cliente já cadastrado:", docSnap.data());
+            localCurrentClientUser.phone = docSnap.data().phone; // Atualiza o 'phone' local
+            updateCustomerInfo(user, false); // Atualiza a UI (não é novo)
+        } else {
+            // Usuário novo ou com cadastro incompleto
+            console.log("Cliente novo ou incompleto. Abrindo modal de cadastro.");
+            openCustomerRegistrationModal(); // Abre o novo modal de cadastro
+        }
+    } catch (error) {
+        console.error("Erro ao verificar cliente:", error);
+        showAssocError("Erro ao verificar seu cadastro.");
+    }
+}
+
+/**
+ * Lida com o salvamento do NOVO modal de cadastro (nascimento/whatsapp).
+ */
+async function handleNewCustomerRegistration(e) {
+    e.preventDefault();
+    if (!tempUserData) {
+        showAssocError("Erro: Dados do usuário perdidos. Tente logar novamente.");
+        return;
     }
 
-    // Configura o modal para o modo
-    if (mode === 'sendOrder') {
-        activateAndSendBtn.textContent = "Confirmar e Enviar";
-        activateAndSendBtn.dataset.mode = 'sendOrder';
-    } else { // mode === 'authOnly'
-        activateAndSendBtn.textContent = "Confirmar Login";
-        activateAndSendBtn.dataset.mode = 'authOnly';
+    const whatsapp = regCustomerWhatsapp.value;
+    const birthday = regCustomerBirthday.value;
+
+    if (!whatsapp || !birthday) {
+        regErrorMsg.textContent = "Por favor, preencha todos os campos.";
+        regErrorMsg.style.display = 'block';
+        return;
     }
+    regErrorMsg.style.display = 'none';
+
+    // Adiciona os novos dados ao objeto de usuário temporário
+    const completeUserData = {
+        ...tempUserData,
+        whatsapp: whatsapp,
+        nascimento: birthday
+    };
+
+    saveRegistrationBtn.disabled = true;
+    saveRegistrationBtn.textContent = "Salvando...";
+
+    try {
+        // Chama a função que salva no Firestore
+        await saveCustomerData(completeUserData);
+        
+        // Atualiza o 'phone' no usuário local
+        if(localCurrentClientUser) {
+            localCurrentClientUser.phone = whatsapp;
+        }
+
+        showToast("Cadastro concluído com sucesso!", false);
+        closeCustomerRegistrationModal(); // Fecha o modal de cadastro
+        
+        // Reabre o modal de associação, agora com o usuário logado
+        openAssociationModal(); 
+        updateCustomerInfo(localCurrentClientUser, false); // Atualiza a UI "Logado como:"
+
+    } catch (error) {
+        console.error("Erro ao salvar cadastro:", error);
+        regErrorMsg.textContent = "Falha ao salvar cadastro. Tente novamente.";
+        regErrorMsg.style.display = 'block';
+    } finally {
+        saveRegistrationBtn.disabled = false;
+        saveRegistrationBtn.textContent = "Salvar e Continuar";
+    }
+}
+
+/**
+ * Salva os dados do cliente no Firestore (Função ATUALIZADA).
+ * @param {object} userData - Objeto com dados do usuário (uid, name, email, photoURL, whatsapp, nascimento)
+ */
+async function saveCustomerData(userData) {
+    const customerRef = doc(getCustomersCollectionRef(), userData.uid);
+    const dataToSave = {
+        uid: userData.uid,
+        name: userData.name,
+        email: userData.email,
+        phone: userData.whatsapp,  // Salvando como 'phone'
+        birthday: userData.nascimento, // Salvando como 'birthday'
+        photoURL: userData.photoURL || null,
+        points: 0,
+        orderHistory: [],
+        vouchersUsed: [],
+        createdAt: serverTimestamp()
+    };
     
-    associationModal.style.display = 'flex';
+    // Usa setDoc com merge:true para criar ou atualizar o cadastro
+    await setDoc(customerRef, dataToSave, { merge: true });
+    console.log("Cadastro do cliente salvo no Firestore:", userData.uid);
+}
+
+
+/**
+ * Atualiza a UI no modal de associação com os dados do cliente.
+ * @param {object | null} user - O objeto User do Firebase Auth, ou null.
+ * @param {boolean} isNew - Flag se o usuário é novo (para não mostrar)
+ */
+function updateCustomerInfo(user, isNew = false) {
+    if (!loggedInStep || !loggedInUserName || !googleLoginBtn) return;
+    
+    if (user && !isNew) { // Só mostra se NÃO for um usuário novo (que está no outro modal)
+        loggedInStep.style.display = 'block';
+        loggedInUserName.textContent = user.displayName || user.email;
+        googleLoginBtn.style.display = 'none'; // Esconde o botão de login
+    } else {
+        loggedInStep.style.display = 'none';
+        loggedInUserName.textContent = '';
+        googleLoginBtn.style.display = 'flex'; // Mostra o botão de login
+    }
 }
 
 
@@ -650,78 +895,84 @@ function openAssociationModal(mode = 'sendOrder') {
 // ==================================================================
 
 /**
- * Lida com a confirmação final do modal (Ativar e Enviar).
+ * Lida com a ativação da mesa e envio do primeiro pedido (botão "Enviar Pedido").
+ * Esta é a versão ATUALIZADA que implementa a auto-abertura de mesa.
  */
-async function handleActivationAndSend() {
-    const mode = activateAndSendBtn.dataset.mode;
-    const user = localCurrentClientUser;
+async function handleActivationAndSend(e) {
+    e.preventDefault();
+    const tableId = activateTableNumber.value.trim();
     
-    if (!user) {
-        showAssocError("Você não está autenticado. Por favor, faça login.");
+    if (!tableId) {
+        showAssocError("Por favor, informe o número da mesa.");
+        activateTableNumber.focus();
         return;
     }
     
-    if (mode === 'authOnly') {
-         associationModal.style.display = 'none';
-         showToast(`Login como ${user.displayName} confirmado!`);
-         return;
-    }
-
-    // --- Modo 'sendOrder' ---
-    const tableNumber = activateTableNumber.value;
-    const clientId = user.uid;
-    
-    if (!tableNumber) {
-        showAssocError("Por favor, insira o número da mesa.");
+    // VERIFICAÇÃO: O usuário DEVE estar logado (Google) para ativar a mesa.
+    if (!localCurrentClientUser) {
+        showAssocError("Por favor, faça o login com Google para continuar.");
         return;
     }
 
+    console.log(`Tentando ativar mesa ${tableId} para o cliente ${localCurrentClientUser.uid}`);
+    
     activateAndSendBtn.disabled = true;
-    activateAndSendBtn.textContent = "Verificando...";
-    
-    try {
-        const tableRef = doc(db, 'artifacts', appId, 'public', 'data', 'tables', tableNumber);
-        const tableDoc = await getDoc(tableRef);
+    activateAndSendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Acessando...';
+    assocErrorMsg.style.display = 'none';
 
-        if (tableDoc.exists()) {
-            // ----- CENÁRIO A: A MESA JÁ EXISTE -----
-            const tableData = tableDoc.data();
+    try {
+        const tableRef = getTableDocRef(tableId);
+        const tableSnap = await getDoc(tableRef);
+
+        // --- LÓGICA DE ATIVAÇÃO ATUALIZADA ---
+
+        if (tableSnap.exists()) {
+            // --- CENÁRIO 1: A MESA EXISTE ---
+            const tableData = tableSnap.data();
+
+            if (tableData.status !== 'closed' && tableData.clientId && tableData.clientId !== localCurrentClientUser.uid) {
+                // CENÁRIO 1a: Mesa está aberta/ocupada por OUTRO cliente. BLOQUEAR.
+                throw new Error("Esta mesa está ocupada por outro cliente.");
             
-            if (tableData.status === 'open') {
-                if (tableData.clientId === clientId) {
-                    console.log(`Cliente ${clientId} reconectando à Mesa ${tableNumber}.`);
-                    localCurrentTableId = tableNumber; 
-                    window.setCurrentTable(tableNumber, true); // Seta no app.js
-                } else {
-                    throw new Error("Mesa já está em uso por outro cliente.");
-                }
             } else {
-                throw new Error("Mesa está fechada. Peça a um garçom para reabri-la.");
+                // CENÁRIO 1b: A mesa está:
+                // 1. Fechada (será reaberta)
+                // 2. Aberta e é minha (reconectando)
+                // 3. Aberta e livre (assumindo)
+                
+                console.log(`Mesa ${tableId} encontrada. Status: ${tableData.status || 'aberta'}. Conectando...`);
+                
+                // Desloga do Google, Loga Anonimamente para a sessão
+                await signOut(auth);
+                const anonUser = await signInAnonymously(auth);
+                console.log("Logado anonimamente para a sessão da mesa:", anonUser.user.uid);
+
+                // ATUALIZA a mesa, reabrindo-a se necessário
+                await updateDoc(tableRef, {
+                    clientId: localCurrentClientUser.uid, 
+                    clientName: localCurrentClientUser.displayName,
+                    clientPhone: localCurrentClientUser.phone || null,
+                    anonymousUid: anonUser.user.uid,
+                    status: 'open', // <-- Força a reabertura ou mantém aberta
+                    diners: tableData.diners || 1 // Mantém os comensais se já existiam
+                });
             }
-            
+        
         } else {
-            // ----- CENÁRIO B: A MESA NÃO EXISTE (AUTO-ABERTURA) -----
-            console.log(`Tentativa de auto-abertura da Mesa ${tableNumber} por ${clientId}.`);
+            // --- CENÁRIO 2: A MESA NÃO EXISTE ---
+            // Lógica de "Auto-abertura" que você pediu
+            console.log(`Mesa ${tableId} não encontrada. Criando (auto-abertura)...`);
             
-            const tablesCollection = getTablesCollectionRef();
-            const q = query(tablesCollection, 
-                            where('status', '==', 'open'), 
-                            where('clientId', '==', clientId));
-            
-            const querySnapshot = await getDocs(q);
-            
-            if (!querySnapshot.empty) {
-                const existingTable = querySnapshot.docs[0].id;
-                throw new Error(`Você já está ativo na Mesa ${existingTable}. Não é possível abrir duas mesas.`);
-            }
-            
-            console.log(`Abrindo nova Mesa ${tableNumber} para ${clientId}...`);
-            const customerData = await getCustomerData(clientId);
-            
+            // Desloga do Google, Loga Anonimamente
+            await signOut(auth);
+            const anonUser = await signInAnonymously(auth);
+            console.log("Logado anonimamente para a sessão da mesa:", anonUser.user.uid);
+
+            // CRIA o novo documento da mesa
             const newTableData = {
-                tableNumber: parseInt(tableNumber, 10),
+                tableNumber: parseInt(tableId, 10),
                 diners: 1, 
-                sector: 'Auto-Abertura', 
+                sector: 'Cliente', // Setor padrão para auto-abertura
                 status: 'open',
                 createdAt: serverTimestamp(),
                 total: 0,
@@ -729,102 +980,47 @@ async function handleActivationAndSend() {
                 payments: [],
                 serviceTaxApplied: true,
                 selectedItems: [], 
-                clientId: clientId,
-                clientName: customerData.name || user.displayName,
-                clientWhatsapp: customerData.whatsapp || null
+                requestedOrders: [], // Começa com array vazio
+                clientId: localCurrentClientUser.uid,
+                clientName: localCurrentClientUser.displayName,
+                clientPhone: localCurrentClientUser.phone || null,
+                anonymousUid: anonUser.user.uid
             };
-            
             await setDoc(tableRef, newTableData);
-            localCurrentTableId = tableNumber;
-            window.setCurrentTable(tableNumber, true); // Seta no app.js
+        }
+
+        // --- CAMINHO DE SUCESSO (Comum aos cenários 1b e 2) ---
+        
+        localCurrentTableId = tableId; // Define o ID da mesa localmente
+        setCurrentTable(tableId, true); // Define a mesa atual globalmente (no app.js)
+        
+        // Se houver itens no carrinho, envia o primeiro pedido
+        if (selectedItems.length > 0) {
+            await sendOrderToFirebase(); 
+        } else {
+            // Apenas atualiza o header
+            clientTableNumber.textContent = `Mesa ${tableId}`;
         }
         
-        // ----- SUCESSO -----
-        clientTableNumber.textContent = `Mesa ${localCurrentTableId}`;
-        await sendOrderToFirebase();
-        associationModal.style.display = 'none';
-        
-    } catch (e) {
-        console.error("Erro ao ativar/abrir mesa:", e);
-        showAssocError(e.message); 
+        showToast(`Mesa ${tableId} ativada! Bem-vindo(a)!`, false);
+        closeAssociationModal();
+
+    } catch (error) {
+        console.error("Erro ao ativar mesa:", error);
+        showAssocError(error.message);
+        // Se falhar, tenta relogar com Google
+        if (auth.currentUser && auth.currentUser.isAnonymous) {
+            await signOut(auth);
+        }
+        // Tenta logar no Google de novo para o usuário não ficar "preso"
+        if(googleLoginBtn) googleLoginBtn.click();
+
     } finally {
         activateAndSendBtn.disabled = false;
-        activateAndSendBtn.textContent = "Confirmar e Enviar";
+        activateAndSendBtn.innerHTML = 'Enviar Pedido';
     }
 }
 
-
-/**
- * Busca os dados de um cliente (como WhatsApp) do /customers
- */
-async function getCustomerData(uid) {
-    if (!uid) return { name: null, whatsapp: null };
-    
-    try {
-        const customerRef = doc(db, 'artifacts', appId, 'public', 'data', 'customers', uid);
-        const docSnap = await getDoc(customerRef);
-        
-        if (docSnap.exists()) {
-            return {
-                name: docSnap.data().name || null,
-                whatsapp: docSnap.data().whatsapp || null
-            };
-        }
-        return { name: null, whatsapp: null };
-    } catch (e) {
-        console.error("Erro ao buscar dados do cliente:", e);
-        return { name: null, whatsapp: null };
-    }
-}
-
-
-/**
- * Envia o pedido (carrinho) para o Firebase.
- */
-async function sendOrderToFirebase() {
-    const tableId = localCurrentTableId;
-    const user = localCurrentClientUser;
-
-    if (!tableId || selectedItems.length === 0) {
-        alert("Nenhum item ou mesa selecionada.");
-        return;
-    }
-
-    const orderId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-    
-    // Pega o 'phone' do usuário local, que foi atualizado pelo checkAndRegisterCustomer
-    const clientPhone = user.phone || null;
-
-    const newOrderRequest = {
-        orderId: orderId,
-        requestedAt: new Date().toISOString(),
-        clientInfo: {
-            uid: user?.uid,
-            name: user?.displayName,
-            phone: clientPhone 
-        },
-        items: selectedItems.map(item => ({ ...item })) 
-    };
-
-    try {
-        const tableRef = doc(db, 'artifacts', appId, 'public', 'data', 'tables', tableId);
-        
-        await updateDoc(tableRef, {
-            requestedOrders: arrayUnion(newOrderRequest),
-            clientOrderPending: true,
-            waiterNotification: "Novo Pedido do Cliente"
-        });
-
-        selectedItems.length = 0;
-        renderClientOrderScreen(); // Re-renderiza localmente
-        
-        showToast("Pedido enviado! Um garçom irá confirmar em breve.");
-        
-    } catch (e) {
-        console.error("Erro ao enviar pedido para o Firebase:", e);
-        showToast("Falha ao enviar o pedido. Tente novamente.", true);
-    }
-}
 
 /**
  * Exibe um erro no modal de associação.
@@ -837,7 +1033,7 @@ function showAssocError(message) {
 }
 
 // ==================================================================
-//               OBSERVAÇÕES RÁPIDAS (ATUALIZADO)
+//               OBSERVAÇÕES RÁPIDAS
 // ==================================================================
 
 /**
@@ -872,7 +1068,6 @@ export const fetchQuickObservations = async () => {
             return quickObsCache;
         }
         
-        // Esta linha agora funciona por causa da importação corrigida
         const q = query(getQuickObsCollectionRef(), orderBy('text', 'asc'));
         const querySnapshot = await getDocs(q);
         quickObsCache = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -891,133 +1086,53 @@ export const fetchQuickObservations = async () => {
 
 
 // ==================================================================
-//               LÓGICA DE AUTENTICAÇÃO (Google, Celular)
+//               LÓGICA DE ENVIO DE PEDIDO
 // ==================================================================
-
 /**
- * Inicia o login com Google.
+ * Envia o pedido (carrinho) para o Firebase.
  */
-function signInWithGoogle() {
-    const provider = new GoogleAuthProvider();
-    signInWithPopup(auth, provider)
-        .then((result) => {
-            const user = result.user;
-            showToast(`Bem-vindo, ${user.displayName}!`);
-        })
-        .catch((error) => {
-            console.error("Erro no login com Google:", error);
-            showAssocError("Falha no login com Google. Tente novamente.");
-        });
-}
+async function sendOrderToFirebase() {
+    const tableId = localCurrentTableId || currentTableId; // Pega o ID da mesa
 
-// ==================================================================
-//               LÓGICA DE REGISTRO DE CLIENTE (CRM)
-// ==================================================================
-
-/**
- * Salva os dados de registro (WhatsApp e Data de Nasc.) no Firestore.
- */
-async function handleCustomerRegistration() {
-    const user = localCurrentClientUser;
-    if (!user) {
-        showToast("Erro: Usuário não autenticado.", true);
+    if (!tableId || selectedItems.length === 0) {
+        alert("Nenhum item ou mesa selecionada.");
         return;
     }
 
-    const whatsapp = registerWhatsApp.value.replace(/\D/g, ''); 
-    const dob = registerDOB.value; 
-
-    if (whatsapp.length < 10) {
-        registerErrorMsg.textContent = "Por favor, insira um WhatsApp válido com DDD.";
-        registerErrorMsg.style.display = 'block';
-        return;
-    }
-    if (!dob) {
-        registerErrorMsg.textContent = "Por favor, insira sua data de nascimento.";
-        registerErrorMsg.style.display = 'block';
-        return;
-    }
-
-    registerErrorMsg.style.display = 'none';
-    confirmRegisterBtn.disabled = true;
-    confirmRegisterBtn.textContent = "Salvando...";
-
-    try {
-        const customerId = user.uid;
-        const customerRef = doc(db, 'artifacts', appId, 'public', 'data', 'customers', customerId);
-        
-        const customerData = {
-            uid: user.uid,
-            name: user.displayName || `Cliente ${user.uid.substring(0, 5)}`, 
-            email: user.email || null, 
-            phone: null, 
-            whatsapp: whatsapp,
-            dob: dob,
-            doc: customerId, 
-            createdAt: serverTimestamp(),
-            points: 0 // Inicia com 0 pontos
-        };
-
-        await setDoc(customerRef, customerData, { merge: true });
-        
-        showToast("Cadastro concluído! Obrigado.");
-        
-        await checkAndRegisterCustomer(auth.currentUser); 
-
-    } catch (e) {
-        console.error("Erro ao salvar cadastro:", e);
-        registerErrorMsg.textContent = "Erro ao salvar. Tente novamente.";
-        registerErrorMsg.style.display = 'block';
-    } finally {
-        confirmRegisterBtn.disabled = false;
-        confirmRegisterBtn.textContent = "Confirmar Cadastro";
-    }
-}
-
-
-/**
- * Verifica se o usuário logado já tem um cadastro completo (com WhatsApp).
- */
-async function checkAndRegisterCustomer(user) {
-    if (!user || user.isAnonymous) return;
+    const orderId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     
-    const customerId = user.uid;
-    const customerRef = doc(db, 'artifacts', appId, 'public', 'data', 'customers', customerId);
+    // Usa o usuário do Google (localCurrentClientUser) para os dados do cliente
+    const clientPhone = localCurrentClientUser?.phone || null;
+    const clientName = localCurrentClientUser?.displayName || 'Cliente';
+    const clientUid = localCurrentClientUser?.uid || 'N/A';
+
+    const newOrderRequest = {
+        orderId: orderId,
+        requestedAt: new Date().toISOString(),
+        clientInfo: {
+            uid: clientUid,
+            name: clientName,
+            phone: clientPhone 
+        },
+        items: selectedItems.map(item => ({ ...item })) 
+    };
 
     try {
-        const docSnap = await getDoc(customerRef);
+        const tableRef = getTableDocRef(tableId); 
         
-        if (docSnap.exists() && docSnap.data().whatsapp) {
-            // ----- CLIENTE JÁ CADASTRADO -----
-            console.log("Cliente já cadastrado:", customerId);
-            
-            // Atualiza o 'phone' do usuário local para o WhatsApp
-            localCurrentClientUser.phone = docSnap.data().whatsapp; 
+        await updateDoc(tableRef, {
+            requestedOrders: arrayUnion(newOrderRequest),
+            clientOrderPending: true,
+            waiterNotification: "Novo Pedido do Cliente"
+        });
 
-            if(registrationStep) registrationStep.style.display = 'none';
-            if(tableDataStep) tableDataStep.style.display = 'block';
-            
-        } else {
-            // ----- NOVO CLIENTE ou CADASTRO INCOMPLETO -----
-            console.log("Novo cliente. Exibindo formulário de registro.");
-            
-            if(tableDataStep) tableDataStep.style.display = 'none';
-            if(registrationStep) registrationStep.style.display = 'block';
-            
-            if (!docSnap.exists()) {
-                 await setDoc(customerRef, {
-                    uid: user.uid,
-                    name: user.displayName || `Cliente ${user.uid.substring(0, 5)}`,
-                    email: user.email || null, 
-                    createdAt: serverTimestamp(),
-                    points: 0 // Inicia com 0 pontos
-                 }, { merge: true });
-            }
-        }
+        selectedItems.length = 0;
+        renderClientOrderScreen(); // Re-renderiza localmente
+        
+        showToast("Pedido enviado! Um garçom irá confirmar em breve.");
+        
     } catch (e) {
-        console.error("Erro ao registrar/verificar cliente:", e);
-        showAssocError("Erro ao verificar seu cadastro. Tente novamente.");
-        if(tableDataStep) tableDataStep.style.display = 'none';
-        if(registrationStep) registrationStep.style.display = 'none';
+        console.error("Erro ao enviar pedido para o Firebase:", e);
+        showToast("Falha ao enviar o pedido. Tente novamente.", true);
     }
 }

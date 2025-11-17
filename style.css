@@ -286,3 +286,109 @@ input:checked + .slider-obs:before { transform: translateX(22px); }
 #menuItemsGridClient {
     gap: 3px;
 }
+
+/* Estilos para as Abas de CRM (do seu arquivo original) */
+.crm-tab-btn {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #9ca3af; /* gray-400 */
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+.crm-tab-btn:hover {
+    color: #d1d5db; /* gray-300 */
+}
+.crm-tab-btn.active {
+    color: #ff7518; /* pumpkin */
+    border-bottom-color: #ff7518;
+}
+.crm-tab-content {
+    display: none;
+    padding: 1rem;
+    background-color: #111827; /* dark-bg */
+    border-radius: 0 0 0.5rem 0.5rem;
+}
+.crm-tab-content.active {
+    display: block;
+}
+/* Esconde a barra de rolagem das abas */
+.crm-tabs-container::-webkit-scrollbar {
+    display: none;
+}
+.crm-tabs-container {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+
+/* ================================================= */
+/* ==== NOVOS ESTILOS PARA ABAS (Modal de Login) ==== */
+/* ================================================= */
+
+.client-tab-btn {
+    border-bottom: 2px solid transparent;
+    color: #6b7280; /* dark-placeholder */
+    transition: all 0.2s ease;
+    padding-top: 0.5rem;
+    padding-bottom: 0.75rem;
+}
+
+.client-tab-btn.active {
+    color: #ff7518; /* pumpkin */
+    border-bottom-color: #ff7518;
+}
+
+.client-tab-btn:not(.active):hover {
+    color: #d1d5db; /* dark-text */
+    border-bottom-color: #374151; /* dark-border */
+}
+
+.client-tab-content {
+    display: none; /* Escondido por padrão */
+}
+
+.client-tab-content.active {
+    display: block; /* Mostrado quando ativo */
+}
+
+/* Botões (copiados do seu style.css para garantir) */
+.btn-pumpkin {
+    background-color: #ff7518; /* bg-pumpkin */
+    color: white;
+    font-weight: 600; /* font-semibold */
+    padding: 0.75rem 1.25rem; /* py-3 px-5 */
+    border-radius: 0.5rem; /* rounded-lg */
+    transition: background-color 0.2s ease;
+}
+.btn-pumpkin:hover {
+    background-color: #e46815; /* pumpkin-dark */
+}
+.btn-pumpkin:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-secondary {
+    background-color: #374151; /* dark-input */
+    color: #d1d5db; /* dark-text */
+    font-weight: 600;
+    padding: 0.75rem 1.25rem;
+    border-radius: 0.5rem;
+    transition: background-color 0.2s ease;
+    border: 1px solid #4b5563;
+}
+.btn-secondary:hover {
+    background-color: #4b5563;
+}
+
+.btn-green {
+    background-color: #10B981; /* green-500 */
+    color: white;
+    font-weight: 600;
+    padding: 0.75rem 1.25rem;
+    border-radius: 0.5rem;
+    transition: background-color 0.2s ease;
+}
+.btn-green:hover {
+    background-color: #059669; /* green-600 */
+}
