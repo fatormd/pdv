@@ -4,18 +4,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- BLOCO PRINCIPAL DE DADOS ---
-    // Todas as suas coleções devem ser definidas DENTRO deste bloco.
     match /artifacts/{appId}/public/data {
 
-      // --- REGRA "VOUCHERS" (CORRIGIDA) ---
-      // Lógica: Permite que todos (Staff E Clientes) LEIAM.
-      // Apenas Gerentes (com role 'gerente') podem ESCREVER.
+      // --- REGRA "VOUCHERS" ---
       match /vouchers/{voucherId} {
-        // Clientes E Staff (qualquer auth) podem LER as regras.
         allow read: if request.auth != null;
-
-        // Apenas GERENTES (staff logado com a role correta) podem ESCREVER.
         allow write: if request.auth != null && 
                        request.auth.token.firebase.sign_in_provider != 'anonymous' &&
                        get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.token.email)).data.role == 'gerente';
@@ -28,69 +21,56 @@ service cloud.firestore {
                        request.auth.token.firebase.sign_in_provider != 'anonymous';
       }
 
-      // --- REGRA "USERS" (STAFF) ---
+      // --- REGRA "USERS" ---
       match /users/{userId} {
-        // Staff pode ler a lista de usuários
         allow read: if request.auth != null &&
                        request.auth.token.firebase.sign_in_provider != 'anonymous';
-        // Ninguém pode escrever (apenas Cloud Functions)
-        allow write: if false; 
+        allow write: if false;
       }
 
-      // --- REGRA "TABLES" (ATUALIZADA) ---
+      // --- REGRA "TABLES" (CORRIGIDA E ROBUSTA) ---
       match /tables/{tableId} {
-        // Staff tem acesso total
+        // 1. Staff tem acesso total
         allow read, write: if request.auth != null && 
                             request.auth.token.firebase.sign_in_provider != 'anonymous';
-                          
-        // Clientes podem ler a mesa
+                            
+        // 2. Clientes (Anônimos) podem LER a mesa
         allow read: if request.auth != null && 
                       request.auth.token.firebase.sign_in_provider == 'anonymous';
-                      
-        // Clientes (anônimos) podem ATUALIZAR campos permitidos
+
+        // 3. Clientes (Anônimos) podem CRIAR uma mesa (Auto-abertura)
+        allow create: if request.auth != null && 
+                       request.auth.token.firebase.sign_in_provider == 'anonymous';
+
+        // 4. Clientes podem ATUALIZAR campos específicos
+        // Usamos diff().affectedKeys() para validar APENAS o que está mudando
         allow update: if request.auth != null &&
                       request.auth.token.firebase.sign_in_provider == 'anonymous' &&
-                      request.resource.data.keys().subsetOf([
-                        'selectedItems', 
-                        'requestedOrders', 
-                        'clientOrderPending', 
-                        'waiterNotification',
-                        'clientName', 
-                        'clientId', 
-                        'clientDocType',
-                        'billRequested', // Permite ao cliente solicitar a conta
-                        // Campos que o Staff pode mudar (necessário para a regra)
-                        'status', 'diners', 'sector', 'createdAt', 'total', 'sentItems', 
-                        'payments', 'serviceTaxApplied', 'accessPin', 'lastKdsSentAt', 
-                        'masterTable', 'mergedTables', 'waiterId'
+                      request.resource.data.diff(resource.data).affectedKeys().subsetOf([
+                        // Dados de identificação do cliente
+                        'clientId', 'clientName', 'clientPhone', 'anonymousUid', 
+                        // Dados básicos da mesa
+                        'status', 'diners', 
+                        // Campos de pedidos e solicitações
+                        'requestedOrders', 'clientOrderPending', 'waiterNotification', 
+                        'billRequested', 'selectedItems'
                       ]);
       }
       
-      // --- REGRA "CUSTOMERS" (ATUALIZADA) ---
+      // --- REGRA "CUSTOMERS" ---
       match /customers/{customerId} {
-        // Staff tem acesso total
         allow read, write: if request.auth != null &&
                            request.auth.token.firebase.sign_in_provider != 'anonymous';
-        
-        // Cliente (anônimo ou logado) pode criar/atualizar seu próprio registro
-        allow write: if request.auth != null &&
+        allow read, write: if request.auth != null &&
                       request.auth.uid == customerId;
-                      
-        // Cliente logado pode ler seus próprios dados
-        allow read: if request.auth != null &&
-                     request.auth.uid == customerId;
       }
       
-      // --- REGRA "KDS" (COZINHA) ---
+      // --- REGRA "KDS" ---
       match /kds_orders/{orderId} {
         allow read, write: if request.auth != null &&
                            request.auth.token.firebase.sign_in_provider != 'anonymous';
       }
       
-      // --- REGRA DE BLOQUEIO PADRÃO (Catch-All) ---
-      // Esta regra deve vir por ÚLTIMO, dentro do bloco /data.
-      // Ela bloqueia o acesso a qualquer sub-coleção que NÃO foi
-      // definida acima (ex: /data/relatorios_secretos)
       match /{document=**} {
         allow read, write: if false;
       }

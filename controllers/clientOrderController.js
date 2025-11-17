@@ -1,12 +1,9 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (COM AUTO-ABERTURA DE MESA) ---
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (CORRIGIDO) ---
 
-// ===== CORREÇÃO CRÍTICA: Adiciona getTableDocRef e getCustomersCollectionRef =====
 import { db, auth, getQuickObsCollectionRef, appId, getTablesCollectionRef, getTableDocRef, getCustomersCollectionRef } from "/services/firebaseService.js";
 import { formatCurrency } from "/utils.js";
 import { getProducts, getCategories, fetchWooCommerceProducts, fetchWooCommerceCategories } from "/services/wooCommerceService.js";
-// ===== CORREÇÃO: Adiciona setDoc (para criar a mesa) =====
 import { onSnapshot, doc, updateDoc, arrayUnion, arrayRemove, setDoc, getDoc, getDocs, query, where, serverTimestamp, orderBy, increment, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-// Importações completas do Auth
 import { GoogleAuthProvider, signInWithPopup, signInAnonymously, RecaptchaVerifier, signInWithPhoneNumber, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
 // Importa do app.js
@@ -20,7 +17,7 @@ let currentCategoryFilter = 'all';
 const ESPERA_KEY = "(EM ESPERA)"; 
 let orderControllerInitialized = false;
 
-// --- NOVO: Variáveis do Novo Fluxo ---
+// --- Variáveis do Novo Fluxo ---
 let localCurrentTableId = null;    // ID da mesa ativa
 let localCurrentClientUser = null; // Guarda o usuário logado (Google)
 let tempUserData = null;           // Guarda dados do Google temporariamente antes do cadastro
@@ -34,7 +31,7 @@ let statusScreen, mainContent, appContainer;
 let searchProductInputClient; 
 let clientObsModal, clientObsText, clientQuickObsButtons, clientConfirmObsBtn, clientCancelObsBtn;
 
-// --- NOVO: Elementos das Abas e do Novo Modal ---
+// --- Elementos das Abas e do Novo Modal ---
 let tabButtons, tabContents;
 let customerRegistrationModal, customerRegistrationForm, saveRegistrationBtn;
 let regCustomerName, regCustomerEmail, regCustomerWhatsapp, regCustomerBirthday, regErrorMsg;
@@ -70,7 +67,7 @@ export const initClientOrderController = () => {
     activateTableNumber = document.getElementById('activateTableNumber'); // Input do Nº da Mesa
     
     // ==================================================================
-    //               NOVA LÓGICA DE ABAS E CADASTRO
+    //               LÓGICA DE ABAS E CADASTRO
     // ==================================================================
 
     // Mapeamento das Abas
@@ -98,7 +95,6 @@ export const initClientOrderController = () => {
     if(customerRegistrationForm) {
         customerRegistrationForm.addEventListener('submit', handleNewCustomerRegistration);
     }
-    // ==================================================================
     
     // Mapeamento do Modal Obs
     clientObsModal = document.getElementById('clientObsModal'); 
@@ -107,7 +103,7 @@ export const initClientOrderController = () => {
     clientConfirmObsBtn = document.getElementById('clientConfirmObsBtn');
     clientCancelObsBtn = document.getElementById('clientCancelObsBtn'); 
 
-    if (clientObsModal) { // Verifica se os elementos do modal existem
+    if (clientObsModal) {
         // Listener Modal Obs: Botões Rápidos
         if (clientQuickObsButtons) {
             clientQuickObsButtons.addEventListener('click', (e) => {
@@ -160,7 +156,7 @@ export const initClientOrderController = () => {
 
                 if (updated) {
                     clientObsModal.style.display = 'none';
-                    renderClientOrderScreen(); // Re-renderiza localmente (sem snapshot)
+                    renderClientOrderScreen(); 
                 } else {
                     console.warn("Nenhum item encontrado para atualizar a observação.");
                     clientObsModal.style.display = 'none';
@@ -172,21 +168,17 @@ export const initClientOrderController = () => {
         if (clientCancelObsBtn) {
             clientCancelObsBtn.addEventListener('click', () => {
                 clientObsModal.style.display = 'none';
-                renderClientOrderScreen(); // Re-renderiza localmente (sem snapshot)
+                renderClientOrderScreen(); 
             });
         }
-    } else {
-        console.warn("[ClientOrder] Modal de Observação (clientObsModal) não encontrado.");
     }
 
-
-    // Listeners principais (Login, Envio)
+    // Listeners principais
     if (sendOrderBtn) sendOrderBtn.onclick = handleSendOrderClick;
     if (authActionBtn) authActionBtn.onclick = handleAuthActionClick;
     if (googleLoginBtn) googleLoginBtn.onclick = signInWithGoogle;
-    if (activationForm) activationForm.onsubmit = handleActivationAndSend; // Lida com o "Enviar Pedido"
+    if (activationForm) activationForm.onsubmit = handleActivationAndSend;
     
-    // Botão Cancelar do Modal de Associação
     const cancelBtn = document.getElementById('cancelActivationBtn');
     if (cancelBtn) {
         cancelBtn.addEventListener('click', (e) => {
@@ -195,22 +187,18 @@ export const initClientOrderController = () => {
         });
     }
 
-
     // Delegação de eventos para o menu
     if (clientMenuContainer) {
         clientMenuContainer.addEventListener('click', (e) => {
             const card = e.target.closest('.product-card');
             if (!card) return;
 
-            // Pega o produto do Cache
             const product = getProducts().find(p => p.id == card.dataset.productId);
             if (!product) return;
 
-            // Se o clique foi no botão de info, mostra info
             if (e.target.closest('.info-item-btn')) {
                  openProductInfoModal(product);
             } else {
-            // Qualquer outro clique no card adiciona ao carrinho
                  addItemToCart(product);
             }
         });
@@ -246,18 +234,12 @@ export const initClientOrderController = () => {
         });
     }
     
-    // Listener da Barra de Busca
     if (searchProductInputClient) {
         searchProductInputClient.addEventListener('input', renderMenu);
     }
 
-    // Gerencia o estado de autenticação
     setupAuthStateObserver();
-    
-    // Busca os produtos
     loadMenu(); 
-
-    // Busca as observações rápidas
     fetchQuickObservations(); 
     
     orderControllerInitialized = true;
@@ -272,22 +254,19 @@ function setupAuthStateObserver() {
         if (user && !user.isAnonymous) {
             // --- USUÁRIO LOGADO COM GOOGLE ---
             console.log("[ClientOrder] Usuário Google Autenticado:", user.displayName);
-            localCurrentClientUser = user; // Armazena o usuário
-            tempUserData = { // Salva dados temporários
+            localCurrentClientUser = user; 
+            tempUserData = { 
                 uid: user.uid,
                 name: user.displayName,
                 email: user.email,
                 photoURL: user.photoURL
             };
-            updateAuthUI(user); // Atualiza o header (Nome, "Sair")
-            // Verifica se o usuário já tem cadastro completo
+            updateAuthUI(user);
             checkCustomerRegistration(user); 
         
         } else if (user && user.isAnonymous) {
-             // --- USUÁRIO ANÔNIMO (JÁ ASSOCIADO A UMA MESA) ---
-             console.log("[ClientOrder] Usuário Anônimo Autenticado (Mesa Ativa).");
-             // Isso acontece DEPOIS do handleActivationAndSend.
-             // O localCurrentClientUser (Google) ainda está na memória.
+             // --- USUÁRIO ANÔNIMO ---
+             console.log("[ClientOrder] Usuário Anônimo Autenticado.");
              closeAssociationModal();
              closeCustomerRegistrationModal();
         } else {
@@ -295,10 +274,9 @@ function setupAuthStateObserver() {
             console.log("[ClientOrder] Nenhum usuário autenticado.");
             localCurrentClientUser = null;
             tempUserData = null;
-            updateAuthUI(null); // Limpa a UI do header (Visitante, "Entrar")
-            updateCustomerInfo(null, false); // Limpa o "Logado como:" no modal
+            updateAuthUI(null);
+            updateCustomerInfo(null, false);
             
-            // Se não estiver em uma mesa, abre o modal de login
             if (!currentTableId) {
                 openAssociationModal();
             }
@@ -306,11 +284,7 @@ function setupAuthStateObserver() {
     });
 }
 
-/**
- * Atualiza a UI (do Header) com base no estado de login.
- */
 function updateAuthUI(user) {
-    // Validação suave, já que o header do client.html não tem mais esses IDs
     if (clientUserName && authActionBtn) {
         if (user && !user.isAnonymous) {
             clientUserName.textContent = user.displayName || user.name || "Cliente";
@@ -324,29 +298,19 @@ function updateAuthUI(user) {
     }
 }
 
-/**
- * Ação do botão "Entrar" / "Sair" do Header (SE ELE EXISTIR).
- */
 function handleAuthActionClick() {
-    if (localCurrentClientUser) { // Se está logado com Google
+    if (localCurrentClientUser) {
         signOut(auth).then(() => {
-            console.log("Usuário deslogado.");
             showToast("Você saiu da sua conta.");
-            // O onAuthStateChanged vai lidar com a abertura do modal
         });
-    } else { // Se está deslogado
+    } else {
         openAssociationModal();
     }
 }
 
-/**
- * Carrega o menu (categorias e produtos).
- */
 async function loadMenu() {
     try {
-        console.log("[ClientOrder] Buscando categorias...");
         const categories = await fetchWooCommerceCategories();
-        console.log("[ClientOrder] Buscando produtos...");
         const products = await fetchWooCommerceProducts();
         
         if (categories.length > 0 && clientCategoryFilters) {
@@ -359,7 +323,7 @@ async function loadMenu() {
         renderMenu(); 
         
         if (statusScreen) statusScreen.style.display = 'none';
-        if (mainContent) mainContent.style.display = 'flex'; // 'flex' é o display do container
+        if (mainContent) mainContent.style.display = 'flex'; 
         
     } catch (error) {
         console.error("Erro ao carregar menu:", error);
@@ -367,10 +331,6 @@ async function loadMenu() {
     }
 }
 
-
-/**
- * Renderiza os produtos no menu.
- */
 function renderMenu() {
     if (!clientMenuContainer) return;
     
@@ -406,25 +366,17 @@ function renderMenu() {
         clientMenuContainer.innerHTML = `<div class="col-span-full text-center p-6 text-yellow-400 italic">Nenhum produto encontrado.</div>`;
     } else {
         clientMenuContainer.innerHTML = filteredProducts.map(product => `
-            <!-- Card de Produto - Pega o ID para o clique -->
             <div class="product-card bg-dark-card border border-dark-border rounded-xl shadow-md flex flex-col overflow-hidden" data-product-id="${product.id}">
                 <img src="${product.image}" alt="${product.name}" class="w-full h-32 object-cover">
-                
                 <div class="p-4 flex flex-col flex-grow">
                     <h4 class="font-semibold text-base text-white mb-2 min-h-[2.5rem]">${product.name}</h4>
-                    
                     <div class="flex justify-between items-center mb-3">
                         <span class="font-bold text-lg text-brand-primary">${formatCurrency(product.price)}</span>
-                        
-                        <!-- Botão Adicionar (só visual, clique é no card) -->
                         <button class="add-item-btn bg-brand-primary text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-brand-primary-dark transition pointer-events-none">
                             <i class="fas fa-plus"></i>
                         </button>
                     </div>
-
                     <div class="flex-grow"></div>
-                    
-                    <!-- Botão Descrição -->
                     <button class="info-item-btn w-full bg-dark-input text-dark-text font-semibold py-2 rounded-lg hover:bg-gray-600 transition text-sm">
                         Descrição
                     </button>
@@ -434,14 +386,8 @@ function renderMenu() {
     }
 }
 
-/**
- * Adiciona um item ao carrinho local (selectedItems) e abre o modal de observação.
- */
 function addItemToCart(product) {
-    if (!product || !product.id) {
-         console.error("Tentativa de adicionar produto inválido:", product);
-         return;
-    }
+    if (!product || !product.id) return;
 
     const newItem = {
         id: product.id,
@@ -457,9 +403,6 @@ function addItemToCart(product) {
     openClientObsModal(product.id, '');
 }
 
-/**
- * Aumenta a quantidade de um item no carrinho.
- */
 function increaseCartItemQuantity(itemId, noteKey) {
     const itemToCopy = selectedItems.findLast(item =>
         item.id == itemId && (item.note || '') === noteKey
@@ -471,9 +414,6 @@ function increaseCartItemQuantity(itemId, noteKey) {
     }
 }
 
-/**
- * Diminui a quantidade de um item no carrinho.
- */
 function decreaseCartItemQuantity(itemId, noteKey) {
     let indexToRemove = -1;
     for (let i = selectedItems.length - 1; i >= 0; i--) {
@@ -489,9 +429,6 @@ function decreaseCartItemQuantity(itemId, noteKey) {
     }
 }
 
-/**
- * Abre o modal de informações do produto.
- */
 function openProductInfoModal(product) {
     if (!product) return;
 
@@ -503,10 +440,7 @@ function openProductInfoModal(product) {
     const descEl = document.getElementById('infoProductDescription');
     const addBtn = document.getElementById('infoProductAddBtn');
 
-    if (!modal || !img || !nameEl || !priceEl || !descEl || !addBtn || !imgLink) {
-        console.error("Elementos do modal de informação do produto não encontrados!");
-        return;
-    }
+    if (!modal || !img || !nameEl || !priceEl || !descEl || !addBtn || !imgLink) return;
 
     img.src = product.image || 'https://placehold.co/600x400/1f2937/d1d5db?text=Produto';
     img.alt = product.name;
@@ -527,19 +461,12 @@ function openProductInfoModal(product) {
     modal.style.display = 'flex';
 }
 
-
-/**
- * Abre o modal de observação para o cliente.
- */
 function openClientObsModal(itemId, noteKey) {
     const products = getProducts();
     const product = products.find(p => p.id == itemId);
     const esperaSwitch = document.getElementById('esperaSwitch'); 
 
-    if (!clientObsModal || !clientObsText || !product || !esperaSwitch) {
-        console.error("Erro: Elementos do modal OBS, switch ou produto não encontrados.");
-        return;
-    }
+    if (!clientObsModal || !clientObsText || !product || !esperaSwitch) return;
 
     const regexEspera = new RegExp(ESPERA_KEY.replace('(', '\\(').replace(')', '\\)'), 'ig');
     const isEspera = regexEspera.test(noteKey);
@@ -557,9 +484,6 @@ function openClientObsModal(itemId, noteKey) {
     clientObsModal.style.display = 'flex';
 }
 
-/**
- * Renderiza o carrinho do cliente (chamado pela renderClientOrderScreen).
- */
 function _renderClientCart() {
     const cartItemsList = document.getElementById('client-cart-items-list');
     if (!cartItemsList) return;
@@ -617,9 +541,6 @@ function _renderClientCart() {
     }
 }
 
-/**
- * Renderiza a tela principal do cliente (carrinho e contagem).
- */
 export function renderClientOrderScreen(tableData) {
     if (clientCartCount) {
         clientCartCount.textContent = selectedItems.length;
@@ -638,50 +559,37 @@ export function renderClientOrderScreen(tableData) {
             sendOrderBtn.title = 'Enviar Pedido para Confirmação';
         }
     }
-    
     _renderClientCart();
 }
 
 
-/**
- * Lida com o clique em "Enviar Pedido".
- */
 function handleSendOrderClick() {
     if (selectedItems.length === 0) {
         showToast("Seu carrinho está vazio.", true);
         return;
     }
     
-    // Se não há mesa, abre o modal de associação
     if (!localCurrentTableId && !currentTableId) { 
         openAssociationModal();
     } else {
-        // Se já tem mesa, envia o pedido
         sendOrderToFirebase();
     }
 }
 
 // ==================================================================
-//               LÓGICA DE ABAS, AUTENTICAÇÃO E ATIVAÇÃO (ATUALIZADA)
+//               LÓGICA DE ABAS, AUTENTICAÇÃO E ATIVAÇÃO
 // ==================================================================
 
-/**
- * Mostra uma aba específica no modal de associação.
- * @param {string} tabName - O 'data-tab' da aba (ex: 'mesa', 'retirada')
- */
 function showTab(tabName) {
     if(!tabContents || !tabButtons) return;
-    // Esconde todos os conteúdos
     tabContents.forEach(content => {
         content.style.display = 'none';
         content.classList.remove('active');
     });
-    // Remove 'active' de todos os botões
     tabButtons.forEach(button => {
         button.classList.remove('active');
     });
 
-    // Mostra o conteúdo e o botão da aba selecionada
     const activeContent = document.getElementById(`tab-content-${tabName}`);
     const activeButton = document.querySelector(`.client-tab-btn[data-tab="${tabName}"]`);
     
@@ -694,53 +602,36 @@ function showTab(tabName) {
     }
 }
 
-/**
- * Abre o modal de associação (login) e reseta para a aba 'mesa'.
- */
 function openAssociationModal() {
     if (associationModal) {
         if(assocErrorMsg) assocErrorMsg.style.display = 'none';
         associationModal.style.display = 'flex';
-        showTab('mesa'); // Garante que a aba 'mesa' é a padrão
+        showTab('mesa'); 
         if (activateTableNumber) {
             activateTableNumber.focus();
         }
     }
 }
 
-/**
- * Fecha o modal de associação.
- */
 function closeAssociationModal() {
     if (associationModal) {
         associationModal.style.display = 'none';
     }
 }
 
-/**
- * Abre o novo modal de cadastro.
- */
 function openCustomerRegistrationModal() {
     if (customerRegistrationModal && tempUserData) {
-        // Preenche o modal com os dados do Google
         regCustomerName.textContent = tempUserData.name || 'Nome não encontrado';
         regCustomerEmail.textContent = tempUserData.email || 'Email não encontrado';
-        regCustomerWhatsapp.value = ''; // Limpa campos
-        regCustomerBirthday.value = ''; // Limpa campos
+        regCustomerWhatsapp.value = ''; 
+        regCustomerBirthday.value = ''; 
         if(regErrorMsg) regErrorMsg.style.display = 'none';
         
-        // Mostra o modal
         customerRegistrationModal.style.display = 'flex';
-        // Esconde o modal de associação
         associationModal.style.display = 'none';
-    } else {
-        console.error("Não foi possível abrir o modal de registro. tempUserData:", tempUserData);
     }
 }
 
-/**
- * Fecha o modal de cadastro.
- */
 function closeCustomerRegistrationModal() {
     if (customerRegistrationModal) {
         customerRegistrationModal.style.display = 'none';
@@ -748,40 +639,26 @@ function closeCustomerRegistrationModal() {
 }
 
 
-/**
- * Inicia o fluxo de login com Google.
- */
 async function signInWithGoogle(e) {
-    e.preventDefault(); // Previne o submit do form
+    e.preventDefault(); 
     const provider = new GoogleAuthProvider();
     try {
-        const result = await signInWithPopup(auth, provider);
-        // O listener 'onAuthStateChanged' vai pegar o resultado e continuar o fluxo.
-        console.log("Login com Google bem-sucedido, aguardando onAuthStateChanged...");
+        await signInWithPopup(auth, provider);
     } catch (error) {
         console.error("Erro no login com Google:", error);
         showAssocError("Erro ao tentar logar com Google.");
     }
 }
 
-/**
- * Verifica se o usuário do Google já tem cadastro completo no Firestore.
- * Se não tiver, abre o modal de cadastro.
- * @param {object} user - O objeto User do Firebase Auth.
- */
 async function checkCustomerRegistration(user) {
     const customerRef = doc(getCustomersCollectionRef(), user.uid);
     try {
         const docSnap = await getDoc(customerRef);
-        if (docSnap.exists() && docSnap.data().phone) { // Verifica se tem 'phone' (whatsapp)
-            // Usuário existe E tem whatsapp (cadastro completo)
-            console.log("Cliente já cadastrado:", docSnap.data());
-            localCurrentClientUser.phone = docSnap.data().phone; // Atualiza o 'phone' local
-            updateCustomerInfo(user, false); // Atualiza a UI (não é novo)
+        if (docSnap.exists() && docSnap.data().phone) { 
+            localCurrentClientUser.phone = docSnap.data().phone; 
+            updateCustomerInfo(user, false); 
         } else {
-            // Usuário novo ou com cadastro incompleto
-            console.log("Cliente novo ou incompleto. Abrindo modal de cadastro.");
-            openCustomerRegistrationModal(); // Abre o novo modal de cadastro
+            openCustomerRegistrationModal();
         }
     } catch (error) {
         console.error("Erro ao verificar cliente:", error);
@@ -789,9 +666,6 @@ async function checkCustomerRegistration(user) {
     }
 }
 
-/**
- * Lida com o salvamento do NOVO modal de cadastro (nascimento/whatsapp).
- */
 async function handleNewCustomerRegistration(e) {
     e.preventDefault();
     if (!tempUserData) {
@@ -809,7 +683,6 @@ async function handleNewCustomerRegistration(e) {
     }
     regErrorMsg.style.display = 'none';
 
-    // Adiciona os novos dados ao objeto de usuário temporário
     const completeUserData = {
         ...tempUserData,
         whatsapp: whatsapp,
@@ -820,21 +693,14 @@ async function handleNewCustomerRegistration(e) {
     saveRegistrationBtn.textContent = "Salvando...";
 
     try {
-        // Chama a função que salva no Firestore
         await saveCustomerData(completeUserData);
-        
-        // Atualiza o 'phone' no usuário local
         if(localCurrentClientUser) {
             localCurrentClientUser.phone = whatsapp;
         }
-
         showToast("Cadastro concluído com sucesso!", false);
-        closeCustomerRegistrationModal(); // Fecha o modal de cadastro
-        
-        // Reabre o modal de associação, agora com o usuário logado
+        closeCustomerRegistrationModal(); 
         openAssociationModal(); 
-        updateCustomerInfo(localCurrentClientUser, false); // Atualiza a UI "Logado como:"
-
+        updateCustomerInfo(localCurrentClientUser, false); 
     } catch (error) {
         console.error("Erro ao salvar cadastro:", error);
         regErrorMsg.textContent = "Falha ao salvar cadastro. Tente novamente.";
@@ -845,61 +711,44 @@ async function handleNewCustomerRegistration(e) {
     }
 }
 
-/**
- * Salva os dados do cliente no Firestore (Função ATUALIZADA).
- * @param {object} userData - Objeto com dados do usuário (uid, name, email, photoURL, whatsapp, nascimento)
- */
 async function saveCustomerData(userData) {
     const customerRef = doc(getCustomersCollectionRef(), userData.uid);
     const dataToSave = {
         uid: userData.uid,
         name: userData.name,
         email: userData.email,
-        phone: userData.whatsapp,  // Salvando como 'phone'
-        birthday: userData.nascimento, // Salvando como 'birthday'
+        phone: userData.whatsapp,  
+        birthday: userData.nascimento, 
         photoURL: userData.photoURL || null,
         points: 0,
         orderHistory: [],
         vouchersUsed: [],
         createdAt: serverTimestamp()
     };
-    
-    // Usa setDoc com merge:true para criar ou atualizar o cadastro
     await setDoc(customerRef, dataToSave, { merge: true });
-    console.log("Cadastro do cliente salvo no Firestore:", userData.uid);
 }
 
-
-/**
- * Atualiza a UI no modal de associação com os dados do cliente.
- * @param {object | null} user - O objeto User do Firebase Auth, ou null.
- * @param {boolean} isNew - Flag se o usuário é novo (para não mostrar)
- */
 function updateCustomerInfo(user, isNew = false) {
     if (!loggedInStep || !loggedInUserName || !googleLoginBtn) return;
     
-    if (user && !isNew) { // Só mostra se NÃO for um usuário novo (que está no outro modal)
+    if (user && !isNew) { 
         loggedInStep.style.display = 'block';
         loggedInUserName.textContent = user.displayName || user.email;
-        googleLoginBtn.style.display = 'none'; // Esconde o botão de login
+        googleLoginBtn.style.display = 'none'; 
     } else {
         loggedInStep.style.display = 'none';
         loggedInUserName.textContent = '';
-        googleLoginBtn.style.display = 'flex'; // Mostra o botão de login
+        googleLoginBtn.style.display = 'flex'; 
     }
 }
 
-
 // ==================================================================
-//               LÓGICA DE ATIVAÇÃO DE MESA (REESCRITA)
+//               LÓGICA DE ATIVAÇÃO DE MESA
 // ==================================================================
 
-/**
- * Lida com a ativação da mesa e envio do primeiro pedido (botão "Enviar Pedido").
- * Esta é a versão ATUALIZADA que implementa a auto-abertura de mesa.
- */
 async function handleActivationAndSend(e) {
-    e.preventDefault();
+    if (e) e.preventDefault(); 
+    
     const tableId = activateTableNumber.value.trim();
     
     if (!tableId) {
@@ -908,7 +757,6 @@ async function handleActivationAndSend(e) {
         return;
     }
     
-    // VERIFICAÇÃO: O usuário DEVE estar logado (Google) para ativar a mesa.
     if (!localCurrentClientUser) {
         showAssocError("Por favor, faça o login com Google para continuar.");
         return;
@@ -924,55 +772,51 @@ async function handleActivationAndSend(e) {
         const tableRef = getTableDocRef(tableId);
         const tableSnap = await getDoc(tableRef);
 
-        // --- LÓGICA DE ATIVAÇÃO ATUALIZADA ---
+        // CRÍTICO: Define a mesa localmente ANTES de trocar o usuário.
+        localCurrentTableId = tableId; 
+        setCurrentTable(tableId, true); 
+
+        const clientData = {
+            uid: localCurrentClientUser.uid,
+            name: localCurrentClientUser.displayName,
+            phone: localCurrentClientUser.phone || null
+        };
 
         if (tableSnap.exists()) {
             // --- CENÁRIO 1: A MESA EXISTE ---
             const tableData = tableSnap.data();
 
-            if (tableData.status !== 'closed' && tableData.clientId && tableData.clientId !== localCurrentClientUser.uid) {
-                // CENÁRIO 1a: Mesa está aberta/ocupada por OUTRO cliente. BLOQUEAR.
+            if (tableData.status !== 'closed' && tableData.clientId && tableData.clientId !== clientData.uid) {
+                localCurrentTableId = null;
+                setCurrentTable(null, true);
                 throw new Error("Esta mesa está ocupada por outro cliente.");
+            } 
             
-            } else {
-                // CENÁRIO 1b: A mesa está:
-                // 1. Fechada (será reaberta)
-                // 2. Aberta e é minha (reconectando)
-                // 3. Aberta e livre (assumindo)
-                
-                console.log(`Mesa ${tableId} encontrada. Status: ${tableData.status || 'aberta'}. Conectando...`);
-                
-                // Desloga do Google, Loga Anonimamente para a sessão
-                await signOut(auth);
-                const anonUser = await signInAnonymously(auth);
-                console.log("Logado anonimamente para a sessão da mesa:", anonUser.user.uid);
-
-                // ATUALIZA a mesa, reabrindo-a se necessário
-                await updateDoc(tableRef, {
-                    clientId: localCurrentClientUser.uid, 
-                    clientName: localCurrentClientUser.displayName,
-                    clientPhone: localCurrentClientUser.phone || null,
-                    anonymousUid: anonUser.user.uid,
-                    status: 'open', // <-- Força a reabertura ou mantém aberta
-                    diners: tableData.diners || 1 // Mantém os comensais se já existiam
-                });
-            }
-        
-        } else {
-            // --- CENÁRIO 2: A MESA NÃO EXISTE ---
-            // Lógica de "Auto-abertura" que você pediu
-            console.log(`Mesa ${tableId} não encontrada. Criando (auto-abertura)...`);
+            console.log(`Mesa ${tableId} encontrada. Conectando...`);
             
-            // Desloga do Google, Loga Anonimamente
             await signOut(auth);
             const anonUser = await signInAnonymously(auth);
-            console.log("Logado anonimamente para a sessão da mesa:", anonUser.user.uid);
+            
+            await updateDoc(tableRef, {
+                clientId: clientData.uid, 
+                clientName: clientData.name,
+                clientPhone: clientData.phone,
+                anonymousUid: anonUser.user.uid,
+                status: 'open',
+                diners: tableData.diners || 1 
+            });
+        
+        } else {
+            // --- CENÁRIO 2: A MESA NÃO EXISTE (Auto-abertura) ---
+            console.log(`Mesa ${tableId} não encontrada. Criando...`);
+            
+            await signOut(auth);
+            const anonUser = await signInAnonymously(auth);
 
-            // CRIA o novo documento da mesa
             const newTableData = {
                 tableNumber: parseInt(tableId, 10),
                 diners: 1, 
-                sector: 'Cliente', // Setor padrão para auto-abertura
+                sector: 'Cliente',
                 status: 'open',
                 createdAt: serverTimestamp(),
                 total: 0,
@@ -980,26 +824,22 @@ async function handleActivationAndSend(e) {
                 payments: [],
                 serviceTaxApplied: true,
                 selectedItems: [], 
-                requestedOrders: [], // Começa com array vazio
-                clientId: localCurrentClientUser.uid,
-                clientName: localCurrentClientUser.displayName,
-                clientPhone: localCurrentClientUser.phone || null,
+                requestedOrders: [],
+                clientId: clientData.uid,
+                clientName: clientData.name,
+                clientPhone: clientData.phone,
                 anonymousUid: anonUser.user.uid
             };
             await setDoc(tableRef, newTableData);
         }
 
-        // --- CAMINHO DE SUCESSO (Comum aos cenários 1b e 2) ---
-        
-        localCurrentTableId = tableId; // Define o ID da mesa localmente
-        setCurrentTable(tableId, true); // Define a mesa atual globalmente (no app.js)
-        
-        // Se houver itens no carrinho, envia o primeiro pedido
+        // --- SUCESSO ---
+        localCurrentClientUser = { ...clientData, isAnonymous: false }; 
+
         if (selectedItems.length > 0) {
             await sendOrderToFirebase(); 
         } else {
-            // Apenas atualiza o header
-            clientTableNumber.textContent = `Mesa ${tableId}`;
+            if (clientTableNumber) clientTableNumber.textContent = `Mesa ${tableId}`;
         }
         
         showToast(`Mesa ${tableId} ativada! Bem-vindo(a)!`, false);
@@ -1008,23 +848,14 @@ async function handleActivationAndSend(e) {
     } catch (error) {
         console.error("Erro ao ativar mesa:", error);
         showAssocError(error.message);
-        // Se falhar, tenta relogar com Google
-        if (auth.currentUser && auth.currentUser.isAnonymous) {
-            await signOut(auth);
-        }
-        // Tenta logar no Google de novo para o usuário não ficar "preso"
-        if(googleLoginBtn) googleLoginBtn.click();
-
     } finally {
-        activateAndSendBtn.disabled = false;
-        activateAndSendBtn.innerHTML = 'Enviar Pedido';
+        if (activateAndSendBtn) {
+            activateAndSendBtn.disabled = false;
+            activateAndSendBtn.innerHTML = 'Enviar Pedido';
+        }
     }
 }
 
-
-/**
- * Exibe um erro no modal de associação.
- */
 function showAssocError(message) {
     if (assocErrorMsg) {
         assocErrorMsg.textContent = message;
@@ -1032,13 +863,6 @@ function showAssocError(message) {
     }
 }
 
-// ==================================================================
-//               OBSERVAÇÕES RÁPIDAS
-// ==================================================================
-
-/**
- * Renderiza botões de observação rápida no modal DO CLIENTE.
- */
 function renderClientQuickObsButtons(observations) {
     if (!clientQuickObsButtons) return;
 
@@ -1058,9 +882,6 @@ function renderClientQuickObsButtons(observations) {
     }).join('');
 }
 
-/**
- * Busca as observações rápidas do Firebase e chama o render.
- */
 export const fetchQuickObservations = async () => {
     try {
         if (quickObsCache.length > 0) {
@@ -1084,15 +905,8 @@ export const fetchQuickObservations = async () => {
     }
 };
 
-
-// ==================================================================
-//               LÓGICA DE ENVIO DE PEDIDO
-// ==================================================================
-/**
- * Envia o pedido (carrinho) para o Firebase.
- */
 async function sendOrderToFirebase() {
-    const tableId = localCurrentTableId || currentTableId; // Pega o ID da mesa
+    const tableId = localCurrentTableId || currentTableId; 
 
     if (!tableId || selectedItems.length === 0) {
         alert("Nenhum item ou mesa selecionada.");
@@ -1101,7 +915,6 @@ async function sendOrderToFirebase() {
 
     const orderId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     
-    // Usa o usuário do Google (localCurrentClientUser) para os dados do cliente
     const clientPhone = localCurrentClientUser?.phone || null;
     const clientName = localCurrentClientUser?.displayName || 'Cliente';
     const clientUid = localCurrentClientUser?.uid || 'N/A';
@@ -1127,7 +940,7 @@ async function sendOrderToFirebase() {
         });
 
         selectedItems.length = 0;
-        renderClientOrderScreen(); // Re-renderiza localmente
+        renderClientOrderScreen(); 
         
         showToast("Pedido enviado! Um garçom irá confirmar em breve.");
         
