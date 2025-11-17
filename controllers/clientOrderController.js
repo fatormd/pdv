@@ -6,21 +6,18 @@ import { getProducts, getCategories, fetchWooCommerceProducts, fetchWooCommerceC
 import { onSnapshot, doc, updateDoc, arrayUnion, arrayRemove, setDoc, getDoc, getDocs, query, where, serverTimestamp, orderBy, increment, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { GoogleAuthProvider, signInWithPopup, signInAnonymously, RecaptchaVerifier, signInWithPhoneNumber, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-// Importa do app.js
-import { showToast, currentTableId, setCurrentTable } from "/app.js"; 
+// Importa funções do app.js
+import { showToast, currentTableId, setCurrentTable, setTableListener } from "/app.js"; 
 
-
-// --- Variáveis de Estado (Locais) ---
-let selectedItems = []; // Itens do carrinho local
+// --- Variáveis de Estado ---
+let selectedItems = []; 
 let quickObsCache = []; 
 let currentCategoryFilter = 'all';
 const ESPERA_KEY = "(EM ESPERA)"; 
 let orderControllerInitialized = false;
-
-// --- Variáveis do Novo Fluxo ---
-let localCurrentTableId = null;    // ID da mesa ativa
-let localCurrentClientUser = null; // Guarda o usuário logado (Google)
-let tempUserData = null;           // Guarda dados do Google temporariamente antes do cadastro
+let localCurrentTableId = null;    
+let localCurrentClientUser = null; 
+let tempUserData = null;           
 
 // --- Elementos da DOM ---
 let clientMenuContainer, clientCategoryFilters, sendOrderBtn, clientCartCount;
@@ -30,47 +27,37 @@ let authActionBtn, clientUserName, clientTableNumber, loggedInStep, loggedInUser
 let statusScreen, mainContent, appContainer;
 let searchProductInputClient; 
 let clientObsModal, clientObsText, clientQuickObsButtons, clientConfirmObsBtn, clientCancelObsBtn;
-
-// --- Elementos das Abas e do Novo Modal ---
 let tabButtons, tabContents;
 let customerRegistrationModal, customerRegistrationForm, saveRegistrationBtn;
 let regCustomerName, regCustomerEmail, regCustomerWhatsapp, regCustomerBirthday, regErrorMsg;
 
 
-// --- Inicialização ---
-
 export const initClientOrderController = () => {
     if (orderControllerInitialized) return;
     console.log("[ClientOrder] Inicializando...");
 
-    // Mapeamento dos elementos principais
+    // Mapeamento
     clientMenuContainer = document.getElementById('client-menu-container');
     clientCategoryFilters = document.getElementById('client-category-filters');
     sendOrderBtn = document.getElementById('sendOrderBtn');
     clientCartCount = document.getElementById('client-cart-count');
-    authActionBtn = document.getElementById('authActionBtn'); // Botão Entrar/Sair no Header
-    clientUserName = document.getElementById('client-user-name'); // Nome no Header
-    clientTableNumber = document.getElementById('client-table-number'); // Nº da Mesa no Header
+    authActionBtn = document.getElementById('authActionBtn'); 
+    clientUserName = document.getElementById('client-user-name'); 
+    clientTableNumber = document.getElementById('client-table-number'); 
     statusScreen = document.getElementById('statusScreen');
     mainContent = document.getElementById('mainContent');
     appContainer = document.getElementById('appContainer');
     searchProductInputClient = document.getElementById('searchProductInputClient');
 
-    // Mapeamento do Modal de Associação (Login)
     associationModal = document.getElementById('associationModal');
-    activationForm = document.getElementById('activationForm'); // Form da Aba Mesa
-    activateAndSendBtn = document.getElementById('activateAndSendBtn'); // Botão "Enviar Pedido" do modal
+    activationForm = document.getElementById('activationForm'); 
+    activateAndSendBtn = document.getElementById('activateAndSendBtn'); 
     googleLoginBtn = document.getElementById('googleLoginBtn');
-    loggedInStep = document.getElementById('loggedInStep'); // Div "Logado como:"
-    loggedInUserName = document.getElementById('loggedInUserName'); // Texto "Logado como:"
+    loggedInStep = document.getElementById('loggedInStep'); 
+    loggedInUserName = document.getElementById('loggedInUserName'); 
     assocErrorMsg = document.getElementById('assocErrorMsg');
-    activateTableNumber = document.getElementById('activateTableNumber'); // Input do Nº da Mesa
+    activateTableNumber = document.getElementById('activateTableNumber'); 
     
-    // ==================================================================
-    //               LÓGICA DE ABAS E CADASTRO
-    // ==================================================================
-
-    // Mapeamento das Abas
     tabButtons = document.querySelectorAll('.client-tab-btn');
     tabContents = document.querySelectorAll('.client-tab-content');
 
@@ -81,7 +68,6 @@ export const initClientOrderController = () => {
         });
     });
 
-    // Mapeamento do Novo Modal de Cadastro
     customerRegistrationModal = document.getElementById('customerRegistrationModal');
     customerRegistrationForm = document.getElementById('customerRegistrationForm');
     saveRegistrationBtn = document.getElementById('saveRegistrationBtn');
@@ -91,12 +77,10 @@ export const initClientOrderController = () => {
     regCustomerBirthday = document.getElementById('regCustomerBirthday');
     regErrorMsg = document.getElementById('regErrorMsg');
 
-    // Listener para o form do novo modal
     if(customerRegistrationForm) {
         customerRegistrationForm.addEventListener('submit', handleNewCustomerRegistration);
     }
     
-    // Mapeamento do Modal Obs
     clientObsModal = document.getElementById('clientObsModal'); 
     clientObsText = document.getElementById('clientObsText'); 
     clientQuickObsButtons = document.getElementById('clientQuickObsButtons'); 
@@ -104,7 +88,6 @@ export const initClientOrderController = () => {
     clientCancelObsBtn = document.getElementById('clientCancelObsBtn'); 
 
     if (clientObsModal) {
-        // Listener Modal Obs: Botões Rápidos
         if (clientQuickObsButtons) {
             clientQuickObsButtons.addEventListener('click', (e) => {
                 const btn = e.target.closest('.quick-obs-btn');
@@ -121,7 +104,6 @@ export const initClientOrderController = () => {
             });
         }
 
-        // Listener Modal Obs: Confirmar
         if (clientConfirmObsBtn) {
             clientConfirmObsBtn.addEventListener('click', () => {
                 const itemId = clientObsModal.dataset.itemId;
@@ -158,13 +140,11 @@ export const initClientOrderController = () => {
                     clientObsModal.style.display = 'none';
                     renderClientOrderScreen(); 
                 } else {
-                    console.warn("Nenhum item encontrado para atualizar a observação.");
                     clientObsModal.style.display = 'none';
                 }
             });
         }
 
-        // Listener Modal Obs: Cancelar
         if (clientCancelObsBtn) {
             clientCancelObsBtn.addEventListener('click', () => {
                 clientObsModal.style.display = 'none';
@@ -173,7 +153,6 @@ export const initClientOrderController = () => {
         }
     }
 
-    // Listeners principais
     if (sendOrderBtn) sendOrderBtn.onclick = handleSendOrderClick;
     if (authActionBtn) authActionBtn.onclick = handleAuthActionClick;
     if (googleLoginBtn) googleLoginBtn.onclick = signInWithGoogle;
@@ -187,15 +166,12 @@ export const initClientOrderController = () => {
         });
     }
 
-    // Delegação de eventos para o menu
     if (clientMenuContainer) {
         clientMenuContainer.addEventListener('click', (e) => {
             const card = e.target.closest('.product-card');
             if (!card) return;
-
             const product = getProducts().find(p => p.id == card.dataset.productId);
             if (!product) return;
-
             if (e.target.closest('.info-item-btn')) {
                  openProductInfoModal(product);
             } else {
@@ -204,11 +180,9 @@ export const initClientOrderController = () => {
         });
     }
     
-    // Delegação de eventos para o carrinho
     document.getElementById('client-cart-items-list')?.addEventListener('click', (e) => {
          const qtyBtn = e.target.closest('.qty-btn');
          const obsSpan = e.target.closest('.obs-span');
-         
          if (qtyBtn) {
              const itemId = qtyBtn.dataset.itemId;
              const noteKey = qtyBtn.dataset.itemNoteKey;
@@ -223,7 +197,6 @@ export const initClientOrderController = () => {
          }
     });
 
-    // Filtros de Categoria
     if (clientCategoryFilters) {
         clientCategoryFilters.addEventListener('click', (e) => {
             const btn = e.target.closest('.category-btn');
@@ -246,13 +219,9 @@ export const initClientOrderController = () => {
     console.log("[ClientOrder] Inicializado com sucesso.");
 };
 
-/**
- * Observa o estado de autenticação do usuário.
- */
 function setupAuthStateObserver() {
     onAuthStateChanged(auth, (user) => {
         if (user && !user.isAnonymous) {
-            // --- USUÁRIO LOGADO COM GOOGLE ---
             console.log("[ClientOrder] Usuário Google Autenticado:", user.displayName);
             localCurrentClientUser = user; 
             tempUserData = { 
@@ -263,20 +232,16 @@ function setupAuthStateObserver() {
             };
             updateAuthUI(user);
             checkCustomerRegistration(user); 
-        
         } else if (user && user.isAnonymous) {
-             // --- USUÁRIO ANÔNIMO ---
              console.log("[ClientOrder] Usuário Anônimo Autenticado.");
              closeAssociationModal();
              closeCustomerRegistrationModal();
         } else {
-            // --- USUÁRIO DESLOGADO ---
             console.log("[ClientOrder] Nenhum usuário autenticado.");
             localCurrentClientUser = null;
             tempUserData = null;
             updateAuthUI(null);
             updateCustomerInfo(null, false);
-            
             if (!currentTableId) {
                 openAssociationModal();
             }
@@ -312,19 +277,15 @@ async function loadMenu() {
     try {
         const categories = await fetchWooCommerceCategories();
         const products = await fetchWooCommerceProducts();
-        
         if (categories.length > 0 && clientCategoryFilters) {
              clientCategoryFilters.innerHTML = categories.map(cat => {
                 const isActive = cat.slug === currentCategoryFilter ? 'bg-brand-primary text-white' : 'bg-dark-input text-dark-text border border-gray-600';
                 return `<button class="category-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap ${isActive}" data-category="${cat.slug || cat.id}">${cat.name}</button>`;
              }).join('');
         }
-        
         renderMenu(); 
-        
         if (statusScreen) statusScreen.style.display = 'none';
         if (mainContent) mainContent.style.display = 'flex'; 
-        
     } catch (error) {
         console.error("Erro ao carregar menu:", error);
         if (statusScreen) statusScreen.innerHTML = '<p class="text-red-400">Erro ao carregar o cardápio. Verifique sua conexão.</p>';
@@ -333,7 +294,6 @@ async function loadMenu() {
 
 function renderMenu() {
     if (!clientMenuContainer) return;
-    
     if (clientCategoryFilters) {
         clientCategoryFilters.querySelectorAll('.category-btn').forEach(btn => {
             const isActive = btn.dataset.category === currentCategoryFilter;
@@ -343,23 +303,17 @@ function renderMenu() {
             btn.classList.toggle('text-dark-text', !isActive);
         });
     }
-
     const products = getProducts();
     let filteredProducts = products;
-    
     if (currentCategoryFilter !== 'all') {
         filteredProducts = products.filter(p => p.category === currentCategoryFilter);
     }
-    
     let searchTerm = '';
     if (searchProductInputClient) { 
          searchTerm = searchProductInputClient.value.trim().toLowerCase();
     }
-
     if (searchTerm) {
-        filteredProducts = filteredProducts.filter(p => 
-            p.name.toLowerCase().includes(searchTerm)
-        );
+        filteredProducts = filteredProducts.filter(p => p.name.toLowerCase().includes(searchTerm));
     }
     
     if (filteredProducts.length === 0) {
@@ -388,7 +342,6 @@ function renderMenu() {
 
 function addItemToCart(product) {
     if (!product || !product.id) return;
-
     const newItem = {
         id: product.id,
         name: product.name,
@@ -397,17 +350,13 @@ function addItemToCart(product) {
         category: product.category || 'uncategorized',
         note: ''
     };
-
     selectedItems.push(newItem); 
     renderClientOrderScreen(); 
     openClientObsModal(product.id, '');
 }
 
 function increaseCartItemQuantity(itemId, noteKey) {
-    const itemToCopy = selectedItems.findLast(item =>
-        item.id == itemId && (item.note || '') === noteKey
-    );
-
+    const itemToCopy = selectedItems.findLast(item => item.id == itemId && (item.note || '') === noteKey);
     if (itemToCopy) {
         selectedItems.push({ ...itemToCopy }); 
         renderClientOrderScreen(); 
@@ -422,7 +371,6 @@ function decreaseCartItemQuantity(itemId, noteKey) {
             break;
         }
     }
-
     if (indexToRemove > -1) {
         selectedItems.splice(indexToRemove, 1); 
         renderClientOrderScreen(); 
@@ -431,7 +379,6 @@ function decreaseCartItemQuantity(itemId, noteKey) {
 
 function openProductInfoModal(product) {
     if (!product) return;
-
     const modal = document.getElementById('productInfoModal');
     const img = document.getElementById('infoProductImage');
     const imgLink = document.getElementById('infoProductImageLink');
@@ -439,7 +386,6 @@ function openProductInfoModal(product) {
     const priceEl = document.getElementById('infoProductPrice');
     const descEl = document.getElementById('infoProductDescription');
     const addBtn = document.getElementById('infoProductAddBtn');
-
     if (!modal || !img || !nameEl || !priceEl || !descEl || !addBtn || !imgLink) return;
 
     img.src = product.image || 'https://placehold.co/600x400/1f2937/d1d5db?text=Produto';
@@ -448,16 +394,13 @@ function openProductInfoModal(product) {
     nameEl.textContent = product.name;
     priceEl.textContent = formatCurrency(product.price);
     descEl.innerHTML = product.description; 
-
     const newAddBtn = addBtn.cloneNode(true);
     addBtn.parentNode.replaceChild(newAddBtn, addBtn);
-    
     newAddBtn.onclick = () => {
         addItemToCart(product);
         modal.style.display = 'none'; 
         showToast(`${product.name} adicionado ao carrinho!`);
     };
-
     modal.style.display = 'flex';
 }
 
@@ -465,12 +408,10 @@ function openClientObsModal(itemId, noteKey) {
     const products = getProducts();
     const product = products.find(p => p.id == itemId);
     const esperaSwitch = document.getElementById('esperaSwitch'); 
-
     if (!clientObsModal || !clientObsText || !product || !esperaSwitch) return;
 
     const regexEspera = new RegExp(ESPERA_KEY.replace('(', '\\(').replace(')', '\\)'), 'ig');
     const isEspera = regexEspera.test(noteKey);
-    
     let cleanNote = noteKey.replace(regexEspera, '').trim();
     if (cleanNote.startsWith(',')) cleanNote = cleanNote.substring(1).trim();
 
@@ -480,14 +421,12 @@ function openClientObsModal(itemId, noteKey) {
 
     clientObsModal.dataset.itemId = itemId;
     clientObsModal.dataset.originalNoteKey = noteKey; 
-
     clientObsModal.style.display = 'flex';
 }
 
 function _renderClientCart() {
     const cartItemsList = document.getElementById('client-cart-items-list');
     if (!cartItemsList) return;
-
     if (selectedItems.length === 0) {
         cartItemsList.innerHTML = `<div class="text-sm md:text-base text-dark-placeholder italic p-2">Nenhum item selecionado.</div>`;
     } else {
@@ -497,26 +436,21 @@ function _renderClientCart() {
             acc[key].count++;
             return acc;
         }, {});
-
         cartItemsList.innerHTML = Object.values(groupedItems).map(group => {
             const note = group.note || '';
             const regexEspera = new RegExp(ESPERA_KEY.replace('(', '\\(').replace(')', '\\)'), 'ig');
             const isEspera = regexEspera.test(note);
             let displayNote = note.replace(regexEspera, '').trim();
             if (displayNote.startsWith(',')) displayNote = displayNote.substring(1).trim();
-
             let noteHtml = '';
             if (isEspera) {
                 noteHtml = `<span class="text-yellow-400 font-semibold">${ESPERA_KEY}</span>`;
-                if (displayNote) {
-                    noteHtml += ` <span class="text-yellow-400">(${displayNote})</span>`;
-                }
+                if (displayNote) noteHtml += ` <span class="text-yellow-400">(${displayNote})</span>`;
             } else if (displayNote) {
                 noteHtml = `<span class="text-yellow-400">(${displayNote})</span>`;
             } else {
                 noteHtml = `(Adicionar Obs.)`;
             }
-
             return `
             <div class="flex justify-between items-center bg-dark-input p-3 rounded-lg shadow-sm">
                 <div class="flex flex-col flex-grow min-w-0 mr-2">
@@ -542,13 +476,9 @@ function _renderClientCart() {
 }
 
 export function renderClientOrderScreen(tableData) {
-    if (clientCartCount) {
-        clientCartCount.textContent = selectedItems.length;
-    }
-    
+    if (clientCartCount) clientCartCount.textContent = selectedItems.length;
     if (sendOrderBtn) {
         const billRequested = tableData?.waiterNotification?.includes('fechamento');
-        
         if (billRequested) {
             sendOrderBtn.disabled = true;
             sendOrderBtn.innerHTML = '<i class="fas fa-hourglass-half"></i>';
@@ -562,23 +492,10 @@ export function renderClientOrderScreen(tableData) {
     _renderClientCart();
 }
 
-
 function handleSendOrderClick() {
-    if (selectedItems.length === 0) {
-        showToast("Seu carrinho está vazio.", true);
-        return;
-    }
-    
-    if (!localCurrentTableId && !currentTableId) { 
-        openAssociationModal();
-    } else {
-        sendOrderToFirebase();
-    }
+    if (selectedItems.length === 0) { showToast("Seu carrinho está vazio.", true); return; }
+    if (!localCurrentTableId && !currentTableId) { openAssociationModal(); } else { sendOrderToFirebase(); }
 }
-
-// ==================================================================
-//               LÓGICA DE ABAS, AUTENTICAÇÃO E ATIVAÇÃO
-// ==================================================================
 
 function showTab(tabName) {
     if(!tabContents || !tabButtons) return;
@@ -589,17 +506,10 @@ function showTab(tabName) {
     tabButtons.forEach(button => {
         button.classList.remove('active');
     });
-
     const activeContent = document.getElementById(`tab-content-${tabName}`);
     const activeButton = document.querySelector(`.client-tab-btn[data-tab="${tabName}"]`);
-    
-    if (activeContent) {
-        activeContent.style.display = 'block';
-        activeContent.classList.add('active');
-    }
-    if (activeButton) {
-        activeButton.classList.add('active');
-    }
+    if (activeContent) { activeContent.style.display = 'block'; activeContent.classList.add('active'); }
+    if (activeButton) { activeButton.classList.add('active'); }
 }
 
 function openAssociationModal() {
@@ -607,16 +517,12 @@ function openAssociationModal() {
         if(assocErrorMsg) assocErrorMsg.style.display = 'none';
         associationModal.style.display = 'flex';
         showTab('mesa'); 
-        if (activateTableNumber) {
-            activateTableNumber.focus();
-        }
+        if (activateTableNumber) activateTableNumber.focus();
     }
 }
 
 function closeAssociationModal() {
-    if (associationModal) {
-        associationModal.style.display = 'none';
-    }
+    if (associationModal) associationModal.style.display = 'none';
 }
 
 function openCustomerRegistrationModal() {
@@ -626,18 +532,14 @@ function openCustomerRegistrationModal() {
         regCustomerWhatsapp.value = ''; 
         regCustomerBirthday.value = ''; 
         if(regErrorMsg) regErrorMsg.style.display = 'none';
-        
         customerRegistrationModal.style.display = 'flex';
         associationModal.style.display = 'none';
     }
 }
 
 function closeCustomerRegistrationModal() {
-    if (customerRegistrationModal) {
-        customerRegistrationModal.style.display = 'none';
-    }
+    if (customerRegistrationModal) customerRegistrationModal.style.display = 'none';
 }
-
 
 async function signInWithGoogle(e) {
     e.preventDefault(); 
@@ -668,35 +570,16 @@ async function checkCustomerRegistration(user) {
 
 async function handleNewCustomerRegistration(e) {
     e.preventDefault();
-    if (!tempUserData) {
-        showAssocError("Erro: Dados do usuário perdidos. Tente logar novamente.");
-        return;
-    }
-
+    if (!tempUserData) { showAssocError("Erro: Dados do usuário perdidos. Tente logar novamente."); return; }
     const whatsapp = regCustomerWhatsapp.value;
     const birthday = regCustomerBirthday.value;
-
-    if (!whatsapp || !birthday) {
-        regErrorMsg.textContent = "Por favor, preencha todos os campos.";
-        regErrorMsg.style.display = 'block';
-        return;
-    }
+    if (!whatsapp || !birthday) { regErrorMsg.textContent = "Por favor, preencha todos os campos."; regErrorMsg.style.display = 'block'; return; }
     regErrorMsg.style.display = 'none';
-
-    const completeUserData = {
-        ...tempUserData,
-        whatsapp: whatsapp,
-        nascimento: birthday
-    };
-
-    saveRegistrationBtn.disabled = true;
-    saveRegistrationBtn.textContent = "Salvando...";
-
+    const completeUserData = { ...tempUserData, whatsapp: whatsapp, nascimento: birthday };
+    saveRegistrationBtn.disabled = true; saveRegistrationBtn.textContent = "Salvando...";
     try {
         await saveCustomerData(completeUserData);
-        if(localCurrentClientUser) {
-            localCurrentClientUser.phone = whatsapp;
-        }
+        if(localCurrentClientUser) localCurrentClientUser.phone = whatsapp;
         showToast("Cadastro concluído com sucesso!", false);
         closeCustomerRegistrationModal(); 
         openAssociationModal(); 
@@ -706,8 +589,7 @@ async function handleNewCustomerRegistration(e) {
         regErrorMsg.textContent = "Falha ao salvar cadastro. Tente novamente.";
         regErrorMsg.style.display = 'block';
     } finally {
-        saveRegistrationBtn.disabled = false;
-        saveRegistrationBtn.textContent = "Salvar e Continuar";
+        saveRegistrationBtn.disabled = false; saveRegistrationBtn.textContent = "Salvar e Continuar";
     }
 }
 
@@ -730,7 +612,6 @@ async function saveCustomerData(userData) {
 
 function updateCustomerInfo(user, isNew = false) {
     if (!loggedInStep || !loggedInUserName || !googleLoginBtn) return;
-    
     if (user && !isNew) { 
         loggedInStep.style.display = 'block';
         loggedInUserName.textContent = user.displayName || user.email;
@@ -743,27 +624,16 @@ function updateCustomerInfo(user, isNew = false) {
 }
 
 // ==================================================================
-//               LÓGICA DE ATIVAÇÃO DE MESA
+//               LÓGICA DE ATIVAÇÃO DE MESA (CORRIGIDA 100%)
 // ==================================================================
 
 async function handleActivationAndSend(e) {
     if (e) e.preventDefault(); 
-    
     const tableId = activateTableNumber.value.trim();
-    
-    if (!tableId) {
-        showAssocError("Por favor, informe o número da mesa.");
-        activateTableNumber.focus();
-        return;
-    }
-    
-    if (!localCurrentClientUser) {
-        showAssocError("Por favor, faça o login com Google para continuar.");
-        return;
-    }
+    if (!tableId) { showAssocError("Por favor, informe o número da mesa."); activateTableNumber.focus(); return; }
+    if (!localCurrentClientUser) { showAssocError("Por favor, faça o login com Google para continuar."); return; }
 
     console.log(`Tentando ativar mesa ${tableId} para o cliente ${localCurrentClientUser.uid}`);
-    
     activateAndSendBtn.disabled = true;
     activateAndSendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Acessando...';
     assocErrorMsg.style.display = 'none';
@@ -772,9 +642,9 @@ async function handleActivationAndSend(e) {
         const tableRef = getTableDocRef(tableId);
         const tableSnap = await getDoc(tableRef);
 
-        // CRÍTICO: Define a mesa localmente ANTES de trocar o usuário.
+        // 1. Define a mesa mas NÃO inicia o listener ainda (param false)
         localCurrentTableId = tableId; 
-        setCurrentTable(tableId, true); 
+        setCurrentTable(tableId, true, false); 
 
         const clientData = {
             uid: localCurrentClientUser.uid,
@@ -782,21 +652,20 @@ async function handleActivationAndSend(e) {
             phone: localCurrentClientUser.phone || null
         };
 
-        if (tableSnap.exists()) {
-            // --- CENÁRIO 1: A MESA EXISTE ---
-            const tableData = tableSnap.data();
+        // 2. Troca para usuário Anônimo
+        await signOut(auth);
+        const anonUser = await signInAnonymously(auth);
+        console.log("Logado anonimamente. Atualizando doc da mesa...");
 
+        // 3. Executa a criação/atualização do documento (sem listener ativo para não dar erro de 'closed')
+        if (tableSnap.exists()) {
+            const tableData = tableSnap.data();
             if (tableData.status !== 'closed' && tableData.clientId && tableData.clientId !== clientData.uid) {
                 localCurrentTableId = null;
-                setCurrentTable(null, true);
+                setCurrentTable(null, true, false);
                 throw new Error("Esta mesa está ocupada por outro cliente.");
             } 
-            
             console.log(`Mesa ${tableId} encontrada. Conectando...`);
-            
-            await signOut(auth);
-            const anonUser = await signInAnonymously(auth);
-            
             await updateDoc(tableRef, {
                 clientId: clientData.uid, 
                 clientName: clientData.name,
@@ -805,14 +674,8 @@ async function handleActivationAndSend(e) {
                 status: 'open',
                 diners: tableData.diners || 1 
             });
-        
         } else {
-            // --- CENÁRIO 2: A MESA NÃO EXISTE (Auto-abertura) ---
             console.log(`Mesa ${tableId} não encontrada. Criando...`);
-            
-            await signOut(auth);
-            const anonUser = await signInAnonymously(auth);
-
             const newTableData = {
                 tableNumber: parseInt(tableId, 10),
                 diners: 1, 
@@ -833,15 +696,16 @@ async function handleActivationAndSend(e) {
             await setDoc(tableRef, newTableData);
         }
 
-        // --- SUCESSO ---
-        localCurrentClientUser = { ...clientData, isAnonymous: false }; 
+        // 4. AGORA SIM, após o documento existir e estar correto, ligamos o Listener
+        console.log("Mesa configurada. Iniciando listener...");
+        setTableListener(tableId, true);
 
+        localCurrentClientUser = { ...clientData, isAnonymous: false }; 
         if (selectedItems.length > 0) {
             await sendOrderToFirebase(); 
         } else {
             if (clientTableNumber) clientTableNumber.textContent = `Mesa ${tableId}`;
         }
-        
         showToast(`Mesa ${tableId} ativada! Bem-vindo(a)!`, false);
         closeAssociationModal();
 
@@ -857,20 +721,15 @@ async function handleActivationAndSend(e) {
 }
 
 function showAssocError(message) {
-    if (assocErrorMsg) {
-        assocErrorMsg.textContent = message;
-        assocErrorMsg.style.display = 'block';
-    }
+    if (assocErrorMsg) { assocErrorMsg.textContent = message; assocErrorMsg.style.display = 'block'; }
 }
 
 function renderClientQuickObsButtons(observations) {
     if (!clientQuickObsButtons) return;
-
     if (observations.length === 0) {
         clientQuickObsButtons.innerHTML = '<p class="text-xs text-dark-placeholder italic">Nenhuma obs. rápida.</p>';
         return;
     }
-
     clientQuickObsButtons.innerHTML = observations.map(obs => {
         const obsText = obs.text || 'Erro';
         return `
@@ -888,15 +747,11 @@ export const fetchQuickObservations = async () => {
             renderClientQuickObsButtons(quickObsCache); 
             return quickObsCache;
         }
-        
         const q = query(getQuickObsCollectionRef(), orderBy('text', 'asc'));
         const querySnapshot = await getDocs(q);
         quickObsCache = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
         renderClientQuickObsButtons(quickObsCache);
-        
         return quickObsCache;
-        
     } catch (e) {
         console.error("Erro ao buscar observações rápidas:", e);
         const buttonsContainer = document.getElementById('clientQuickObsButtons'); 
@@ -907,14 +762,9 @@ export const fetchQuickObservations = async () => {
 
 async function sendOrderToFirebase() {
     const tableId = localCurrentTableId || currentTableId; 
-
-    if (!tableId || selectedItems.length === 0) {
-        alert("Nenhum item ou mesa selecionada.");
-        return;
-    }
+    if (!tableId || selectedItems.length === 0) { alert("Nenhum item ou mesa selecionada."); return; }
 
     const orderId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-    
     const clientPhone = localCurrentClientUser?.phone || null;
     const clientName = localCurrentClientUser?.displayName || 'Cliente';
     const clientUid = localCurrentClientUser?.uid || 'N/A';
@@ -922,28 +772,20 @@ async function sendOrderToFirebase() {
     const newOrderRequest = {
         orderId: orderId,
         requestedAt: new Date().toISOString(),
-        clientInfo: {
-            uid: clientUid,
-            name: clientName,
-            phone: clientPhone 
-        },
+        clientInfo: { uid: clientUid, name: clientName, phone: clientPhone },
         items: selectedItems.map(item => ({ ...item })) 
     };
 
     try {
         const tableRef = getTableDocRef(tableId); 
-        
         await updateDoc(tableRef, {
             requestedOrders: arrayUnion(newOrderRequest),
             clientOrderPending: true,
             waiterNotification: "Novo Pedido do Cliente"
         });
-
         selectedItems.length = 0;
         renderClientOrderScreen(); 
-        
         showToast("Pedido enviado! Um garçom irá confirmar em breve.");
-        
     } catch (e) {
         console.error("Erro ao enviar pedido para o Firebase:", e);
         showToast("Falha ao enviar o pedido. Tente novamente.", true);

@@ -4,6 +4,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // --- BLOCO PRINCIPAL DE DADOS ---
     match /artifacts/{appId}/public/data {
 
       // --- REGRA "VOUCHERS" ---
@@ -21,16 +22,17 @@ service cloud.firestore {
                        request.auth.token.firebase.sign_in_provider != 'anonymous';
       }
 
-      // --- REGRA "USERS" ---
+      // --- REGRA "USERS" (STAFF) ---
       match /users/{userId} {
         allow read: if request.auth != null &&
                        request.auth.token.firebase.sign_in_provider != 'anonymous';
+        // Escrita bloqueada para segurança (usar Cloud Functions ou Admin)
         allow write: if false;
       }
 
-      // --- REGRA "TABLES" (CORRIGIDA E ROBUSTA) ---
+      // --- REGRA "TABLES" (CORREÇÃO DEFINITIVA) ---
       match /tables/{tableId} {
-        // 1. Staff tem acesso total
+        // 1. Staff tem acesso total (Ler e Escrever)
         allow read, write: if request.auth != null && 
                             request.auth.token.firebase.sign_in_provider != 'anonymous';
                             
@@ -42,25 +44,37 @@ service cloud.firestore {
         allow create: if request.auth != null && 
                        request.auth.token.firebase.sign_in_provider == 'anonymous';
 
-        // 4. Clientes podem ATUALIZAR campos específicos
-        // Usamos diff().affectedKeys() para validar APENAS o que está mudando
+        // 4. Clientes podem ATUALIZAR campos (LISTA COMPLETA DE CAMPOS PERMITIDOS)
+        // Mudamos de .diff() para .keys().subsetOf(). Isso valida o documento INTEIRO final.
+        // Se o documento final tiver qualquer campo fora desta lista, o Firebase bloqueia.
         allow update: if request.auth != null &&
                       request.auth.token.firebase.sign_in_provider == 'anonymous' &&
-                      request.resource.data.diff(resource.data).affectedKeys().subsetOf([
-                        // Dados de identificação do cliente
-                        'clientId', 'clientName', 'clientPhone', 'anonymousUid', 
-                        // Dados básicos da mesa
-                        'status', 'diners', 
-                        // Campos de pedidos e solicitações
-                        'requestedOrders', 'clientOrderPending', 'waiterNotification', 
-                        'billRequested', 'selectedItems'
+                      request.resource.data.keys().subsetOf([
+                        // Identificação da Mesa e Status
+                        'tableNumber', 'status', 'diners', 'sector', 'createdAt', 'total', 
+                        
+                        // Identificação do Cliente
+                        'clientId', 'clientName', 'clientPhone', 'anonymousUid', 'clientDocType',
+                        
+                        // Pedidos e Itens
+                        'selectedItems', 'requestedOrders', 'sentItems', 
+                        
+                        // Notificações e Financeiro
+                        'clientOrderPending', 'waiterNotification', 'billRequested', 
+                        'payments', 'serviceTaxApplied', 
+                        
+                        // Campos de Sistema/Legado (Importantes para não quebrar a validação)
+                        'accessPin', 'lastKdsSentAt', 'masterTable', 'mergedTables', 'waiterId'
                       ]);
       }
       
       // --- REGRA "CUSTOMERS" ---
       match /customers/{customerId} {
+        // Staff tem acesso total
         allow read, write: if request.auth != null &&
                            request.auth.token.firebase.sign_in_provider != 'anonymous';
+        
+        // Cliente pode criar/ler/atualizar seu próprio registro
         allow read, write: if request.auth != null &&
                       request.auth.uid == customerId;
       }
@@ -71,6 +85,7 @@ service cloud.firestore {
                            request.auth.token.firebase.sign_in_provider != 'anonymous';
       }
       
+      // --- REGRA DE BLOQUEIO PADRÃO ---
       match /{document=**} {
         allow read, write: if false;
       }
