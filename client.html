@@ -7,16 +7,17 @@
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 
-    <link rel="stylesheet" href="style.css"> <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css"> 
+    
+    <script src="https://cdn.tailwindcss.com"></script>
 
     <script>
-        // Configuração original do Tailwind (mantém as cores dark)
         tailwind.config = {
             theme: {
                 extend: {
                     fontFamily: { sans: ['Inter', 'sans-serif'] },
                     colors: {
-                        'primary': '#4f46e5', // Índigo (pode ajustar se quiser outra cor primária)
+                        'primary': '#4f46e5', 
                         'pumpkin': '#ff7518',
                         'pumpkin-dark': '#e46815',
                         'dark-bg': '#111827',
@@ -25,24 +26,24 @@
                         'dark-text': '#d1d5db',
                         'dark-placeholder': '#6b7280',
                         'dark-border': '#374151',
-                        
-                        'brand-primary': '#ff7518', // Laranja Pumpkin
+                        'brand-primary': '#ff7518', 
                         'brand-primary-dark': '#e46815',
                     },
                 }
             }
         }
     </script>
+
     <style>
         #appContainer {
-            width: 200vw !important; /* Para a transição entre telas */
-            height: 100%; /* Garante que o container ocupe a altura */
+            width: 200vw !important; 
+            height: 100%; 
         }
         #loginScreen, #panelScreen, #orderScreen, #managerScreen {
-            display: none !important; /* Esconde telas do Staff */
+            display: none !important; 
         }
         .header-bar {
-            display: none !important; /* Esconde header do Staff */
+            display: none !important; 
         }
         #clientOrderScreen, #clientPaymentScreen {
             padding: 1rem;
@@ -85,35 +86,33 @@
             padding: 0.75rem 1rem;
             font-size: 0.875rem;
             font-weight: 600;
-            color: #9ca3af; /* gray-400 */
+            color: #9ca3af; 
             border-bottom: 2px solid transparent;
             transition: all 0.2s;
         }
         .crm-tab-btn:hover {
-            color: #d1d5db; /* gray-300 */
+            color: #d1d5db; 
         }
         .crm-tab-btn.active {
-            color: #ff7518; /* pumpkin */
+            color: #ff7518; 
             border-bottom-color: #ff7518;
         }
         .crm-tab-content {
             display: none;
             padding: 1rem;
-            background-color: #111827; /* dark-bg */
+            background-color: #111827; 
             border-radius: 0 0 0.5rem 0.5rem;
         }
         .crm-tab-content.active {
             display: block;
         }
-        /* Esconde a barra de rolagem das abas */
         .crm-tabs-container::-webkit-scrollbar {
             display: none;
         }
         .crm-tabs-container {
-            -ms-overflow-style: none;  /* IE and Edge */
-            scrollbar-width: none;  /* Firefox */
+            -ms-overflow-style: none; 
+            scrollbar-width: none;  
         }
-
     </style>
 </head>
 <body class="bg-dark-bg text-dark-text min-h-screen client-mode">
@@ -121,16 +120,13 @@
     <div id="statusScreen" class="fixed inset-0 bg-dark-bg z-[5000] flex justify-center items-center p-4" style="display: flex;">
         <i class="fas fa-spinner fa-spin text-4xl text-brand-primary"></i>
     </div>
-    <!-- Elementos ocultos do header original, mantidos para compatibilidade -->
+    
     <span id="client-user-name" class="hidden"></span>
     <button id="authActionBtn" class="hidden"></button>
 
     <main id="mainContent" class="relative overflow-hidden">
         <div id="appContainer" class="flex transition-transform duration-300 ease-out">
 
-            <!-- ========================================================== -->
-            <!-- ==== TELA DE PEDIDO (CLIENTE) (Preservada do seu original) ==== -->
-            <!-- ========================================================== -->
             <div id="clientOrderScreen" class="w-screen flex-shrink-0 flex flex-col">
                 <div class="flex items-center justify-between mb-4 md:mb-6 flex-shrink-0">
                     <div class="flex items-center text-green-400">
@@ -173,9 +169,6 @@
                 </div>
             </div> 
             
-            <!-- ========================================================== -->
-            <!-- ==== TELA DE PAGAMENTO (CLIENTE) (Preservada do seu original) ==== -->
-            <!-- ========================================================== -->
             <div id="clientPaymentScreen" class="w-screen flex-shrink-0 flex flex-col">
                  <div class="flex items-center justify-between mb-4 md:mb-6 flex-shrink-0 print-hide">
                     <div class="flex items-center text-indigo-400">
@@ -293,17 +286,11 @@
         </div> 
     </main>
 
-    <!-- ================================================================== -->
-    <!-- ================== MODAL DE ASSOCIAÇÃO (LOGIN) =================== -->
-    <!-- ================== (ESTRUTURA ATUALIZADA COM ABAS) ================ -->
-    <!-- ================================================================== -->
     <div id="associationModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4" style="display: none;">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm">
             
-            <!-- TÍTULO ATUALIZADO -->
             <h3 class="text-xl font-bold mb-6 text-white text-center">Identifique-se para pedir</h3>
 
-            <!-- ESTRUTURA DE ABAS (NOVA) -->
             <div class="border-b border-dark-border flex mb-4">
                 <button class="client-tab-btn flex-1 py-2 px-3 text-sm font-semibold text-center active" data-tab="mesa">
                     <i class="fas fa-tablet-alt mr-1"></i> MESA
@@ -319,13 +306,10 @@
                 </button>
             </div>
             
-            <!-- CONTEÚDO DAS ABAS (NOVO) -->
             <div class="tab-content-container">
                 
-                <!-- ABA 1: MESA -->
                 <div id="tab-content-mesa" class="client-tab-content active space-y-4">
                     <form id="activationForm" class="space-y-4">
-                        <!-- Input: 'nº da mesa' -->
                         <div>
                             <label class="text-sm text-dark-text" for="activateTableNumber">Nº da Mesa</label>
                             <input type="number" id="activateTableNumber" class="w-full p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text mt-1" placeholder="Informe o número da sua mesa">
@@ -336,25 +320,16 @@
                             <span class="relative px-3 bg-dark-card text-sm text-dark-text-secondary">Obrigatório</span>
                         </div>
 
-                        <!-- Button: 'logar com google' -->
                         <button type="button" id="googleLoginBtn" class="w-full py-3 px-4 bg-white text-gray-700 rounded-lg font-semibold flex items-center justify-center border border-gray-300 hover:bg-gray-50">
-                            <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-                                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l8.06 6.21C12.02 13.52 17.64 9.5 24 9.5z"></path>
-                                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
-                                <path fill="#FBBC05" d="M10.62 27.56c-.53-1.6-1.02-3.29-1.02-5.06s.49-3.46 1.02-5.06l-8.06-6.21C.96 14.72 0 19.21 0 24s.96 9.28 2.56 12.66l8.06-6.21z"></path>
-                                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.52 1.7-5.71 2.68-9.16 2.68-6.36 0-11.98-4.02-13.92-9.62l-8.06 6.21C6.51 42.62 14.62 48 24 48z"></path>
-                                <path fill="none" d="M0 0h48v48H0z"></path>
-                            </svg>
+                            <i class="fab fa-google mr-3 text-red-500 text-lg"></i>
                             Logar com Google
                         </button>
                         
-                        <!-- Display: 'logado como:' -->
                         <div id="loggedInStep" class="p-3 bg-dark-input rounded-lg text-center" style="display: none;">
                             <span class="text-sm text-dark-text">Logado como:</span>
                             <p id="loggedInUserName" class="font-semibold text-white"></p>
                         </div>
 
-                        <!-- INPUTS OCULTOS DO MODAL ANTIGO - MANTIDOS CASO A LÓGICA AINDA OS USE -->
                         <div id="authButtons" style="display: none;"></div>
                         <div id="tableDataStep" style="display: none;">
                              <input type="number" id="activateDiners" value="1">
@@ -365,11 +340,9 @@
                             <p id="registerErrorMsg"></p>
                             <button id="confirmRegisterBtn"></button>
                         </div>
-                        <!-- FIM DOS INPUTS OCULTOS -->
 
                         <p id="assocErrorMsg" class="text-red-400 text-sm" style="display: none;">Mensagem de erro aqui.</p>
 
-                        <!-- Botões: 'cancelar', 'enviar pedido' -->
                         <div class="flex justify-end space-x-3 pt-4">
                             <button type="button" id="cancelActivationBtn" class="px-5 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition text-base font-medium">Cancelar</button>
                             <button type="submit" id="activateAndSendBtn" class="px-5 py-3 bg-brand-primary text-white rounded-lg hover:bg-brand-primary-dark transition text-base font-medium">Enviar Pedido</button>
@@ -377,15 +350,12 @@
                     </form>
                 </div>
 
-                <!-- ABA 2: RETIRADA -->
                 <div id="tab-content-retirada" class="client-tab-content" style="display: none;">
                     <p class="text-dark-placeholder text-center p-8">Módulo de Retirada em desenvolvimento.</p>
                 </div>
-                <!-- ABA 3: ENTREGA -->
                 <div id="tab-content-entrega" class="client-tab-content" style="display: none;">
                     <p class="text-dark-placeholder text-center p-8">Módulo de Entrega em desenvolvimento.</p>
                 </div>
-                <!-- ABA 4: IFOOD -->
                 <div id="tab-content-ifood" class="client-tab-content" style="display: none;">
                     <p class="text-dark-placeholder text-center p-8">Módulo de iFood em desenvolvimento.</p>
                 </div>
@@ -394,9 +364,6 @@
     </div>
 
 
-    <!-- ================================================================== -->
-    <!-- ================== NOVO MODAL DE CADASTRO (CLIENTE) ================ -->
-    <!-- ================================================================== -->
     <div id="customerRegistrationModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-[51] p-4" style="display: none;">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 class="text-xl font-bold mb-4 text-white">Quase lá!</h3>
@@ -428,10 +395,6 @@
         </div>
     </div>
     
-    <!-- ================================================================== -->
-    <!-- ========= OUTROS MODAIS (Preservados do seu original) ========== -->
-    <!-- ================================================================== -->
-
     <div id="clientObsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
         <div class="bg-dark-card border border-dark-border p-4 md:p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 id="obsItemName" class="text-lg md:text-xl font-bold mb-4 text-indigo-400">Adicionar Observação</h3>
@@ -488,7 +451,6 @@
 
     <p class="mt-8 text-center text-xs text-dark-placeholder" id="user-id-display">.</p>
 
-    <!-- Scripts (Preservados do seu original) -->
     <script>
         // Função para imprimir o resumo da conta no modo cliente
         window.printSummaryClient = () => {
@@ -525,7 +487,7 @@
         window.openKdsStatusModal = () => {};
         window.handleTableTransferConfirmed = () => {};
 
-        // IDs do Firebase (Corretos)
+        // IDs do Firebase
         window.__app_id = "1:1097659747429:web:8ec0a7c3978c311dbe0a8c";
         window.__firebase_config = JSON.stringify({
             apiKey: "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY",

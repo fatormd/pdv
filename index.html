@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fator PDV - Login</title>
+    <title>Fator PDV - Staff</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="style.css">
@@ -30,6 +30,7 @@
             }
         }
     </script>
+
     <style>
         @media print {
             .print-hide, header, #reviewActionBar, #addSplitAccountBtn, #chargeInputs, #openNfeModalBtn, #finalizeOrderBtn, #backToOrderFromPaymentBtn { display: none !important; }
@@ -39,6 +40,10 @@
             #paymentSummaryCard .text-pumpkin, #paymentSummaryCard .text-indigo-400, #paymentSummaryCard .text-green-400 { color: #000 !important; }
             ::-webkit-scrollbar { display: none; }
         }
+        /* Scrollbar personalizada para modais */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #1f2937; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #4b5563; border-radius: 10px; }
     </style>
 </head>
 <body class="bg-dark-bg min-h-screen text-dark-text"> 
@@ -273,6 +278,7 @@
 
                     <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openProductManagement')"> <i class="fas fa-box-open text-3xl mb-2"></i> <h4 class="font-bold text-lg">Produtos</h4> <p class="text-xs">Gerenciar cardápio</p> </div>
                     <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openCashManagement')"> <i class="fas fa-cash-register text-3xl mb-2 text-green-400"></i> <h4 class="font-bold text-lg">Gestão de Caixa</h4> <p class="text-xs">Abertura, fechamento, sangria</p> </div>
+                    
                     <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="document.getElementById('reportsModal').style.display='flex'; document.querySelector('.report-tab-btn[data-tab=\'sales\']').click();"> <i class="fas fa-chart-line text-3xl mb-2 text-indigo-400"></i> <h4 class="font-bold text-lg">Relatórios</h4> <p class="text-xs">Vendas, produtos, comissões</p> </div>
                     
                     <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openTableMerge')"> <i class="fas fa-people-arrows text-3xl mb-2 text-pumpkin"></i> <h4 class="font-bold text-lg">Agrupar Mesas</h4> <p class="text-xs">Unir mesas</p> </div>
@@ -310,7 +316,9 @@
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm text-center">
             <h3 class="text-xl font-bold mb-4 text-red-400" id="customAlertTitle">Aviso</h3>
             <p class="text-base mb-6 text-dark-text" id="customAlertMessage">Mensagem Padrão.</p>
-            <button id="customAlertOkBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition">OK</button>
+            <button id="customAlertOkBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition">
+                OK
+            </button>
         </div>
     </div>
     
@@ -376,17 +384,32 @@
                 <label for="customerSearchCpf" class="block text-sm font-medium text-dark-placeholder mb-1">Buscar por CPF / CNPJ</label>
                 <div class="flex space-x-2">
                     <input type="text" id="customerSearchCpf" placeholder="Digite o CPF ou CNPJ" class="input-pdv w-full">
-                    <button id="searchCustomerByCpfBtn" class="p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition w-14"><i class="fas fa-search"></i></button>
+                    <button id="searchCustomerByCpfBtn" class="p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition w-14">
+                        <i class="fas fa-search"></i>
+                    </button>
                 </div>
             </div>
-             <div id="customerSearchResults" class="mb-4 p-3 rounded-lg bg-dark-bg border border-dark-border min-h-[50px]"></div>
+             <div id="customerSearchResults" class="mb-4 p-3 rounded-lg bg-dark-bg border border-dark-border min-h-[50px]">
+                </div>
              <hr class="border-gray-600 my-4">
              <h4 class="text-lg font-semibold mb-3 text-dark-text">Dados do Cliente</h4>
              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <div><label for="customerName" class="block text-sm font-medium text-dark-placeholder mb-1">Nome*</label><input type="text" id="customerName" class="input-pdv w-full"></div>
-                 <div><label for="customerCpf" class="block text-sm font-medium text-dark-placeholder mb-1">CPF/CNPJ*</label><input type="text" id="customerCpf" placeholder="Documento" class="input-pdv w-full"></div>
-                 <div><label for="customerPhone" class="block text-sm font-medium text-dark-placeholder mb-1">Telefone</label><input type="tel" id="customerPhone" class="input-pdv w-full"></div>
-                 <div><label for="customerEmail" class="block text-sm font-medium text-dark-placeholder mb-1">E-mail</label><input type="email" id="customerEmail" class="input-pdv w-full"></div>
+                 <div>
+                    <label for="customerName" class="block text-sm font-medium text-dark-placeholder mb-1">Nome Completo / Razão Social*</label>
+                    <input type="text" id="customerName" class="input-pdv w-full">
+                 </div>
+                 <div>
+                    <label for="customerCpf" class="block text-sm font-medium text-dark-placeholder mb-1">CPF / CNPJ*</label>
+                    <input type="text" id="customerCpf" placeholder="Documento (só números)" class="input-pdv w-full">
+                 </div>
+                 <div>
+                    <label for="customerPhone" class="block text-sm font-medium text-dark-placeholder mb-1">Telefone</label>
+                    <input type="tel" id="customerPhone" placeholder="(__) _____-____" class="input-pdv w-full">
+                 </div>
+                 <div>
+                    <label for="customerEmail" class="block text-sm font-medium text-dark-placeholder mb-1">E-mail</label>
+                    <input type="email" id="customerEmail" class="input-pdv w-full">
+                 </div>
              </div>
              <p class="text-xs text-dark-placeholder mt-1">* Campos obrigatórios</p>
             <div class="flex justify-end space-x-3 mt-6">
@@ -472,7 +495,7 @@
                 <form id="userForm" class="hidden p-4 border border-gray-600 rounded-lg bg-dark-input space-y-3">
                     <h4 id="userFormTitle" class="text-lg font-semibold text-pumpkin mb-2">Adicionar Novo Usuário</h4>
                     <input type="hidden" id="userIdInput">
-                    <div><label class="block text-sm font-medium text-dark-placeholder mb-1">Nome*</label><input type="text" id="userNameInput" placeholder="Nome" class="input-pdv w-full" required></div>
+                    <div><label class="block text-sm font-medium text-dark-placeholder mb-1">Nome Completo*</label><input type="text" id="userNameInput" placeholder="Nome" class="input-pdv w-full" required></div>
                     <div><label class="block text-sm font-medium text-dark-placeholder mb-1">E-mail*</label><input type="email" id="userEmailInput" placeholder="email@exemplo.com" class="input-pdv w-full" required autocomplete="username"></div>
                     <div id="userPasswordContainer"><label class="block text-sm font-medium text-dark-placeholder mb-1">Senha*</label><input type="password" id="userPasswordInput" placeholder="Senha" class="input-pdv w-full" autocomplete="new-password"><p id="passwordHint" class="text-xs text-dark-placeholder mt-1" style="display: none;">Deixe em branco para não alterar.</p></div>
                     <div><label class="block text-sm font-medium text-dark-placeholder mb-1">Função*</label><select id="userRoleSelect" class="input-pdv w-full" required><option value="" disabled selected>Selecione</option><option value="garcom">Garçom</option><option value="caixa">Caixa</option><option value="gerente">Gerente</option></select></div>
@@ -642,12 +665,14 @@
     <script>
         window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`);
         window.activateItemSelection = () => {}; 
+        // Placeholders
         window.removeSplitAccount = (splitId) => { alert(`Funcionalidade desativada`)};
         window.openPaymentModalForSplit = (splitId) => { alert(`Funcionalidade desativada`); };
         window.openSplitTransferModal = (splitId, mode) => { alert(`Funcionalidade desativada`); };
     </script>
 
     <script>
+        // CONFIGURAÇÃO FIREBASE (Substitua pelos seus dados reais se necessário)
         window.__app_id = "1:1097659747429:web:8ec0a7c3978c311dbe0a8c";
         window.__firebase_config = JSON.stringify({
             apiKey: "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY",
