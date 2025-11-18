@@ -6,7 +6,6 @@
     <title>Fator PDV - Login</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    
     <link rel="stylesheet" href="style.css">
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -32,76 +31,13 @@
         }
     </script>
     <style>
-        /* Estilos específicos para impressão */
         @media print {
-
-            /* --- INÍCIO DA CORREÇÃO DEFINITIVA --- */
-            
-            /* 1. Esconde tudo que tem a classe .print-hide */
-            .print-hide, 
-            header,
-            #reviewActionBar {
-                display: none !important;
-            }
-
-            /* 2. Força TODOS os ancestrais do card a se comportarem
-                  como blocos estáticos simples, removendo qualquer
-                  layout, transformação ou corte. */
-            body, #mainContent, #appContainer, #paymentScreen {
-                display: block !important;     /* Reseta flex */
-                overflow: visible !important;  /* CRÍTICO: Reseta overflow: hidden e overflow-x: hidden */
-                overflow-x: visible !important;
-                overflow-y: visible !important;
-                height: auto !important;       /* CRÍTICO: Reseta height: 100% e 100vh */
-                width: auto !important;        /* CRÍTICO: Reseta width: 100vw e 400vw */
-                min-height: initial !important;
-                position: static !important;   /* CRÍTICO: Reseta position: relative */
-                transform: none !important;    /* CRÍTICO: Reseta transform: translateX(...) */
-                background: none !important;   /* Limpa o fundo dark */
-                color: black !important;       /* Garante texto preto base */
-                padding: 0 !important;
-                margin: 0 !important;
-                /* Reseta a transição que pode bugar a impressão */
-                transition: none !important; 
-            }
-            /* --- FIM DA CORREÇÃO DEFINITIVA --- */
-
-
-            /* 3. Posiciona o card de resumo para impressão */
-            #paymentSummaryCard {
-                position: absolute;
-                left: 10px; /* Margem da página */
-                top: 10px;  /* Margem da página */
-                width: 95%; /* Ocupa a largura da página */
-                margin: 0;
-                padding: 1rem; /* Restaura o padding interno do card */
-                border: 1px solid #ccc !important; /* Borda simples para impressão */
-                box-shadow: none !important;
-                background-color: white !important;
-                color: black !important;
-                display: block !important; /* Garante que esteja visível */
-                visibility: visible !important;
-            }
-            
-            /* 4. Força cores de texto específicas dentro do card */
-            #paymentSummaryCard span, #paymentSummaryCard p, #paymentSummaryCard div, #paymentSummaryCard h2, #paymentSummaryCard label {
-                color: black !important;
-            }
-            #paymentSummaryCard .text-pumpkin {
-                 color: #333 !important; 
-            }
-            #paymentSummaryCard .text-indigo-400 {
-                 color: #333 !important;
-            }
-             #paymentSummaryCard .text-green-400 {
-                  color: #333 !important;
-             }
-             #paymentSummaryCard .text-dark-placeholder {
-                  color: #555 !important;
-             }
-             #paymentSummaryCard .border-dark-border, #paymentSummaryCard .border-b {
-                  border-color: #ccc !important;
-             }
+            .print-hide, header, #reviewActionBar, #addSplitAccountBtn, #chargeInputs, #openNfeModalBtn, #finalizeOrderBtn, #backToOrderFromPaymentBtn { display: none !important; }
+            body, #mainContent, #appContainer, #paymentScreen { display: block !important; overflow: visible !important; height: auto !important; width: auto !important; min-height: initial !important; position: static !important; transform: none !important; background: none !important; color: black !important; padding: 0 !important; margin: 0 !important; transition: none !important; }
+            #paymentSummaryCard { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; border: none !important; box-shadow: none !important; background-color: white !important; color: black !important; display: block !important; visibility: visible !important; }
+            #paymentSummaryCard span, #paymentSummaryCard p, #paymentSummaryCard div, #paymentSummaryCard h2, #paymentSummaryCard label { color: black !important; }
+            #paymentSummaryCard .text-pumpkin, #paymentSummaryCard .text-indigo-400, #paymentSummaryCard .text-green-400 { color: #000 !important; }
+            ::-webkit-scrollbar { display: none; }
         }
     </style>
 </head>
@@ -123,7 +59,6 @@
             <h2 id="current-table-number" class="text-xl font-bold text-dark-text ml-2">Fator MD</h2> 
         </div>
         <div class="flex items-center space-x-3">
-            
             <button id="openCashierBtn" class="p-2 text-green-400 hover:text-green-300 transition hidden" title="Meu Caixa">
                 <i class="fas fa-cash-register text-lg"></i>
             </button>
@@ -142,9 +77,8 @@
             <div id="loginScreen" class="w-screen flex-shrink-0 flex items-center justify-center p-4 bg-dark-bg print-hide">
                  <div class="content-card bg-dark-card p-8 rounded-xl shadow-2xl w-full max-w-sm text-center">
                     <h3 class="text-2xl font-bold text-pumpkin mb-6">Fator PDV - Staff</h3>
-                    
                     <form id="loginForm">
-                        <input type="email" id="loginEmail" placeholder="E-mail (Ex: agencia@fatormd.com)" class="input-pdv w-full p-4 mb-4 text-base">
+                        <input type="email" id="loginEmail" placeholder="E-mail" class="input-pdv w-full p-4 mb-4 text-base">
                         <input type="password" id="loginPassword" placeholder="Senha" class="input-pdv w-full p-4 mb-6 text-base">
                     </form>
                     <div id="loginErrorMsg" class="text-red-400 text-sm mb-4" style="display: none;"></div>
@@ -184,10 +118,8 @@
                     </div>
                 </div>
                 <h2 class="text-xl font-semibold my-3 text-dark-text">Setores (<span id="openTablesCount">0</span>)</h2>
-                <div id="sectorFilters" class="flex space-x-2 overflow-x-auto pb-3 mb-3">
-                    </div>
-                <div id="openTablesList" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                    </div>
+                <div id="sectorFilters" class="flex space-x-2 overflow-x-auto pb-3 mb-3"></div>
+                <div id="openTablesList" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3"></div>
             </div>
 
             <div id="orderScreen" class="flex-shrink-0 bg-dark-bg text-dark-text print-hide">
@@ -207,12 +139,10 @@
                                 <i class="fas fa-paper-plane"></i> 
                             </button>
                         </div>
-                        <div id="openOrderList" class="space-y-3 mb-4">
-                            </div>
+                        <div id="openOrderList" class="space-y-3 mb-4"></div>
                     </div>
                 </div>
-                <div id="clientPendingOrders" class="mt-6 mb-4 p-4 content-card bg-dark-card border border-yellow-500 hidden">
-                    </div>
+                <div id="clientPendingOrders" class="mt-6 mb-4 p-4 content-card bg-dark-card border border-yellow-500 hidden"></div>
                 <div id="menuContainer" class="mt-6">
                     <div class="flex justify-between items-center mb-4 px-1">
                         <h2 class="text-xl font-bold text-dark-text">Cardápio</h2>
@@ -221,10 +151,8 @@
                             <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-dark-placeholder"></i>
                         </div>
                     </div>
-                    <div id="categoryFilters" class="flex space-x-2 overflow-x-auto pb-2 mb-4 px-1">
-                        </div>
-                    <div id="menuItemsGrid" class="px-1 grid grid-cols-2 md:grid-cols-3 gap-4">
-                         </div>
+                    <div id="categoryFilters" class="flex space-x-2 overflow-x-auto pb-2 mb-4 px-1"></div>
+                    <div id="menuItemsGrid" class="px-1 grid grid-cols-2 md:grid-cols-3 gap-4"></div>
                 </div>
             </div>
             
@@ -245,8 +173,7 @@
                             <i class="fas fa-print text-lg"></i>
                         </button>
                     </div>
-                    <div id="reviewItemsList" class="space-y-3 pt-2 max-h-60 overflow-y-auto"> 
-                         </div>
+                    <div id="reviewItemsList" class="space-y-3 pt-2 max-h-60 overflow-y-auto"></div>
                     
                     <div class="content-card bg-dark-bg border border-dark-border p-4 mb-6 mt-6 hidden print-hide"> 
                         <div class="flex justify-between items-center mb-4">
@@ -255,9 +182,7 @@
                                 + Dividir
                             </button>
                         </div>
-                        <div id="paymentSplitsContainer" class="space-y-3">
-                           <p class="text-sm text-dark-placeholder italic">Nenhuma divisão criada.</p> 
-                        </div>
+                        <div id="paymentSplitsContainer" class="space-y-3"></div>
                     </div>
                     
                     <div class="flex justify-between items-center border-t border-dark-border pt-4 mt-4">
@@ -307,8 +232,7 @@
                             <i class="fas fa-user-plus"></i>
                         </button>
                     </div>
-                    <div id="paymentMethodButtons" class="grid grid-cols-3 gap-2 mb-3">
-                        </div>
+                    <div id="paymentMethodButtons" class="grid grid-cols-3 gap-2 mb-3"></div>
                     <div class="flex space-x-2 mb-4">
                         <input type="text" id="paymentValueInput" placeholder="Valor (Ex: 50,00)" inputmode="decimal" class="input-pdv w-full text-lg">
                         <button id="openCalculatorBtn" class="p-3 bg-gray-600 text-white rounded-lg hover:bg-gray-500 transition w-14">
@@ -341,23 +265,25 @@
                     <h2 class="text-2xl font-bold text-pumpkin">Painel Gerencial</h2>
                 </div>
                 <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openProductManagement')"> <i class="fas fa-box-open text-3xl mb-2"></i> <h4 class="font-bold text-lg">Produtos</h4> <p class="text-xs">Gerenciar cardápio (WooCommerce)</p> </div>
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openCashManagement')"> <i class="fas fa-cash-register text-3xl mb-2 text-green-400"></i> <h4 class="font-bold text-lg">Gestão de Caixa</h4> <p class="text-xs">Abertura, fechamento, sangria</p> </div>
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="document.getElementById('reportsModal').style.display='flex'"> <i class="fas fa-chart-line text-3xl mb-2 text-indigo-400"></i> <h4 class="font-bold text-lg">Relatórios</h4> <p class="text-xs">Vendas, produtos, comissões</p> </div>
-                    
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" data-action="openTableMerge" onclick="window.openManagerAuthModal('openTableMerge')"> <i class="fas fa-people-arrows text-3xl mb-2 text-pumpkin"></i> <h4 class="font-bold text-lg">Agrupar Mesas</h4> <p class="text-xs">Unir mesas em uma conta mestra</p> </div>
+                    <div class="manager-card content-card p-4 text-center cursor-pointer bg-red-900/20 border border-red-500/30 hover:bg-red-900/40" onclick="window.openManagerAuthModal('closeDay')"> 
+                        <i class="fas fa-file-invoice-dollar text-3xl mb-2 text-red-400"></i> 
+                        <h4 class="font-bold text-lg text-red-400">Encerrar Dia</h4> 
+                        <p class="text-xs text-red-200">Consolidar Vendas</p> 
+                    </div>
 
+                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openProductManagement')"> <i class="fas fa-box-open text-3xl mb-2"></i> <h4 class="font-bold text-lg">Produtos</h4> <p class="text-xs">Gerenciar cardápio</p> </div>
+                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openCashManagement')"> <i class="fas fa-cash-register text-3xl mb-2 text-green-400"></i> <h4 class="font-bold text-lg">Gestão de Caixa</h4> <p class="text-xs">Abertura, fechamento, sangria</p> </div>
+                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="document.getElementById('reportsModal').style.display='flex'; document.querySelector('.report-tab-btn[data-tab=\'sales\']').click();"> <i class="fas fa-chart-line text-3xl mb-2 text-indigo-400"></i> <h4 class="font-bold text-lg">Relatórios</h4> <p class="text-xs">Vendas, produtos, comissões</p> </div>
+                    
+                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openTableMerge')"> <i class="fas fa-people-arrows text-3xl mb-2 text-pumpkin"></i> <h4 class="font-bold text-lg">Agrupar Mesas</h4> <p class="text-xs">Unir mesas</p> </div>
                     <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openInventoryManagement')"> <i class="fas fa-boxes text-3xl mb-2"></i> <h4 class="font-bold text-lg">Estoque</h4> <p class="text-xs">(Em breve)</p> </div>
                     <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openRecipesManagement')"> <i class="fas fa-book text-3xl mb-2"></i> <h4 class="font-bold text-lg">Ficha Técnica</h4> <p class="text-xs">(Em breve)</p> </div>
                     <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openCustomerCRM')"> <i class="fas fa-users text-3xl mb-2 text-indigo-400"></i> <h4 class="font-bold text-lg">Clientes (CRM)</h4> <p class="text-xs">(Em breve)</p> </div>
-                    
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openVoucherManagement')"> <i class="fas fa-tags text-3xl mb-2 text-pumpkin"></i> <h4 class="font-bold text-lg">Vouchers (CRM)</h4> <p class="text-xs">Gerenciar regras de resgate.</p> </div>
-                    
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openWaiterReg')"> <i class="fas fa-user-shield text-3xl mb-2 text-red-400"></i> <h4 class="font-bold text-lg">Usuários</h4> <p class="text-xs">Cadastrar Garçons / Gerentes</p> </div>
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openWooSync')"> <i class="fas fa-sync text-3xl mb-2 text-gray-400"></i> <h4 class="font-bold text-lg">Sincronizar</h4> <p class="text-xs">Forçar sincronia com WooCommerce</p> </div>
-                    
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openSectorManagement')"> <i class="fas fa-map-signs text-3xl mb-2"></i> <h4 class="font-bold text-lg">Gerenciar Setores</h4> <p class="text-xs">Adicionar/remover setores das mesas</p> </div>
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openQuickObsManagement')"> <i class="fas fa-comment-dots text-3xl mb-2"></i> <h4 class="font-bold text-lg">Obs. Rápidas</h4> <p class="text-xs">Adicionar/remover botões de obs.</p> </div>
+                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openVoucherManagement')"> <i class="fas fa-tags text-3xl mb-2 text-pumpkin"></i> <h4 class="font-bold text-lg">Vouchers (CRM)</h4> <p class="text-xs">Gerenciar regras</p> </div>
+                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openWaiterReg')"> <i class="fas fa-user-shield text-3xl mb-2 text-red-400"></i> <h4 class="font-bold text-lg">Usuários</h4> <p class="text-xs">Cadastrar Garçons</p> </div>
+                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openWooSync')"> <i class="fas fa-sync text-3xl mb-2 text-gray-400"></i> <h4 class="font-bold text-lg">Sincronizar</h4> <p class="text-xs">Forçar sincronia</p> </div>
+                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openSectorManagement')"> <i class="fas fa-map-signs text-3xl mb-2"></i> <h4 class="font-bold text-lg">Gerenciar Setores</h4> <p class="text-xs">Adicionar/remover setores</p> </div>
+                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openQuickObsManagement')"> <i class="fas fa-comment-dots text-3xl mb-2"></i> <h4 class="font-bold text-lg">Obs. Rápidas</h4> <p class="text-xs">Adicionar/remover botões</p> </div>
                 </div>
             </div>
             
@@ -367,16 +293,11 @@
     <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 id="obsItemName" class="text-xl font-bold mb-4 text-indigo-400">Adicionar Observação</h3>
-            
-            <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-4">
-                 </div>
-            <textarea id="obsInput" rows="3" placeholder="Ex: Sem cebola, Ponto da carne..." class="input-pdv w-full p-3 text-base"></textarea>
+            <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-4"></div>
+            <textarea id="obsInput" rows="3" placeholder="Ex: Sem cebola..." class="input-pdv w-full p-3 text-base"></textarea>
             <div class="flex items-center justify-between mt-3 mb-4">
                  <span class="text-dark-text font-semibold">Item em Espera?</span>
-                 <label class="switch-obs">
-                     <input type="checkbox" id="esperaSwitch">
-                     <span class="slider-obs"></span>
-                 </label>
+                 <label class="switch-obs"><input type="checkbox" id="esperaSwitch"><span class="slider-obs"></span></label>
             </div>
             <div class="flex justify-end space-x-3 mt-4">
                 <button id="cancelObsBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-base">Cancelar</button>
@@ -389,14 +310,11 @@
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm text-center">
             <h3 class="text-xl font-bold mb-4 text-red-400" id="customAlertTitle">Aviso</h3>
             <p class="text-base mb-6 text-dark-text" id="customAlertMessage">Mensagem Padrão.</p>
-            <button id="customAlertOkBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition">
-                OK
-            </button>
+            <button id="customAlertOkBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition">OK</button>
         </div>
     </div>
     
-    <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
-        </div>
+    <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"></div>
     
     <div id="calculatorModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-4 rounded-xl shadow-2xl w-full max-w-xs relative">
@@ -407,34 +325,29 @@
                 <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="operator" data-value="%">%</button>
                 <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="operator" data-value="/">/</button>
                 <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="backspace">&larr;</button>
-
                 <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="7">7</button>
                 <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="8">8</button>
                 <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="9">9</button>
                 <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="operator" data-value="*">*</button>
-
                 <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="4">4</button>
                 <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="5">5</button>
                 <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="6">6</button>
                 <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="operator" data-value="-">-</button>
-
                 <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="1">1</button>
                 <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="2">2</button>
                 <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="number" data-value="3">3</button>
                 <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="operator" data-value="+">+</button>
-
                 <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl col-span-2" data-action="number" data-value="0">0</button>
                 <button class="calc-btn p-3 bg-dark-input rounded hover:bg-gray-600 text-xl" data-action="decimal" data-value=",">,</button>
                 <button class="calc-btn p-3 bg-green-600 rounded hover:bg-green-700 text-xl" data-action="calculate">=</button>
-
-                </div>
+            </div>
              <button id="confirmCalcBtn" class="w-full mt-3 p-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition">OK (Usar Valor)</button>
         </div>
     </div>
     
     <div id="tableTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
-            <h3 class="text-xl font-bold mb-4 text-pumpkin">Transferir Itens (Mesa Inteira/Parcial)</h3>
+            <h3 class="text-xl font-bold mb-4 text-pumpkin">Transferir Itens</h3>
             <p class="text-sm text-dark-placeholder mb-3">Insira a mesa de destino para os itens selecionados.</p>
             <input type="number" id="targetTableInput" placeholder="Nº Mesa Destino" class="input-pdv w-full text-center mb-3">
             <div id="newTableDinersInput" class="hidden space-y-2 mb-3 p-3 bg-dark-bg rounded-lg border border-dark-border">
@@ -463,32 +376,17 @@
                 <label for="customerSearchCpf" class="block text-sm font-medium text-dark-placeholder mb-1">Buscar por CPF / CNPJ</label>
                 <div class="flex space-x-2">
                     <input type="text" id="customerSearchCpf" placeholder="Digite o CPF ou CNPJ" class="input-pdv w-full">
-                    <button id="searchCustomerByCpfBtn" class="p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition w-14">
-                        <i class="fas fa-search"></i>
-                    </button>
+                    <button id="searchCustomerByCpfBtn" class="p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition w-14"><i class="fas fa-search"></i></button>
                 </div>
             </div>
-             <div id="customerSearchResults" class="mb-4 p-3 rounded-lg bg-dark-bg border border-dark-border min-h-[50px]">
-                </div>
+             <div id="customerSearchResults" class="mb-4 p-3 rounded-lg bg-dark-bg border border-dark-border min-h-[50px]"></div>
              <hr class="border-gray-600 my-4">
              <h4 class="text-lg font-semibold mb-3 text-dark-text">Dados do Cliente</h4>
              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <div>
-                    <label for="customerName" class="block text-sm font-medium text-dark-placeholder mb-1">Nome Completo / Razão Social*</label>
-                    <input type="text" id="customerName" class="input-pdv w-full">
-                 </div>
-                 <div>
-                    <label for="customerCpf" class="block text-sm font-medium text-dark-placeholder mb-1">CPF / CNPJ*</label>
-                    <input type="text" id="customerCpf" placeholder="Documento (só números)" class="input-pdv w-full">
-                 </div>
-                 <div>
-                    <label for="customerPhone" class="block text-sm font-medium text-dark-placeholder mb-1">Telefone</label>
-                    <input type="tel" id="customerPhone" placeholder="(__) _____-____" class="input-pdv w-full">
-                 </div>
-                 <div>
-                    <label for="customerEmail" class="block text-sm font-medium text-dark-placeholder mb-1">E-mail</label>
-                    <input type="email" id="customerEmail" class="input-pdv w-full">
-                 </div>
+                 <div><label for="customerName" class="block text-sm font-medium text-dark-placeholder mb-1">Nome*</label><input type="text" id="customerName" class="input-pdv w-full"></div>
+                 <div><label for="customerCpf" class="block text-sm font-medium text-dark-placeholder mb-1">CPF/CNPJ*</label><input type="text" id="customerCpf" placeholder="Documento" class="input-pdv w-full"></div>
+                 <div><label for="customerPhone" class="block text-sm font-medium text-dark-placeholder mb-1">Telefone</label><input type="tel" id="customerPhone" class="input-pdv w-full"></div>
+                 <div><label for="customerEmail" class="block text-sm font-medium text-dark-placeholder mb-1">E-mail</label><input type="email" id="customerEmail" class="input-pdv w-full"></div>
              </div>
              <p class="text-xs text-dark-placeholder mt-1">* Campos obrigatórios</p>
             <div class="flex justify-end space-x-3 mt-6">
@@ -499,42 +397,65 @@
         </div>
     </div>
     
-    <div id="reportsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
-         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
-            <h3 class="text-xl font-bold mb-4 text-indigo-400">Relatórios</h3>
-            <p class="text-dark-text">Módulo de relatórios em desenvolvimento.</p>
-            <button class="w-full mt-4 px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('reportsModal').style.display='none'">Fechar</button>
+    <div id="reportsModal" class="fixed inset-0 bg-gray-900 bg-opacity-95 flex items-center justify-center z-50 hidden p-4 print-hide">
+         <div class="bg-dark-card border border-dark-border w-full max-w-4xl h-[90vh] flex flex-col rounded-xl shadow-2xl">
+            <div class="flex justify-between items-center p-6 border-b border-gray-700 bg-gray-800 rounded-t-xl">
+                <div>
+                    <h3 class="text-2xl font-bold text-indigo-400"><i class="fas fa-chart-pie mr-2"></i>Relatório Diário</h3>
+                    <p class="text-sm text-gray-400">Visão geral de vendas e auditoria.</p>
+                </div>
+                <button class="text-gray-400 hover:text-white text-2xl" onclick="document.getElementById('reportsModal').style.display='none'">&times;</button>
+            </div>
+            <div class="p-4 bg-dark-bg border-b border-gray-700 flex justify-between items-center flex-wrap gap-4">
+                <div class="flex space-x-2">
+                    <button class="report-tab-btn px-4 py-2 rounded-lg bg-indigo-600 text-white font-bold" data-tab="sales">Vendas</button>
+                    <button class="report-tab-btn px-4 py-2 rounded-lg bg-dark-input text-gray-300 hover:bg-gray-700 transition" data-tab="shifts">Auditoria de Turnos</button>
+                    <button class="report-tab-btn px-4 py-2 rounded-lg bg-dark-input text-gray-300 hover:bg-gray-700 transition" data-tab="monthly">Histórico Mensal</button>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <label class="text-gray-400 text-sm">Data:</label>
+                    <input type="date" id="reportDateInput" class="input-pdv py-1 px-3 text-sm">
+                    <button id="refreshReportBtn" class="p-2 bg-pumpkin text-white rounded hover:bg-pumpkin-dark"><i class="fas fa-sync-alt"></i></button>
+                </div>
+            </div>
+            <div class="flex-grow overflow-y-auto p-6 custom-scrollbar bg-dark-bg">
+                <div id="tab-sales" class="report-content block space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="p-4 bg-gray-800 rounded-lg border border-gray-700"><p class="text-gray-400 text-xs uppercase">Faturamento Total</p><p class="text-2xl font-bold text-green-400" id="reportTotalSales">R$ 0,00</p></div>
+                        <div class="p-4 bg-gray-800 rounded-lg border border-gray-700"><p class="text-gray-400 text-xs uppercase">Dinheiro</p><p class="text-xl font-bold text-white" id="reportTotalMoney">R$ 0,00</p></div>
+                        <div class="p-4 bg-gray-800 rounded-lg border border-gray-700"><p class="text-gray-400 text-xs uppercase">Cartão/Pix</p><p class="text-xl font-bold text-white" id="reportTotalDigital">R$ 0,00</p></div>
+                        <div class="p-4 bg-gray-800 rounded-lg border border-gray-700"><p class="text-gray-400 text-xs uppercase">Taxa Serviço</p><p class="text-xl font-bold text-blue-400" id="reportTotalService">R$ 0,00</p></div>
+                    </div>
+                    <div class="bg-dark-card rounded-lg border border-gray-700 overflow-hidden">
+                        <div class="p-3 bg-gray-800 border-b border-gray-700 font-bold text-gray-300">Mesas Fechadas</div>
+                        <table class="w-full text-left text-sm text-gray-400">
+                            <thead class="bg-gray-900 text-xs uppercase"><tr><th class="p-3">Hora</th><th class="p-3">Mesa</th><th class="p-3">Garçom</th><th class="p-3 text-right">Total</th></tr></thead>
+                            <tbody id="reportSalesTableBody" class="divide-y divide-gray-700"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="tab-shifts" class="report-content hidden space-y-6">
+                    <div class="grid grid-cols-1 gap-4" id="shiftsListContainer"><p class="text-center text-gray-500 italic py-8">Carregando turnos...</p></div>
+                </div>
+                <div id="tab-monthly" class="report-content hidden space-y-6">
+                    <div class="grid grid-cols-1 gap-4" id="monthlyReportsContainer"><p class="text-center text-gray-500 italic py-8">Carregando histórico...</p></div>
+                </div>
+            </div>
          </div>
     </div>
 
     <div id="nfeModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
-            <h3 class="text-xl font-bold mb-4 text-indigo-400">Emissão de Nota Fiscal (NF-e/NFC-e)</h3>
-            
-            <div id="nfeError" class="hidden p-3 rounded-lg bg-red-900 border border-red-700 text-red-200 mb-4">
-                <p id="nfeErrorMessage" class="font-semibold">Erro aqui</p>
-            </div>
-            
+            <h3 class="text-xl font-bold mb-4 text-indigo-400">Emissão de Nota Fiscal</h3>
+            <div id="nfeError" class="hidden p-3 rounded-lg bg-red-900 border border-red-700 text-red-200 mb-4"><p id="nfeErrorMessage" class="font-semibold">Erro aqui</p></div>
             <div id="nfeDetails">
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-dark-placeholder mb-1">Cliente</label>
-                    <p id="nfeCustomerName" class="text-lg font-semibold text-dark-text">Carregando...</p>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-dark-placeholder mb-1">Documento (CPF/CNPJ)</label>
-                    <p id="nfeCustomerDoc" class="text-lg font-semibold text-dark-text">Carregando...</p>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-dark-placeholder mb-1">Valor Total da Venda</label>
-                    <p id="nfeTotalValue" class="text-2xl font-bold text-pumpkin">R$ 0,00</p>
-                </div>
+                <div class="mb-4"><label class="block text-sm font-medium text-dark-placeholder mb-1">Cliente</label><p id="nfeCustomerName" class="text-lg font-semibold text-dark-text">Carregando...</p></div>
+                <div class="mb-4"><label class="block text-sm font-medium text-dark-placeholder mb-1">Documento</label><p id="nfeCustomerDoc" class="text-lg font-semibold text-dark-text">Carregando...</p></div>
+                <div class="mb-4"><label class="block text-sm font-medium text-dark-placeholder mb-1">Valor Total</label><p id="nfeTotalValue" class="text-2xl font-bold text-pumpkin">R$ 0,00</p></div>
             </div>
-
             <div class="flex justify-end space-x-3 mt-6">
                 <button class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('nfeModal').style.display='none'">Cancelar</button>
-                <button id="nfeConfirmBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
-                    <i class="fas fa-check-circle"></i> Emitir (Simulação)
-                </button>
+                <button id="nfeConfirmBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"><i class="fas fa-check-circle"></i> Emitir</button>
             </div>
         </div>
     </div>
@@ -542,114 +463,176 @@
     <div id="userManagementModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center mb-4 flex-shrink-0">
-                <h3 class="text-xl font-bold text-red-400">Gerenciar Usuários do Sistema</h3>
-                <button class="px-4 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('userManagementModal').style.display='none'; document.getElementById('userForm').style.display='none';">
-                    Fechar
-                </button>
+                <h3 class="text-xl font-bold text-red-400">Gerenciar Usuários</h3>
+                <button class="px-4 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('userManagementModal').style.display='none'; document.getElementById('userForm').style.display='none';">Fechar</button>
             </div>
-
             <div class="flex-grow overflow-y-auto mb-4 custom-scrollbar">
-
-                <div id="userListContainer" class="mb-4 border border-gray-600 p-3 rounded-lg bg-dark-bg min-h-[200px]">
-                    <p class="text-dark-placeholder italic">Carregando usuários...</p>
-                </div>
-
-                <button id="showUserFormBtn" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition mb-4">
-                    <i class="fas fa-plus"></i> Adicionar Novo Usuário
-                </button>
-
+                <div id="userListContainer" class="mb-4 border border-gray-600 p-3 rounded-lg bg-dark-bg min-h-[200px]"><p class="text-dark-placeholder italic">Carregando usuários...</p></div>
+                <button id="showUserFormBtn" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition mb-4"><i class="fas fa-plus"></i> Adicionar Novo Usuário</button>
                 <form id="userForm" class="hidden p-4 border border-gray-600 rounded-lg bg-dark-input space-y-3">
                     <h4 id="userFormTitle" class="text-lg font-semibold text-pumpkin mb-2">Adicionar Novo Usuário</h4>
                     <input type="hidden" id="userIdInput">
-
-                    <div>
-                        <label for="userNameInput" class="block text-sm font-medium text-dark-placeholder mb-1">Nome Completo*</label>
-                        <input type="text" id="userNameInput" placeholder="Nome do Usuário" class="input-pdv w-full" required>
-                    </div>
-                    <div>
-                        <label for="userEmailInput" class="block text-sm font-medium text-dark-placeholder mb-1">E-mail (Login)*</label>
-                        <input type="email" id="userEmailInput" placeholder="email@exemplo.com" class="input-pdv w-full" required autocomplete="username">
-                    </div>
-                    
-                    <div id="userPasswordContainer">
-                        <label for="userPasswordInput" class="block text-sm font-medium text-dark-placeholder mb-1">Senha*</label>
-                        <input type="password" id="userPasswordInput" placeholder="Senha (mínimo 6 caracteres)" class="input-pdv w-full" autocomplete="new-password">
-                        <p id="passwordHint" class="text-xs text-dark-placeholder mt-1" style="display: none;">Deixe em branco para não alterar a senha existente.</p>
-                    </div>
-                    <div>
-                        <label for="userRoleSelect" class="block text-sm font-medium text-dark-placeholder mb-1">Função (Papel)*</label>
-                        <select id="userRoleSelect" class="input-pdv w-full" required>
-                            <option value="" disabled selected>Selecione a função</option>
-                            <option value="garcom">Garçom</option>
-                            <option value="caixa">Caixa</option>
-                            <option value="gerente">Gerente</option>
-                        </select>
-                    </div>
-                     <div>
-                        <label for="userIsActiveCheckbox" class="flex items-center space-x-2 text-dark-text">
-                            <input type="checkbox" id="userIsActiveCheckbox" class="h-4 w-4 rounded text-pumpkin focus:ring-pumpkin border-gray-600 bg-dark-input" checked>
-                            <span>Usuário Ativo</span>
-                        </label>
-                    </div>
-
-                    <div class="flex justify-end space-x-3 pt-3">
-                        <button type="button" id="cancelUserFormBtn" class="px-4 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition">Cancelar</button>
-                        <button type="submit" id="saveUserBtn" class="px-4 py-2 bg-pumpkin text-white rounded-lg hover:bg-pumpkin-dark transition">Salvar Usuário</button>
-                    </div>
+                    <div><label class="block text-sm font-medium text-dark-placeholder mb-1">Nome*</label><input type="text" id="userNameInput" placeholder="Nome" class="input-pdv w-full" required></div>
+                    <div><label class="block text-sm font-medium text-dark-placeholder mb-1">E-mail*</label><input type="email" id="userEmailInput" placeholder="email@exemplo.com" class="input-pdv w-full" required autocomplete="username"></div>
+                    <div id="userPasswordContainer"><label class="block text-sm font-medium text-dark-placeholder mb-1">Senha*</label><input type="password" id="userPasswordInput" placeholder="Senha" class="input-pdv w-full" autocomplete="new-password"><p id="passwordHint" class="text-xs text-dark-placeholder mt-1" style="display: none;">Deixe em branco para não alterar.</p></div>
+                    <div><label class="block text-sm font-medium text-dark-placeholder mb-1">Função*</label><select id="userRoleSelect" class="input-pdv w-full" required><option value="" disabled selected>Selecione</option><option value="garcom">Garçom</option><option value="caixa">Caixa</option><option value="gerente">Gerente</option></select></div>
+                     <div><label class="flex items-center space-x-2 text-dark-text"><input type="checkbox" id="userIsActiveCheckbox" class="h-4 w-4 rounded text-pumpkin bg-dark-input" checked><span>Usuário Ativo</span></label></div>
+                    <div class="flex justify-end space-x-3 pt-3"><button type="button" id="cancelUserFormBtn" class="px-4 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition">Cancelar</button><button type="submit" id="saveUserBtn" class="px-4 py-2 bg-pumpkin text-white rounded-lg hover:bg-pumpkin-dark transition">Salvar Usuário</button></div>
                     <p id="userFormError" class="text-red-400 text-sm mt-2" style="display: none;"></p>
                 </form>
-
-            </div> </div>
-    </div>
-    
-    <div id="voucherManagementModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
-        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-            <div class="flex justify-between items-center mb-4 flex-shrink-0">
-                <h3 class="text-xl font-bold text-pumpkin">Gerenciar Vouchers de Resgate</h3>
-                <button class="px-4 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('voucherManagementModal').style.display='none'; document.getElementById('voucherForm').reset(); document.getElementById('voucherForm').style.display='none';">
-                    Fechar
-                </button>
-            </div>
-
-            <div class="flex-grow overflow-y-auto mb-4 custom-scrollbar">
-
-                <div id="voucherListContainer" class="mb-4 border border-gray-600 p-3 rounded-lg bg-dark-bg min-h-[100px]">
-                    <p class="text-dark-placeholder italic">Carregando vouchers...</p>
-                </div>
-
-                <form id="voucherForm" class="p-4 border border-gray-600 rounded-lg bg-dark-input space-y-3" style="display: none;">
-                    <h4 id="voucherFormTitle" class="text-lg font-semibold text-indigo-400 mb-2">Novo Voucher</h4>
-                    <input type="hidden" id="voucherIdInput">
-
-                    <div>
-                        <label for="voucherNameInput" class="block text-sm font-medium text-dark-placeholder mb-1">Nome/Descrição do Voucher*</label>
-                        <input type="text" id="voucherNameInput" placeholder="Ex: R$10 de desconto na próxima compra" class="input-pdv w-full" required>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label for="voucherPointsInput" class="block text-sm font-medium text-dark-placeholder mb-1">Pontos Necessários*</label>
-                            <input type="number" id="voucherPointsInput" placeholder="Ex: 100" class="input-pdv w-full" required min="1">
-                        </div>
-                        <div>
-                            <label for="voucherValueInput" class="block text-sm font-medium text-dark-placeholder mb-1">Valor do Desconto (R$)*</label>
-                            <input type="number" id="voucherValueInput" placeholder="Ex: 10.00" class="input-pdv w-full" required min="0.01" step="0.01">
-                        </div>
-                    </div>
-
-                    <div class="flex justify-end space-x-3 pt-3">
-                        <button type="button" id="cancelVoucherFormBtn" class="px-4 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('voucherForm').reset(); document.getElementById('voucherForm').style.display='none';">Cancelar</button>
-                        <button type="submit" id="saveVoucherBtn" class="px-4 py-2 bg-pumpkin text-white rounded-lg hover:bg-pumpkin-dark transition">Salvar Voucher</button>
-                    </div>
-                    <p id="voucherFormError" class="text-red-400 text-sm mt-2" style="display: none;"></p>
-                </form>
-
-                 <button id="showVoucherFormBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition mt-4">
-                    <i class="fas fa-plus"></i> Adicionar Novo Voucher
-                </button>
             </div> 
         </div>
     </div>
     
+    <div id="voucherManagementModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
+        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4 flex-shrink-0"><h3 class="text-xl font-bold text-pumpkin">Gerenciar Vouchers</h3><button class="px-4 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('voucherManagementModal').style.display='none'; document.getElementById('voucherForm').reset(); document.getElementById('voucherForm').style.display='none';">Fechar</button></div>
+            <div class="flex-grow overflow-y-auto mb-4 custom-scrollbar">
+                <div id="voucherListContainer" class="mb-4 border border-gray-600 p-3 rounded-lg bg-dark-bg min-h-[100px]"><p class="text-dark-placeholder italic">Carregando vouchers...</p></div>
+                <form id="voucherForm" class="p-4 border border-gray-600 rounded-lg bg-dark-input space-y-3" style="display: none;">
+                    <h4 id="voucherFormTitle" class="text-lg font-semibold text-indigo-400 mb-2">Novo Voucher</h4>
+                    <input type="hidden" id="voucherIdInput">
+                    <div><label class="block text-sm font-medium text-dark-placeholder mb-1">Nome*</label><input type="text" id="voucherNameInput" placeholder="Ex: R$10 desconto" class="input-pdv w-full" required></div>
+                    <div class="grid grid-cols-2 gap-4"><div><label class="block text-sm font-medium text-dark-placeholder mb-1">Pontos*</label><input type="number" id="voucherPointsInput" placeholder="Ex: 100" class="input-pdv w-full" required min="1"></div><div><label class="block text-sm font-medium text-dark-placeholder mb-1">Desconto (R$)*</label><input type="number" id="voucherValueInput" placeholder="Ex: 10.00" class="input-pdv w-full" required min="0.01" step="0.01"></div></div>
+                    <div class="flex justify-end space-x-3 pt-3"><button type="button" id="cancelVoucherFormBtn" class="px-4 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('voucherForm').reset(); document.getElementById('voucherForm').style.display='none';">Cancelar</button><button type="submit" id="saveVoucherBtn" class="px-4 py-2 bg-pumpkin text-white rounded-lg hover:bg-pumpkin-dark transition">Salvar Voucher</button></div>
+                    <p id="voucherFormError" class="text-red-400 text-sm mt-2" style="display: none;"></p>
+                </form>
+                 <button id="showVoucherFormBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition mt-4"><i class="fas fa-plus"></i> Adicionar Novo Voucher</button>
+            </div> 
+        </div>
+    </div>
+    
+    <div id="cashierModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
+        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-green-400" id="cashierModalTitle">Meu Caixa</h3>
+                <button class="text-gray-400 hover:text-white" onclick="document.getElementById('cashierModal').style.display='none'">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div id="cashierOpenScreen" class="hidden">
+                <div class="text-center mb-6">
+                    <i class="fas fa-cash-register text-4xl text-pumpkin mb-3"></i>
+                    <p class="text-dark-text">Seu caixa está fechado.</p>
+                    <p class="text-sm text-dark-placeholder">Informe o fundo de troco recebido para iniciar.</p>
+                </div>
+                <label class="block text-sm font-medium text-dark-placeholder mb-1">Fundo de Troco (R$)</label>
+                <input type="number" id="cashierStartFloat" class="input-pdv w-full mb-6 text-lg text-center font-bold" placeholder="0.00" step="0.01">
+                <button id="confirmOpenCashierBtn" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition">
+                    Abrir Caixa
+                </button>
+            </div>
+
+            <div id="cashierStatusScreen" class="hidden space-y-3">
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="p-3 bg-dark-bg rounded border border-dark-border">
+                        <span class="text-xs text-dark-placeholder block">Abertura</span>
+                        <span id="cashierOpenedAtDisplay" class="font-bold text-white">--:--</span>
+                    </div>
+                    <div class="p-3 bg-dark-bg rounded border border-dark-border">
+                        <span class="text-xs text-dark-placeholder block">Fundo Inicial</span>
+                        <span id="cashierStartFloatDisplay" class="font-bold text-green-400">R$ 0,00</span>
+                    </div>
+                </div>
+
+                <div class="p-3 bg-dark-bg rounded border border-dark-border">
+                    <p class="text-xs uppercase font-bold text-dark-placeholder mb-2 border-b border-gray-700 pb-1">Vendas (Turno Atual)</p>
+                    
+                    <div class="flex justify-between items-center mb-1 text-sm">
+                        <span class="text-gray-300">Cartão/Pix:</span>
+                        <span id="cashierSalesDigital" class="font-semibold text-white">R$ 0,00</span>
+                    </div>
+                    <div class="flex justify-between items-center mb-1 text-sm">
+                        <span class="text-gray-300">Dinheiro:</span>
+                        <span id="cashierSalesMoney" class="font-semibold text-green-400">R$ 0,00</span>
+                    </div>
+                    
+                    <div class="my-2 border-t border-gray-700 border-dashed"></div>
+
+                    <div class="flex justify-between items-center mb-1 text-xs text-gray-400">
+                        <span>Produtos Vendidos:</span>
+                        <span id="cashierTotalProducts">R$ 0,00</span>
+                    </div>
+                    <div class="flex justify-between items-center mb-1 text-xs text-blue-400">
+                        <span>Taxa de Serviço (10%):</span>
+                        <span id="cashierTotalService">R$ 0,00</span>
+                    </div>
+
+                    <div class="mt-2 pt-2 border-t border-gray-700 flex justify-between items-center">
+                        <span class="font-bold text-pumpkin">Total Vendas:</span>
+                        <span id="cashierSalesTotal" class="font-bold text-pumpkin text-lg">R$ 0,00</span>
+                    </div>
+                </div>
+                
+                <div class="bg-dark-bg rounded border border-dark-border overflow-hidden">
+                    <div class="bg-gray-800 px-3 py-2 border-b border-dark-border">
+                         <p class="text-xs uppercase font-bold text-gray-400">Movimentações (Mesas Fechadas)</p>
+                    </div>
+                    <div id="cashierTransactionsList" class="max-h-32 overflow-y-auto p-2 space-y-1 custom-scrollbar">
+                        <p class="text-center text-xs text-gray-600 italic">Nenhuma movimentação.</p>
+                    </div>
+                </div>
+
+                <div class="p-3 bg-dark-bg rounded border border-red-900/30">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm text-red-300 font-semibold">Sangrias (Retiradas)</span>
+                        <button id="openSangriaModalBtn" class="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded transition">
+                            + Registrar
+                        </button>
+                    </div>
+                    <div id="sangriaList" class="text-xs text-gray-400 max-h-20 overflow-y-auto space-y-1">
+                        <p class="italic opacity-50">Nenhuma sangria registrada.</p>
+                    </div>
+                    <div class="flex justify-between items-center mt-2 pt-1 border-t border-red-900/30 font-bold text-red-400 text-sm">
+                        <span>Total Retirado:</span>
+                        <span id="cashierTotalSangria">R$ 0,00</span>
+                    </div>
+                </div>
+
+                <hr class="border-gray-600 my-4">
+                
+                <div>
+                    <p class="text-sm text-white font-bold mb-2">Fechamento de Turno</p>
+                    <div class="flex justify-between text-sm mb-2 bg-gray-800 p-2 rounded">
+                        <span>Dinheiro Esperado na Gaveta:</span>
+                        <span id="cashierExpectedMoney" class="font-bold text-white">R$ 0,00</span>
+                    </div>
+
+                    <label class="block text-xs text-dark-placeholder mb-1">Contagem Final (Dinheiro na Mão)*</label>
+                    <input type="number" id="cashierEndFloat" class="input-pdv w-full mb-2 text-lg font-bold text-white bg-gray-700 border-gray-600" placeholder="0.00" step="0.01">
+                    
+                    <div id="cashierDifferenceContainer" class="hidden mb-3 p-2 rounded text-center text-sm">
+                        <span class="block text-xs opacity-75">Diferença (Quebra de Caixa)</span>
+                        <span id="cashierDifferenceValue" class="font-bold text-lg">R$ 0,00</span>
+                    </div>
+
+                    <div id="cashierJustificationContainer" class="hidden">
+                        <label class="block text-xs text-red-400 mb-1">Justificativa da Diferença*</label>
+                        <textarea id="cashierClosingNote" class="input-pdv w-full text-sm p-2 h-16" placeholder="Explique a sobra ou falta..."></textarea>
+                    </div>
+                </div>
+                
+                <button id="confirmCloseCashierBtn" class="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition mt-2">
+                    Encerrar Turno
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="sangriaModal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[60] hidden p-4 print-hide">
+        <div class="bg-dark-card border border-red-500/50 p-5 rounded-lg shadow-xl w-full max-w-xs">
+            <h4 class="text-lg font-bold text-red-400 mb-3">Nova Sangria</h4>
+            <p class="text-xs text-gray-400 mb-3">Registre o valor entregue ao gerente.</p>
+            <input type="number" id="sangriaValueInput" class="input-pdv w-full mb-2" placeholder="Valor (R$)" step="0.01">
+            <input type="text" id="sangriaReasonInput" class="input-pdv w-full mb-4" placeholder="Motivo (Ex: Recolhimento)">
+            <div class="flex space-x-2">
+                <button class="flex-1 bg-gray-600 text-white py-2 rounded hover:bg-gray-500" onclick="document.getElementById('sangriaModal').style.display='none'">Cancelar</button>
+                <button id="confirmSangriaBtn" class="flex-1 bg-red-600 text-white py-2 rounded hover:bg-red-700 font-bold">Salvar</button>
+            </div>
+        </div>
+    </div>
+
     <div id="waiterRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"></div>
     <div id="selectiveTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"></div>
     <div id="productManagementModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"></div>
@@ -659,24 +642,20 @@
     <script>
         window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`);
         window.activateItemSelection = () => {}; 
-        // Placeholders para funções onclick da divisão (agora escondida)
-        window.removeSplitAccount = (splitId) => { alert(`Remover Divisão ${splitId} (DEV)`)};
-        window.openPaymentModalForSplit = (splitId) => { alert(`Pagar Conta Dividida ${splitId} (DEV)`); };
-        window.openSplitTransferModal = (splitId, mode) => { alert(`Mover Itens Para/De ${splitId} (DEV)`); };
+        window.removeSplitAccount = (splitId) => { alert(`Funcionalidade desativada`)};
+        window.openPaymentModalForSplit = (splitId) => { alert(`Funcionalidade desativada`); };
+        window.openSplitTransferModal = (splitId, mode) => { alert(`Funcionalidade desativada`); };
     </script>
 
     <script>
-        // Config Firebase
-        // Este é o ID do seu documento no Firestore (visto na captura de tela)
         window.__app_id = "1:1097659747429:web:8ec0a7c3978c311dbe0a8c";
-        
         window.__firebase_config = JSON.stringify({
             apiKey: "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY",
             authDomain: "fator-pdv.firebaseapp.com",
             projectId: "fator-pdv",
             storageBucket: "fator-pdv.appspot.com",
             messagingSenderId: "1097659747429",
-            appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c" // Este é o App ID do projeto
+            appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c"
         });
     </script>
     <script type="module" src="app.js"></script>

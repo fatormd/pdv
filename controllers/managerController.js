@@ -1,463 +1,37 @@
-// --- CONTROLLERS/MANAGERCONTROLLER.JS (COMPLETO, SEM ALTERAÇÕES, JÁ ESTAVA CORRETO) ---
-import { functions, auth } from "/services/firebaseService.js";
-import { httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
-import { openUserManagementModal } from "/controllers/userManagementController.js";
-
-// Importa getVouchersCollectionRef do service
-import { getQuickObsCollectionRef, getVouchersCollectionRef } from "/services/firebaseService.js"; 
+import { db, appId, getVouchersCollectionRef, getQuickObsCollectionRef, getTablesCollectionRef } from "/services/firebaseService.js";
 import { 
-    getDocs, query, orderBy, doc, setDoc, deleteDoc, updateDoc, FieldValue, serverTimestamp
+    collection, query, where, getDocs, orderBy, Timestamp, 
+    doc, setDoc, deleteDoc, updateDoc, serverTimestamp, getDoc, limit
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { formatCurrency } from "/utils.js";
+import { openUserManagementModal } from "/controllers/userManagementController.js";
 
-// Variáveis de Vouchers
+// Variáveis
+let managerModal; 
+let managerAuthCallback;
 let voucherManagementModal, voucherListContainer, voucherForm;
-
-let managerModal; // Container do modal
-let managerAuthCallback; // Guarda a ação que precisa de autenticação
-
-
-/**
- * Abre o modal de autenticação de gerente.
- * @param {string} actionCallback - A função (string) a ser executada após a senha correta.
- */
-export const openManagerAuthModal = (actionCallback) => {
-    if (!managerModal) {
-         console.error("Modal Gerencial não encontrado.");
-         return;
-    }
-    
-    managerAuthCallback = actionCallback; // Salva a ação (ex: 'openQuickObsManagement' ou 'openVoucherManagement')
-
-    const authModalHTML = `
-        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm text-center">
-            <h3 class="text-xl font-bold mb-4 text-red-400">Acesso Restrito</h3>
-            <p class="text-base mb-6 text-dark-text">Por favor, insira a senha de Gerente para continuar.</p>
-            <form id="managerAuthForm">
-                <input type="password" id="managerPasswordInput" placeholder="Senha de Gerente" class="input-pdv w-full p-4 mb-6 text-base" autocomplete="current-password">
-                <div id="managerAuthError" class="text-red-400 text-sm mb-4" style="display: none;"></div>
-                <div class="flex justify-end space-x-3">
-                    <button type="button" id="cancelManagerAuthBtn" class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition">Cancelar</button>
-                    <button type="submit" id="submitManagerAuthBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">Autorizar</button>
-                </div>
-            </form>
-        </div>
-    `;
-    
-    managerModal.innerHTML = authModalHTML;
-    managerModal.style.display = 'flex';
-    document.getElementById('managerPasswordInput').focus();
-
-    // Adiciona listeners ao formulário
-    document.getElementById('cancelManagerAuthBtn').onclick = () => managerModal.style.display = 'none';
-    document.getElementById('managerAuthForm').onsubmit = handleManagerAuthSubmit;
-};
-window.openManagerAuthModal = openManagerAuthModal;
+let reportDateInput;
+let managerControllerInitialized = false;
 
 
-/**
- * Lida com o submit do formulário de autenticação de gerente.
- */
-const handleManagerAuthSubmit = async (e) => {
-    e.preventDefault();
-    const passwordInput = document.getElementById('managerPasswordInput');
-    const errorMsg = document.getElementById('managerAuthError');
-    const submitBtn = document.getElementById('submitManagerAuthBtn');
-    
-    if (!passwordInput || !errorMsg || !submitBtn) return;
-
-    const password = passwordInput.value;
-    if (password.length < 4) {
-        errorMsg.textContent = "Senha inválida.";
-        errorMsg.style.display = 'block';
-        return;
-    }
-
-    submitBtn.disabled = true;
-    submitBtn.textContent = "Verificando...";
-    errorMsg.style.display = 'none';
-
-    try {
-        
-        // NOTA: Esta cloud function 'verifyManagerPassword' não existe no seu functions/index.js
-        // Você está usando uma senha 'chumbada' no app.js (1234).
-        // Vou simular o comportamento do app.js para manter a consistência.
-        if (password === '1234') { // Usando a mesma senha do app.js
-            console.log("[Manager] Autorização concedida (senha local).");
-            // Executa a ação que estava pendente
-            if (managerAuthCallback) {
-                handleGerencialAction(managerAuthCallback, null);
-            }
-        } else {
-            throw new Error("Senha incorreta.");
-        }
-
-    } catch (error) {
-        console.error("Erro na autorização gerencial:", error);
-        errorMsg.textContent = error.message || "Senha incorreta ou falha na verificação.";
-        errorMsg.style.display = 'block';
-        submitBtn.disabled = false;
-        submitBtn.textContent = "Autorizar";
-    }
-};
-
-// ==================================================================
-//               FUNÇÕES DE VOUCHER MANAGEMENT
-// ==================================================================
-
-/**
- * Renderiza a lista de vouchers na modal.
- */
-const renderVouchers = (vouchers) => {
-    if (!voucherListContainer) return;
-
-    if (vouchers.length === 0) {
-        voucherListContainer.innerHTML = '<p class="text-sm text-dark-placeholder italic">Nenhuma regra de voucher cadastrada.</p>';
-        return;
-    }
-
-    voucherListContainer.innerHTML = vouchers.map(v => `
-        <div class="flex justify-between items-center bg-dark-input p-3 rounded-lg mb-2">
-            <div>
-                <h4 class="font-bold text-dark-text">${v.name}</h4>
-                <p class="text-sm text-indigo-400">${v.points} pontos por ${formatCurrency(v.value)}</p>
-            </div>
-            <button class="text-red-400 hover:text-red-500 transition" 
-                    onclick="window.handleDeleteVoucher('${v.id}')">
-                <i class="fas fa-trash"></i>
-            </button>
-        </div>
-    `).join('');
-};
-
-/**
- * Busca os vouchers do Firestore.
- */
-const fetchVouchers = async () => {
-    if (!voucherListContainer) return;
-    voucherListContainer.innerHTML = '<p class="text-sm text-yellow-400 italic">Buscando vouchers...</p>';
-    try {
-        // Usa a função importada do service
-        const q = query(getVouchersCollectionRef(), orderBy('points', 'asc'));
-        const querySnapshot = await getDocs(q);
-        
-        const vouchers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
-        renderVouchers(vouchers);
-        return vouchers;
-
-    } catch (error) {
-        console.error("Erro ao buscar vouchers:", error);
-        voucherListContainer.innerHTML = '<p class="text-sm text-red-400">Erro ao carregar vouchers.</p>';
-        return [];
-    }
-};
-
-/**
- * Abre a modal de gerenciamento de vouchers.
- */
-const openVoucherManagementModal = async () => {
-    if (!voucherManagementModal) return;
-    if(managerModal) managerModal.style.display = 'none'; // Fecha o modal de autenticação
-    voucherManagementModal.style.display = 'flex';
-    if(voucherForm) voucherForm.style.display = 'none'; // Esconde o form por padrão
-    await fetchVouchers();
-};
-window.openVoucherManagementModal = openVoucherManagementModal;
-
-
-/**
- * Salva ou atualiza um voucher.
- */
-const handleSaveVoucher = async (e) => {
-    e.preventDefault();
-    const id = document.getElementById('voucherIdInput').value || doc(getVouchersCollectionRef()).id; 
-    const name = document.getElementById('voucherNameInput').value;
-    const points = parseInt(document.getElementById('voucherPointsInput').value);
-    const value = parseFloat(document.getElementById('voucherValueInput').value);
-    const errorEl = document.getElementById('voucherFormError');
-    const saveBtn = document.getElementById('saveVoucherBtn');
-
-    if (points <= 0 || value <= 0) {
-        errorEl.textContent = 'Pontos e valor de desconto devem ser maiores que zero.';
-        errorEl.style.display = 'block';
-        return;
-    }
-    errorEl.style.display = 'none';
-    saveBtn.disabled = true;
-
-    try {
-        const voucherRef = doc(getVouchersCollectionRef(), id);
-        await setDoc(voucherRef, {
-            id,
-            name,
-            points,
-            value,
-            createdAt: serverTimestamp() 
-        }, { merge: true });
-
-        document.getElementById('voucherForm').reset();
-        document.getElementById('voucherForm').style.display = 'none';
-        await fetchVouchers();
-        alert(`Voucher ${name} salvo com sucesso!`);
-
-    } catch (e) {
-        console.error("Erro ao salvar voucher:", e);
-        errorEl.textContent = 'Falha ao salvar voucher.';
-        errorEl.style.display = 'block';
-    } finally {
-        saveBtn.disabled = false;
-    }
-};
-
-/**
- * Exclui um voucher.
- */
-const handleDeleteVoucher = async (id) => {
-    if (!confirm("Tem certeza que deseja EXCLUIR esta regra de voucher?")) return;
-    
-    try {
-        const voucherRef = doc(getVouchersCollectionRef(), id);
-        await deleteDoc(voucherRef);
-        await fetchVouchers();
-        alert("Voucher excluído com sucesso.");
-    } catch (e) {
-        console.error("Erro ao excluir voucher:", e);
-        alert("Falha ao excluir voucher.");
-    }
-};
-window.handleDeleteVoucher = handleDeleteVoucher; 
-
-// ==================================================================
-//        FIM FUNÇÕES DE VOUCHER MANAGEMENT
-// ==================================================================
-
-
-// ==================================================================
-//               GERENCIAR OBSERVAÇÕES RÁPIDAS (EXISTENTE)
-// ==================================================================
-
-/**
- * Renderiza o HTML do modal de gerenciamento de observações rápidas.
- * Busca os dados do Firebase e popula o modal.
- */
-const renderQuickObsManagementModal = async () => {
-    if (!managerModal) return;
-
-    const modalHTML = `
-    <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
-        <div class="flex justify-between items-center mb-4 flex-shrink-0">
-            <h3 class="text-xl font-bold text-indigo-400">Gerenciar Observações Rápidas</h3>
-            <button id="closeQuickObsModalBtn" class="px-4 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition">
-                Fechar
-            </button>
-        </div>
-        
-        <div class="flex-grow overflow-y-auto mb-4 custom-scrollbar">
-            <form id="addQuickObsForm" class="flex space-x-2 mb-4">
-                <input type="text" id="newQuickObsInput" placeholder="Digite a nova observação (ex: Sem Gelo)" class="input-pdv w-full" required>
-                <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">Adicionar</button>
-            </form>
-            
-            <div id="quickObsListContainer" class="space-y-2 min-h-[100px]">
-                <p class="text-dark-placeholder italic">Carregando observações...</p>
-            </div>
-        </div>
-    </div>
-    `;
-    
-    managerModal.innerHTML = modalHTML;
-    managerModal.style.display = 'flex';
-    
-    const listContainer = document.getElementById('quickObsListContainer');
-    
-    // Busca dados
-    try {
-        const q = query(getQuickObsCollectionRef(), orderBy('text', 'asc'));
-        const querySnapshot = await getDocs(q);
-        const obsList = querySnapshot.docs.map(doc => ({ id: doc.id, text: doc.data().text }));
-        
-        if (obsList.length === 0) {
-            listContainer.innerHTML = '<p class="text-dark-placeholder italic">Nenhuma observação cadastrada.</p>';
-        } else {
-            listContainer.innerHTML = obsList.map(obs => `
-                <div class="flex justify-between items-center bg-dark-input p-3 rounded-lg">
-                    <span class="text-dark-text">${obs.text}</span>
-                    <button class="delete-quick-obs-btn text-red-400 hover:text-red-500" data-id="${obs.id}" data-text="${obs.text}" title="Excluir">
-                        <i class="fas fa-trash pointer-events-none"></i>
-                    </button>
-                </div>
-            `).join('');
-        }
-
-        // Adiciona listeners de exclusão
-        listContainer.querySelectorAll('.delete-quick-obs-btn').forEach(btn => {
-            btn.onclick = (e) => {
-                const docId = e.currentTarget.dataset.id;
-                const docText = e.currentTarget.dataset.text;
-                handleDeleteQuickObs(docId, docText);
-            };
-        });
-
-    } catch (e) {
-        console.error("Erro ao buscar obs rápidas:", e);
-        listContainer.innerHTML = '<p class="text-red-400">Erro ao carregar observações.</p>';
-    }
-
-    // Adiciona listeners do modal
-    document.getElementById('closeQuickObsModalBtn').onclick = () => managerModal.style.display = 'none';
-    document.getElementById('addQuickObsForm').onsubmit = (e) => {
-        e.preventDefault();
-        const input = document.getElementById('newQuickObsInput');
-        const newText = input.value.trim();
-        if (newText) {
-            handleAddQuickObs(newText, input);
-        }
-    };
-};
-
-/**
- * Adiciona uma nova observação ao Firebase.
- */
-const handleAddQuickObs = async (newText, inputElement) => {
-    if (!newText) return;
-    
-    try {
-        // Cria uma referência de documento baseada no próprio texto (para evitar duplicatas)
-        const docId = newText.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-        if (docId.length === 0) {
-             alert("Texto inválido para criar um ID.");
-             return;
-        }
-        
-        const obsRef = doc(getQuickObsCollectionRef(), docId);
-        
-        await setDoc(obsRef, { text: newText });
-        
-        console.log(`Observação rápida "${newText}" adicionada.`);
-        renderQuickObsManagementModal(); // Re-renderiza o modal
-        
-    } catch (e) {
-        console.error("Erro ao adicionar observação:", e);
-        alert("Falha ao adicionar observação.");
-        if (inputElement) inputElement.value = newText; // Devolve o texto
-    }
-};
-
-/**
- * Exclui uma observação do Firebase.
- */
-const handleDeleteQuickObs = async (docId, obsText) => {
-    if (!docId || !obsText) return;
-    if (!confirm(`Tem certeza que deseja excluir a observação "${obsText}"?`)) return;
-
-    try {
-        const obsRef = doc(getQuickObsCollectionRef(), docId);
-        await deleteDoc(obsRef);
-        
-        console.log(`Observação rápida "${obsText}" excluída.`);
-        renderQuickObsManagementModal(); // Re-renderiza
-
-    } catch (e) {
-        console.error("Erro ao excluir observação:", e);
-        alert("Falha ao excluir observação.");
-    }
-};
-
-/**
- * Função de entrada chamada pelo app.js
- */
-const openQuickObsManagement = () => {
-    // Apenas renderiza o modal. A função fará o fetch dos dados.
-    renderQuickObsManagementModal();
-};
-
-
-// ==================================================================
-//               AÇÃO GERENCIAL PRINCIPAL
-// ==================================================================
-
-/**
- * Ponto de entrada para todas as ações do painel gerencial.
- * @param {string} action - O nome da ação (ex: 'openCashManagement').
- * @param {object} payload - Dados extras (se necessário).
- */
-export const handleGerencialAction = (action, payload) => {
-    console.log(`[Manager] Executando ação gerencial: ${action}`);
-    
-    // Fecha o modal de autenticação (se estiver aberto)
-    if (managerModal) managerModal.style.display = 'none';
-
-    switch (action) {
-        case 'openProductManagement':
-            alert("Módulo Gerenciar Produtos (WooCommerce) em desenvolvimento.");
-            break;
-        case 'openCashManagement':
-            alert("Módulo Gerenciar Caixa em desenvolvimento.");
-            break;
-        case 'openInventoryManagement':
-            alert("Módulo Gerenciar Estoque em desenvolvimento.");
-            break;
-        case 'openRecipesManagement':
-            alert("Módulo Gerenciar Ficha Técnica em desenvolvimento.");
-            break;
-        case 'openCustomerCRM':
-            alert("Módulo Gerenciar Clientes (CRM) em desenvolvimento.");
-            break;
-        case 'openWaiterReg':
-            // Esta é a ação de 'Gerenciar Usuários'
-            openUserManagementModal();
-            break;
-        case 'openWooSync':
-            alert("Módulo Sincronizar WooCommerce em desenvolvimento.");
-            break;
-        case 'openSectorManagement':
-            alert("Módulo Gerenciar Setores em desenvolvimento.");
-            break;
-            
-        case 'openQuickObsManagement':
-            openQuickObsManagement(); // Chama a nova função
-            break;
-        case 'openVoucherManagement': // <--- CASE
-            openVoucherManagementModal();
-            break;
-            
-        case 'openTableMerge':
-            alert("Módulo Agrupar Mesas em desenvolvimento.");
-            break;
-        default:
-             alert(`Módulo Gerencial não reconhecido: ${action}.`);
-    }
-};
-
-
-/**
- * Inicializa o controller do painel gerencial.
- */
 export const initManagerController = () => {
+    if (managerControllerInitialized) return;
     console.log("[ManagerController] Inicializando...");
     
     managerModal = document.getElementById('managerModal');
     
-    if (!managerModal) {
-         console.error("[ManagerController] Erro Fatal: Modal 'managerModal' não encontrado.");
-         return;
-    }
+    if (!managerModal) return;
     
-    // Adiciona listener para fechar o modal clicando no fundo (se necessário)
     managerModal.addEventListener('click', (e) => {
-         if (e.target === managerModal) {
-             managerModal.style.display = 'none';
-         }
+         if (e.target === managerModal) managerModal.style.display = 'none';
     });
 
-    // Mapeamento de elementos do Voucher Management
+    // Vouchers
     voucherManagementModal = document.getElementById('voucherManagementModal'); 
     voucherListContainer = document.getElementById('voucherListContainer');     
     voucherForm = document.getElementById('voucherForm');                       
     const showVoucherFormBtn = document.getElementById('showVoucherFormBtn'); 
 
-    // LISTENERS DO FORM DE VOUCHER
     if (voucherForm) voucherForm.addEventListener('submit', handleSaveVoucher);
     if (showVoucherFormBtn) showVoucherFormBtn.addEventListener('click', () => { 
         voucherForm.style.display = 'block'; 
@@ -466,5 +40,430 @@ export const initManagerController = () => {
         document.getElementById('saveVoucherBtn').textContent = 'Salvar Voucher';
     });
 
-    console.log("[ManagerController] Inicializado.");
+    // Relatórios
+    reportDateInput = document.getElementById('reportDateInput');
+    if (reportDateInput) {
+        reportDateInput.valueAsDate = new Date(); 
+        reportDateInput.addEventListener('change', loadReports);
+    }
+    document.getElementById('refreshReportBtn')?.addEventListener('click', loadReports);
+
+    // Abas
+    const tabBtns = document.querySelectorAll('.report-tab-btn');
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            tabBtns.forEach(b => {
+                b.classList.remove('bg-indigo-600', 'text-white');
+                b.classList.add('bg-dark-input', 'text-gray-300');
+            });
+            btn.classList.remove('bg-dark-input', 'text-gray-300');
+            btn.classList.add('bg-indigo-600', 'text-white');
+
+            document.querySelectorAll('.report-content').forEach(c => c.classList.add('hidden'));
+            document.getElementById(`tab-${btn.dataset.tab}`).classList.remove('hidden');
+            
+            if (btn.dataset.tab === 'monthly') {
+                fetchMonthlyReports();
+            }
+        });
+    });
+
+    managerControllerInitialized = true;
+};
+
+export const handleGerencialAction = (action, payload) => {
+    console.log(`[Manager] Ação: ${action}`);
+    if (managerModal) managerModal.style.display = 'none';
+
+    switch (action) {
+        case 'openWaiterReg': openUserManagementModal(); break;
+        case 'openQuickObsManagement': renderQuickObsManagementModal(); break;
+        case 'openVoucherManagement': openVoucherManagementModal(); break;
+        case 'openCashManagement': openReportPanel('shifts'); break;
+        
+        // AÇÃO: FECHAR DIA
+        case 'closeDay': handleCloseDay(); break;
+
+        default: alert(`Em desenvolvimento: ${action}`);
+    }
+};
+
+// --- FECHAMENTO DO DIA ---
+const handleCloseDay = async () => {
+    if (!confirm("Tem certeza que deseja ENCERRAR O DIA?\nIsso consolidará todas as vendas e turnos de hoje em um relatório final.")) return;
+
+    const todayStr = new Date().toISOString().split('T')[0]; 
+    const reportId = `daily_${todayStr}`;
+    const reportRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'daily_reports'), reportId);
+
+    try {
+        const docSnap = await getDoc(reportRef);
+        if (docSnap.exists()) {
+            if (!confirm("Já existe um fechamento para hoje. Deseja sobrescrever?")) return;
+        }
+
+        const start = Timestamp.fromDate(new Date(todayStr + 'T00:00:00'));
+        const end = Timestamp.fromDate(new Date(todayStr + 'T23:59:59'));
+
+        // 1. Vendas
+        const tablesQ = query(collection(db, 'artifacts', appId, 'public', 'data', 'tables'), 
+            where('status', '==', 'closed'), where('closedAt', '>=', start), where('closedAt', '<=', end));
+        const tablesSnap = await getDocs(tablesQ);
+        
+        let totalSales = 0, money = 0, digital = 0;
+        let ordersCount = 0;
+
+        tablesSnap.forEach(d => {
+            const t = d.data();
+            totalSales += (t.finalTotal || t.total || 0);
+            ordersCount++;
+            (t.payments || []).forEach(p => {
+                const v = parseFloat(p.value.replace(/[^\d,]/g,'').replace(',','.'));
+                if(p.method.toLowerCase().includes('dinheiro')) money += v; else digital += v;
+            });
+        });
+
+        // 2. Turnos
+        const shiftsQ = query(collection(db, 'artifacts', appId, 'public', 'data', 'shifts'),
+            where('openedAt', '>=', start), where('openedAt', '<=', end));
+        const shiftsSnap = await getDocs(shiftsQ);
+        const shiftIds = shiftsSnap.docs.map(d => d.id);
+
+        // 3. Salva
+        await setDoc(reportRef, {
+            date: todayStr,
+            totalSales,
+            totalMoney: money,
+            totalDigital: digital,
+            ordersCount,
+            shiftsAudited: shiftIds,
+            closedAt: serverTimestamp()
+        });
+
+        alert(`Dia encerrado com sucesso!\nTotal: ${formatCurrency(totalSales)}`);
+        openReportPanel('monthly');
+
+    } catch (e) {
+        console.error(e);
+        alert("Erro ao encerrar dia: " + e.message);
+    }
+};
+
+const fetchMonthlyReports = async () => {
+    const container = document.getElementById('monthlyReportsContainer');
+    if (!container) return;
+    container.innerHTML = '<p class="text-center py-4 text-gray-500">Carregando...</p>';
+
+    try {
+        const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'daily_reports'), orderBy('date', 'desc'), limit(30));
+        const snap = await getDocs(q);
+        
+        if (snap.empty) {
+            container.innerHTML = '<p class="text-center py-4 text-gray-500">Nenhum fechamento registrado.</p>';
+            return;
+        }
+
+        container.innerHTML = snap.docs.map(d => {
+            const r = d.data();
+            return `
+            <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex justify-between items-center">
+                <div>
+                    <h4 class="text-white font-bold text-lg">${r.date.split('-').reverse().join('/')}</h4>
+                    <p class="text-sm text-gray-400">${r.ordersCount} pedidos</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-green-400 font-bold text-xl">${formatCurrency(r.totalSales)}</p>
+                    <p class="text-xs text-gray-500">Dinheiro: ${formatCurrency(r.totalMoney)}</p>
+                </div>
+            </div>`;
+        }).join('');
+
+    } catch (e) {
+        console.error(e);
+        container.innerHTML = '<p class="text-center text-red-400">Erro ao carregar histórico.</p>';
+    }
+};
+
+// --- MODAL DE DETALHES (INJETADO DINAMICAMENTE) ---
+window.showOrderDetails = async (docId) => {
+    let modal = document.getElementById('orderDetailsModal');
+    if (!modal) {
+        document.body.insertAdjacentHTML('beforeend', `
+            <div id="orderDetailsModal" class="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[60] hidden p-4 print-hide">
+                <div class="bg-dark-card border border-dark-border w-full max-w-md rounded-xl shadow-2xl flex flex-col max-h-[80vh]">
+                    <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                        <h3 class="text-lg font-bold text-pumpkin">Detalhes do Pedido</h3>
+                        <button onclick="document.getElementById('orderDetailsModal').style.display='none'" class="text-gray-400 hover:text-white">&times;</button>
+                    </div>
+                    <div id="orderDetailsContent" class="p-4 overflow-y-auto custom-scrollbar flex-grow">Carregando...</div>
+                    <div class="p-4 border-t border-gray-700 bg-gray-800 rounded-b-xl text-right">
+                        <button onclick="document.getElementById('orderDetailsModal').style.display='none'" class="px-4 py-2 bg-gray-600 rounded text-white">Fechar</button>
+                    </div>
+                </div>
+            </div>
+        `);
+        modal = document.getElementById('orderDetailsModal');
+    }
+    
+    modal.style.display = 'flex';
+    const content = document.getElementById('orderDetailsContent');
+    content.innerHTML = '<p class="text-center text-yellow-400"><i class="fas fa-spinner fa-spin"></i> Buscando dados...</p>';
+
+    try {
+        const docRef = doc(getTablesCollectionRef(), docId);
+        const snap = await getDoc(docRef);
+        
+        if (!snap.exists()) {
+            content.innerHTML = '<p class="text-red-400">Erro: Pedido não encontrado.</p>';
+            return;
+        }
+
+        const data = snap.data();
+        const items = data.sentItems || [];
+        const payments = data.payments || [];
+
+        let itemsHtml = items.map(item => `
+            <div class="flex justify-between py-1 border-b border-gray-800 text-sm">
+                <div class="flex flex-col">
+                    <span class="text-white">${item.name}</span>
+                    ${item.note ? `<span class="text-xs text-gray-500 italic">${item.note}</span>` : ''}
+                </div>
+                <span class="text-gray-300 font-mono">${formatCurrency(item.price)}</span>
+            </div>
+        `).join('');
+
+        let paymentsHtml = payments.map(p => `
+            <div class="flex justify-between py-1 text-xs text-green-400">
+                <span>${p.method}</span>
+                <span>${p.value}</span>
+            </div>
+        `).join('');
+
+        content.innerHTML = `
+            <div class="mb-4 border-b border-gray-700 pb-3">
+                <p class="text-xs text-gray-500">ID: ${docId}</p>
+                <p class="text-sm text-white font-bold">Mesa ${data.tableNumber}</p>
+                <p class="text-xs text-gray-400">${new Date(data.closedAt.toDate()).toLocaleString()}</p>
+                <p class="text-xs text-gray-400">Atendente: ${data.waiterId || 'N/A'}</p>
+            </div>
+            
+            <h4 class="text-xs uppercase font-bold text-pumpkin mb-2">Itens</h4>
+            <div class="mb-4 space-y-1">${itemsHtml || '<p class="italic text-gray-600">Sem itens</p>'}</div>
+            
+            <h4 class="text-xs uppercase font-bold text-green-400 mb-2">Pagamentos</h4>
+            <div class="mb-4 space-y-1">${paymentsHtml || '<p class="italic text-gray-600">Sem pagamentos</p>'}</div>
+
+            <div class="flex justify-between items-center pt-3 border-t border-gray-600 mt-4">
+                <span class="font-bold text-white text-lg">TOTAL</span>
+                <span class="font-bold text-xl text-pumpkin">${formatCurrency(data.finalTotal || data.total)}</span>
+            </div>
+        `;
+
+    } catch (e) {
+        console.error(e);
+        content.innerHTML = `<p class="text-red-400">Erro ao carregar detalhes: ${e.message}</p>`;
+    }
+};
+
+// --- FUNÇÕES DE UI EXISTENTES ---
+
+export const openManagerAuthModal = (actionCallback) => {
+    if (!managerModal) return;
+    managerAuthCallback = actionCallback; 
+    managerModal.innerHTML = `
+        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm text-center">
+            <h3 class="text-xl font-bold mb-4 text-red-400">Acesso Restrito</h3>
+            <input type="password" id="managerPasswordInput" placeholder="Senha" class="input-pdv w-full p-4 mb-6 text-base">
+            <div class="flex justify-end space-x-3">
+                <button onclick="document.getElementById('managerModal').style.display='none'" class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg">Cancelar</button>
+                <button id="submitManagerAuthBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg">Entrar</button>
+            </div>
+        </div>`;
+    managerModal.style.display = 'flex';
+    document.getElementById('managerPasswordInput').focus();
+    document.getElementById('submitManagerAuthBtn').onclick = () => {
+        if(document.getElementById('managerPasswordInput').value === '1234') handleGerencialAction(managerAuthCallback);
+        else alert('Senha incorreta');
+    };
+};
+
+const openReportPanel = (tabName = 'sales') => {
+    const modal = document.getElementById('reportsModal');
+    if(modal) {
+        modal.style.display = 'flex';
+        const btn = document.querySelector(`.report-tab-btn[data-tab="${tabName}"]`);
+        if(btn) btn.click();
+        loadReports();
+    }
+};
+
+const loadReports = async () => {
+    if (!reportDateInput) return;
+    const selectedDate = new Date(reportDateInput.value + 'T00:00:00');
+    const startOfDay = Timestamp.fromDate(selectedDate);
+    const nextDay = new Date(selectedDate); nextDay.setDate(nextDay.getDate() + 1);
+    const endOfDay = Timestamp.fromDate(nextDay);
+
+    try { await Promise.all([fetchSalesData(startOfDay, endOfDay), fetchShiftsData(startOfDay, endOfDay)]); } catch (e) { console.error(e); }
+};
+
+const fetchSalesData = async (start, end) => {
+    const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'tables'), where('status', '==', 'closed'), where('closedAt', '>=', start), where('closedAt', '<', end), orderBy('closedAt', 'desc'));
+    const snapshot = await getDocs(q);
+    let totalSales = 0, totalMoney = 0, totalDigital = 0, totalService = 0, rowsHtml = '';
+
+    snapshot.forEach(docSnap => {
+        const table = docSnap.data();
+        let tableTotal = 0;
+        (table.payments || []).forEach(p => {
+            const val = parseFloat(p.value.replace(/[^\d,]/g,'').replace(',','.'));
+            if (!isNaN(val)) { tableTotal += val; if (p.method.toLowerCase().includes('dinheiro')) totalMoney += val; else totalDigital += val; }
+        });
+        totalSales += tableTotal;
+        if (table.serviceTaxApplied) totalService += (tableTotal - (tableTotal / 1.1));
+
+        rowsHtml += `<tr class="hover:bg-gray-700 transition border-b border-gray-800 cursor-pointer" onclick="window.showOrderDetails('${docSnap.id}')">
+            <td class="p-3">${table.closedAt ? table.closedAt.toDate().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--'}</td>
+            <td class="p-3 font-bold text-white">Mesa ${table.tableNumber}</td>
+            <td class="p-3 text-gray-400">${table.waiterId || 'Staff'}</td>
+            <td class="p-3 text-right text-green-400 font-bold">${formatCurrency(tableTotal)}</td></tr>`;
+    });
+
+    document.getElementById('reportTotalSales').textContent = formatCurrency(totalSales);
+    document.getElementById('reportTotalMoney').textContent = formatCurrency(totalMoney);
+    document.getElementById('reportTotalDigital').textContent = formatCurrency(totalDigital);
+    document.getElementById('reportTotalService').textContent = formatCurrency(totalService);
+    document.getElementById('reportSalesTableBody').innerHTML = rowsHtml || '<tr><td colspan="4" class="text-center p-4">Sem vendas.</td></tr>';
+};
+
+const fetchShiftsData = async (start, end) => {
+    const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'shifts'), where('openedAt', '>=', start), where('openedAt', '<', end), orderBy('openedAt', 'desc'));
+    const snapshot = await getDocs(q);
+    const container = document.getElementById('shiftsListContainer');
+    if (snapshot.empty) { container.innerHTML = '<p class="text-center py-4">Nenhum turno.</p>'; return; }
+    
+    container.innerHTML = snapshot.docs.map(d => {
+        const s = d.data();
+        const diff = s.difference || 0;
+        const color = diff > 0.1 ? 'text-blue-400' : diff < -0.1 ? 'text-red-400' : 'text-green-500';
+        return `<div class="bg-gray-800 p-4 rounded border border-gray-700 flex justify-between">
+            <div><h4 class="text-white font-bold">${s.userName}</h4><p class="text-xs text-gray-400">${s.openedAt.toDate().toLocaleTimeString()}</p></div>
+            <div class="text-right"><p class="${color} font-bold">${formatCurrency(diff)}</p><p class="text-xs text-gray-500">${s.status}</p></div>
+        </div>`;
+    }).join('');
+};
+
+// --- VOUCHERS/OBS ---
+const openVoucherManagementModal = async () => {
+    if (!voucherManagementModal) return;
+    if(managerModal) managerModal.style.display = 'none';
+    voucherManagementModal.style.display = 'flex';
+    if(voucherForm) voucherForm.style.display = 'none';
+    await fetchVouchers();
+};
+window.openVoucherManagementModal = openVoucherManagementModal;
+
+const fetchVouchers = async () => {
+    if (!voucherListContainer) return;
+    voucherListContainer.innerHTML = '<p class="text-sm text-yellow-400 italic">Buscando...</p>';
+    try {
+        const q = query(getVouchersCollectionRef(), orderBy('points', 'asc'));
+        const querySnapshot = await getDocs(q);
+        const vouchers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        if (vouchers.length === 0) {
+            voucherListContainer.innerHTML = '<p class="text-sm text-dark-placeholder italic">Nenhum voucher cadastrado.</p>';
+        } else {
+            voucherListContainer.innerHTML = vouchers.map(v => `
+                <div class="flex justify-between items-center bg-dark-input p-3 rounded-lg mb-2">
+                    <div>
+                        <h4 class="font-bold text-dark-text">${v.name}</h4>
+                        <p class="text-sm text-indigo-400">${v.points} pts = ${formatCurrency(v.value)}</p>
+                    </div>
+                    <button class="text-red-400 hover:text-red-500" onclick="window.handleDeleteVoucher('${v.id}')"><i class="fas fa-trash"></i></button>
+                </div>
+            `).join('');
+        }
+    } catch (error) {
+        console.error(error);
+        voucherListContainer.innerHTML = '<p class="text-red-400">Erro ao carregar.</p>';
+    }
+};
+
+const handleSaveVoucher = async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('voucherIdInput').value || doc(getVouchersCollectionRef()).id;
+    const name = document.getElementById('voucherNameInput').value;
+    const points = parseInt(document.getElementById('voucherPointsInput').value);
+    const value = parseFloat(document.getElementById('voucherValueInput').value);
+    const saveBtn = document.getElementById('saveVoucherBtn');
+
+    saveBtn.disabled = true;
+    try {
+        await setDoc(doc(getVouchersCollectionRef(), id), { id, name, points, value, createdAt: serverTimestamp() }, { merge: true });
+        voucherForm.style.display = 'none';
+        await fetchVouchers();
+        alert("Salvo!");
+    } catch (e) {
+        alert("Erro ao salvar: " + e.message);
+    } finally {
+        saveBtn.disabled = false;
+    }
+};
+
+window.handleDeleteVoucher = async (id) => {
+    if(confirm("Excluir voucher?")) {
+        await deleteDoc(doc(getVouchersCollectionRef(), id));
+        fetchVouchers();
+    }
+};
+
+const renderQuickObsManagementModal = async () => {
+    if (!managerModal) return;
+    managerModal.innerHTML = `
+    <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold text-indigo-400">Obs. Rápidas</h3>
+            <button id="closeQuickObs" class="px-4 py-2 bg-gray-600 text-white rounded">Fechar</button>
+        </div>
+        <form id="addQuickObsForm" class="flex space-x-2 mb-4">
+            <input type="text" id="newQuickObsInput" placeholder="Nova observação..." class="input-pdv w-full" required>
+            <button type="submit" class="bg-green-600 text-white px-4 rounded">Adicionar</button>
+        </form>
+        <div id="quickObsList" class="overflow-y-auto flex-grow space-y-2">Carregando...</div>
+    </div>`;
+    
+    managerModal.style.display = 'flex';
+    document.getElementById('closeQuickObs').onclick = () => managerModal.style.display = 'none';
+    
+    document.getElementById('addQuickObsForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const text = document.getElementById('newQuickObsInput').value.trim();
+        if(text) {
+            const id = text.toLowerCase().replace(/[^a-z0-9]/g, '');
+            await setDoc(doc(getQuickObsCollectionRef(), id), { text });
+            loadQuickObsList();
+            document.getElementById('newQuickObsInput').value = '';
+        }
+    };
+    loadQuickObsList();
+};
+
+const loadQuickObsList = async () => {
+    const container = document.getElementById('quickObsList');
+    if(!container) return;
+    const snap = await getDocs(query(getQuickObsCollectionRef(), orderBy('text')));
+    container.innerHTML = snap.docs.map(d => `
+        <div class="flex justify-between bg-dark-input p-2 rounded">
+            <span class="text-white">${d.data().text}</span>
+            <button onclick="window.deleteQuickObs('${d.id}')" class="text-red-400"><i class="fas fa-trash"></i></button>
+        </div>
+    `).join('');
+};
+
+window.deleteQuickObs = async (id) => {
+    if(confirm("Excluir?")) {
+        await deleteDoc(doc(getQuickObsCollectionRef(), id));
+        loadQuickObsList();
+    }
 };

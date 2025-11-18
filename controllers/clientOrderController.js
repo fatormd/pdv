@@ -1,10 +1,10 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (CORRIGIDO) ---
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (VERSÃO FINAL - REABERTURA INTELIGENTE) ---
 
 import { db, auth, getQuickObsCollectionRef, appId, getTablesCollectionRef, getTableDocRef, getCustomersCollectionRef } from "/services/firebaseService.js";
 import { formatCurrency } from "/utils.js";
-import { getProducts, getCategories, fetchWooCommerceProducts, fetchWooCommerceCategories } from "/services/wooCommerceService.js";
-import { onSnapshot, doc, updateDoc, arrayUnion, arrayRemove, setDoc, getDoc, getDocs, query, where, serverTimestamp, orderBy, increment, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { GoogleAuthProvider, signInWithPopup, signInAnonymously, RecaptchaVerifier, signInWithPhoneNumber, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getProducts, getCategories, fetchWooCommerceCategories, fetchWooCommerceProducts } from "/services/wooCommerceService.js";
+import { onSnapshot, doc, updateDoc, arrayUnion, setDoc, getDoc, getDocs, query, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
 // Importa funções do app.js
 import { showToast, currentTableId, setCurrentTable, setTableListener } from "/app.js"; 
@@ -624,14 +624,22 @@ function updateCustomerInfo(user, isNew = false) {
 }
 
 // ==================================================================
-//               LÓGICA DE ATIVAÇÃO DE MESA (CORRIGIDA 100%)
+//               LÓGICA DE ATIVAÇÃO DE MESA (CORRIGIDA)
 // ==================================================================
 
 async function handleActivationAndSend(e) {
     if (e) e.preventDefault(); 
     const tableId = activateTableNumber.value.trim();
-    if (!tableId) { showAssocError("Por favor, informe o número da mesa."); activateTableNumber.focus(); return; }
-    if (!localCurrentClientUser) { showAssocError("Por favor, faça o login com Google para continuar."); return; }
+    
+    if (!tableId) { 
+        showAssocError("Por favor, informe o número da mesa."); 
+        activateTableNumber.focus(); 
+        return; 
+    }
+    if (!localCurrentClientUser) { 
+        showAssocError("Por favor, faça o login com Google para continuar."); 
+        return; 
+    }
 
     console.log(`Tentando ativar mesa ${tableId} para o cliente ${localCurrentClientUser.uid}`);
     activateAndSendBtn.disabled = true;
@@ -642,7 +650,7 @@ async function handleActivationAndSend(e) {
         const tableRef = getTableDocRef(tableId);
         const tableSnap = await getDoc(tableRef);
 
-        // 1. Define a mesa mas NÃO inicia o listener ainda (param false)
+        // 1. Define a mesa localmente
         localCurrentTableId = tableId; 
         setCurrentTable(tableId, true, false); 
 
@@ -652,30 +660,70 @@ async function handleActivationAndSend(e) {
             phone: localCurrentClientUser.phone || null
         };
 
-        // 2. Troca para usuário Anônimo
-        await signOut(auth);
-        const anonUser = await signInAnonymously(auth);
-        console.log("Logado anonimamente. Atualizando doc da mesa...");
-
-        // 3. Executa a criação/atualização do documento (sem listener ativo para não dar erro de 'closed')
+        // 2. Lógica de Criação / Atualização / Reabertura
         if (tableSnap.exists()) {
             const tableData = tableSnap.data();
+
+            // CENÁRIO A: Mesa Aberta por OUTRA pessoa
             if (tableData.status !== 'closed' && tableData.clientId && tableData.clientId !== clientData.uid) {
                 localCurrentTableId = null;
                 setCurrentTable(null, true, false);
                 throw new Error("Esta mesa está ocupada por outro cliente.");
             } 
-            console.log(`Mesa ${tableId} encontrada. Conectando...`);
-            await updateDoc(tableRef, {
-                clientId: clientData.uid, 
-                clientName: clientData.name,
-                clientPhone: clientData.phone,
-                anonymousUid: anonUser.user.uid,
-                status: 'open',
-                diners: tableData.diners || 1 
-            });
+            
+            // CENÁRIO B: Mesa FECHADA (Reabertura/Nova Sessão)
+            else if (tableData.status === 'closed') {
+                console.log(`Mesa ${tableId} estava fechada. Arquivando sessão anterior e reabrindo...`);
+                
+                // 1. Arquivar a sessão anterior para não perder o relatório financeiro
+                // Criamos um ID único para o histórico: "7_closed_TIMESTAMP"
+                const historyId = `${tableId}_closed_${Date.now()}`;
+                const historyRef = doc(getTablesCollectionRef(), historyId);
+                
+                // Copia os dados exatos da mesa fechada para o histórico
+                await setDoc(historyRef, tableData);
+
+                // 2. Resetar a mesa original para a nova sessão (Limpa tudo)
+                const newSessionData = {
+                    tableNumber: parseInt(tableId, 10),
+                    diners: tableData.diners || 1, 
+                    sector: tableData.sector || 'Salão', // Mantém o setor
+                    status: 'open',
+                    createdAt: serverTimestamp(), // Nova data de abertura
+                    total: 0,
+                    sentItems: [],
+                    payments: [], // Limpa pagamentos antigos
+                    serviceTaxApplied: true,
+                    selectedItems: [], 
+                    requestedOrders: [],
+                    clientId: clientData.uid,
+                    clientName: clientData.name,
+                    clientPhone: clientData.phone,
+                    anonymousUid: null,
+                    
+                    // Remove campos de fechamento antigo
+                    closedAt: null,
+                    finalTotal: null
+                };
+                
+                // Sobrescreve a mesa principal com os dados limpos
+                await setDoc(tableRef, newSessionData);
+            }
+            
+            // CENÁRIO C: Mesa Aberta por MIM (Continuar pedindo)
+            else {
+                console.log(`Mesa ${tableId} encontrada e ativa. Atualizando dados...`);
+                await updateDoc(tableRef, {
+                    clientId: clientData.uid, 
+                    clientName: clientData.name,
+                    clientPhone: clientData.phone,
+                    status: 'open'
+                });
+            }
+
         } else {
-            console.log(`Mesa ${tableId} não encontrada. Criando...`);
+            // CENÁRIO D: Mesa Nova (Nunca existiu no banco)
+            console.log(`Mesa ${tableId} não encontrada. Criando do zero...`);
             const newTableData = {
                 tableNumber: parseInt(tableId, 10),
                 diners: 1, 
@@ -691,22 +739,22 @@ async function handleActivationAndSend(e) {
                 clientId: clientData.uid,
                 clientName: clientData.name,
                 clientPhone: clientData.phone,
-                anonymousUid: anonUser.user.uid
+                anonymousUid: null
             };
             await setDoc(tableRef, newTableData);
         }
 
-        // 4. AGORA SIM, após o documento existir e estar correto, ligamos o Listener
+        // 3. Inicia o Listener e envia o pedido se houver itens no carrinho
         console.log("Mesa configurada. Iniciando listener...");
         setTableListener(tableId, true);
 
-        localCurrentClientUser = { ...clientData, isAnonymous: false }; 
         if (selectedItems.length > 0) {
             await sendOrderToFirebase(); 
         } else {
             if (clientTableNumber) clientTableNumber.textContent = `Mesa ${tableId}`;
+            showToast(`Mesa ${tableId} aberta!`, false);
         }
-        showToast(`Mesa ${tableId} ativada! Bem-vindo(a)!`, false);
+        
         closeAssociationModal();
 
     } catch (error) {

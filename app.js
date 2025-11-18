@@ -1,4 +1,4 @@
-// --- APP.JS (VERSÃO FINAL COM FIREBASE AUTH) ---
+// --- APP.JS (VERSÃO FINAL COM FIREBASE AUTH E CONTROLE DE CAIXA) ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapshot, writeBatch, arrayRemove, arrayUnion, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
@@ -15,6 +15,8 @@ import { initOrderController, renderOrderScreen, increaseLocalItemQuantity, decr
 import { initPaymentController, renderPaymentSummary, deletePayment, handleMassActionRequest, handleFinalizeOrder, handleMassDeleteConfirmed, executeDeletePayment, openTableTransferModal, handleConfirmTableTransfer } from '/controllers/paymentController.js';
 import { initManagerController, handleGerencialAction } from '/controllers/managerController.js';
 import { initUserManagementController, openUserManagementModal } from '/controllers/userManagementController.js';
+// NOVO: Import do Controlador de Caixa
+import { initCashierController } from '/controllers/cashierController.js';
 
 // Imports do Cliente
 import { initClientOrderController, renderClientOrderScreen } from '/controllers/clientOrderController.js';
@@ -452,6 +454,9 @@ const initStaffApp = async (staffName) => {
         initPaymentController();
         initManagerController();
         initUserManagementController();
+        
+        initCashierController(); // <--- ADICIONADO: Inicializa o controle de caixa
+
         renderTableFilters();
         fetchWooCommerceProducts(renderMenu).catch(e => console.error("[INIT Staff] Falha ao carregar produtos:", e));
         fetchWooCommerceCategories(renderMenu).catch(e => console.error("[INIT Staff] Falha ao carregar categorias:", e));
@@ -574,14 +579,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
              const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
              const logoutBtnHeader = document.getElementById('logoutBtnHeader');
-             const cashierBtn = document.getElementById('openCashierBtn');
-             
-             if (cashierBtn) {
-                 cashierBtn.addEventListener('click', () => {
-                     alert("Módulo de 'Meu Caixa' em desenvolvimento.");
-                 });
-             }
-
+             // O botão cashierBtn agora é controlado pelo cashierController, não precisamos de listener aqui
              if (openManagerPanelBtn) openManagerPanelBtn.addEventListener('click', () => { window.openManagerAuthModal('goToManagerPanel'); });
              if (logoutBtnHeader) logoutBtnHeader.addEventListener('click', handleLogout);
         }
