@@ -6,6 +6,20 @@ service cloud.firestore {
     // --- BLOCO PRINCIPAL DE DADOS ---
     match /artifacts/{appId}/public/data {
 
+      // --- NOVA REGRA: CATEGORIAS (CARDÁPIO) ---
+      match /categories/{categoryId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && 
+                       get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.token.email)).data.role == 'gerente';
+      }
+
+      // --- NOVA REGRA: PRODUTOS (CARDÁPIO) ---
+      match /products/{productId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && 
+                       get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.token.email)).data.role == 'gerente';
+      }
+
       // --- REGRA "VOUCHERS" ---
       match /vouchers/{voucherId} {
         allow read: if request.auth != null;
@@ -32,7 +46,6 @@ service cloud.firestore {
       match /tables/{tableId} {
         allow read, write: if request.auth != null && 
                             request.auth.token.firebase.sign_in_provider == 'password';
-
         allow read, create: if request.auth != null;
 
         allow update: if request.auth != null && (
@@ -46,7 +59,7 @@ service cloud.firestore {
                           'accessPin', 'lastKdsSentAt', 'masterTable', 'mergedTables', 'waiterId',
                           'closedAt', 'finalTotal', 'wooOrderId', 'closedBy'
                         ])
-                      );
+                   );
       }
       
       // --- REGRA "CUSTOMERS" (CRM) ---
@@ -73,12 +86,12 @@ service cloud.firestore {
         allow create: if request.auth != null &&
                          request.auth.token.firebase.sign_in_provider != 'anonymous' &&
                          request.resource.data.userId == request.auth.token.email;
-
+                         
         allow read, write: if request.auth != null &&
                            get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.token.email)).data.role == 'gerente';
       }
 
-      // --- REGRA "DAILY_REPORTS" (FECHAMENTO DIÁRIO) --- [NOVO]
+      // --- REGRA "DAILY_REPORTS" (FECHAMENTO DIÁRIO) ---
       match /daily_reports/{reportId} {
         allow read: if request.auth != null;
         allow write: if request.auth != null &&
@@ -90,5 +103,15 @@ service cloud.firestore {
         allow read, write: if false;
       }
     }
+
+    // ==========================================================
+    //       REGRA: CONFIGURAÇÃO DE PRODUTOS (IRMÃO DE DATA)
+    // ==========================================================
+    match /artifacts/{appId}/public/product_config {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+                   get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.token.email)).data.role == 'gerente';
+    }
+
   }
 }

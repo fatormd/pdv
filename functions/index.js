@@ -1,191 +1,165 @@
 // =======================================================
-// IMPORTS GLOBAIS (SINTAXE V2)
+// IMPORTS GLOBAIS
 // =======================================================
-const {onCall, HttpsError} = require("firebase-functions/v2/https");
-const {initializeApp} = require("firebase-admin/app");
-const {getFirestore, FieldValue} = require("firebase-admin/firestore");
-const {getAuth} = require("firebase-admin/auth");
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { initializeApp } = require("firebase-admin/app");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { getAuth } = require("firebase-admin/auth");
 const axios = require("axios");
+const https = require("https");
+const crypto = require("crypto");
 
 initializeApp();
 
 // =======================================================
-// FUNÇÃO DO WOOCOMMERCE (SINTAXE V2)
+// CONFIGURAÇÃO SSL & REDE
 // =======================================================
+const httpsAgent = new https.Agent({
+  rejectUnauthorized: false, 
+  secureOptions: crypto.constants.SSL_OP_LEGACY_SERVER_CONNECT,
+  minVersion: "TLSv1",
+  ciphers: "DEFAULT@SECLEVEL=0",
+  family: 4, 
+  keepAlive: true
+});
+
+const wooClient = axios.create({
+  httpsAgent: httpsAgent,
+  timeout: 290000, 
+  headers: {
+    "Content-Type": "application/json",
+    "User-Agent": "FatorPDV/1.0 (FirebaseFunctions)",
+    "Connection": "keep-alive"
+  }
+});
 
 const WOOCOMMERCE_URL = "https://nossotempero.fatormd.com";
 
-exports.proxyWooCommerce = onCall(async (request) => {
+// =======================================================
+// 1. PROXY WOOCOMMERCE (ATUALIZADO COM PUT/DELETE)
+// =======================================================
+exports.proxyWooCommerce = onCall({ timeoutSeconds: 300, memory: "512MiB" }, async (request) => {
   const { method, endpoint, payload } = request.data;
   
-  const consumerKey = process.env.WOO_KEY;
-  const consumerSecret = process.env.WOO_SECRET;
+  const consumerKey = process.env.WOO_APP_KEY;
+  const consumerSecret = process.env.WOO_APP_SECRET;
 
   if (!consumerKey || !consumerSecret) {
-    console.error("Erro Crítico: Variáveis de ambiente WOO_KEY ou WOO_SECRET não definidas!");
-    throw new HttpsError(
-      "internal",
-      "Erro interno do servidor ao tentar aceder às configurações."
-    );
+    throw new HttpsError("internal", "Chaves de API não configuradas no servidor.");
   }
 
-  if (!method || !endpoint) {
-    throw new HttpsError(
-      "invalid-argument",
-      "A função deve ser chamada com 'method' e 'endpoint'."
-    );
-  }
-
-  const authParams = `consumer_key=${consumerKey}&consumer_secret=${consumerSecret}`;
+  const authParams = `consumer_key=${consumerKey}&consumer_secret=${consumerSecret}&_t=${Date.now()}`;
+  // Verifica se o endpoint já tem query params
   const querySeparator = endpoint.includes("?") ? "&" : "?";
   const url = `${WOOCOMMERCE_URL}/wp-json/wc/v3/${endpoint}${querySeparator}${authParams}`;
 
   try {
+    console.log(`[Proxy] ${method} ${endpoint}`);
+    
     let response;
     if (method.toUpperCase() === "GET") {
-      response = await axios.get(url);
+      response = await wooClient.get(url);
     } else if (method.toUpperCase() === "POST") {
-      response = await axios.post(url, payload, {
-        headers: { "Content-Type": "application/json" },
-      });
-    } else {
-      throw new HttpsError(
-        "invalid-argument",
-        "Método (method) não suportado. Use 'GET' ou 'POST'."
-      );
+      response = await wooClient.post(url, payload);
+    } else if (method.toUpperCase() === "PUT") { // Adicionado
+      response = await wooClient.put(url, payload);
+    } else if (method.toUpperCase() === "DELETE") { // Adicionado
+      // O Axios trata query params no delete de forma diferente, mas como passamos na URL, funciona.
+      response = await wooClient.delete(url);
     }
+    
     return response.data;
+
   } catch (error) {
-    console.error("Erro ao chamar a API do WooCommerce:", error.response ? JSON.stringify(error.response.data) : error.message);
-    throw new HttpsError(
-      "internal",
-      "Erro ao processar a requisição do WooCommerce."
-    );
+    console.error("Erro Proxy Woo:", error.message);
+    if (error.code === 'ECONNABORTED') {
+       throw new HttpsError("deadline-exceeded", "O servidor WooCommerce demorou muito para responder.");
+    }
+    if (error.response) {
+        console.error("Resposta do Woo:", error.response.status, error.response.data);
+    }
+    throw new HttpsError("internal", `Erro WooCommerce: ${error.message}`);
   }
 });
 
-
 // =======================================================
-// FUNÇÕES DE GERENCIAMENTO DE USUÁRIO (SINTAXE V2)
+// 2. SINCRONIZAÇÃO DE PRODUTOS
 // =======================================================
+exports.syncProductsFromWoo = onCall({ timeoutSeconds: 540, memory: "1GiB" }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sem autenticação.");
 
-const firestore = getFirestore();
-const auth = getAuth();
-const APP_ID = "1:1097659747429:web:8ec0a7c3978c311dbe0a8c"; // Seu App ID
-
-// --- FUNÇÃO PARA CRIAR NOVO USUÁRIO ---
-exports.createNewUser = onCall(async (request) => {
-  if (!request.auth) {
-    throw new HttpsError(
-      "unauthenticated",
-      "Você precisa estar logado para criar usuários."
-    );
-  }
-
-  const callerDoc = await firestore
-    .collection("artifacts").doc(APP_ID)
-    .collection("public").doc("data")
-    .collection("users")
-    .doc(request.auth.token.email) // Email do gerente
-    .get();
-
-  if (!callerDoc.exists || callerDoc.data().role !== "gerente") {
-    throw new HttpsError(
-      "permission-denied",
-      "Apenas gerentes podem criar novos usuários."
-    );
-  }
-
-  const { email, password, name, role, isActive } = request.data;
-
-  if (!email || !password || !name || !role) {
-    throw new HttpsError(
-      "invalid-argument",
-      "Dados incompletos. E-mail, senha, nome e cargo são obrigatórios."
-    );
-  }
+  const consumerKey = process.env.WOO_APP_KEY;
+  const consumerSecret = process.env.WOO_APP_SECRET;
+  const firestore = getFirestore();
+  const APP_ID = "1:1097659747429:web:8ec0a7c3978c311dbe0a8c"; 
 
   try {
-    const userRecord = await auth.createUser({
-      email: email,
-      password: password,
-      displayName: name,
-      disabled: !isActive,
+    const authParams = `consumer_key=${consumerKey}&consumer_secret=${consumerSecret}`;
+    const url = `${WOOCOMMERCE_URL}/wp-json/wc/v3/products?per_page=100&status=publish&${authParams}`;
+
+    console.log("Iniciando busca no Woo (Sync)...");
+    const response = await wooClient.get(url);
+    const products = response.data;
+
+    const batch = firestore.batch();
+    const productsRef = firestore.collection(`artifacts/${APP_ID}/public/data/products_cache`);
+
+    products.forEach(p => {
+      const docRef = productsRef.doc(p.id.toString());
+      batch.set(docRef, {
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        categories: p.categories,
+        description: p.description || '',
+        image: (p.images && p.images.length > 0) ? p.images[0].src : '',
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
     });
 
-    const userDocRef = firestore
-      .collection("artifacts").doc(APP_ID)
-      .collection("public").doc("data")
-      .collection("users")
-      .doc(email);
+    await batch.commit();
+    return { success: true, count: products.length, message: "Sincronizado." };
 
-    await userDocRef.set({
-      name: name,
-      email: email,
-      role: role,
-      isActive: isActive,
-      createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-
-    return {
-      status: "success",
-      message: `Usuário ${name} (${email}) criado com sucesso.`,
-      uid: userRecord.uid,
-    };
   } catch (error) {
-    throw new HttpsError("internal", error.message);
+    throw new HttpsError("internal", `Falha na sincronização: ${error.message}`);
   }
 });
 
-// --- FUNÇÃO PARA ATUALIZAR USUÁRIO ---
+// =======================================================
+// 3. GERENCIAMENTO DE USUÁRIOS
+// =======================================================
+// Mantendo as funções de usuário essenciais
+exports.createNewUser = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Login necessário.");
+  const { email, password, name, role, isActive } = request.data;
+  const APP_ID = "1:1097659747429:web:8ec0a7c3978c311dbe0a8c";
+  try {
+    const userRecord = await getAuth().createUser({ email, password, displayName: name, disabled: !isActive });
+    await getFirestore().collection("artifacts").doc(APP_ID).collection("public").doc("data").collection("users").doc(email)
+      .set({ name, email, role, isActive, createdAt: FieldValue.serverTimestamp() });
+    return { status: "success", uid: userRecord.uid };
+  } catch (error) { throw new HttpsError("internal", error.message); }
+});
+
 exports.updateUser = onCall(async (request) => {
   const { originalEmail, name, role, isActive } = request.data;
-
+  const APP_ID = "1:1097659747429:web:8ec0a7c3978c311dbe0a8c";
   try {
-    const userRecord = await auth.getUserByEmail(originalEmail);
-    await auth.updateUser(userRecord.uid, {
-      displayName: name,
-      disabled: !isActive,
-    });
-
-    const userDocRef = firestore
-      .collection("artifacts").doc(APP_ID)
-      .collection("public").doc("data")
-      .collection("users")
-      .doc(originalEmail);
-      
-    await userDocRef.update({
-      name: name,
-      role: role,
-      isActive: isActive,
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-
-    return { status: "success", message: `Usuário ${name} atualizado.` };
-  } catch (error) {
-    throw new HttpsError("internal", error.message);
-  }
+    const userRecord = await getAuth().getUserByEmail(originalEmail);
+    await getAuth().updateUser(userRecord.uid, { displayName: name, disabled: !isActive });
+    await getFirestore().collection("artifacts").doc(APP_ID).collection("public").doc("data").collection("users").doc(originalEmail)
+      .update({ name, role, isActive, updatedAt: FieldValue.serverTimestamp() });
+    return { status: "success" };
+  } catch (error) { throw new HttpsError("internal", error.message); }
 });
 
-// --- FUNÇÃO PARA EXCLUIR USUÁRIO ---
 exports.deleteUser = onCall(async (request) => {
   const { email } = request.data;
-
+  const APP_ID = "1:1097659747429:web:8ec0a7c3978c311dbe0a8c";
   try {
-    const userRecord = await auth.getUserByEmail(email);
-    await auth.deleteUser(userRecord.uid);
-
-    const userDocRef = firestore
-      .collection("artifacts").doc(APP_ID)
-      .collection("public").doc("data")
-      .collection("users")
-      .doc(email);
-      
-    await userDocRef.delete();
-
-    return { status: "success", message: `Usuário ${email} excluído.` };
-  } catch (error) {
-    throw new HttpsError("internal", error.message);
-  }
+    const userRecord = await getAuth().getUserByEmail(email);
+    await getAuth().deleteUser(userRecord.uid);
+    await getFirestore().collection("artifacts").doc(APP_ID).collection("public").doc("data").collection("users").doc(email).delete();
+    return { status: "success" };
+  } catch (error) { throw new HttpsError("internal", error.message); }
 });

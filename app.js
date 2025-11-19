@@ -1,4 +1,4 @@
-// --- APP.JS (VERSÃO FINAL COM FIREBASE AUTH E CONTROLE DE CAIXA) ---
+// --- APP.JS (VERSÃO FINAL COM FIREBASE AUTH, CAIXA E KDS) ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapshot, writeBatch, arrayRemove, arrayUnion, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
@@ -15,8 +15,9 @@ import { initOrderController, renderOrderScreen, increaseLocalItemQuantity, decr
 import { initPaymentController, renderPaymentSummary, deletePayment, handleMassActionRequest, handleFinalizeOrder, handleMassDeleteConfirmed, executeDeletePayment, openTableTransferModal, handleConfirmTableTransfer } from '/controllers/paymentController.js';
 import { initManagerController, handleGerencialAction } from '/controllers/managerController.js';
 import { initUserManagementController, openUserManagementModal } from '/controllers/userManagementController.js';
-// NOVO: Import do Controlador de Caixa
 import { initCashierController } from '/controllers/cashierController.js';
+// NOVO: Import do Controlador KDS
+import { initKdsController } from '/controllers/kdsController.js';
 
 // Imports do Cliente
 import { initClientOrderController, renderClientOrderScreen } from '/controllers/clientOrderController.js';
@@ -40,6 +41,7 @@ export const screens = {
     'orderScreen': 2, 
     'paymentScreen': 3, 
     'managerScreen': 4,
+    'kdsScreen': 5, // <--- NOVA TELA REGISTRADA
     'clientOrderScreen': 0, 
     'clientPaymentScreen': 1
 };
@@ -95,11 +97,15 @@ const hideLoginScreen = () => {
     if (mainHeader) mainHeader.style.display = 'flex';
     if (mainContent) mainContent.style.display = 'block';
     document.body.classList.add('logged-in');
+    
     const logoutBtn = document.getElementById('logoutBtnHeader');
     const managerBtn = document.getElementById('openManagerPanelBtn');
     const cashierBtn = document.getElementById('openCashierBtn'); 
+    const kdsBtn = document.getElementById('openKdsBtn'); // <--- NOVO BOTÃO
+    
     if (logoutBtn) logoutBtn.classList.remove('hidden');
     if (cashierBtn) cashierBtn.classList.remove('hidden'); 
+    if (kdsBtn) kdsBtn.classList.remove('hidden'); // <--- MOSTRA O BOTÃO KDS
     if (managerBtn) managerBtn.classList.toggle('hidden', userRole !== 'gerente');
 };
 
@@ -137,10 +143,14 @@ export const goToScreen = async (screenId) => {
         console.log(`[NAV] Navegando para ${screenId} (índice ${screenIndex})`);
         if (appContainer) appContainer.style.transform = `translateX(-${screenIndex * 100}vw)`;
         if (mainContent) mainContent.style.display = 'block';
+        
         if (!isClientMode) {
-            document.body.classList.toggle('bg-gray-900', screenId === 'managerScreen');
-            document.body.classList.toggle('bg-dark-bg', screenId !== 'managerScreen');
+            // ATUALIZADO: Aplica fundo especial para Gerencial E KDS
+            const isSpecialScreen = screenId === 'managerScreen' || screenId === 'kdsScreen';
+            document.body.classList.toggle('bg-gray-900', isSpecialScreen);
+            document.body.classList.toggle('bg-dark-bg', !isSpecialScreen);
         }
+        
         if (isClientMode) {
             const event = new CustomEvent('screenChanged', { detail: { screenId: screenId } });
             window.dispatchEvent(event);
@@ -332,7 +342,6 @@ export const setTableListener = (tableId, isClientMode = false) => {
     });
 };
 
-// === CORREÇÃO: Adicionado parâmetro 'shouldListen' ===
 export const setCurrentTable = (tableId, isClientMode = false, shouldListen = true) => {
     if (currentTableId === tableId && unsubscribeTable && shouldListen) {
         console.log(`[APP] Already listening to table ${tableId}. Forcing re-render.`);
@@ -366,7 +375,6 @@ export const setCurrentTable = (tableId, isClientMode = false, shouldListen = tr
          if(orderScreenTableNumEl) orderScreenTableNumEl.textContent = `Mesa ${tableId}`;
     }
 
-    // SÓ INICIA O LISTENER SE SOLICITADO
     if (shouldListen) {
         setTableListener(tableId, isClientMode);
     }
@@ -454,8 +462,8 @@ const initStaffApp = async (staffName) => {
         initPaymentController();
         initManagerController();
         initUserManagementController();
-        
-        initCashierController(); // <--- ADICIONADO: Inicializa o controle de caixa
+        initCashierController();
+        initKdsController(); // <--- INICIALIZA KDS
 
         renderTableFilters();
         fetchWooCommerceProducts(renderMenu).catch(e => console.error("[INIT Staff] Falha ao carregar produtos:", e));
@@ -579,7 +587,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
              const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
              const logoutBtnHeader = document.getElementById('logoutBtnHeader');
-             // O botão cashierBtn agora é controlado pelo cashierController, não precisamos de listener aqui
+             
              if (openManagerPanelBtn) openManagerPanelBtn.addEventListener('click', () => { window.openManagerAuthModal('goToManagerPanel'); });
              if (logoutBtnHeader) logoutBtnHeader.addEventListener('click', handleLogout);
         }
