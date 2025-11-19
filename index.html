@@ -273,18 +273,19 @@
                     <h2 class="text-2xl font-bold text-pumpkin">Painel Gerencial</h2>
                 </div>
                 <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <div class="manager-card content-card p-4 text-center cursor-pointer bg-red-900/20 border border-red-500/30 hover:bg-red-900/40" onclick="window.openManagerAuthModal('closeDay')"> 
-                        <i class="fas fa-file-invoice-dollar text-3xl mb-2 text-red-400"></i> 
-                        <h4 class="font-bold text-lg text-red-400">Encerrar Dia</h4> 
-                        <p class="text-xs text-red-200">Consolidar Vendas</p> 
+                    
+                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openProductManagement')"> 
+                        <i class="fas fa-box-open text-3xl mb-2"></i> 
+                        <h4 class="font-bold text-lg">Produtos</h4> 
+                        <p class="text-xs">Gerenciar cardápio</p> 
                     </div>
 
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openProductManagement')"> <i class="fas fa-box-open text-3xl mb-2"></i> <h4 class="font-bold text-lg">Produtos</h4> <p class="text-xs">Gerenciar cardápio</p> </div>
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openCashManagement')"> <i class="fas fa-cash-register text-3xl mb-2 text-green-400"></i> <h4 class="font-bold text-lg">Gestão de Caixa</h4> <p class="text-xs">Abertura, fechamento, sangria</p> </div>
+                    <div class="manager-card content-card p-4 text-center cursor-pointer bg-gray-800 border border-gray-600 hover:bg-gray-700" onclick="window.openManagerAuthModal('openCashManagementReport')"> 
+                        <i class="fas fa-cash-register text-3xl mb-2 text-green-400"></i> 
+                        <h4 class="font-bold text-lg">Gestão de Caixa</h4> 
+                        <p class="text-xs">Turnos, Fechamentos e Vendas</p> 
+                    </div>
                     
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="document.getElementById('reportsModal').style.display='flex'; document.querySelector('.report-tab-btn[data-tab=\'sales\']').click();"> <i class="fas fa-chart-line text-3xl mb-2 text-indigo-400"></i> <h4 class="font-bold text-lg">Relatórios</h4> <p class="text-xs">Vendas, produtos, comissões</p> </div>
-                    
-                    <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openTableMerge')"> <i class="fas fa-people-arrows text-3xl mb-2 text-pumpkin"></i> <h4 class="font-bold text-lg">Agrupar Mesas</h4> <p class="text-xs">Unir mesas</p> </div>
                     <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openInventoryManagement')"> <i class="fas fa-boxes text-3xl mb-2"></i> <h4 class="font-bold text-lg">Estoque</h4> <p class="text-xs">(Em breve)</p> </div>
                     <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openRecipesManagement')"> <i class="fas fa-book text-3xl mb-2"></i> <h4 class="font-bold text-lg">Ficha Técnica</h4> <p class="text-xs">(Em breve)</p> </div>
                     <div class="manager-card content-card p-4 text-center cursor-pointer" onclick="window.openManagerAuthModal('openCustomerCRM')"> <i class="fas fa-users text-3xl mb-2 text-indigo-400"></i> <h4 class="font-bold text-lg">Clientes (CRM)</h4> <p class="text-xs">(Em breve)</p> </div>
@@ -456,19 +457,25 @@
     </div>
     
     <div id="reportsModal" class="fixed inset-0 bg-gray-900 bg-opacity-95 flex items-center justify-center z-50 hidden p-4 print-hide">
-         <div class="bg-dark-card border border-dark-border w-full max-w-4xl h-[90vh] flex flex-col rounded-xl shadow-2xl">
+         <div class="bg-dark-card border border-dark-border w-full max-w-5xl h-[90vh] flex flex-col rounded-xl shadow-2xl">
             <div class="flex justify-between items-center p-6 border-b border-gray-700 bg-gray-800 rounded-t-xl">
                 <div>
-                    <h3 class="text-2xl font-bold text-indigo-400"><i class="fas fa-chart-pie mr-2"></i>Relatório Diário</h3>
-                    <p class="text-sm text-gray-400">Visão geral de vendas e auditoria.</p>
+                    <h3 class="text-2xl font-bold text-green-400"><i class="fas fa-cash-register mr-2"></i>Gestão de Caixa</h3>
+                    <p class="text-sm text-gray-400">Visão geral de turnos e vendas do dia.</p>
                 </div>
-                <button class="text-gray-400 hover:text-white text-2xl" onclick="document.getElementById('reportsModal').style.display='none'">&times;</button>
+                <div class="flex items-center space-x-4">
+                    <button onclick="window.handleGerencialAction('closeDay')" class="px-4 py-2 bg-red-900/50 border border-red-500 text-red-200 rounded hover:bg-red-900 transition text-sm font-bold">
+                        <i class="fas fa-file-invoice-dollar mr-2"></i>Encerrar Dia
+                    </button>
+                    <button class="text-gray-400 hover:text-white text-2xl" onclick="document.getElementById('reportsModal').style.display='none'">&times;</button>
+                </div>
             </div>
+            
             <div class="p-4 bg-dark-bg border-b border-gray-700 flex justify-between items-center flex-wrap gap-4">
                 <div class="flex space-x-2">
-                    <button class="report-tab-btn px-4 py-2 rounded-lg bg-indigo-600 text-white font-bold" data-tab="sales">Vendas</button>
-                    <button class="report-tab-btn px-4 py-2 rounded-lg bg-dark-input text-gray-300 hover:bg-gray-700 transition" data-tab="shifts">Auditoria de Turnos</button>
-                    <button class="report-tab-btn px-4 py-2 rounded-lg bg-dark-input text-gray-300 hover:bg-gray-700 transition" data-tab="monthly">Histórico Mensal</button>
+                    <button class="report-tab-btn px-4 py-2 rounded-lg bg-indigo-600 text-white font-bold" data-tab="active-shifts">Abertos (Turno Atual)</button>
+                    <button class="report-tab-btn px-4 py-2 rounded-lg bg-dark-input text-gray-300 hover:bg-gray-700 transition" data-tab="closed-shifts">Fechados</button>
+                    <button class="report-tab-btn px-4 py-2 rounded-lg bg-dark-input text-gray-300 hover:bg-gray-700 transition" data-tab="sales">Relatório Vendas</button>
                 </div>
                 <div class="flex items-center space-x-2">
                     <label class="text-gray-400 text-sm">Data:</label>
@@ -476,8 +483,24 @@
                     <button id="refreshReportBtn" class="p-2 bg-pumpkin text-white rounded hover:bg-pumpkin-dark"><i class="fas fa-sync-alt"></i></button>
                 </div>
             </div>
+
             <div class="flex-grow overflow-y-auto p-6 custom-scrollbar bg-dark-bg">
-                <div id="tab-sales" class="report-content block space-y-6">
+                
+                <div id="tab-active-shifts" class="report-content block space-y-4">
+                    <h4 class="text-lg font-bold text-white mb-4">Caixas Ativos Agora</h4>
+                    <div id="activeShiftsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <p class="text-gray-500 italic">Carregando caixas abertos...</p>
+                    </div>
+                </div>
+
+                <div id="tab-closed-shifts" class="report-content hidden space-y-4">
+                    <h4 class="text-lg font-bold text-white mb-4">Histórico de Caixas (Data Selecionada)</h4>
+                    <div id="closedShiftsContainer" class="space-y-3">
+                         <p class="text-gray-500 italic">Carregando histórico...</p>
+                    </div>
+                </div>
+
+                <div id="tab-sales" class="report-content hidden space-y-6">
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div class="p-4 bg-gray-800 rounded-lg border border-gray-700"><p class="text-gray-400 text-xs uppercase">Faturamento Total</p><p class="text-2xl font-bold text-green-400" id="reportTotalSales">R$ 0,00</p></div>
                         <div class="p-4 bg-gray-800 rounded-lg border border-gray-700"><p class="text-gray-400 text-xs uppercase">Dinheiro</p><p class="text-xl font-bold text-white" id="reportTotalMoney">R$ 0,00</p></div>
@@ -485,18 +508,12 @@
                         <div class="p-4 bg-gray-800 rounded-lg border border-gray-700"><p class="text-gray-400 text-xs uppercase">Taxa Serviço</p><p class="text-xl font-bold text-blue-400" id="reportTotalService">R$ 0,00</p></div>
                     </div>
                     <div class="bg-dark-card rounded-lg border border-gray-700 overflow-hidden">
-                        <div class="p-3 bg-gray-800 border-b border-gray-700 font-bold text-gray-300">Mesas Fechadas</div>
+                        <div class="p-3 bg-gray-800 border-b border-gray-700 font-bold text-gray-300">Vendas Consolidadas (Mesas Fechadas)</div>
                         <table class="w-full text-left text-sm text-gray-400">
-                            <thead class="bg-gray-900 text-xs uppercase"><tr><th class="p-3">Hora</th><th class="p-3">Mesa</th><th class="p-3">Garçom</th><th class="p-3 text-right">Total</th></tr></thead>
+                            <thead class="bg-gray-900 text-xs uppercase"><tr><th class="p-3">Hora</th><th class="p-3">Mesa</th><th class="p-3">Garçom/Op.</th><th class="p-3 text-right">Total</th></tr></thead>
                             <tbody id="reportSalesTableBody" class="divide-y divide-gray-700"></tbody>
                         </table>
                     </div>
-                </div>
-                <div id="tab-shifts" class="report-content hidden space-y-6">
-                    <div class="grid grid-cols-1 gap-4" id="shiftsListContainer"><p class="text-center text-gray-500 italic py-8">Carregando turnos...</p></div>
-                </div>
-                <div id="tab-monthly" class="report-content hidden space-y-6">
-                    <div class="grid grid-cols-1 gap-4" id="monthlyReportsContainer"><p class="text-center text-gray-500 italic py-8">Carregando histórico...</p></div>
                 </div>
             </div>
          </div>

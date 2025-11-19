@@ -1,4 +1,4 @@
-// --- SERVICES/WOOCOMMERCESERVICE.JS (COMPLETO E ATUALIZADO) ---
+// --- SERVICES/WOOCOMMERCESERVICE.JS ---
 import { getNumericValueFromCurrency } from "/utils.js";
 import { functions } from "/services/firebaseService.js";
 import { httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
@@ -155,7 +155,7 @@ export const fetchWooCommerceProducts = async (renderMenuCallback) => {
 
     } catch (error) {
         console.error("[Woo] Falha ao buscar produtos:", error.message);
-        alert(`Erro ao carregar produtos: ${error.message}`);
+        // alert(`Erro ao carregar produtos: ${error.message}`);
         return [];
     }
 };
@@ -180,7 +180,7 @@ export const fetchWooCommerceCategories = async (renderCategoryFiltersCallback) 
 
     } catch (error) {
          console.error("[Woo] Falha ao buscar categorias:", error.message);
-         alert(`Erro ao carregar categorias: ${error.message}`);
+         // alert(`Erro ao carregar categorias: ${error.message}`);
          return [{ id: 'all', name: 'Novidades', slug: 'all' }];
     }
 };
