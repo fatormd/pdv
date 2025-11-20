@@ -3,24 +3,27 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- BLOCO PRINCIPAL DE DADOS ---
     match /artifacts/{appId}/public/data {
 
-      // --- NOVA REGRA: CATEGORIAS (CARDÁPIO) ---
+      // --- NOVA REGRA: SETORES (CRUCIAL PARA O ERRO SUMIR) ---
+      match /sectors/{sectorId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && 
+                       get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.token.email)).data.role == 'gerente';
+      }
+
       match /categories/{categoryId} {
         allow read: if request.auth != null;
         allow write: if request.auth != null && 
                        get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.token.email)).data.role == 'gerente';
       }
 
-      // --- NOVA REGRA: PRODUTOS (CARDÁPIO) ---
       match /products/{productId} {
         allow read: if request.auth != null;
         allow write: if request.auth != null && 
                        get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.token.email)).data.role == 'gerente';
       }
 
-      // --- REGRA "VOUCHERS" ---
       match /vouchers/{voucherId} {
         allow read: if request.auth != null;
         allow write: if request.auth != null && 
@@ -28,26 +31,22 @@ service cloud.firestore {
                        get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.token.email)).data.role == 'gerente';
       }
 
-      // --- REGRA "QUICK_OBS" ---
       match /quick_obs/{obsId} {
         allow read: if request.auth != null;
         allow write: if request.auth != null && 
                        request.auth.token.firebase.sign_in_provider != 'anonymous';
       }
 
-      // --- REGRA "USERS" (STAFF) ---
       match /users/{userId} {
         allow read: if request.auth != null &&
                        request.auth.token.firebase.sign_in_provider != 'anonymous';
         allow write: if false;
       }
 
-      // --- REGRA "TABLES" (MESAS) ---
       match /tables/{tableId} {
         allow read, write: if request.auth != null && 
                             request.auth.token.firebase.sign_in_provider == 'password';
         allow read, create: if request.auth != null;
-
         allow update: if request.auth != null && (
                         resource.data.clientId == request.auth.uid ||
                         request.resource.data.keys().subsetOf([
@@ -59,10 +58,9 @@ service cloud.firestore {
                           'accessPin', 'lastKdsSentAt', 'masterTable', 'mergedTables', 'waiterId',
                           'closedAt', 'finalTotal', 'wooOrderId', 'closedBy'
                         ])
-                   );
+                    );
       }
       
-      // --- REGRA "CUSTOMERS" (CRM) ---
       match /customers/{customerId} {
         allow read, write: if request.auth != null &&
                            request.auth.token.firebase.sign_in_provider == 'password';
@@ -70,48 +68,38 @@ service cloud.firestore {
                               request.auth.uid == customerId;
       }
       
-      // --- REGRA "KDS" (PEDIDOS NA COZINHA) ---
       match /kds_orders/{orderId} {
         allow read, write: if request.auth != null &&
                            request.auth.token.firebase.sign_in_provider == 'password';
         allow create: if request.auth != null;
       }
 
-      // --- REGRA "SHIFTS" (CAIXA / TURNOS) ---
       match /shifts/{shiftId} {
         allow read, write: if request.auth != null && 
                            request.auth.token.firebase.sign_in_provider != 'anonymous' &&
                            resource.data.userId == request.auth.token.email;
-        
         allow create: if request.auth != null &&
                          request.auth.token.firebase.sign_in_provider != 'anonymous' &&
                          request.resource.data.userId == request.auth.token.email;
-                         
         allow read, write: if request.auth != null &&
                            get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.token.email)).data.role == 'gerente';
       }
 
-      // --- REGRA "DAILY_REPORTS" (FECHAMENTO DIÁRIO) ---
       match /daily_reports/{reportId} {
         allow read: if request.auth != null;
         allow write: if request.auth != null &&
                        get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.token.email)).data.role == 'gerente';
       }
       
-      // --- BLOQUEIO PADRÃO ---
       match /{document=**} {
         allow read, write: if false;
       }
     }
 
-    // ==========================================================
-    //       REGRA: CONFIGURAÇÃO DE PRODUTOS (IRMÃO DE DATA)
-    // ==========================================================
     match /artifacts/{appId}/public/product_config {
       allow read: if request.auth != null;
       allow write: if request.auth != null && 
                    get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.token.email)).data.role == 'gerente';
     }
-
   }
 }

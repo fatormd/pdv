@@ -250,6 +250,7 @@ window.openManagerAuthModal = (action, payload = null) => {
                     case 'deletePayment': executeDeletePayment(payload); break;
                     case 'goToManagerPanel': await goToScreen('managerScreen'); break;
                     case 'openProductManagement': handleGerencialAction(action); break;
+                    case 'openCashManagementReport': handleGerencialAction(action); break; // <--- CORREÇÃO: Garante que este action também funcione
                     case 'openCashManagement': handleGerencialAction(action); break;
                     case 'openInventoryManagement': handleGerencialAction(action); break;
                     case 'openRecipesManagement': handleGerencialAction(action); break;
@@ -273,6 +274,11 @@ window.openManagerAuthModal = (action, payload = null) => {
     }
 };
 window.openManagerAuthModal = openManagerAuthModal;
+
+// ========== CORREÇÃO AQUI: Expor a função globalmente ==========
+// Isso permite que os botões no HTML (como "Encerrar Dia") funcionem
+window.handleGerencialAction = handleGerencialAction;
+// ===============================================================
 
 window.deletePayment = (timestamp) => window.openManagerAuthModal('deletePayment', timestamp);
 window.handleMassActionRequest = (action) => { if(action === 'delete') window.openManagerAuthModal('executeMassDelete'); else if (action === 'transfer') window.openManagerAuthModal('executeMassTransfer'); };

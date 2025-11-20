@@ -1,18 +1,59 @@
-// --- CONTROLLERS/PANELCONTROLLER.JS (Atualizado: Ícone de Impressão como Ação Direta) ---
-import { getTablesCollectionRef, getTableDocRef, db } from "/services/firebaseService.js";
-import { query, where, orderBy, onSnapshot, getDoc, setDoc, updateDoc, serverTimestamp, writeBatch, arrayUnion, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+// --- CONTROLLERS/PANELCONTROLLER.JS (Completo e Atualizado com Setores Dinâmicos) ---
+import { getTablesCollectionRef, getTableDocRef, db, getSectorsCollectionRef } from "/services/firebaseService.js";
+import { query, where, orderBy, onSnapshot, getDoc, setDoc, updateDoc, serverTimestamp, writeBatch, arrayUnion, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { formatCurrency, formatElapsedTime } from "/utils.js";
 import { goToScreen, currentTableId, selectedItems, unsubscribeTable, currentOrderSnapshot, setCurrentTable, userRole, selectTableAndStartListener } from "/app.js";
 
 
 // --- ESTADO DO MÓDULO ---
-const SECTORS = ['Todos', 'Salão 1', 'Bar', 'Mezanino', 'Calçada'];
+let SECTORS = ['Todos']; // Inicializa apenas com 'Todos', será preenchido via Firebase
 let currentSectorFilter = 'Todos';
 let unsubscribeTables = null;
 let panelInitialized = false;
 let currentTablesSnapshot = []; // Armazena o snapshot completo para uso em modais
 
-// --- RENDERIZAÇÃO DE SETORES ---
+// --- CARREGAMENTO DE SETORES DINÂMICO ---
+const fetchServiceSectors = async () => {
+    try {
+        // Busca apenas setores marcados como 'service' (Atendimento)
+        const q = query(getSectorsCollectionRef(), where('type', '==', 'service'), orderBy('name'));
+        const snapshot = await getDocs(q);
+        
+        const dynamicSectors = snapshot.docs.map(doc => doc.data().name);
+        
+        if (dynamicSectors.length > 0) {
+            SECTORS = ['Todos', ...dynamicSectors];
+        } else {
+            // Fallback caso não haja nada cadastrado ainda
+            SECTORS = ['Todos', 'Salão 1', 'Bar', 'Mezanino', 'Calçada']; 
+        }
+        
+        // Atualiza a interface
+        renderTableFilters();
+        populateSectorDropdown();
+
+    } catch (e) {
+        console.error("Erro ao carregar setores dinâmicos:", e);
+        // Garante que a UI não quebre
+        renderTableFilters();
+        populateSectorDropdown();
+    }
+};
+
+const populateSectorDropdown = () => {
+    const select = document.getElementById('sectorInput');
+    // Tenta atualizar também o select do modal de transferência, se existir na DOM
+    const transferSelect = document.getElementById('newTableSector');
+    
+    const optionsHtml = '<option value="" disabled selected>Setor</option>' + 
+        SECTORS.slice(1).map(s => `<option value="${s}">${s}</option>`).join('');
+
+    if (select) select.innerHTML = optionsHtml;
+    if (transferSelect) transferSelect.innerHTML = optionsHtml;
+};
+
+
+// --- RENDERIZAÇÃO DE SETORES (FILTROS) ---
 export const renderTableFilters = () => {
     const sectorFiltersContainer = document.getElementById('sectorFilters');
     if (!sectorFiltersContainer) return;
@@ -30,14 +71,10 @@ export const renderTableFilters = () => {
         `;
     }).join('');
 
+    // Reaplica classes visualmente (redundância de segurança para interações rápidas)
      sectorFiltersContainer.querySelectorAll('.sector-btn').forEach(btn => {
         const isActive = btn.dataset.sector === currentSectorFilter;
-        btn.classList.toggle('bg-pumpkin', isActive);
-        btn.classList.toggle('text-white', isActive);
-        btn.classList.toggle('bg-dark-input', !isActive);
-        btn.classList.toggle('text-dark-text', !isActive);
-        btn.classList.toggle('border-gray-600', !isActive);
-        btn.classList.toggle('border-pumpkin', isActive);
+        btn.className = `sector-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap ${isActive ? 'bg-pumpkin text-white border-pumpkin' : 'bg-dark-input text-dark-text border-gray-600'}`;
     });
 };
 
@@ -74,8 +111,6 @@ const renderTables = (docs) => {
             // 1. Prioridade Máxima: Solicitação de Conta (Verde)
             else if (isBillRequested) {
                  cardColorClasses = 'bg-green-900 border-green-700 text-white hover:bg-green-800 ring-2 ring-green-400 animate-pulse';
-                 // O ícone agora é um botão que chama a lógica de confirmação e leva para a tela de pagamento.
-                 // Adicionamos a classe 'bill-request-icon' para a exclusão do listener principal.
                  attentionIconHtml = `<button class="attention-icon-btn bill-request-icon" data-table-id="${tableId}" onclick="window.handleBillRequestConfirmation('${tableId}')" title="Cliente solicitou a conta! Clique para imprimir.">
                                         <i class="fas fa-print text-xl text-green-400 animate-pulse"></i>
                                      </button>`;
@@ -423,9 +458,12 @@ export const handleConfirmTableMerge = async () => {
     }
 };
 
-export const initPanelController = () => {
+export const initPanelController = async () => {
     if (panelInitialized) return;
     console.log("[PanelController] Inicializando...");
+
+    // 1. Carrega os setores do Firebase antes de renderizar
+    await fetchServiceSectors();
 
     const abrirMesaBtn = document.getElementById('abrirMesaBtn');
     const searchTableBtn = document.getElementById('searchTableBtn');
@@ -447,15 +485,9 @@ export const initPanelController = () => {
             if (btn) {
                 const sector = btn.dataset.sector;
                 currentSectorFilter = sector;
-                sectorFiltersContainer.querySelectorAll('.sector-btn').forEach(b => {
-                    const isActive = b.dataset.sector === currentSectorFilter;
-                    b.classList.toggle('bg-pumpkin', isActive);
-                    b.classList.toggle('text-white', isActive);
-                    b.classList.toggle('bg-dark-input', !isActive);
-                    b.classList.toggle('text-dark-text', !isActive);
-                    b.classList.toggle('border-gray-600', !isActive);
-                    b.classList.toggle('border-pumpkin', isActive);
-                });
+                
+                // Atualiza visual dos botões via re-renderização
+                renderTableFilters();
                 loadOpenTables(); 
             }
         });

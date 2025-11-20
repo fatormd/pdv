@@ -1,4 +1,5 @@
-import { db, appId, getVouchersCollectionRef, getQuickObsCollectionRef, getTablesCollectionRef } from "/services/firebaseService.js";
+// --- CONTROLLERS/MANAGERCONTROLLER.JS ---
+import { db, appId, getVouchersCollectionRef, getQuickObsCollectionRef, getTablesCollectionRef, getCustomersCollectionRef, getSectorsCollectionRef } from "/services/firebaseService.js";
 import { 
     collection, query, where, getDocs, orderBy, Timestamp, 
     doc, setDoc, deleteDoc, updateDoc, serverTimestamp, getDoc, limit
@@ -84,18 +85,239 @@ export const handleGerencialAction = (action, payload) => {
         case 'openWooSync': syncWithWooCommerce(); break;
         case 'openProductManagement': renderProductManagementModal(); break;
         
-        // Novas Ações de Caixa
+        // Ações de Caixa
         case 'openCashManagementReport': openReportPanel('active-shifts'); break;
         case 'closeDay': handleCloseDay(); break;
+
+        // Ação CRM
+        case 'openCustomerCRM': renderCustomerCrmModal(); break;
+
+        // Ação Gestão de Setores
+        case 'openSectorManagement': renderSectorManagementModal(); break;
 
         // Ações "Em Breve"
         case 'openInventoryManagement': alert("Módulo de Estoque em desenvolvimento."); break;
         case 'openRecipesManagement': alert("Módulo de Ficha Técnica em desenvolvimento."); break;
-        case 'openCustomerCRM': alert("Módulo de CRM em desenvolvimento."); break;
-        case 'openSectorManagement': alert("Gestão de Setores em desenvolvimento."); break;
 
         default: console.warn(`Ação não mapeada: ${action}`);
     }
+};
+
+// =================================================================
+//              GESTÃO DE SETORES
+// =================================================================
+const renderSectorManagementModal = async () => {
+    if (!managerModal) return;
+
+    managerModal.innerHTML = `
+        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-lg h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-pumpkin"><i class="fas fa-map-signs mr-2"></i>Gerenciar Setores</h3>
+                <button onclick="document.getElementById('managerModal').style.display='none'" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            
+            <div class="flex space-x-2 mb-4 border-b border-gray-700 pb-2">
+                <button class="sector-tab-btn flex-1 py-2 rounded-t-lg font-bold text-sm bg-indigo-600 text-white" data-type="service">Atendimento (Mesas)</button>
+                <button class="sector-tab-btn flex-1 py-2 rounded-t-lg font-bold text-sm bg-gray-700 text-gray-400 hover:text-white" data-type="production">Produção (KDS)</button>
+            </div>
+
+            <form id="addSectorForm" class="flex space-x-2 mb-4">
+                <input type="text" id="newSectorName" placeholder="Nome do Setor (Ex: Mezanino)" class="input-pdv w-full" required>
+                <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-4 rounded-lg font-bold"><i class="fas fa-plus"></i></button>
+            </form>
+
+            <div id="sectorListContainer" class="flex-grow overflow-y-auto custom-scrollbar space-y-2">
+                <p class="text-center text-gray-500 italic mt-4">Carregando...</p>
+            </div>
+        </div>
+    `;
+    managerModal.style.display = 'flex';
+
+    let currentType = 'service';
+
+    const loadSectors = async () => {
+        const container = document.getElementById('sectorListContainer');
+        container.innerHTML = '<p class="text-center text-gray-500 italic mt-4">Atualizando...</p>';
+        
+        try {
+            const q = query(getSectorsCollectionRef(), where('type', '==', currentType), orderBy('name'));
+            const snap = await getDocs(q);
+
+            if (snap.empty) {
+                container.innerHTML = `<p class="text-center text-gray-500 italic mt-4">Nenhum setor de ${currentType === 'service' ? 'atendimento' : 'produção'} cadastrado.</p>`;
+                return;
+            }
+
+            container.innerHTML = snap.docs.map(doc => `
+                <div class="flex justify-between items-center bg-dark-input p-3 rounded border border-gray-700">
+                    <span class="text-white font-medium">${doc.data().name}</span>
+                    <button onclick="window.deleteSector('${doc.id}')" class="text-red-400 hover:text-red-300 transition p-1" title="Excluir">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `).join('');
+        } catch (e) {
+            console.error(e);
+            container.innerHTML = '<p class="text-center text-red-400">Erro ao carregar setores.</p>';
+        }
+    };
+
+    // Tabs Logic
+    document.querySelectorAll('.sector-tab-btn').forEach(btn => {
+        btn.onclick = () => {
+            document.querySelectorAll('.sector-tab-btn').forEach(b => {
+                b.classList.remove('bg-indigo-600', 'text-white');
+                b.classList.add('bg-gray-700', 'text-gray-400');
+            });
+            btn.classList.remove('bg-gray-700', 'text-gray-400');
+            btn.classList.add('bg-indigo-600', 'text-white');
+            currentType = btn.dataset.type;
+            loadSectors();
+        };
+    });
+
+    // Add Sector
+    document.getElementById('addSectorForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const nameInput = document.getElementById('newSectorName');
+        const name = nameInput.value.trim();
+        if (!name) return;
+
+        try {
+            const id = `${currentType}_${name.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+            await setDoc(doc(getSectorsCollectionRef(), id), {
+                name: name,
+                type: currentType,
+                createdAt: serverTimestamp()
+            });
+            nameInput.value = '';
+            loadSectors();
+        } catch (error) {
+            alert("Erro ao adicionar: " + error.message);
+        }
+    };
+
+    // Delete Global Function
+    window.deleteSector = async (id) => {
+        if(confirm("Remover este setor?")) {
+            await deleteDoc(doc(getSectorsCollectionRef(), id));
+            loadSectors();
+        }
+    };
+
+    // Initial Load
+    loadSectors();
+};
+
+// =================================================================
+//              MÓDULO CRM (CLIENTES)
+// =================================================================
+const renderCustomerCrmModal = async () => {
+    const modalId = 'crmModal';
+    let modal = document.getElementById(modalId);
+    
+    if (!modal) {
+        const modalHtml = `<div id="${modalId}" class="fixed inset-0 bg-gray-900 bg-opacity-95 flex items-center justify-center z-50 hidden p-4 print-hide"></div>`;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        modal = document.getElementById(modalId);
+    }
+
+    modal.innerHTML = `
+        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col">
+            <div class="flex justify-between items-center mb-6 flex-shrink-0 border-b border-gray-700 pb-4">
+                <div>
+                    <h3 class="text-2xl font-bold text-indigo-400"><i class="fas fa-users mr-2"></i>CRM de Clientes</h3>
+                    <p class="text-sm text-gray-400">Gerencie fidelidade e histórico de visitas.</p>
+                </div>
+                <button onclick="document.getElementById('${modalId}').style.display='none'" class="text-gray-400 hover:text-white text-3xl">&times;</button>
+            </div>
+            
+            <div class="mb-4 flex space-x-2">
+                <input type="text" id="crmSearchInput" placeholder="Buscar por Nome ou CPF..." class="input-pdv w-full">
+                <button id="crmSearchBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 rounded-lg font-bold"><i class="fas fa-search"></i></button>
+            </div>
+
+            <div class="flex-grow overflow-y-auto custom-scrollbar bg-dark-bg rounded-lg border border-gray-700">
+                <table class="w-full text-left text-sm text-gray-400">
+                    <thead class="bg-gray-800 text-xs uppercase font-bold text-gray-300 sticky top-0">
+                        <tr>
+                            <th class="p-4">Cliente</th>
+                            <th class="p-4">Contato</th>
+                            <th class="p-4 text-center">Pontos</th>
+                            <th class="p-4 text-center">Última Visita</th>
+                            <th class="p-4 text-right">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="crmListBody" class="divide-y divide-gray-700">
+                        <tr><td colspan="5" class="p-8 text-center italic">Carregando clientes...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+    
+    modal.style.display = 'flex';
+    
+    const fetchAndRenderCustomers = async (searchTerm = '') => {
+        const container = document.getElementById('crmListBody');
+        try {
+            const q = query(getCustomersCollectionRef(), orderBy('name'), limit(50)); 
+            const snap = await getDocs(q);
+            
+            if (snap.empty) {
+                container.innerHTML = '<tr><td colspan="5" class="p-8 text-center italic">Nenhum cliente encontrado.</td></tr>';
+                return;
+            }
+
+            const customers = snap.docs.map(d => ({id: d.id, ...d.data()}));
+            const filtered = searchTerm 
+                ? customers.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()) || (c.cpf && c.cpf.includes(searchTerm)))
+                : customers;
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<tr><td colspan="5" class="p-8 text-center italic">Nenhum resultado para a busca.</td></tr>';
+                return;
+            }
+
+            container.innerHTML = filtered.map(c => {
+                const lastVisit = c.lastVisit?.toDate ? c.lastVisit.toDate().toLocaleDateString('pt-BR') : 'Nunca';
+                return `
+                    <tr class="hover:bg-gray-800 transition">
+                        <td class="p-4">
+                            <p class="font-bold text-white text-base">${c.name}</p>
+                            <p class="text-xs text-gray-500">CPF/CNPJ: ${c.cpf}</p>
+                        </td>
+                        <td class="p-4">
+                            <p>${c.phone || '-'}</p>
+                            <p class="text-xs">${c.email || '-'}</p>
+                        </td>
+                        <td class="p-4 text-center">
+                            <span class="bg-indigo-900 text-indigo-200 py-1 px-3 rounded-full font-bold text-xs">${c.points || 0} pts</span>
+                        </td>
+                        <td class="p-4 text-center">${lastVisit}</td>
+                        <td class="p-4 text-right">
+                            <button onclick="alert('Histórico detalhado em breve (ID: ${c.id})')" class="text-indigo-400 hover:text-white mr-2" title="Histórico">
+                                <i class="fas fa-history"></i>
+                            </button>
+                            <button onclick="alert('Editar cliente em breve')" class="text-blue-400 hover:text-white" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+        } catch (e) {
+            console.error(e);
+            container.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-red-400">Erro ao carregar: ${e.message}</td></tr>`;
+        }
+    };
+
+    const searchInput = document.getElementById('crmSearchInput');
+    document.getElementById('crmSearchBtn').onclick = () => fetchAndRenderCustomers(searchInput.value);
+    searchInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') fetchAndRenderCustomers(searchInput.value); });
+
+    await fetchAndRenderCustomers();
 };
 
 // =================================================================
@@ -306,12 +528,11 @@ const loadReports = async () => {
     const startOfDay = Timestamp.fromDate(new Date(dateVal + 'T00:00:00'));
     const endOfDay = Timestamp.fromDate(new Date(dateVal + 'T23:59:59'));
 
-    // Identifica qual aba está ativa para priorizar carregamento (opcional, aqui carrega tudo)
     try {
         await Promise.all([
-            fetchActiveShifts(),                 // Aba: Abertos (Tempo Real)
-            fetchClosedShifts(startOfDay, endOfDay), // Aba: Fechados
-            fetchSalesData(startOfDay, endOfDay)     // Aba: Vendas
+            fetchActiveShifts(),
+            fetchClosedShifts(startOfDay, endOfDay),
+            fetchSalesData(startOfDay, endOfDay)
         ]);
     } catch (e) { 
         console.error("Erro ao carregar dados do painel de caixa:", e); 
@@ -323,7 +544,6 @@ const fetchActiveShifts = async () => {
     const container = document.getElementById('activeShiftsContainer');
     if (!container) return;
     
-    // Busca apenas turnos ABERTOS, independente da data do filtro (mostra o 'agora')
     const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'shifts'), where('status', '==', 'open'));
     
     try {
@@ -403,7 +623,6 @@ const fetchClosedShifts = async (start, end) => {
         container.innerHTML = snap.docs.map(doc => {
             const s = doc.data();
             const diff = s.difference || 0;
-            // Cores para diferença: Vermelho (Falta > 0.50), Azul (Sobra > 0.50), Verde (Ok)
             const diffColor = diff < -0.5 ? 'text-red-400' : (diff > 0.5 ? 'text-blue-400' : 'text-green-500');
             
             const openTime = s.openedAt?.toDate().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
@@ -507,7 +726,6 @@ const handleCloseDay = async () => {
         const start = Timestamp.fromDate(new Date(todayStr + 'T00:00:00'));
         const end = Timestamp.fromDate(new Date(todayStr + 'T23:59:59'));
 
-        // Consolida Mesas
         const tablesQ = query(collection(db, 'artifacts', appId, 'public', 'data', 'tables'), 
             where('status', '==', 'closed'), where('closedAt', '>=', start), where('closedAt', '<=', end));
         const tablesSnap = await getDocs(tablesQ);
@@ -515,7 +733,6 @@ const handleCloseDay = async () => {
         let totalSales = 0, money = 0, digital = 0, ordersCount = 0;
         tablesSnap.forEach(d => {
             const t = d.data(); 
-            // Tenta pegar do finalTotal (se existir) ou recalcula dos pagamentos
             let tableTotal = 0;
             if (t.payments) {
                 t.payments.forEach(p => {
@@ -530,13 +747,11 @@ const handleCloseDay = async () => {
             ordersCount++;
         });
 
-        // Consolida Turnos
         const shiftsQ = query(collection(db, 'artifacts', appId, 'public', 'data', 'shifts'), 
             where('openedAt', '>=', start), where('openedAt', '<=', end));
         const shiftsSnap = await getDocs(shiftsQ);
         const shiftIds = shiftsSnap.docs.map(d => d.id);
 
-        // Salva Relatório
         await setDoc(reportRef, { 
             date: todayStr, 
             totalSales, 
@@ -549,7 +764,6 @@ const handleCloseDay = async () => {
         
         alert(`Dia encerrado com sucesso!\n\nTotal Consolidado: ${formatCurrency(totalSales)}\nDinheiro: ${formatCurrency(money)}\nDigital: ${formatCurrency(digital)}`);
         
-        // Opcional: Mudar para uma aba de "Histórico Mensal" se existisse
         loadReports(); 
 
     } catch (e) { 
@@ -558,15 +772,9 @@ const handleCloseDay = async () => {
     }
 };
 
-const fetchMonthlyReports = async () => {
-    // Placeholder para aba de histórico mensal se implementada no futuro
-    // Código mantido para compatibilidade
-};
-
 // --- FUNÇÕES AUXILIARES E OUTROS MODAIS ---
 
 window.showOrderDetails = async (docId) => { 
-    // Futuro: Abrir modal com detalhes do pedido (itens, pagamentos, etc.)
     console.log("Ver detalhes do pedido:", docId);
 };
 
