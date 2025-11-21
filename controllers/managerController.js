@@ -774,8 +774,108 @@ const handleCloseDay = async () => {
 
 // --- FUNÇÕES AUXILIARES E OUTROS MODAIS ---
 
-window.showOrderDetails = async (docId) => { 
-    console.log("Ver detalhes do pedido:", docId);
+window.showOrderDetails = async (docId) => {
+    // 1. Create Modal if not exists
+    let modal = document.getElementById('orderDetailsModal');
+    if (!modal) {
+        const modalHtml = `
+            <div id="orderDetailsModal" class="fixed inset-0 bg-gray-900 bg-opacity-95 flex items-center justify-center z-[60] hidden p-4 print-hide">
+                <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+                    <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-4">
+                        <h3 class="text-2xl font-bold text-green-400">Detalhes do Pedido</h3>
+                        <button onclick="document.getElementById('orderDetailsModal').style.display='none'" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+                    </div>
+                    <div id="orderDetailsContent" class="flex-grow overflow-y-auto custom-scrollbar space-y-4">
+                        <p class="text-center text-gray-500 italic">Carregando...</p>
+                    </div>
+                    <div class="pt-4 border-t border-gray-700 flex justify-end">
+                        <button onclick="document.getElementById('orderDetailsModal').style.display='none'" class="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg">Fechar</button>
+                    </div>
+                </div>
+            </div>`;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        modal = document.getElementById('orderDetailsModal');
+    }
+
+    modal.style.display = 'flex';
+    const contentDiv = document.getElementById('orderDetailsContent');
+    contentDiv.innerHTML = '<div class="flex justify-center p-10"><i class="fas fa-spinner fa-spin text-3xl text-pumpkin"></i></div>';
+
+    try {
+        const docRef = doc(getTablesCollectionRef(), docId);
+        const docSnap = await getDoc(docRef);
+
+        if (!docSnap.exists()) {
+            contentDiv.innerHTML = '<p class="text-red-400 text-center">Pedido não encontrado.</p>';
+            return;
+        }
+
+        const order = docSnap.data();
+        const items = order.sentItems || [];
+        const payments = order.payments || [];
+        const openTime = order.createdAt?.toDate ? order.createdAt.toDate().toLocaleString('pt-BR') : 'N/A';
+        const closeTime = order.closedAt?.toDate ? order.closedAt.toDate().toLocaleString('pt-BR') : 'N/A';
+
+        const groupedItems = items.reduce((acc, item) => {
+            const key = item.id + (item.note || '');
+            if (!acc[key]) acc[key] = { ...item, qty: 0, total: 0 };
+            acc[key].qty++;
+            acc[key].total += (item.price || 0);
+            return acc;
+        }, {});
+
+        const itemsHtml = Object.values(groupedItems).map(item => `
+            <div class="flex justify-between items-start border-b border-gray-700 pb-2 last:border-0">
+                <div>
+                    <span class="text-white font-semibold">${item.qty}x ${item.name}</span>
+                    ${item.note ? `<p class="text-xs text-yellow-400 italic">${item.note}</p>` : ''}
+                </div>
+                <span class="text-gray-300">${formatCurrency(item.total)}</span>
+            </div>
+        `).join('');
+
+        const paymentsHtml = payments.map(p => `
+            <div class="flex justify-between text-sm">
+                <span class="text-gray-400">${p.method}</span>
+                <span class="text-green-400 font-mono">${p.value}</span>
+            </div>
+        `).join('');
+
+        contentDiv.innerHTML = `
+            <div class="grid grid-cols-2 gap-4 text-sm text-gray-400 mb-4">
+                <div>
+                    <p><span class="font-bold text-gray-300">Mesa:</span> ${order.tableNumber}</p>
+                    <p><span class="font-bold text-gray-300">Operador:</span> ${order.waiterId || order.closedBy || 'N/A'}</p>
+                </div>
+                <div class="text-right">
+                    <p><span class="font-bold text-gray-300">Abertura:</span> ${openTime}</p>
+                    <p><span class="font-bold text-gray-300">Fechamento:</span> ${closeTime}</p>
+                </div>
+            </div>
+
+            <div class="bg-dark-input p-4 rounded-lg">
+                <h4 class="text-pumpkin font-bold mb-2 border-b border-gray-600 pb-1">Itens Consumidos</h4>
+                <div class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                    ${items.length ? itemsHtml : '<p class="italic text-gray-500">Sem itens registrados.</p>'}
+                </div>
+            </div>
+
+            <div class="bg-dark-input p-4 rounded-lg">
+                <h4 class="text-green-400 font-bold mb-2 border-b border-gray-600 pb-1">Pagamentos</h4>
+                <div class="space-y-1">
+                    ${payments.length ? paymentsHtml : '<p class="italic text-gray-500">Sem pagamentos.</p>'}
+                </div>
+                <div class="flex justify-between items-center mt-3 pt-2 border-t border-gray-600">
+                    <span class="text-white font-bold text-lg">Total Final</span>
+                    <span class="text-green-400 font-bold text-xl">${formatCurrency(order.finalTotal || order.total || 0)}</span>
+                </div>
+            </div>
+        `;
+
+    } catch (e) {
+        console.error("Erro ao carregar detalhes:", e);
+        contentDiv.innerHTML = `<p class="text-red-400 text-center">Erro ao carregar dados: ${e.message}</p>`;
+    }
 };
 
 // Função global de autenticação gerencial

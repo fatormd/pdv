@@ -1,4 +1,4 @@
-// --- APP.JS (VERSÃO FINAL COM FIREBASE AUTH, CAIXA E KDS) ---
+// --- APP.JS (VERSÃO FINAL CORRIGIDA - COMPLETA) ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapshot, writeBatch, arrayRemove, arrayUnion, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
@@ -9,14 +9,13 @@ import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, auth, 
 import { fetchWooCommerceProducts, fetchWooCommerceCategories } from '/services/wooCommerceService.js';
 import { formatCurrency, formatElapsedTime, getNumericValueFromCurrency, maskPhoneNumber } from '/utils.js';
 
-// --- IMPORTS ESTÁTICOS PARA CONTROLADORES CORE ---
+// --- IMPORTS DOS CONTROLADORES ---
 import { initPanelController, loadOpenTables, renderTableFilters, handleAbrirMesa, handleSearchTable, openTableMergeModal } from '/controllers/panelController.js';
 import { initOrderController, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity, openObsModalForGroup, renderMenu } from '/controllers/orderController.js';
 import { initPaymentController, renderPaymentSummary, deletePayment, handleMassActionRequest, handleFinalizeOrder, handleMassDeleteConfirmed, executeDeletePayment, openTableTransferModal, handleConfirmTableTransfer } from '/controllers/paymentController.js';
 import { initManagerController, handleGerencialAction } from '/controllers/managerController.js';
 import { initUserManagementController, openUserManagementModal } from '/controllers/userManagementController.js';
 import { initCashierController } from '/controllers/cashierController.js';
-// NOVO: Import do Controlador KDS
 import { initKdsController } from '/controllers/kdsController.js';
 
 // Imports do Cliente
@@ -41,12 +40,16 @@ export const screens = {
     'orderScreen': 2, 
     'paymentScreen': 3, 
     'managerScreen': 4,
-    'kdsScreen': 5, // <--- NOVA TELA REGISTRADA
+    'kdsScreen': 5, 
     'clientOrderScreen': 0, 
     'clientPaymentScreen': 1
 };
-export let currentTableId = null; export let selectedItems = []; export let currentOrderSnapshot = null;
-export let userRole = 'anonymous'; export let userId = null; export let unsubscribeTable = null;
+export let currentTableId = null; 
+export let selectedItems = []; 
+export let currentOrderSnapshot = null;
+export let userRole = 'anonymous'; 
+export let userId = null; 
+export let unsubscribeTable = null;
 
 // --- ELEMENTOS UI ---
 let statusScreen, mainContent, appContainer, loginScreen, mainHeader;
@@ -101,11 +104,11 @@ const hideLoginScreen = () => {
     const logoutBtn = document.getElementById('logoutBtnHeader');
     const managerBtn = document.getElementById('openManagerPanelBtn');
     const cashierBtn = document.getElementById('openCashierBtn'); 
-    const kdsBtn = document.getElementById('openKdsBtn'); // <--- NOVO BOTÃO
+    const kdsBtn = document.getElementById('openKdsBtn');
     
     if (logoutBtn) logoutBtn.classList.remove('hidden');
     if (cashierBtn) cashierBtn.classList.remove('hidden'); 
-    if (kdsBtn) kdsBtn.classList.remove('hidden'); // <--- MOSTRA O BOTÃO KDS
+    if (kdsBtn) kdsBtn.classList.remove('hidden'); 
     if (managerBtn) managerBtn.classList.toggle('hidden', userRole !== 'gerente');
 };
 
@@ -145,7 +148,6 @@ export const goToScreen = async (screenId) => {
         if (mainContent) mainContent.style.display = 'block';
         
         if (!isClientMode) {
-            // ATUALIZADO: Aplica fundo especial para Gerencial E KDS
             const isSpecialScreen = screenId === 'managerScreen' || screenId === 'kdsScreen';
             document.body.classList.toggle('bg-gray-900', isSpecialScreen);
             document.body.classList.toggle('bg-dark-bg', !isSpecialScreen);
@@ -205,6 +207,7 @@ export const handleTableTransferConfirmed = async (originTableId, targetTableId,
 };
 window.handleTableTransferConfirmed = handleTableTransferConfirmed;
 
+// --- MODAL DE AUTENTICAÇÃO DE GERENTE ---
 window.openManagerAuthModal = (action, payload = null) => {
     if (userRole !== 'gerente') {
         alert("Acesso negado. Apenas o perfil 'Gerente' pode realizar esta ação.");
@@ -250,12 +253,13 @@ window.openManagerAuthModal = (action, payload = null) => {
                     case 'deletePayment': executeDeletePayment(payload); break;
                     case 'goToManagerPanel': await goToScreen('managerScreen'); break;
                     case 'openProductManagement': handleGerencialAction(action); break;
-                    case 'openCashManagementReport': handleGerencialAction(action); break; // <--- CORREÇÃO: Garante que este action também funcione
+                    case 'openCashManagementReport': handleGerencialAction(action); break; 
                     case 'openCashManagement': handleGerencialAction(action); break;
                     case 'openInventoryManagement': handleGerencialAction(action); break;
                     case 'openRecipesManagement': handleGerencialAction(action); break;
                     case 'openCustomerCRM': handleGerencialAction(action); break;
                     case 'openWooSync': handleGerencialAction(action); break;
+                    case 'openSectorManagement': handleGerencialAction(action); break;
                     default: handleGerencialAction(action, payload); break;
                 }
             } else {
@@ -275,17 +279,13 @@ window.openManagerAuthModal = (action, payload = null) => {
 };
 window.openManagerAuthModal = openManagerAuthModal;
 
-// ========== CORREÇÃO AQUI: Expor a função globalmente ==========
-// Isso permite que os botões no HTML (como "Encerrar Dia") funcionem
-window.handleGerencialAction = handleGerencialAction;
-// ===============================================================
-
+// --- EXPOSIÇÃO DE FUNÇÕES GLOBAIS ---
+window.handleGerencialAction = handleGerencialAction; // IMPORTANTE: Expondo para o HTML
 window.deletePayment = (timestamp) => window.openManagerAuthModal('deletePayment', timestamp);
 window.handleMassActionRequest = (action) => { if(action === 'delete') window.openManagerAuthModal('executeMassDelete'); else if (action === 'transfer') window.openManagerAuthModal('executeMassTransfer'); };
 window.openObsModalForGroup = openObsModalForGroup;
 window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`);
 window.openNfeModal = () => { /* Lógica para abrir modal NFe */ };
-window.openNfeModal = openNfeModal;
 
 
 // --- LÓGICA DE LISTENER DA MESA ---
@@ -313,11 +313,8 @@ export const setTableListener = (tableId, isClientMode = false) => {
 
             if (JSON.stringify(firebaseSelectedItems) !== JSON.stringify(selectedItems)) {
                  if (!isClientMode || (isClientMode && selectedItems.length === 0)){
-                     console.log("[Listener] Syncing selectedItems from Firebase.");
                      selectedItems.length = 0;
                      selectedItems.push(...firebaseSelectedItems);
-                 } else {
-                     console.log("[Listener] Client has local items, not syncing from Firebase.");
                  }
             }
 
@@ -350,7 +347,6 @@ export const setTableListener = (tableId, isClientMode = false) => {
 
 export const setCurrentTable = (tableId, isClientMode = false, shouldListen = true) => {
     if (currentTableId === tableId && unsubscribeTable && shouldListen) {
-        console.log(`[APP] Already listening to table ${tableId}. Forcing re-render.`);
         if(currentOrderSnapshot){
              if (isClientMode) {
                  renderClientOrderScreen(currentOrderSnapshot);
@@ -362,24 +358,15 @@ export const setCurrentTable = (tableId, isClientMode = false, shouldListen = tr
         return;
     }
 
-    console.log(`[APP] Setting current table to ${tableId} (ClientMode: ${isClientMode}, Listen: ${shouldListen})`);
     currentTableId = tableId;
     selectedItems.length = 0;
     currentOrderSnapshot = null;
 
-    if (isClientMode) {
-         const clientTableNumEl = document.getElementById('client-table-number');
-         const paymentTableNumElClient = document.getElementById('payment-table-number');
-         if(clientTableNumEl) clientTableNumEl.textContent = `Mesa ${tableId}`;
-         if(paymentTableNumElClient) paymentTableNumElClient.textContent = `Mesa ${tableId}`;
-    } else {
-         const currentTableNumEl = document.getElementById('current-table-number');
-         const paymentTableNumEl = document.getElementById('payment-table-number');
-         const orderScreenTableNumEl = document.getElementById('order-screen-table-number');
-         if(currentTableNumEl) currentTableNumEl.textContent = `Mesa ${tableId}`;
-         if(paymentTableNumEl) paymentTableNumEl.textContent = `Mesa ${tableId}`;
-         if(orderScreenTableNumEl) orderScreenTableNumEl.textContent = `Mesa ${tableId}`;
-    }
+    const els = ['current-table-number', 'payment-table-number', 'order-screen-table-number', 'client-table-number'];
+    els.forEach(id => {
+        const el = document.getElementById(id);
+        if(el) el.textContent = `Mesa ${tableId}`;
+    });
 
     if (shouldListen) {
         setTableListener(tableId, isClientMode);
@@ -406,10 +393,7 @@ const handleStaffLogin = async (event) => {
     const loginBtn = document.getElementById('loginBtn');
     const loginErrorMsg = document.getElementById('loginErrorMsg');
 
-    if (!loginEmailInput || !loginPasswordInput || !loginBtn || !loginErrorMsg) {
-        console.error("Elementos do formulário de login não encontrados.");
-        return;
-    }
+    if (!loginEmailInput || !loginPasswordInput || !loginBtn || !loginErrorMsg) return;
 
     const email = loginEmailInput.value;
     const password = loginPasswordInput.value;
@@ -430,13 +414,7 @@ const handleStaffLogin = async (event) => {
 
     } catch (error) {
         console.error("Erro no login Firebase Auth:", error.code, error.message);
-        if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-            loginErrorMsg.textContent = "E-mail ou senha inválidos.";
-        } else if (error.code === 'auth/invalid-email') {
-            loginErrorMsg.textContent = "Formato de e-mail inválido.";
-        } else {
-            loginErrorMsg.textContent = "Erro de conexão. Tente novamente.";
-        }
+        loginErrorMsg.textContent = "E-mail ou senha inválidos.";
         loginErrorMsg.style.display = 'block';
         loginBtn.disabled = false;
         loginBtn.textContent = 'Entrar';
@@ -448,9 +426,8 @@ const handleLogout = () => {
     userId = null; currentTableId = null; selectedItems.length = 0; userRole = 'anonymous'; currentOrderSnapshot = null;
     if (unsubscribeTable) { unsubscribeTable(); unsubscribeTable = null; }
 
-    const authInstance = auth;
-    if (authInstance) {
-        signOut(authInstance).catch(error => console.error("Erro ao deslogar:", error));
+    if (auth) {
+        signOut(auth).catch(error => console.error("Erro ao deslogar:", error));
     }
 
     showLoginScreen();
@@ -469,11 +446,11 @@ const initStaffApp = async (staffName) => {
         initManagerController();
         initUserManagementController();
         initCashierController();
-        initKdsController(); // <--- INICIALIZA KDS
+        initKdsController(); // INICIALIZA KDS
 
         renderTableFilters();
-        fetchWooCommerceProducts(renderMenu).catch(e => console.error("[INIT Staff] Falha ao carregar produtos:", e));
-        fetchWooCommerceCategories(renderMenu).catch(e => console.error("[INIT Staff] Falha ao carregar categorias:", e));
+        fetchWooCommerceProducts(renderMenu).catch(e => console.error("[INIT Staff] Falha produtos:", e));
+        fetchWooCommerceCategories(renderMenu).catch(e => console.error("[INIT Staff] Falha categorias:", e));
 
         hideStatus();
         hideLoginScreen(); 
@@ -488,7 +465,6 @@ const initStaffApp = async (staffName) => {
 
     } catch (error) {
         console.error("Erro CRÍTICO durante initStaffApp:", error);
-        alert(`Erro grave na inicialização: ${error.message}. Verifique o console.`);
         showLoginScreen(); 
     }
 };
@@ -496,22 +472,16 @@ const initStaffApp = async (staffName) => {
 const initClientApp = async () => {
     console.log("[ClientApp] initClientApp CALLED"); 
     try {
-        const authInstance = auth;
-        if (authInstance && !authInstance.currentUser) {
-             await signInAnonymously(authInstance); 
-             console.log("[ClientApp] Signed in anonymously."); 
+        if (auth && !auth.currentUser) {
+             await signInAnonymously(auth); 
         }
-
         initClientOrderController();
         initClientPaymentController();
-
         clientLoginModal = document.getElementById('associationModal');
         if (clientLoginModal) clientLoginModal.style.display = 'none';
-
         console.log("[ClientApp] initClientApp FINISHED"); 
     } catch (error) {
         console.error("Erro CRÍTICO durante initClientApp:", error);
-        alert(`Erro grave na inicialização do Cliente: ${error.message}. Verifique o console.`);
     }
 };
 
@@ -523,10 +493,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const firebaseConfigRaw = typeof window.__firebase_config !== 'undefined' ? window.__firebase_config : null;
         const firebaseConfig = firebaseConfigRaw ? JSON.parse(firebaseConfigRaw) : FIREBASE_CONFIG;
         const appIdentifier = typeof window.__app_id !== 'undefined' ? window.__app_id : "pdv_fator_instance_001";
+        
         const app = initializeApp(firebaseConfig);
         const dbInstance = getFirestore(app);
         const authInstance = getAuth(app);
         const functionsInstance = getFunctions(app, 'us-central1');
+        
         initializeFirebase(dbInstance, authInstance, appIdentifier, functionsInstance);
         console.log("[APP] Firebase Initialized"); 
 
@@ -561,7 +533,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                  });
              }
 
+             // === TRAVA DE SEGURANÇA (FIXO PARA CONECTANDO...) ===
+             const loginTimeout = setTimeout(() => {
+                 if (statusScreen && statusScreen.style.display !== 'none' && !auth.currentUser) {
+                     console.warn("[APP] Firebase Auth demorou demais. Forçando tela de login.");
+                     showLoginScreen();
+                 }
+             }, 3000); // 3 segundos de espera máxima
+
              onAuthStateChanged(authInstance, async (user) => {
+                 clearTimeout(loginTimeout); // Cancela a trava se carregar a tempo
+
                  if (user && !user.isAnonymous) {
                      console.log("[APP] Usuário Staff autenticado:", user.email);
                      
@@ -585,6 +567,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                          handleLogout();
                      }
                  } else if (user && user.isAnonymous) {
+                     // Lógica para cliente anônimo se necessário no futuro
                  } else {
                      console.log("[APP] Usuário não autenticado, mostrando tela de login.");
                      showLoginScreen();
