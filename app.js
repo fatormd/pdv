@@ -590,3 +590,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 });
+
+// --- FUNÇÃO DE ALERTA SONORO (Adicionar no final do app.js) ---
+export const playNotificationSound = () => {
+    const audio = document.getElementById('notificationSound');
+    if (audio) {
+        audio.currentTime = 0; // Reinicia o som se já estiver tocando
+        audio.play().catch(e => console.warn("Reprodução de som bloqueada (interaja com a página primeiro)."));
+    }
+};
+window.playNotificationSound = playNotificationSound;

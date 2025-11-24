@@ -3,103 +3,131 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // O caminho base do seu aplicativo
     match /artifacts/{appId}/public/data {
 
-      // --- NOVA REGRA: SETORES (CRUCIAL PARA O ERRO SUMIR) ---
+      // --- FUNÇÕES AUXILIARES (Helpers) ---
+      
+      // Verifica se o usuário está autenticado
+      function isAuthenticated() {
+        return request.auth != null;
+      }
+
+      // Verifica se é um login de Staff (email/senha) e não anônimo (cliente)
+      function isStaff() {
+        return isAuthenticated() && request.auth.token.firebase.sign_in_provider != 'anonymous';
+      }
+
+      // Verifica se o usuário tem a role 'gerente' no documento de usuários
+      function isGerente() {
+        return isStaff() && 
+          get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.token.email)).data.role == 'gerente';
+      }
+
+      // --- REGRAS DAS COLEÇÕES ---
+
+      // 1. STATUS DO SISTEMA (NOVO)
+      // Essencial para: Abertura de Casa, Metas Mensais, Business Day
+      match /system_status/{docId} {
+        allow read: if isAuthenticated(); // Todos podem ver se a casa está aberta
+        allow write: if isGerente();      // Apenas gerente define metas e abre casa
+      }
+
+      // 2. SETORES (NOVO)
+      // Essencial para: Filtros do Painel e KDS
       match /sectors/{sectorId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null && 
-                       get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.token.email)).data.role == 'gerente';
+        allow read: if isAuthenticated();
+        allow write: if isGerente();
       }
 
-      match /categories/{categoryId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null && 
-                       get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.token.email)).data.role == 'gerente';
-      }
-
-      match /products/{productId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null && 
-                       get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.token.email)).data.role == 'gerente';
-      }
-
-      match /vouchers/{voucherId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null && 
-                       request.auth.token.firebase.sign_in_provider != 'anonymous' &&
-                       get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.token.email)).data.role == 'gerente';
-      }
-
-      match /quick_obs/{obsId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null && 
-                       request.auth.token.firebase.sign_in_provider != 'anonymous';
-      }
-
-      match /users/{userId} {
-        allow read: if request.auth != null &&
-                       request.auth.token.firebase.sign_in_provider != 'anonymous';
-        allow write: if false;
-      }
-
-      match /tables/{tableId} {
-        allow read, write: if request.auth != null && 
-                            request.auth.token.firebase.sign_in_provider == 'password';
-        allow read, create: if request.auth != null;
-        allow update: if request.auth != null && (
-                        resource.data.clientId == request.auth.uid ||
-                        request.resource.data.keys().subsetOf([
-                          'tableNumber', 'status', 'diners', 'sector', 'createdAt', 'total', 
-                          'clientId', 'clientName', 'clientPhone', 'anonymousUid', 'clientDocType',
-                          'selectedItems', 'requestedOrders', 'sentItems', 
-                          'clientOrderPending', 'waiterNotification', 'billRequested', 
-                          'payments', 'serviceTaxApplied', 
-                          'accessPin', 'lastKdsSentAt', 'masterTable', 'mergedTables', 'waiterId',
-                          'closedAt', 'finalTotal', 'wooOrderId', 'closedBy'
-                        ])
-                    );
-      }
-      
-      match /customers/{customerId} {
-        allow read, write: if request.auth != null &&
-                           request.auth.token.firebase.sign_in_provider == 'password';
-        allow read, write: if request.auth != null &&
-                              request.auth.uid == customerId;
-      }
-      
+      // 3. KDS (PEDIDOS DA COZINHA)
       match /kds_orders/{orderId} {
-        allow read, write: if request.auth != null &&
-                           request.auth.token.firebase.sign_in_provider == 'password';
-        allow create: if request.auth != null;
+        // Staff cria, atualiza (status) e lê. 
+        // Clientes podem criar indiretamente via Cloud Function ou regra de mesa, mas aqui focamos no Staff.
+        allow read, write: if isAuthenticated();
       }
 
-      match /shifts/{shiftId} {
-        allow read, write: if request.auth != null && 
-                           request.auth.token.firebase.sign_in_provider != 'anonymous' &&
-                           resource.data.userId == request.auth.token.email;
-        allow create: if request.auth != null &&
-                         request.auth.token.firebase.sign_in_provider != 'anonymous' &&
-                         request.resource.data.userId == request.auth.token.email;
-        allow read, write: if request.auth != null &&
-                           get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.token.email)).data.role == 'gerente';
+      // 4. PRODUTOS E CATEGORIAS
+      match /categories/{categoryId} {
+        allow read: if isAuthenticated();
+        allow write: if isGerente();
+      }
+      match /products/{productId} {
+        allow read: if isAuthenticated();
+        allow write: if isGerente();
       }
 
-      match /daily_reports/{reportId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null &&
-                       get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.token.email)).data.role == 'gerente';
+      // 5. VOUCHERS E OBSERVAÇÕES
+      match /vouchers/{voucherId} {
+        allow read: if isAuthenticated();
+        allow write: if isGerente();
+      }
+      match /quick_obs/{obsId} {
+        allow read: if isAuthenticated();
+        allow write: if isStaff(); // Staff pode criar obs rápidas se necessário
+      }
+
+      // 6. USUÁRIOS (STAFF)
+      match /users/{userId} {
+        allow read: if isStaff(); // Staff precisa ler para saber seu próprio cargo
+        allow write: if false;    // Escrita somente via Cloud Function (segurança)
+      }
+
+      // 7. MESAS (CORE)
+      match /tables/{tableId} {
+        // Staff tem acesso total
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated(); // Staff ou Cliente anônimo iniciando
+        
+        // Regras de atualização complexas para permitir Cliente e Staff
+        allow update: if isAuthenticated() && (
+          isStaff() || 
+          resource.data.clientId == request.auth.uid ||
+          request.resource.data.keys().subsetOf([
+            'tableNumber', 'status', 'diners', 'sector', 'createdAt', 'total', 
+            'clientId', 'clientName', 'clientPhone', 'anonymousUid', 'clientDocType',
+            'selectedItems', 'requestedOrders', 'sentItems', 
+            'clientOrderPending', 'waiterNotification', 'billRequested', 
+            'payments', 'serviceTaxApplied', 
+            'accessPin', 'lastKdsSentAt', 'masterTable', 'mergedTables', 'waiterId',
+            'closedAt', 'finalTotal', 'wooOrderId', 'closedBy'
+          ])
+        );
+        
+        allow delete: if isStaff(); // Apenas staff fecha/deleta mesa
       }
       
+      // 8. CLIENTES (CRM)
+      match /customers/{customerId} {
+        allow read, write: if isStaff(); // Staff gerencia CRM
+        allow read, write: if request.auth.uid == customerId; // O próprio cliente
+      }
+
+      // 9. TURNOS DE CAIXA (SHIFTS)
+      match /shifts/{shiftId} {
+        // O próprio usuário pode gerenciar seu turno
+        allow read, update: if isStaff() && resource.data.userId == request.auth.token.email;
+        allow create: if isStaff() && request.resource.data.userId == request.auth.token.email;
+        // Gerente pode ver e editar qualquer turno
+        allow read, write: if isGerente();
+      }
+
+      // 10. RELATÓRIOS DIÁRIOS (FECHAMENTO)
+      match /daily_reports/{reportId} {
+        allow read: if isStaff();
+        allow write: if isGerente();
+      }
+      
+      // Bloqueio padrão para qualquer outra coisa não mapeada
       match /{document=**} {
         allow read, write: if false;
       }
     }
 
+    // Configurações Públicas (Se houver)
     match /artifacts/{appId}/public/product_config {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && 
-                   get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.token.email)).data.role == 'gerente';
+      allow read: if isAuthenticated();
+      allow write: if isGerente();
     }
   }
 }

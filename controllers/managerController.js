@@ -1,9 +1,22 @@
 // --- CONTROLLERS/MANAGERCONTROLLER.JS ---
-import { db, appId, getVouchersCollectionRef, getQuickObsCollectionRef, getTablesCollectionRef, getCustomersCollectionRef, getSectorsCollectionRef } from "/services/firebaseService.js";
+// VERSÃO FINAL COMPLETA E UNIFICADA
+
+import { 
+    db, appId, 
+    getVouchersCollectionRef, 
+    getQuickObsCollectionRef, 
+    getTablesCollectionRef, 
+    getCustomersCollectionRef, 
+    getSectorsCollectionRef, 
+    getSystemStatusDocRef, 
+    getFinancialGoalsDocRef 
+} from "/services/firebaseService.js";
+
 import { 
     collection, query, where, getDocs, orderBy, Timestamp, 
     doc, setDoc, deleteDoc, updateDoc, serverTimestamp, getDoc, limit
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
 import { formatCurrency } from "/utils.js";
 import { openUserManagementModal } from "/controllers/userManagementController.js";
 import { 
@@ -11,7 +24,7 @@ import {
     createWooProduct, updateWooProduct, deleteWooProduct, fetchWooCommerceProducts 
 } from "/services/wooCommerceService.js";
 
-// Variáveis de Estado
+// --- VARIÁVEIS DE ESTADO ---
 let managerModal; 
 let managerAuthCallback;
 let voucherManagementModal, voucherListContainer, voucherForm;
@@ -24,13 +37,13 @@ export const initManagerController = () => {
     console.log("[ManagerController] Inicializando...");
     
     managerModal = document.getElementById('managerModal');
-    if (!managerModal) return;
-    
-    managerModal.addEventListener('click', (e) => {
-         if (e.target === managerModal) managerModal.style.display = 'none';
-    });
+    if (managerModal) {
+        managerModal.addEventListener('click', (e) => {
+             if (e.target === managerModal) managerModal.style.display = 'none';
+        });
+    }
 
-    // Configuração do Modal de Vouchers
+    // Configuração de Vouchers
     voucherManagementModal = document.getElementById('voucherManagementModal'); 
     voucherListContainer = document.getElementById('voucherListContainer');     
     voucherForm = document.getElementById('voucherForm');                       
@@ -39,7 +52,7 @@ export const initManagerController = () => {
     });
     if (voucherForm) voucherForm.addEventListener('submit', handleSaveVoucher);
 
-    // Configuração do Painel de Gestão de Caixa (Relatórios)
+    // Configuração de Relatórios
     reportDateInput = document.getElementById('reportDateInput');
     if (reportDateInput) {
         reportDateInput.valueAsDate = new Date(); 
@@ -47,25 +60,25 @@ export const initManagerController = () => {
     }
     document.getElementById('refreshReportBtn')?.addEventListener('click', loadReports);
 
-    // Lógica de Abas do Painel de Caixa
+    // Listeners das Abas de Relatório
     const tabBtns = document.querySelectorAll('.report-tab-btn');
     tabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
-            // Remove ativo de todas
             tabBtns.forEach(b => { 
                 b.classList.remove('bg-indigo-600', 'text-white'); 
                 b.classList.add('bg-dark-input', 'text-gray-300'); 
             });
-            // Ativa a atual
             btn.classList.remove('bg-dark-input', 'text-gray-300'); 
             btn.classList.add('bg-indigo-600', 'text-white');
             
-            // Troca o conteúdo visível
             document.querySelectorAll('.report-content').forEach(c => c.classList.add('hidden'));
             const targetContent = document.getElementById(`tab-${btn.dataset.tab}`);
             if(targetContent) targetContent.classList.remove('hidden');
             
-            // Recarrega dados se necessário
+            // Recarrega dados específicos se for a aba de vendas
+            if (btn.dataset.tab === 'sales') {
+                fetchMonthlyPerformance(); 
+            }
             loadReports();
         });
     });
@@ -80,22 +93,20 @@ export const handleGerencialAction = (action, payload) => {
 
     switch (action) {
         case 'openWaiterReg': openUserManagementModal(); break;
+        
         case 'openQuickObsManagement': renderQuickObsManagementModal(); break;
         case 'openVoucherManagement': openVoucherManagementModal(); break;
+        case 'openSectorManagement': renderSectorManagementModal(); break;
+        
         case 'openWooSync': syncWithWooCommerce(); break;
         case 'openProductManagement': renderProductManagementModal(); break;
         
-        // Ações de Caixa
         case 'openCashManagementReport': openReportPanel('active-shifts'); break;
+        case 'openHouse': handleOpenHouse(); break;
         case 'closeDay': handleCloseDay(); break;
 
-        // Ação CRM
         case 'openCustomerCRM': renderCustomerCrmModal(); break;
 
-        // Ação Gestão de Setores
-        case 'openSectorManagement': renderSectorManagementModal(); break;
-
-        // Ações "Em Breve"
         case 'openInventoryManagement': alert("Módulo de Estoque em desenvolvimento."); break;
         case 'openRecipesManagement': alert("Módulo de Ficha Técnica em desenvolvimento."); break;
 
@@ -104,418 +115,16 @@ export const handleGerencialAction = (action, payload) => {
 };
 
 // =================================================================
-//              GESTÃO DE SETORES
-// =================================================================
-const renderSectorManagementModal = async () => {
-    if (!managerModal) return;
-
-    managerModal.innerHTML = `
-        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-lg h-[80vh] flex flex-col">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-bold text-pumpkin"><i class="fas fa-map-signs mr-2"></i>Gerenciar Setores</h3>
-                <button onclick="document.getElementById('managerModal').style.display='none'" class="text-gray-400 hover:text-white text-2xl">&times;</button>
-            </div>
-            
-            <div class="flex space-x-2 mb-4 border-b border-gray-700 pb-2">
-                <button class="sector-tab-btn flex-1 py-2 rounded-t-lg font-bold text-sm bg-indigo-600 text-white" data-type="service">Atendimento (Mesas)</button>
-                <button class="sector-tab-btn flex-1 py-2 rounded-t-lg font-bold text-sm bg-gray-700 text-gray-400 hover:text-white" data-type="production">Produção (KDS)</button>
-            </div>
-
-            <form id="addSectorForm" class="flex space-x-2 mb-4">
-                <input type="text" id="newSectorName" placeholder="Nome do Setor (Ex: Mezanino)" class="input-pdv w-full" required>
-                <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-4 rounded-lg font-bold"><i class="fas fa-plus"></i></button>
-            </form>
-
-            <div id="sectorListContainer" class="flex-grow overflow-y-auto custom-scrollbar space-y-2">
-                <p class="text-center text-gray-500 italic mt-4">Carregando...</p>
-            </div>
-        </div>
-    `;
-    managerModal.style.display = 'flex';
-
-    let currentType = 'service';
-
-    const loadSectors = async () => {
-        const container = document.getElementById('sectorListContainer');
-        container.innerHTML = '<p class="text-center text-gray-500 italic mt-4">Atualizando...</p>';
-        
-        try {
-            const q = query(getSectorsCollectionRef(), where('type', '==', currentType), orderBy('name'));
-            const snap = await getDocs(q);
-
-            if (snap.empty) {
-                container.innerHTML = `<p class="text-center text-gray-500 italic mt-4">Nenhum setor de ${currentType === 'service' ? 'atendimento' : 'produção'} cadastrado.</p>`;
-                return;
-            }
-
-            container.innerHTML = snap.docs.map(doc => `
-                <div class="flex justify-between items-center bg-dark-input p-3 rounded border border-gray-700">
-                    <span class="text-white font-medium">${doc.data().name}</span>
-                    <button onclick="window.deleteSector('${doc.id}')" class="text-red-400 hover:text-red-300 transition p-1" title="Excluir">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            `).join('');
-        } catch (e) {
-            console.error(e);
-            container.innerHTML = '<p class="text-center text-red-400">Erro ao carregar setores.</p>';
-        }
-    };
-
-    // Tabs Logic
-    document.querySelectorAll('.sector-tab-btn').forEach(btn => {
-        btn.onclick = () => {
-            document.querySelectorAll('.sector-tab-btn').forEach(b => {
-                b.classList.remove('bg-indigo-600', 'text-white');
-                b.classList.add('bg-gray-700', 'text-gray-400');
-            });
-            btn.classList.remove('bg-gray-700', 'text-gray-400');
-            btn.classList.add('bg-indigo-600', 'text-white');
-            currentType = btn.dataset.type;
-            loadSectors();
-        };
-    });
-
-    // Add Sector
-    document.getElementById('addSectorForm').onsubmit = async (e) => {
-        e.preventDefault();
-        const nameInput = document.getElementById('newSectorName');
-        const name = nameInput.value.trim();
-        if (!name) return;
-
-        try {
-            const id = `${currentType}_${name.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
-            await setDoc(doc(getSectorsCollectionRef(), id), {
-                name: name,
-                type: currentType,
-                createdAt: serverTimestamp()
-            });
-            nameInput.value = '';
-            loadSectors();
-        } catch (error) {
-            alert("Erro ao adicionar: " + error.message);
-        }
-    };
-
-    // Delete Global Function
-    window.deleteSector = async (id) => {
-        if(confirm("Remover este setor?")) {
-            await deleteDoc(doc(getSectorsCollectionRef(), id));
-            loadSectors();
-        }
-    };
-
-    // Initial Load
-    loadSectors();
-};
-
-// =================================================================
-//              MÓDULO CRM (CLIENTES)
-// =================================================================
-const renderCustomerCrmModal = async () => {
-    const modalId = 'crmModal';
-    let modal = document.getElementById(modalId);
-    
-    if (!modal) {
-        const modalHtml = `<div id="${modalId}" class="fixed inset-0 bg-gray-900 bg-opacity-95 flex items-center justify-center z-50 hidden p-4 print-hide"></div>`;
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-        modal = document.getElementById(modalId);
-    }
-
-    modal.innerHTML = `
-        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col">
-            <div class="flex justify-between items-center mb-6 flex-shrink-0 border-b border-gray-700 pb-4">
-                <div>
-                    <h3 class="text-2xl font-bold text-indigo-400"><i class="fas fa-users mr-2"></i>CRM de Clientes</h3>
-                    <p class="text-sm text-gray-400">Gerencie fidelidade e histórico de visitas.</p>
-                </div>
-                <button onclick="document.getElementById('${modalId}').style.display='none'" class="text-gray-400 hover:text-white text-3xl">&times;</button>
-            </div>
-            
-            <div class="mb-4 flex space-x-2">
-                <input type="text" id="crmSearchInput" placeholder="Buscar por Nome ou CPF..." class="input-pdv w-full">
-                <button id="crmSearchBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 rounded-lg font-bold"><i class="fas fa-search"></i></button>
-            </div>
-
-            <div class="flex-grow overflow-y-auto custom-scrollbar bg-dark-bg rounded-lg border border-gray-700">
-                <table class="w-full text-left text-sm text-gray-400">
-                    <thead class="bg-gray-800 text-xs uppercase font-bold text-gray-300 sticky top-0">
-                        <tr>
-                            <th class="p-4">Cliente</th>
-                            <th class="p-4">Contato</th>
-                            <th class="p-4 text-center">Pontos</th>
-                            <th class="p-4 text-center">Última Visita</th>
-                            <th class="p-4 text-right">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="crmListBody" class="divide-y divide-gray-700">
-                        <tr><td colspan="5" class="p-8 text-center italic">Carregando clientes...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    `;
-    
-    modal.style.display = 'flex';
-    
-    const fetchAndRenderCustomers = async (searchTerm = '') => {
-        const container = document.getElementById('crmListBody');
-        try {
-            const q = query(getCustomersCollectionRef(), orderBy('name'), limit(50)); 
-            const snap = await getDocs(q);
-            
-            if (snap.empty) {
-                container.innerHTML = '<tr><td colspan="5" class="p-8 text-center italic">Nenhum cliente encontrado.</td></tr>';
-                return;
-            }
-
-            const customers = snap.docs.map(d => ({id: d.id, ...d.data()}));
-            const filtered = searchTerm 
-                ? customers.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()) || (c.cpf && c.cpf.includes(searchTerm)))
-                : customers;
-
-            if (filtered.length === 0) {
-                container.innerHTML = '<tr><td colspan="5" class="p-8 text-center italic">Nenhum resultado para a busca.</td></tr>';
-                return;
-            }
-
-            container.innerHTML = filtered.map(c => {
-                const lastVisit = c.lastVisit?.toDate ? c.lastVisit.toDate().toLocaleDateString('pt-BR') : 'Nunca';
-                return `
-                    <tr class="hover:bg-gray-800 transition">
-                        <td class="p-4">
-                            <p class="font-bold text-white text-base">${c.name}</p>
-                            <p class="text-xs text-gray-500">CPF/CNPJ: ${c.cpf}</p>
-                        </td>
-                        <td class="p-4">
-                            <p>${c.phone || '-'}</p>
-                            <p class="text-xs">${c.email || '-'}</p>
-                        </td>
-                        <td class="p-4 text-center">
-                            <span class="bg-indigo-900 text-indigo-200 py-1 px-3 rounded-full font-bold text-xs">${c.points || 0} pts</span>
-                        </td>
-                        <td class="p-4 text-center">${lastVisit}</td>
-                        <td class="p-4 text-right">
-                            <button onclick="alert('Histórico detalhado em breve (ID: ${c.id})')" class="text-indigo-400 hover:text-white mr-2" title="Histórico">
-                                <i class="fas fa-history"></i>
-                            </button>
-                            <button onclick="alert('Editar cliente em breve')" class="text-blue-400 hover:text-white" title="Editar">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-
-        } catch (e) {
-            console.error(e);
-            container.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-red-400">Erro ao carregar: ${e.message}</td></tr>`;
-        }
-    };
-
-    const searchInput = document.getElementById('crmSearchInput');
-    document.getElementById('crmSearchBtn').onclick = () => fetchAndRenderCustomers(searchInput.value);
-    searchInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') fetchAndRenderCustomers(searchInput.value); });
-
-    await fetchAndRenderCustomers();
-};
-
-// =================================================================
-//              GESTÃO DE PRODUTOS (WOOCOMMERCE)
-// =================================================================
-const renderProductManagementModal = async () => {
-    const modalId = 'productManagementModal';
-    let modal = document.getElementById(modalId);
-    
-    if (!modal) {
-        const modalHtml = `<div id="${modalId}" class="fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center z-50 hidden p-4 print-hide"></div>`;
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-        modal = document.getElementById(modalId);
-    }
-
-    modal.innerHTML = `
-        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-3xl h-[85vh] flex flex-col">
-            <div class="flex justify-between items-center mb-4 flex-shrink-0">
-                <h3 class="text-xl font-bold text-indigo-400">Gestão de Produtos (WooCommerce)</h3>
-                <button onclick="document.getElementById('${modalId}').style.display='none'" class="text-gray-400 hover:text-white text-2xl">&times;</button>
-            </div>
-            
-            <div id="prodListContainer" class="flex-grow overflow-y-auto custom-scrollbar mb-4">
-                <div class="text-center text-gray-500 py-10"><i class="fas fa-spinner fa-spin"></i> Carregando produtos...</div>
-            </div>
-
-            <div class="pt-2 border-t border-gray-700 flex-shrink-0">
-                <button id="btnNewProduct" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition">
-                    <i class="fas fa-plus"></i> Novo Produto
-                </button>
-            </div>
-        </div>
-    `;
-    
-    modal.style.display = 'flex';
-    await refreshProductList();
-    document.getElementById('btnNewProduct').onclick = () => renderProductForm();
-};
-
-const refreshProductList = async () => {
-    const container = document.getElementById('prodListContainer');
-    if (!container) return;
-
-    let products = getProducts();
-    if (!products || products.length === 0) {
-        products = await fetchWooCommerceProducts();
-    }
-
-    if (!products || products.length === 0) {
-        container.innerHTML = '<p class="text-center text-gray-500 py-10">Nenhum produto encontrado.</p>';
-        return;
-    }
-
-    container.innerHTML = products.map(p => `
-        <div class="flex justify-between items-center bg-dark-input p-3 rounded-lg mb-2 border border-gray-700">
-            <div class="flex items-center space-x-3">
-                <img src="${p.image || 'https://placehold.co/50'}" class="w-10 h-10 rounded object-cover bg-gray-800">
-                <div>
-                    <h4 class="font-bold text-dark-text">${p.name}</h4>
-                    <p class="text-xs text-indigo-400">
-                        ${formatCurrency(p.price)} 
-                        <span class="text-gray-500 ml-2">(${p.status === 'publish' ? 'Visível' : 'Oculto'})</span>
-                    </p>
-                </div>
-            </div>
-            <div class="flex space-x-2">
-                <button class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm btn-edit-prod" data-id="${p.id}"><i class="fas fa-edit"></i></button>
-                <button class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm btn-del-prod" data-id="${p.id}"><i class="fas fa-trash"></i></button>
-            </div>
-        </div>
-    `).join('');
-
-    document.querySelectorAll('.btn-edit-prod').forEach(btn => {
-        btn.onclick = () => {
-            const product = products.find(p => p.id == btn.dataset.id);
-            renderProductForm(product);
-        };
-    });
-
-    document.querySelectorAll('.btn-del-prod').forEach(btn => {
-        btn.onclick = () => handleDeleteProduct(btn.dataset.id);
-    });
-};
-
-const renderProductForm = (product = null) => {
-    const container = document.getElementById('prodListContainer');
-    const isEdit = !!product;
-    const categories = getCategories().filter(c => c.id !== 'all');
-
-    container.innerHTML = `
-        <form id="productForm" class="space-y-4 p-2">
-            <h4 class="text-lg font-bold text-white mb-4">${isEdit ? 'Editar Produto' : 'Novo Produto'}</h4>
-            
-            <div>
-                <label class="block text-sm text-gray-400 mb-1">Nome</label>
-                <input type="text" id="prodName" class="input-pdv w-full" value="${product?.name || ''}" required>
-            </div>
-            
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm text-gray-400 mb-1">Preço (R$)</label>
-                    <input type="number" id="prodPrice" class="input-pdv w-full" step="0.01" value="${product?.price || ''}" required>
-                </div>
-                <div>
-                    <label class="block text-sm text-gray-400 mb-1">Preço Regular (De)</label>
-                    <input type="number" id="prodRegPrice" class="input-pdv w-full" step="0.01" value="${product?.regular_price || ''}">
-                </div>
-            </div>
-
-            <div>
-                <label class="block text-sm text-gray-400 mb-1">Categoria</label>
-                <select id="prodCat" class="input-pdv w-full">
-                    ${categories.map(c => `<option value="${c.id}" ${product?.categoryId == c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
-                </select>
-            </div>
-
-            <div>
-                <label class="block text-sm text-gray-400 mb-1">Status</label>
-                <select id="prodStatus" class="input-pdv w-full">
-                    <option value="publish" ${product?.status === 'publish' ? 'selected' : ''}>Publicado (Visível)</option>
-                    <option value="draft" ${product?.status === 'draft' ? 'selected' : ''}>Rascunho (Oculto)</option>
-                    <option value="private" ${product?.status === 'private' ? 'selected' : ''}>Privado</option>
-                </select>
-            </div>
-
-            <div>
-                <label class="block text-sm text-gray-400 mb-1">Descrição</label>
-                <textarea id="prodDesc" class="input-pdv w-full" rows="3">${product?.description || ''}</textarea>
-            </div>
-            
-            <div>
-                <label class="block text-sm text-gray-400 mb-1">URL da Imagem</label>
-                <input type="text" id="prodImg" class="input-pdv w-full" placeholder="https://..." value="${product?.image || ''}">
-            </div>
-
-            <div class="flex space-x-3 pt-4">
-                <button type="button" class="flex-1 bg-gray-600 hover:bg-gray-500 text-white py-3 rounded-lg" onclick="refreshProductList()">Cancelar</button>
-                <button type="submit" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold">Salvar</button>
-            </div>
-        </form>
-    `;
-
-    document.getElementById('btnNewProduct').style.display = 'none';
-
-    document.getElementById('productForm').onsubmit = async (e) => {
-        e.preventDefault();
-        const submitBtn = e.target.querySelector('button[type="submit"]');
-        submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
-
-        const data = {
-            name: document.getElementById('prodName').value,
-            regular_price: document.getElementById('prodRegPrice').value,
-            price: document.getElementById('prodPrice').value,
-            categories: [{ id: parseInt(document.getElementById('prodCat').value) }],
-            status: document.getElementById('prodStatus').value,
-            description: document.getElementById('prodDesc').value,
-            images: document.getElementById('prodImg').value ? [{ src: document.getElementById('prodImg').value }] : []
-        };
-
-        try {
-            if (isEdit) {
-                await updateWooProduct(product.id, data);
-            } else {
-                await createWooProduct(data);
-            }
-            alert("Produto salvo com sucesso!");
-            document.getElementById('btnNewProduct').style.display = 'block';
-            refreshProductList();
-        } catch (error) {
-            alert("Erro ao salvar: " + error.message);
-            submitBtn.disabled = false; submitBtn.textContent = 'Salvar';
-        }
-    };
-};
-
-const handleDeleteProduct = async (id) => {
-    if (!confirm("Tem certeza que deseja excluir este produto? Ele será movido para a lixeira.")) return;
-    try {
-        await deleteWooProduct(id);
-        alert("Produto excluído.");
-        refreshProductList();
-    } catch (error) {
-        alert("Erro ao excluir: " + error.message);
-    }
-};
-
-// =================================================================
-//              GESTÃO DE CAIXA E RELATÓRIOS (UNIFICADO)
+//              1. GESTÃO DE CAIXA E RELATÓRIOS
 // =================================================================
 
 const openReportPanel = (tabName = 'active-shifts') => {
     const modal = document.getElementById('reportsModal');
     if(modal) {
         modal.style.display = 'flex';
-        // Simula clique na aba correta
         const btn = document.querySelector(`.report-tab-btn[data-tab="${tabName}"]`);
         if(btn) btn.click();
-        else loadReports(); // Carrega padrão se aba não encontrada
+        else loadReports(); 
     }
 };
 
@@ -528,18 +137,21 @@ const loadReports = async () => {
     const startOfDay = Timestamp.fromDate(new Date(dateVal + 'T00:00:00'));
     const endOfDay = Timestamp.fromDate(new Date(dateVal + 'T23:59:59'));
 
+    const dateEl = document.getElementById('salesTodayDate');
+    if (dateEl) dateEl.textContent = new Date(dateVal).toLocaleDateString('pt-BR');
+
     try {
         await Promise.all([
             fetchActiveShifts(),
             fetchClosedShifts(startOfDay, endOfDay),
-            fetchSalesData(startOfDay, endOfDay)
+            fetchDailySales(startOfDay, endOfDay) 
         ]);
     } catch (e) { 
         console.error("Erro ao carregar dados do painel de caixa:", e); 
     }
 };
 
-// ABA 1: CAIXAS ABERTOS (ACTIVE SHIFTS)
+// --- ABA 1: Turnos Abertos ---
 const fetchActiveShifts = async () => {
     const container = document.getElementById('activeShiftsContainer');
     if (!container) return;
@@ -548,58 +160,32 @@ const fetchActiveShifts = async () => {
     
     try {
         const snap = await getDocs(q);
-
         if (snap.empty) {
             container.innerHTML = '<p class="text-gray-500 col-span-full text-center py-8 italic">Nenhum caixa aberto no momento.</p>';
             return;
         }
-
         container.innerHTML = snap.docs.map(doc => {
             const s = doc.data();
             const openTime = s.openedAt?.toDate ? s.openedAt.toDate().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--:--';
-            const initial = s.initialBalance || 0;
-
             return `
                 <div class="bg-gray-800 border border-green-500/50 rounded-xl p-5 shadow-lg relative flex flex-col">
                     <div class="absolute top-3 right-3">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-900 text-green-300 border border-green-700 animate-pulse">
-                            <span class="w-2 h-2 bg-green-400 rounded-full mr-1.5"></span> Ativo
-                        </span>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-900 text-green-300 border border-green-700 animate-pulse"><span class="w-2 h-2 bg-green-400 rounded-full mr-1.5"></span> Ativo</span>
                     </div>
-                    
                     <div class="flex items-center mb-4">
-                        <div class="h-12 w-12 rounded-full bg-gray-700 flex items-center justify-center text-2xl mr-4 border border-gray-600">
-                            <i class="fas fa-user-circle text-green-400"></i>
-                        </div>
-                        <div>
-                            <h5 class="text-white font-bold text-lg leading-tight">${s.userName || 'Operador'}</h5>
-                            <p class="text-xs text-gray-400 mt-1">Aberto às ${openTime}</p>
-                        </div>
+                        <div class="h-12 w-12 rounded-full bg-gray-700 flex items-center justify-center text-2xl mr-4 border border-gray-600"><i class="fas fa-user-circle text-green-400"></i></div>
+                        <div><h5 class="text-white font-bold text-lg leading-tight">${s.userName || 'Operador'}</h5><p class="text-xs text-gray-400 mt-1">Aberto às ${openTime}</p></div>
                     </div>
-                    
                     <div class="bg-gray-900/50 rounded-lg p-3 mb-4 border border-gray-700">
-                        <div class="flex justify-between text-sm mb-1">
-                            <span class="text-gray-400">Fundo Inicial:</span>
-                            <span class="text-white font-mono font-bold">${formatCurrency(initial)}</span>
-                        </div>
-                        <div class="flex justify-between text-sm">
-                            <span class="text-gray-400">Setor:</span>
-                            <span class="text-pumpkin font-bold">Geral</span> </div>
+                        <div class="flex justify-between text-sm mb-1"><span class="text-gray-400">Fundo Inicial:</span><span class="text-white font-mono font-bold">${formatCurrency(s.initialBalance || 0)}</span></div>
                     </div>
-
-                    <button onclick="alert('Funcionalidade de Detalhes em Tempo Real será implementada na próxima atualização.')" class="mt-auto w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold transition flex items-center justify-center shadow-md">
-                        <i class="fas fa-eye mr-2"></i> Ver Movimentação
-                    </button>
                 </div>
             `;
         }).join('');
-    } catch (e) {
-        console.error(e);
-        container.innerHTML = '<p class="text-red-400 col-span-full text-center">Erro ao carregar caixas.</p>';
-    }
+    } catch (e) { console.error(e); container.innerHTML = '<p class="text-red-400 col-span-full text-center">Erro ao carregar caixas.</p>'; }
 };
 
-// ABA 2: CAIXAS FECHADOS (CLOSED SHIFTS)
+// --- ABA 2: Turnos Fechados (Histórico) ---
 const fetchClosedShifts = async (start, end) => {
     const container = document.getElementById('closedShiftsContainer');
     if (!container) return;
@@ -614,7 +200,6 @@ const fetchClosedShifts = async (start, end) => {
     
     try {
         const snap = await getDocs(q);
-
         if (snap.empty) {
             container.innerHTML = '<p class="text-gray-500 text-center py-8 italic">Nenhum caixa fechado nesta data.</p>';
             return;
@@ -624,7 +209,6 @@ const fetchClosedShifts = async (start, end) => {
             const s = doc.data();
             const diff = s.difference || 0;
             const diffColor = diff < -0.5 ? 'text-red-400' : (diff > 0.5 ? 'text-blue-400' : 'text-green-500');
-            
             const openTime = s.openedAt?.toDate().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
             const closeTime = s.closedAt?.toDate().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
 
@@ -634,148 +218,89 @@ const fetchClosedShifts = async (start, end) => {
                         <div class="mr-4 text-gray-500 bg-gray-900 h-10 w-10 flex items-center justify-center rounded-full"><i class="fas fa-history"></i></div>
                         <div>
                             <h4 class="text-white font-bold text-base">${s.userName}</h4>
-                            <p class="text-xs text-gray-400">
-                                <i class="far fa-clock mr-1"></i> ${openTime} - ${closeTime}
-                            </p>
+                            <p class="text-xs text-gray-400"><i class="far fa-clock mr-1"></i> ${openTime} - ${closeTime}</p>
                         </div>
                     </div>
-                    
-                    <div class="flex space-x-2 w-full md:w-2/3 justify-between md:justify-end bg-gray-900/30 p-2 rounded-lg md:bg-transparent md:p-0">
-                        <div class="text-right px-2 md:px-4 border-r border-gray-700 last:border-0">
-                            <p class="text-[10px] text-gray-500 uppercase tracking-wider">Vendas (Din)</p>
-                            <p class="text-white font-bold text-sm">${formatCurrency(s.reportSalesMoney || 0)}</p>
+                    <div class="flex space-x-2 w-full md:w-2/3 justify-between md:justify-end items-center bg-gray-900/30 p-2 rounded-lg md:bg-transparent md:p-0">
+                        <div class="text-right px-2 md:px-4 border-r border-gray-700">
+                            <p class="text-[10px] text-gray-500 uppercase tracking-wider">Vendas</p>
+                            <p class="text-white font-bold text-sm">${formatCurrency(s.reportSalesMoney + s.reportSalesDigital)}</p>
                         </div>
-                        <div class="text-right px-2 md:px-4 border-r border-gray-700 last:border-0">
-                            <p class="text-[10px] text-gray-500 uppercase tracking-wider">Na Gaveta</p>
-                            <p class="text-white font-bold text-sm">${formatCurrency(s.finalCashInDrawer || 0)}</p>
-                        </div>
-                        <div class="text-right px-2 md:px-4">
+                        <div class="text-right px-2 md:px-4 border-r border-gray-700">
                             <p class="text-[10px] text-gray-500 uppercase tracking-wider">Quebra</p>
                             <p class="${diffColor} font-bold text-sm">${formatCurrency(diff)}</p>
                         </div>
+                        <button onclick="window.openShiftDetails('${doc.id}')" class="ml-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-bold flex items-center">
+                            <i class="fas fa-list mr-1"></i> Ver Vendas
+                        </button>
                     </div>
                 </div>
             `;
         }).join('');
-    } catch (e) {
-        console.error(e);
-        container.innerHTML = '<p class="text-red-400 text-center">Erro ao carregar histórico.</p>';
-    }
+    } catch (e) { console.error(e); container.innerHTML = '<p class="text-red-400 text-center">Erro ao carregar histórico.</p>'; }
 };
 
-// ABA 3: RELATÓRIO DE VENDAS (SALES DATA)
-const fetchSalesData = async (start, end) => {
-    const q = query(
-        collection(db, 'artifacts', appId, 'public', 'data', 'tables'), 
-        where('status', '==', 'closed'), 
-        where('closedAt', '>=', start), 
-        where('closedAt', '<', end), 
-        orderBy('closedAt', 'desc')
-    );
+// --- MODAL: Detalhes do Turno (Auditoria) ---
+window.openShiftDetails = async (shiftId) => {
+    const modal = document.getElementById('shiftDetailsModal');
+    const tableBody = document.getElementById('shiftSalesTableBody');
+    const header = document.getElementById('shiftDetailsHeader');
     
-    const snapshot = await getDocs(q);
+    if (!modal || !tableBody) return;
     
-    let totalSales = 0, totalMoney = 0, totalDigital = 0, totalService = 0;
-    let rowsHtml = '';
-
-    snapshot.forEach(docSnap => {
-        const table = docSnap.data(); 
-        let tableTotal = 0;
-        
-        (table.payments || []).forEach(p => {
-            const val = parseFloat(p.value.toString().replace(/[^\d,.-]/g,'').replace(',','.'));
-            if (!isNaN(val)) { 
-                tableTotal += val; 
-                if (p.method.toLowerCase().includes('dinheiro')) totalMoney += val; 
-                else totalDigital += val; 
-            }
-        });
-        
-        totalSales += tableTotal; 
-        if (table.serviceTaxApplied) totalService += (tableTotal - (tableTotal / 1.1));
-        
-        rowsHtml += `
-            <tr class="hover:bg-gray-700 transition border-b border-gray-800 cursor-pointer" onclick="window.showOrderDetails('${docSnap.id}')">
-                <td class="p-3 text-gray-300">${table.closedAt ? table.closedAt.toDate().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--'}</td>
-                <td class="p-3 font-bold text-white">Mesa ${table.tableNumber}</td>
-                <td class="p-3 text-gray-400 text-sm">${table.waiterId || table.closedBy || 'Staff'}</td>
-                <td class="p-3 text-right text-green-400 font-bold">${formatCurrency(tableTotal)}</td>
-            </tr>`;
-    });
-
-    document.getElementById('reportTotalSales').textContent = formatCurrency(totalSales);
-    document.getElementById('reportTotalMoney').textContent = formatCurrency(totalMoney);
-    document.getElementById('reportTotalDigital').textContent = formatCurrency(totalDigital);
-    document.getElementById('reportTotalService').textContent = formatCurrency(totalService);
-    document.getElementById('reportSalesTableBody').innerHTML = rowsHtml || '<tr><td colspan="4" class="text-center p-8 text-gray-500 italic">Nenhuma venda registrada neste período.</td></tr>';
-};
-
-const handleCloseDay = async () => {
-    if (!confirm("ATENÇÃO: Tem certeza que deseja ENCERRAR O DIA?\n\nIsso consolidará todas as vendas e turnos de hoje em um relatório final imutável.")) return;
-
-    const todayStr = new Date().toISOString().split('T')[0]; 
-    const reportId = `daily_${todayStr}`;
-    const reportRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'daily_reports'), reportId);
+    modal.style.display = 'flex';
+    tableBody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-500 italic">Carregando vendas do turno...</td></tr>';
+    header.textContent = "Carregando...";
 
     try {
-        const docSnap = await getDoc(reportRef);
-        if (docSnap.exists()) {
-            if (!confirm("Já existe um fechamento para hoje. Deseja sobrescrever?")) return;
+        const shiftRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'shifts'), shiftId);
+        const shiftSnap = await getDoc(shiftRef);
+        
+        if (!shiftSnap.exists()) throw new Error("Turno não encontrado.");
+        const shift = shiftSnap.data();
+        
+        header.textContent = `${shift.userName} | ${shift.openedAt.toDate().toLocaleString()} - ${shift.closedAt.toDate().toLocaleTimeString()}`;
+
+        const tablesQ = query(
+            getTablesCollectionRef(), 
+            where('status', '==', 'closed'), 
+            where('closedAt', '>=', shift.openedAt), 
+            where('closedAt', '<=', shift.closedAt), 
+            orderBy('closedAt', 'desc')
+        );
+        
+        const snapshot = await getDocs(tablesQ);
+        
+        if (snapshot.empty) {
+            tableBody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-500 italic">Nenhuma venda registrada neste período.</td></tr>';
+            return;
         }
 
-        const start = Timestamp.fromDate(new Date(todayStr + 'T00:00:00'));
-        const end = Timestamp.fromDate(new Date(todayStr + 'T23:59:59'));
-
-        const tablesQ = query(collection(db, 'artifacts', appId, 'public', 'data', 'tables'), 
-            where('status', '==', 'closed'), where('closedAt', '>=', start), where('closedAt', '<=', end));
-        const tablesSnap = await getDocs(tablesQ);
-        
-        let totalSales = 0, money = 0, digital = 0, ordersCount = 0;
-        tablesSnap.forEach(d => {
-            const t = d.data(); 
+        tableBody.innerHTML = snapshot.docs.map(docSnap => {
+            const table = docSnap.data(); 
             let tableTotal = 0;
-            if (t.payments) {
-                t.payments.forEach(p => {
-                     const v = parseFloat(p.value.toString().replace(/[^\d,.-]/g,'').replace(',','.'));
-                     if(!isNaN(v)) {
-                         tableTotal += v;
-                         if(p.method.toLowerCase().includes('dinheiro')) money += v; else digital += v;
-                     }
-                });
-            }
-            totalSales += tableTotal;
-            ordersCount++;
-        });
+            (table.payments || []).forEach(p => {
+                const val = parseFloat(p.value.toString().replace(/[^\d,.-]/g,'').replace(',','.'));
+                if (!isNaN(val)) tableTotal += val; 
+            });
+            
+            return `
+                <tr class="hover:bg-gray-700 transition border-b border-gray-800 cursor-pointer" onclick="window.showOrderDetails('${docSnap.id}')">
+                    <td class="p-3 text-gray-300">${table.closedAt ? table.closedAt.toDate().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--'}</td>
+                    <td class="p-3 font-bold text-white">Mesa ${table.tableNumber}</td>
+                    <td class="p-3 text-gray-400 text-sm">${table.waiterId || table.closedBy || 'Staff'}</td>
+                    <td class="p-3 text-right text-green-400 font-bold">${formatCurrency(tableTotal)}</td>
+                </tr>`;
+        }).join('');
 
-        const shiftsQ = query(collection(db, 'artifacts', appId, 'public', 'data', 'shifts'), 
-            where('openedAt', '>=', start), where('openedAt', '<=', end));
-        const shiftsSnap = await getDocs(shiftsQ);
-        const shiftIds = shiftsSnap.docs.map(d => d.id);
-
-        await setDoc(reportRef, { 
-            date: todayStr, 
-            totalSales, 
-            totalMoney: money, 
-            totalDigital: digital, 
-            ordersCount, 
-            shiftsAudited: shiftIds, 
-            closedAt: serverTimestamp() 
-        });
-        
-        alert(`Dia encerrado com sucesso!\n\nTotal Consolidado: ${formatCurrency(totalSales)}\nDinheiro: ${formatCurrency(money)}\nDigital: ${formatCurrency(digital)}`);
-        
-        loadReports(); 
-
-    } catch (e) { 
-        console.error(e); 
-        alert("Erro crítico ao encerrar dia: " + e.message); 
+    } catch (e) {
+        console.error(e);
+        tableBody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-red-400">Erro: ${e.message}</td></tr>`;
     }
 };
 
-// --- FUNÇÕES AUXILIARES E OUTROS MODAIS ---
-
+// --- DETALHES DO PEDIDO ---
 window.showOrderDetails = async (docId) => {
-    // 1. Create Modal if not exists
     let modal = document.getElementById('orderDetailsModal');
     if (!modal) {
         const modalHtml = `
@@ -878,43 +403,425 @@ window.showOrderDetails = async (docId) => {
     }
 };
 
-// Função global de autenticação gerencial
-export const openManagerAuthModal = (actionCallback) => {
-    if (!managerModal) return;
-    managerAuthCallback = actionCallback; 
-    managerModal.innerHTML = `
-        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm text-center">
-            <h3 class="text-xl font-bold mb-4 text-red-400">Acesso Restrito</h3>
-            <p class="text-sm text-gray-400 mb-4">Esta ação requer privilégios de gerente.</p>
-            <input type="password" id="managerPasswordInput" placeholder="Senha" class="input-pdv w-full p-4 mb-6 text-base text-center tracking-widest">
-            <div class="flex justify-end space-x-3">
-                <button onclick="document.getElementById('managerModal').style.display='none'" class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition">Cancelar</button>
-                <button id="submitManagerAuthBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-bold">Entrar</button>
-            </div>
-        </div>`;
-    managerModal.style.display = 'flex';
-    const input = document.getElementById('managerPasswordInput');
-    input.focus();
+// --- ABA 3: Dashboard de Vendas do Dia (Top 10, Pico, Equipe) ---
+const fetchDailySales = async (start, end) => {
+    const q = query(
+        collection(db, 'artifacts', appId, 'public', 'data', 'tables'), 
+        where('status', '==', 'closed'), 
+        where('closedAt', '>=', start), 
+        where('closedAt', '<', end)
+    );
     
-    const submit = () => {
-        if(input.value === '1234') handleGerencialAction(managerAuthCallback);
-        else { alert('Senha incorreta'); input.value = ''; input.focus(); }
-    };
+    const snapshot = await getDocs(q);
+    
+    let totalSales = 0, totalMoney = 0, totalDigital = 0, count = 0;
+    const productStats = {};
+    const salesByHour = {};
+    const salesByWaiter = {};
 
-    document.getElementById('submitManagerAuthBtn').onclick = submit;
-    input.onkeydown = (e) => { if(e.key === 'Enter') submit(); };
+    snapshot.forEach(docSnap => {
+        const table = docSnap.data(); 
+        let tableTotal = 0;
+        count++;
+        
+        (table.payments || []).forEach(p => {
+            const val = parseFloat(p.value.toString().replace(/[^\d,.-]/g,'').replace(',','.'));
+            if (!isNaN(val)) { 
+                tableTotal += val; 
+                if (p.method.toLowerCase().includes('dinheiro')) totalMoney += val; 
+                else totalDigital += val; 
+            }
+        });
+        totalSales += tableTotal; 
+
+        // Top 10 (Agrupa por ID para precisão)
+        if (table.sentItems) {
+            table.sentItems.forEach(item => {
+                const id = item.id;
+                if (!productStats[id]) {
+                    productStats[id] = { name: item.name, qty: 0 };
+                }
+                productStats[id].qty += 1;
+            });
+        }
+
+        // Horário de Pico
+        if (table.closedAt) {
+            const hour = table.closedAt.toDate().getHours();
+            const hourKey = `${hour}h - ${hour+1}h`;
+            salesByHour[hourKey] = (salesByHour[hourKey] || 0) + 1; 
+        }
+
+        // Desempenho Equipe
+        const waiter = table.waiterId || table.closedBy || 'Não Identificado';
+        salesByWaiter[waiter] = (salesByWaiter[waiter] || 0) + tableTotal;
+    });
+
+    const ticketMedio = count > 0 ? totalSales / count : 0;
+
+    document.getElementById('reportTotalSales').textContent = formatCurrency(totalSales);
+    document.getElementById('reportTotalMoney').textContent = formatCurrency(totalMoney);
+    document.getElementById('reportTotalDigital').textContent = formatCurrency(totalDigital);
+    document.getElementById('reportTicketMedio').textContent = formatCurrency(ticketMedio);
+
+    // Render Top 10 & Save to Storage
+    const topProducts = Object.values(productStats)
+        .sort((a, b) => b.qty - a.qty)
+        .slice(0, 10);
+    
+    // Salva lista de IDs do Top 10 para usar no Cardápio
+    const top10Ids = Object.keys(productStats)
+        .sort((a, b) => productStats[b].qty - productStats[a].qty)
+        .slice(0, 10);
+    localStorage.setItem('top10_products', JSON.stringify(top10Ids));
+
+    const topListEl = document.getElementById('topProductsList');
+    if(topListEl) {
+        if(topProducts.length === 0) topListEl.innerHTML = '<p class="text-xs text-gray-500 italic">Sem dados.</p>';
+        else {
+            topListEl.innerHTML = topProducts.map((p, index) => `
+                <div class="flex justify-between items-center text-sm border-b border-gray-700 pb-1 last:border-0">
+                    <span class="text-gray-300"><b class="text-pumpkin mr-2">#${index+1}</b> ${p.name}</span>
+                    <span class="font-mono text-white font-bold">${p.qty}</span>
+                </div>
+            `).join('');
+        }
+    }
+
+    // Render Horário de Pico
+    let peakHour = '--:--';
+    let peakCount = 0;
+    Object.entries(salesByHour).forEach(([hour, count]) => {
+        if(count > peakCount) {
+            peakCount = count;
+            peakHour = hour;
+        }
+    });
+    const peakHourEl = document.getElementById('peakHourDisplay');
+    const peakVolEl = document.getElementById('peakHourVolume');
+    if(peakHourEl) peakHourEl.textContent = peakHour;
+    if(peakVolEl) peakVolEl.textContent = `${peakCount} pedidos`;
+
+    // Render Desempenho Equipe
+    const teamListEl = document.getElementById('teamPerformanceList');
+    if (teamListEl) {
+        const sortedTeam = Object.entries(salesByWaiter).sort(([,a], [,b]) => b - a);
+        if (sortedTeam.length === 0) teamListEl.innerHTML = '<p class="text-xs text-gray-500 italic">Sem vendas.</p>';
+        else {
+            teamListEl.innerHTML = sortedTeam.map(([name, total], index) => `
+                <div class="flex justify-between items-center text-sm border-b border-gray-700 pb-1 last:border-0">
+                    <span class="text-gray-300 truncate"><b class="text-blue-400 mr-2">${index+1}.</b> ${name}</span>
+                    <span class="font-mono text-white font-bold text-xs">${formatCurrency(total)}</span>
+                </div>
+            `).join('');
+        }
+    }
 };
 
+// --- Desempenho Mensal ---
+const fetchMonthlyPerformance = async () => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    
+    try {
+        const goalSnap = await getDoc(getFinancialGoalsDocRef());
+        const meta = goalSnap.exists() ? (goalSnap.data().monthlyGoal || 0) : 0;
 
-// --- GESTÃO DE VOUCHERS ---
+        const q = query(
+            collection(db, 'artifacts', appId, 'public', 'data', 'tables'), 
+            where('status', '==', 'closed'), 
+            where('closedAt', '>=', Timestamp.fromDate(startOfMonth)), 
+            where('closedAt', '<=', Timestamp.fromDate(endOfMonth))
+        );
+        
+        const snapshot = await getDocs(q);
+        let totalMonth = 0;
+        snapshot.forEach(doc => {
+            (doc.data().payments || []).forEach(p => {
+                const v = parseFloat(p.value.toString().replace(/[^\d,.-]/g,'').replace(',','.'));
+                if (!isNaN(v)) totalMonth += v;
+            });
+        });
+
+        const percent = meta > 0 ? Math.min(100, (totalMonth / meta) * 100) : 0;
+        const missing = Math.max(0, meta - totalMonth);
+        const dayOfMonth = now.getDate();
+        const daysInMonth = endOfMonth.getDate();
+        const projection = dayOfMonth > 0 ? (totalMonth / dayOfMonth) * daysInMonth : 0;
+
+        document.getElementById('monthSoldDisplay').textContent = formatCurrency(totalMonth);
+        document.getElementById('monthGoalDisplay').textContent = formatCurrency(meta);
+        document.getElementById('monthMissing').textContent = formatCurrency(missing);
+        document.getElementById('monthProjection').textContent = formatCurrency(projection);
+        
+        const progressBar = document.getElementById('monthProgressBar');
+        const progressText = document.getElementById('monthProgressPercent');
+        
+        progressBar.style.width = `${percent}%`;
+        progressText.textContent = `${percent.toFixed(1)}%`;
+        
+        progressBar.className = `h-6 rounded-full transition-all duration-1000 ease-out flex items-center justify-end pr-2 ${
+            percent < 30 ? 'bg-red-600' : (percent < 70 ? 'bg-yellow-500' : 'bg-gradient-to-r from-blue-600 to-green-500')
+        }`;
+
+    } catch (e) {
+        console.error("Erro ao carregar mensal:", e);
+    }
+};
+
+window.setMonthlyGoal = async () => {
+    const currentVal = document.getElementById('monthGoalDisplay').textContent.replace(/[^\d,]/g,'');
+    const newVal = prompt("Defina a Meta de Vendas para este mês (R$):", currentVal);
+    
+    if (newVal) {
+        const numVal = parseFloat(newVal.replace('.','').replace(',','.'));
+        if (!isNaN(numVal)) {
+            try {
+                await setDoc(getFinancialGoalsDocRef(), { monthlyGoal: numVal }, { merge: true });
+                fetchMonthlyPerformance(); 
+            } catch(e) { alert("Erro ao salvar meta."); }
+        }
+    }
+};
+
+// --- Comparativo de Datas ---
+window.runDateComparison = async () => {
+    const dateA = document.getElementById('compDateA').value;
+    const dateB = document.getElementById('compDateB').value;
+    
+    if (!dateA || !dateB) { alert("Selecione as duas datas."); return; }
+
+    const resultContainer = document.getElementById('comparisonResult');
+    const valAEl = document.getElementById('compValueA');
+    const valBEl = document.getElementById('compValueB');
+    const diffEl = document.getElementById('compDiffValue');
+    const labelA = document.getElementById('compLabelA');
+    const labelB = document.getElementById('compLabelB');
+
+    try {
+        const getDayTotal = async (dateStr) => {
+            const start = Timestamp.fromDate(new Date(dateStr + 'T00:00:00'));
+            const end = Timestamp.fromDate(new Date(dateStr + 'T23:59:59'));
+            const q = query(
+                collection(db, 'artifacts', appId, 'public', 'data', 'tables'), 
+                where('status', '==', 'closed'), 
+                where('closedAt', '>=', start), 
+                where('closedAt', '<=', end)
+            );
+            const snap = await getDocs(q);
+            let total = 0;
+            snap.forEach(d => {
+                 (d.data().payments || []).forEach(p => {
+                    const v = parseFloat(p.value.toString().replace(/[^\d,.-]/g,'').replace(',','.'));
+                    if(!isNaN(v)) total += v;
+                 });
+            });
+            return total;
+        };
+
+        const [totalA, totalB] = await Promise.all([getDayTotal(dateA), getDayTotal(dateB)]);
+
+        valAEl.textContent = formatCurrency(totalA);
+        valBEl.textContent = formatCurrency(totalB);
+        labelA.textContent = new Date(dateA).toLocaleDateString('pt-BR');
+        labelB.textContent = new Date(dateB).toLocaleDateString('pt-BR');
+
+        let diffPercent = 0;
+        if (totalA > 0) {
+            diffPercent = ((totalB - totalA) / totalA) * 100;
+        } else if (totalB > 0) {
+            diffPercent = 100; 
+        }
+
+        const sign = diffPercent > 0 ? '+' : '';
+        const colorClass = diffPercent >= 0 ? 'text-green-400' : 'text-red-400';
+        
+        diffEl.textContent = `${sign}${diffPercent.toFixed(1)}%`;
+        diffEl.className = `text-xl font-extrabold ${colorClass}`;
+
+        resultContainer.classList.remove('hidden');
+
+    } catch (e) {
+        console.error("Erro comparativo:", e);
+        alert("Erro ao comparar datas.");
+    }
+};
+
+// =================================================================
+//              2. ABERTURA/FECHAMENTO DE TURNO
+// =================================================================
+const handleOpenHouse = async () => {
+    if (!confirm("CONFIRMAR ABERTURA DE TURNO?\n\nIsso definirá o início do novo ciclo de produção (KDS).")) return;
+    try {
+        const statusRef = getSystemStatusDocRef();
+        await setDoc(statusRef, {
+            startAt: serverTimestamp(),
+            openedAt: new Date().toISOString(),
+            status: 'open'
+        }, { merge: true });
+        alert("Turno Aberto! A produção foi iniciada.");
+        loadReports();
+    } catch (e) {
+        console.error("Erro ao abrir casa:", e);
+        alert("Erro ao registrar abertura: " + e.message);
+    }
+};
+
+const handleCloseDay = async () => {
+    if (!confirm("ATENÇÃO: Tem certeza que deseja ENCERRAR O TURNO?")) return;
+    try {
+        const todayStr = new Date().toISOString().split('T')[0]; 
+        const reportId = `daily_${todayStr}`;
+        const reportRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'daily_reports'), reportId);
+        
+        await setDoc(reportRef, { 
+            date: todayStr, 
+            closedAt: serverTimestamp() 
+        });
+        
+        alert(`Turno encerrado com sucesso!`);
+        loadReports(); 
+    } catch (e) { 
+        console.error(e); 
+        alert("Erro crítico ao encerrar: " + e.message); 
+    }
+};
+
+// =================================================================
+//              3. GESTÃO DE SETORES
+// =================================================================
+const renderSectorManagementModal = async () => {
+    if (!managerModal) return;
+    managerModal.innerHTML = `<div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-lg h-[80vh] flex flex-col"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold text-pumpkin">Gerenciar Setores</h3><button onclick="document.getElementById('managerModal').style.display='none'" class="text-gray-400 hover:text-white text-2xl">&times;</button></div><div class="flex space-x-2 mb-4 border-b border-gray-700 pb-2"><button class="sector-tab-btn flex-1 py-2 rounded-t-lg font-bold text-sm bg-indigo-600 text-white" data-type="service">Atendimento</button><button class="sector-tab-btn flex-1 py-2 rounded-t-lg font-bold text-sm bg-gray-700 text-gray-400 hover:text-white" data-type="production">Produção</button></div><form id="addSectorForm" class="flex space-x-2 mb-4"><input type="text" id="newSectorName" placeholder="Nome do Setor" class="input-pdv w-full" required><button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-4 rounded-lg font-bold"><i class="fas fa-plus"></i></button></form><div id="sectorListContainer" class="flex-grow overflow-y-auto custom-scrollbar space-y-2"><p class="text-center text-gray-500 italic mt-4">Carregando...</p></div></div>`;
+    managerModal.style.display = 'flex';
+    
+    let currentType = 'service';
+    const loadSectors = async () => {
+        const container = document.getElementById('sectorListContainer');
+        try {
+            const q = query(getSectorsCollectionRef(), where('type', '==', currentType), orderBy('name'));
+            const snap = await getDocs(q);
+            if (snap.empty) { container.innerHTML = '<p class="text-center text-gray-500 italic">Nenhum setor cadastrado.</p>'; return; }
+            container.innerHTML = snap.docs.map(doc => `<div class="flex justify-between items-center bg-dark-input p-3 rounded border border-gray-700"><span class="text-white font-medium">${doc.data().name}</span><button onclick="window.deleteSector('${doc.id}')" class="text-red-400 hover:text-red-300 transition p-1"><i class="fas fa-trash"></i></button></div>`).join('');
+        } catch (e) { container.innerHTML = '<p class="text-red-400 text-center">Erro.</p>'; }
+    };
+    document.querySelectorAll('.sector-tab-btn').forEach(btn => {
+        btn.onclick = () => {
+            document.querySelectorAll('.sector-tab-btn').forEach(b => { b.classList.remove('bg-indigo-600', 'text-white'); b.classList.add('bg-gray-700', 'text-gray-400'); });
+            btn.classList.remove('bg-gray-700', 'text-gray-400'); btn.classList.add('bg-indigo-600', 'text-white');
+            currentType = btn.dataset.type; loadSectors();
+        };
+    });
+    document.getElementById('addSectorForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('newSectorName').value.trim();
+        if (!name) return;
+        try { await setDoc(doc(getSectorsCollectionRef(), `${currentType}_${name.toLowerCase().replace(/[^a-z0-9]/g, '')}`), { name, type: currentType, createdAt: serverTimestamp() }); document.getElementById('newSectorName').value = ''; loadSectors(); } catch (e) { alert(e.message); }
+    };
+    window.deleteSector = async (id) => { if(confirm("Remover?")) { await deleteDoc(doc(getSectorsCollectionRef(), id)); loadSectors(); } };
+    loadSectors();
+};
+
+// =================================================================
+//              4. GESTÃO DE PRODUTOS (WOOCOMMERCE)
+// =================================================================
+const renderProductManagementModal = async () => {
+    const modalId = 'productManagementModal';
+    let modal = document.getElementById(modalId);
+    if (!modal) { /* create if missing */ } 
+    
+    modal.innerHTML = `<div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-3xl h-[85vh] flex flex-col"><div class="flex justify-between items-center mb-4 flex-shrink-0"><h3 class="text-xl font-bold text-indigo-400">Gestão de Produtos (WooCommerce)</h3><button onclick="document.getElementById('${modalId}').style.display='none'" class="text-gray-400 hover:text-white text-2xl">&times;</button></div><div id="prodListContainer" class="flex-grow overflow-y-auto custom-scrollbar mb-4"><div class="text-center text-gray-500 py-10"><i class="fas fa-spinner fa-spin"></i> Carregando...</div></div><div class="pt-2 border-t border-gray-700 flex-shrink-0"><button id="btnNewProduct" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition"><i class="fas fa-plus"></i> Novo Produto</button></div></div>`;
+    
+    modal.style.display = 'flex';
+    await refreshProductList();
+    document.getElementById('btnNewProduct').onclick = () => renderProductForm();
+};
+
+const refreshProductList = async () => {
+    const container = document.getElementById('prodListContainer');
+    if (!container) return;
+    let products = getProducts();
+    if (!products || products.length === 0) products = await fetchWooCommerceProducts();
+    if (!products || products.length === 0) { container.innerHTML = '<p class="text-center text-gray-500 py-10">Nenhum produto.</p>'; return; }
+    container.innerHTML = products.map(p => `
+        <div class="flex justify-between items-center bg-dark-input p-3 rounded-lg mb-2 border border-gray-700">
+            <div class="flex items-center space-x-3">
+                <img src="${p.image || 'https://placehold.co/50'}" class="w-10 h-10 rounded object-cover bg-gray-800">
+                <div><h4 class="font-bold text-dark-text">${p.name}</h4><p class="text-xs text-indigo-400">${formatCurrency(p.price)} <span class="text-gray-500 ml-2">(${p.status})</span></p></div>
+            </div>
+            <div class="flex space-x-2"><button class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm btn-edit-prod" data-id="${p.id}"><i class="fas fa-edit"></i></button><button class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm btn-del-prod" data-id="${p.id}"><i class="fas fa-trash"></i></button></div>
+        </div>`).join('');
+    document.querySelectorAll('.btn-edit-prod').forEach(btn => btn.onclick = () => { renderProductForm(products.find(p => p.id == btn.dataset.id)); });
+    document.querySelectorAll('.btn-del-prod').forEach(btn => btn.onclick = () => handleDeleteProduct(btn.dataset.id));
+};
+
+const renderProductForm = (product = null) => {
+    const container = document.getElementById('prodListContainer');
+    const isEdit = !!product;
+    const categories = getCategories().filter(c => c.id !== 'all');
+    container.innerHTML = `
+        <form id="productForm" class="space-y-4 p-2"><h4 class="text-lg font-bold text-white mb-4">${isEdit ? 'Editar' : 'Novo'}</h4>
+            <div><label class="block text-sm text-gray-400 mb-1">Nome</label><input type="text" id="prodName" class="input-pdv w-full" value="${product?.name || ''}" required></div>
+            <div class="grid grid-cols-2 gap-4"><div><label class="block text-sm text-gray-400 mb-1">Preço</label><input type="number" id="prodPrice" class="input-pdv w-full" step="0.01" value="${product?.price || ''}" required></div><div><label class="block text-sm text-gray-400 mb-1">Regular</label><input type="number" id="prodRegPrice" class="input-pdv w-full" step="0.01" value="${product?.regular_price || ''}"></div></div>
+            <div><label class="block text-sm text-gray-400 mb-1">Categoria</label><select id="prodCat" class="input-pdv w-full">${categories.map(c => `<option value="${c.id}" ${product?.categoryId == c.id ? 'selected' : ''}>${c.name}</option>`).join('')}</select></div>
+            <div><label class="block text-sm text-gray-400 mb-1">Status</label><select id="prodStatus" class="input-pdv w-full"><option value="publish" ${product?.status === 'publish' ? 'selected' : ''}>Publicado</option><option value="draft" ${product?.status === 'draft' ? 'selected' : ''}>Rascunho</option></select></div>
+            <div><label class="block text-sm text-gray-400 mb-1">Imagem URL</label><input type="text" id="prodImg" class="input-pdv w-full" value="${product?.image || ''}"></div>
+            <div class="flex space-x-3 pt-4"><button type="button" class="flex-1 bg-gray-600 hover:bg-gray-500 text-white py-3 rounded-lg" onclick="refreshProductList()">Cancelar</button><button type="submit" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold">Salvar</button></div>
+        </form>`;
+    document.getElementById('btnNewProduct').style.display = 'none';
+    document.getElementById('productForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const data = { name: document.getElementById('prodName').value, regular_price: document.getElementById('prodRegPrice').value, price: document.getElementById('prodPrice').value, categories: [{ id: parseInt(document.getElementById('prodCat').value) }], status: document.getElementById('prodStatus').value, images: [{ src: document.getElementById('prodImg').value }] };
+        try { if(isEdit) await updateWooProduct(product.id, data); else await createWooProduct(data); alert("Salvo!"); document.getElementById('btnNewProduct').style.display = 'block'; refreshProductList(); } catch(e) { alert(e.message); }
+    };
+};
+
+const handleDeleteProduct = async (id) => { if(confirm("Excluir?")) { try { await deleteWooProduct(id); refreshProductList(); } catch(e) { alert(e.message); } } };
+
+// =================================================================
+//              5. CRM & OBSERVAÇÕES
+// =================================================================
+const renderCustomerCrmModal = async () => {
+    const modalId = 'crmModal';
+    let modal = document.getElementById(modalId);
+    if (!modal) { /* create */ }
+    modal.innerHTML = `<div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col"><div class="flex justify-between items-center mb-6 border-b border-gray-700 pb-4"><div><h3 class="text-2xl font-bold text-indigo-400">CRM</h3><p class="text-sm text-gray-400">Fidelidade</p></div><button onclick="document.getElementById('${modalId}').style.display='none'" class="text-gray-400 hover:text-white text-3xl">&times;</button></div><div class="mb-4 flex space-x-2"><input type="text" id="crmSearchInput" placeholder="Buscar..." class="input-pdv w-full"><button id="crmSearchBtn" class="bg-indigo-600 text-white px-4 rounded-lg"><i class="fas fa-search"></i></button></div><div class="flex-grow overflow-y-auto custom-scrollbar bg-dark-bg rounded-lg border border-gray-700"><table class="w-full text-left text-sm text-gray-400"><tbody id="crmListBody" class="divide-y divide-gray-700"><tr><td colspan="5" class="p-8 text-center">Carregando...</td></tr></tbody></table></div></div>`;
+    modal.style.display = 'flex';
+    const fetchAndRender = async (term='') => {
+        const container = document.getElementById('crmListBody');
+        const q = query(getCustomersCollectionRef(), orderBy('name'), limit(50));
+        const snap = await getDocs(q);
+        if(snap.empty) { container.innerHTML = '<tr><td class="p-8 text-center">Vazio.</td></tr>'; return; }
+        const list = snap.docs.map(d=>({id:d.id, ...d.data()})).filter(c=> !term || c.name.toLowerCase().includes(term.toLowerCase()));
+        container.innerHTML = list.map(c => `<tr class="hover:bg-gray-800"><td class="p-4 font-bold text-white">${c.name}<br><span class="text-gray-500 text-xs">${c.cpf}</span></td><td class="p-4 text-center"><span class="bg-indigo-900 text-indigo-200 py-1 px-3 rounded text-xs">${c.points||0} pts</span></td></tr>`).join('');
+    };
+    document.getElementById('crmSearchBtn').onclick = () => fetchAndRender(document.getElementById('crmSearchInput').value);
+    fetchAndRender();
+};
+
+const renderQuickObsManagementModal = async () => { 
+    if (!managerModal) return;
+    managerModal.innerHTML = `<div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold text-indigo-400">Observações Rápidas</h3><button id="closeQuickObs" class="px-3 py-1 bg-gray-700 text-white rounded">&times;</button></div><form id="addQuickObsForm" class="flex space-x-2 mb-4"><input type="text" id="newQuickObsInput" class="input-pdv w-full" required><button type="submit" class="bg-green-600 text-white px-4 rounded"><i class="fas fa-plus"></i></button></form><div id="quickObsList" class="overflow-y-auto flex-grow space-y-2 pr-2 custom-scrollbar"></div></div>`;
+    managerModal.style.display = 'flex'; 
+    document.getElementById('closeQuickObs').onclick = () => managerModal.style.display = 'none';
+    const loadObs = async () => {
+        const container = document.getElementById('quickObsList');
+        const snap = await getDocs(query(getQuickObsCollectionRef(), orderBy('text')));
+        container.innerHTML = snap.docs.map(d => `<div class="flex justify-between items-center bg-dark-input p-3 rounded border border-gray-700"><span class="text-white">${d.data().text}</span><button onclick="window.deleteQuickObs('${d.id}')" class="text-red-400 hover:text-red-300"><i class="fas fa-trash"></i></button></div>`).join('');
+    };
+    document.getElementById('addQuickObsForm').onsubmit = async (e) => { e.preventDefault(); const val = document.getElementById('newQuickObsInput').value; if(val) { await setDoc(doc(getQuickObsCollectionRef(), val.toLowerCase().replace(/[^a-z0-9]/g, '')), { text: val }); loadObs(); } };
+    window.deleteQuickObs = async (id) => { if(confirm("Excluir?")) { await deleteDoc(doc(getQuickObsCollectionRef(), id)); loadObs(); } };
+    loadObs();
+};
+
+// VOUCHER HELPERS
 const openVoucherManagementModal = async () => {
     if (!voucherManagementModal) return; 
-    if(managerModal) managerModal.style.display = 'none'; 
+    managerModal.style.display = 'none'; 
     voucherManagementModal.style.display = 'flex'; 
-    if(voucherForm) voucherForm.style.display = 'none'; 
     await fetchVouchers();
 };
-window.openVoucherManagementModal = openVoucherManagementModal;
 
 const fetchVouchers = async () => { 
     if (!voucherListContainer) return; 
@@ -923,26 +830,9 @@ const fetchVouchers = async () => {
         const q = query(getVouchersCollectionRef(), orderBy('points', 'asc'));
         const querySnapshot = await getDocs(q);
         const vouchers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
-        if (vouchers.length === 0) {
-            voucherListContainer.innerHTML = '<p class="text-sm text-dark-placeholder italic text-center py-4">Nenhum voucher cadastrado.</p>';
-        } else {
-            voucherListContainer.innerHTML = vouchers.map(v => `
-                <div class="flex justify-between items-center bg-dark-input p-3 rounded-lg mb-2 border border-gray-700">
-                    <div>
-                        <h4 class="font-bold text-dark-text">${v.name}</h4>
-                        <p class="text-sm text-indigo-400 font-mono">${v.points} pts = ${formatCurrency(v.value)}</p>
-                    </div>
-                    <button class="text-red-400 hover:text-red-500 p-2 rounded hover:bg-gray-700 transition" onclick="window.handleDeleteVoucher('${v.id}')">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            `).join('');
-        }
-    } catch (error) { 
-        console.error(error); 
-        voucherListContainer.innerHTML = '<p class="text-red-400 text-center">Erro ao carregar.</p>'; 
-    }
+        if (vouchers.length === 0) { voucherListContainer.innerHTML = '<p class="text-sm text-dark-placeholder italic text-center py-4">Nenhum voucher cadastrado.</p>'; } 
+        else { voucherListContainer.innerHTML = vouchers.map(v => `<div class="flex justify-between items-center bg-dark-input p-3 rounded-lg mb-2 border border-gray-700"><div><h4 class="font-bold text-dark-text">${v.name}</h4><p class="text-sm text-indigo-400 font-mono">${v.points} pts = ${formatCurrency(v.value)}</p></div><button class="text-red-400 hover:text-red-500 p-2 rounded hover:bg-gray-700 transition" onclick="window.handleDeleteVoucher('${v.id}')"><i class="fas fa-trash"></i></button></div>`).join(''); }
+    } catch (error) { console.error(error); voucherListContainer.innerHTML = '<p class="text-red-400 text-center">Erro ao carregar.</p>'; }
 };
 
 const handleSaveVoucher = async (e) => { 
@@ -952,86 +842,18 @@ const handleSaveVoucher = async (e) => {
     const points = parseInt(document.getElementById('voucherPointsInput').value); 
     const value = parseFloat(document.getElementById('voucherValueInput').value); 
     const saveBtn = document.getElementById('saveVoucherBtn');
-    
     saveBtn.disabled = true; 
     try { 
         await setDoc(doc(getVouchersCollectionRef(), id), { id, name, points, value, createdAt: serverTimestamp() }, { merge: true }); 
         voucherForm.style.display = 'none'; 
         await fetchVouchers(); 
-        // alert("Voucher salvo!"); 
-    } catch (e) { 
-        alert("Erro: " + e.message); 
-    } finally { 
-        saveBtn.disabled = false; 
-    }
+    } catch (e) { alert("Erro: " + e.message); } 
+    finally { saveBtn.disabled = false; }
 };
 
 window.handleDeleteVoucher = async (id) => { 
     if(confirm("Excluir voucher permanentemente?")) { 
         await deleteDoc(doc(getVouchersCollectionRef(), id)); 
         fetchVouchers(); 
-    }
-};
-
-
-// --- OBSERVAÇÕES RÁPIDAS ---
-const renderQuickObsManagementModal = async () => { 
-    if (!managerModal) return;
-    managerModal.innerHTML = `
-        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-bold text-indigo-400">Observações Rápidas</h3>
-                <button id="closeQuickObs" class="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded transition">&times;</button>
-            </div>
-            <form id="addQuickObsForm" class="flex space-x-2 mb-4">
-                <input type="text" id="newQuickObsInput" placeholder="Nova observação (ex: Sem gelo)..." class="input-pdv w-full" required>
-                <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-4 rounded font-bold transition"><i class="fas fa-plus"></i></button>
-            </form>
-            <div id="quickObsList" class="overflow-y-auto flex-grow space-y-2 pr-2 custom-scrollbar">
-                <p class="text-gray-500 text-center italic">Carregando...</p>
-            </div>
-        </div>`;
-    
-    managerModal.style.display = 'flex'; 
-    document.getElementById('closeQuickObs').onclick = () => managerModal.style.display = 'none';
-    
-    document.getElementById('addQuickObsForm').onsubmit = async (e) => { 
-        e.preventDefault(); 
-        const text = document.getElementById('newQuickObsInput').value.trim(); 
-        if(text) { 
-            const id = text.toLowerCase().replace(/[^a-z0-9]/g, ''); 
-            await setDoc(doc(getQuickObsCollectionRef(), id), { text }); 
-            loadQuickObsList(); 
-            document.getElementById('newQuickObsInput').value = ''; 
-            document.getElementById('newQuickObsInput').focus();
-        } 
-    }; 
-    loadQuickObsList();
-};
-
-const loadQuickObsList = async () => { 
-    const container = document.getElementById('quickObsList'); 
-    if(!container) return; 
-    const snap = await getDocs(query(getQuickObsCollectionRef(), orderBy('text')));
-    
-    if (snap.empty) {
-        container.innerHTML = '<p class="text-gray-500 text-center italic py-4">Nenhuma observação cadastrada.</p>';
-        return;
-    }
-
-    container.innerHTML = snap.docs.map(d => `
-        <div class="flex justify-between items-center bg-dark-input p-3 rounded border border-gray-700">
-            <span class="text-white font-medium">${d.data().text}</span>
-            <button onclick="window.deleteQuickObs('${d.id}')" class="text-red-400 hover:text-red-300 transition p-1">
-                <i class="fas fa-trash"></i>
-            </button>
-        </div>
-    `).join('');
-};
-
-window.deleteQuickObs = async (id) => { 
-    if(confirm("Excluir observação?")) { 
-        await deleteDoc(doc(getQuickObsCollectionRef(), id)); 
-        loadQuickObsList(); 
     }
 };

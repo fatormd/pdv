@@ -1,21 +1,52 @@
-// --- CONTROLLERS/PANELCONTROLLER.JS (Completo e Atualizado com Setores Dinâmicos) ---
-import { getTablesCollectionRef, getTableDocRef, db, getSectorsCollectionRef } from "/services/firebaseService.js";
-import { query, where, orderBy, onSnapshot, getDoc, setDoc, updateDoc, serverTimestamp, writeBatch, arrayUnion, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+// --- CONTROLLERS/PANELCONTROLLER.JS (ATUALIZADO: KDS STATUS + ALERTAS SONOROS) ---
+import { 
+    getTablesCollectionRef, 
+    getTableDocRef, 
+    db, 
+    getSectorsCollectionRef,
+    getKdsCollectionRef // <--- NOVO IMPORT
+} from "/services/firebaseService.js";
+
+import { 
+    query, 
+    where, 
+    orderBy, 
+    onSnapshot, 
+    getDoc, 
+    setDoc, 
+    updateDoc, 
+    serverTimestamp, 
+    writeBatch, 
+    arrayUnion, 
+    deleteDoc, 
+    getDocs 
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
 import { formatCurrency, formatElapsedTime } from "/utils.js";
-import { goToScreen, currentTableId, selectedItems, unsubscribeTable, currentOrderSnapshot, setCurrentTable, userRole, selectTableAndStartListener } from "/app.js";
+
+import { 
+    goToScreen, 
+    currentTableId, 
+    selectedItems, 
+    unsubscribeTable, 
+    currentOrderSnapshot, 
+    setCurrentTable, 
+    userRole, 
+    selectTableAndStartListener,
+    playNotificationSound // <--- NOVO IMPORT
+} from "/app.js";
 
 
 // --- ESTADO DO MÓDULO ---
-let SECTORS = ['Todos']; // Inicializa apenas com 'Todos', será preenchido via Firebase
+let SECTORS = ['Todos']; 
 let currentSectorFilter = 'Todos';
 let unsubscribeTables = null;
 let panelInitialized = false;
-let currentTablesSnapshot = []; // Armazena o snapshot completo para uso em modais
+let currentTablesSnapshot = []; 
 
 // --- CARREGAMENTO DE SETORES DINÂMICO ---
 const fetchServiceSectors = async () => {
     try {
-        // Busca apenas setores marcados como 'service' (Atendimento)
         const q = query(getSectorsCollectionRef(), where('type', '==', 'service'), orderBy('name'));
         const snapshot = await getDocs(q);
         
@@ -24,17 +55,14 @@ const fetchServiceSectors = async () => {
         if (dynamicSectors.length > 0) {
             SECTORS = ['Todos', ...dynamicSectors];
         } else {
-            // Fallback caso não haja nada cadastrado ainda
             SECTORS = ['Todos', 'Salão 1', 'Bar', 'Mezanino', 'Calçada']; 
         }
         
-        // Atualiza a interface
         renderTableFilters();
         populateSectorDropdown();
 
     } catch (e) {
         console.error("Erro ao carregar setores dinâmicos:", e);
-        // Garante que a UI não quebre
         renderTableFilters();
         populateSectorDropdown();
     }
@@ -42,7 +70,6 @@ const fetchServiceSectors = async () => {
 
 const populateSectorDropdown = () => {
     const select = document.getElementById('sectorInput');
-    // Tenta atualizar também o select do modal de transferência, se existir na DOM
     const transferSelect = document.getElementById('newTableSector');
     
     const optionsHtml = '<option value="" disabled selected>Setor</option>' + 
@@ -71,7 +98,6 @@ export const renderTableFilters = () => {
         `;
     }).join('');
 
-    // Reaplica classes visualmente (redundância de segurança para interações rápidas)
      sectorFiltersContainer.querySelectorAll('.sector-btn').forEach(btn => {
         const isActive = btn.dataset.sector === currentSectorFilter;
         btn.className = `sector-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap ${isActive ? 'bg-pumpkin text-white border-pumpkin' : 'bg-dark-input text-dark-text border-gray-600'}`;
@@ -138,9 +164,10 @@ const renderTables = (docs) => {
             const elapsedTime = lastSentAt ? formatElapsedTime(lastSentAt) : null;
             const timerHtml = elapsedTime ? `<div class="table-timer"><i class="fas fa-clock"></i> <span>${elapsedTime}</span></div>` : '';
             
+            // Botão KDS chama a nova função
             let kdsStatusButtonHtml = '';
             if (lastSentAt) {
-                 kdsStatusButtonHtml = `<button class="kds-status-icon-btn" title="Status KDS" onclick="window.openKdsStatusModal(${tableId})"><i class="fas fa-tasks"></i></button>`;
+                 kdsStatusButtonHtml = `<button class="kds-status-icon-btn" title="Status KDS" onclick="window.openKdsStatusModal('${tableId}')"><i class="fas fa-tasks"></i></button>`;
             }
             
             const mergeIconHtml = isMerged ? '' : `<button class="merge-icon-btn" title="Agrupar Mesas" onclick="window.openManagerAuthModal('openTableMerge', ${tableId})"><i class="fas fa-people-arrows"></i></button>`;
@@ -173,12 +200,10 @@ const renderTables = (docs) => {
         card.parentNode.replaceChild(newCard, card);
         
         newCard.addEventListener('click', (e) => {
-            // Exclui cliques em qualquer ícone/botão (incluindo o novo ícone de impressão)
             if (e.target.closest('.kds-status-icon-btn') || e.target.closest('.attention-icon') || e.target.closest('.merge-icon-btn') || e.target.closest('.bill-request-icon')) return; 
 
             const tableId = newCard.dataset.tableId;
             if (tableId) {
-                // Comportamento Padrão: Sempre vai para a tela de Pedido (OrderScreen) se não clicou no ícone
                 selectTableAndStartListener(tableId);
             }
         });
@@ -193,8 +218,25 @@ export const loadOpenTables = () => {
     else q = query(tablesCollection, where('status', 'in', ['open', 'merged']), where('sector', '==', currentSectorFilter), orderBy('tableNumber', 'asc'));
 
     console.log(`[Panel] Configurando listener: ${currentSectorFilter === 'Todos' ? 'Todos' : `Setor ${currentSectorFilter}`}`);
+    
     unsubscribeTables = onSnapshot(q, (snapshot) => {
         console.log(`[Panel] Snapshot: ${snapshot.docs.length} mesas.`);
+        
+        // --- LÓGICA DE SOM (NOTIFICAÇÕES) ---
+        snapshot.docChanges().forEach((change) => {
+            if (change.type === "modified" || change.type === "added") {
+                const data = change.doc.data();
+                // Toca som se pediu conta ou fez pedido
+                if (data.billRequested === true || data.clientOrderPending === true) {
+                    if(change.type === "modified") {
+                        console.log(`[Panel] Alerta na Mesa ${data.tableNumber}! Tocando som...`);
+                        playNotificationSound();
+                    }
+                }
+            }
+        });
+        // -------------------------------------
+
         renderTables(snapshot.docs);
     }, (error) => {
         const openTablesList = document.getElementById('openTablesList');
@@ -262,30 +304,19 @@ export const handleSearchTable = async () => {
     }
 };
 
-// ==================================================================
-//               FUNÇÃO DO CLIQUE NO ÍCONE (Ação Direta)
-// ==================================================================
-/**
- * Lida com o clique no ícone de impressão (Solicitação de Conta).
- * Executa ação imediata: limpa alerta, seleciona mesa e vai para tela de pagamento.
- * Expõe a função para ser chamada via 'onclick' do HTML.
- */
+// --- AÇÃO DIRETA: CONFIRMAR PEDIDO DE CONTA ---
 async function handleBillRequestConfirmation(tableId) {
     if (!tableId) return;
 
     const tableRef = getTableDocRef(tableId);
     
     try {
-        // 1. Confirma o recebimento (limpa a flag)
         await updateDoc(tableRef, {
-            billRequested: false, // Limpa a flag
-            waiterNotification: null // Limpa a notificação
+            billRequested: false, 
+            waiterNotification: null 
         });
 
-        // 2. Carrega a mesa (globalmente no app.js)
         selectTableAndStartListener(tableId);
-        
-        // 3. Leva o garçom direto para a tela de pagamento
         goToScreen('paymentScreen');
         
     } catch (e) {
@@ -293,12 +324,9 @@ async function handleBillRequestConfirmation(tableId) {
         alert("Erro ao processar a solicitação. Tente novamente.");
     }
 }
-window.handleBillRequestConfirmation = handleBillRequestConfirmation; // Torna a função acessível pelo HTML
+window.handleBillRequestConfirmation = handleBillRequestConfirmation;
 
-// ==================================================================
-//               LÓGICA DE AGRUPAMENTO DE MESAS
-// ==================================================================
-
+// --- AGRUPAMENTO DE MESAS ---
 export const openTableMergeModal = () => {
     const managerModal = document.getElementById('managerModal');
     if (!managerModal) return;
@@ -458,11 +486,116 @@ export const handleConfirmTableMerge = async () => {
     }
 };
 
+// --- NOVA FUNÇÃO DE STATUS KDS (VISUALIZAÇÃO DO MODAL) ---
+window.openKdsStatusModal = async (tableId) => {
+    const modal = document.getElementById('tableKdsModal');
+    const content = document.getElementById('tableKdsContent');
+    const title = document.getElementById('tableKdsTitle');
+    
+    if (!modal || !content) {
+        console.error("Modal KDS (tableKdsModal) não encontrado no DOM. Adicione-o ao index.html.");
+        return;
+    }
+
+    title.textContent = `Cozinha - Mesa ${tableId}`;
+    content.innerHTML = `
+        <div class="flex flex-col items-center justify-center py-8">
+            <i class="fas fa-spinner fa-spin text-pumpkin text-3xl mb-3"></i>
+            <p class="text-gray-400">Consultando cozinha...</p>
+        </div>`;
+    modal.style.display = 'flex';
+
+    try {
+        // Busca pedidos ativos dessa mesa no KDS
+        const q = query(
+            getKdsCollectionRef(), 
+            where('tableNumber', '==', parseInt(tableId)),
+            orderBy('sentAt', 'desc')
+        );
+        
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+            content.innerHTML = `
+                <div class="text-center py-6 opacity-50">
+                    <i class="fas fa-check-circle text-4xl text-gray-500 mb-2"></i>
+                    <p class="text-gray-400">Nenhum pedido ativo na cozinha.</p>
+                </div>`;
+            return;
+        }
+
+        let html = '';
+        
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            
+            const statusConfig = {
+                'pending': { label: 'Pendente', color: 'text-red-400 border-red-900/50 bg-red-900/20', icon: 'fa-clock' },
+                'preparing': { label: 'Preparando', color: 'text-blue-400 border-blue-900/50 bg-blue-900/20', icon: 'fa-fire' },
+                'ready': { label: 'Pronto', color: 'text-green-400 border-green-900/50 bg-green-900/20', icon: 'fa-check' },
+                'finished': { label: 'Entregue', color: 'text-gray-500 border-gray-700 bg-gray-800', icon: 'fa-history' },
+                'cancelled': { label: 'Cancelado', color: 'text-gray-400 border-gray-700 bg-red-900/10 line-through', icon: 'fa-ban' }
+            };
+            
+            const st = statusConfig[data.status] || { label: data.status, color: 'text-gray-400', icon: 'fa-question' };
+            const time = data.sentAt?.toDate ? data.sentAt.toDate().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--:--';
+
+            let itemsHtml = '';
+            if (data.sectors) {
+                Object.entries(data.sectors).forEach(([sectorName, items]) => {
+                    if(items && items.length > 0) {
+                        itemsHtml += `
+                            <div class="mt-2 border-t border-gray-700 pt-1 first:border-0 first:pt-0">
+                                <p class="text-[10px] uppercase font-bold text-gray-500 mb-1">${sectorName}</p>
+                                ${items.map(item => `
+                                    <div class="flex justify-between items-start text-sm mb-1">
+                                        <span class="text-gray-200 font-medium">${item.name}</span>
+                                        ${item.note ? `<span class="text-xs text-yellow-500 italic ml-2 bg-yellow-900/20 px-1 rounded max-w-[120px] truncate">${item.note}</span>` : ''}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        `;
+                    }
+                });
+            }
+
+            const cancelReasonHtml = data.status === 'cancelled' ? `<p class="text-xs text-red-400 mt-2 italic border-t border-gray-700 pt-1">Motivo: ${data.cancellationReason || 'N/A'}</p>` : '';
+
+            html += `
+                <div class="bg-dark-input border border-gray-700 rounded-lg p-3 shadow-sm relative overflow-hidden">
+                    <div class="flex justify-between items-center mb-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs font-mono text-gray-500">#${data.orderId.slice(-4)}</span>
+                            <span class="text-xs text-gray-400"><i class="far fa-clock mr-1"></i>${time}</span>
+                        </div>
+                        <span class="text-xs font-bold px-2 py-1 rounded border flex items-center ${st.color}">
+                            <i class="fas ${st.icon} mr-1.5"></i> ${st.label}
+                        </span>
+                    </div>
+                    <div class="pl-1">
+                        ${itemsHtml || '<p class="text-xs text-gray-500 italic">Sem itens registrados</p>'}
+                        ${cancelReasonHtml}
+                    </div>
+                </div>
+            `;
+        });
+
+        content.innerHTML = html;
+
+    } catch (error) {
+        console.error("Erro ao buscar status KDS:", error);
+        content.innerHTML = `
+            <div class="text-center py-4">
+                <p class="text-red-400 font-bold mb-1">Erro ao carregar</p>
+                <p class="text-xs text-gray-500">${error.message}</p>
+            </div>`;
+    }
+};
+
 export const initPanelController = async () => {
     if (panelInitialized) return;
     console.log("[PanelController] Inicializando...");
 
-    // 1. Carrega os setores do Firebase antes de renderizar
     await fetchServiceSectors();
 
     const abrirMesaBtn = document.getElementById('abrirMesaBtn');
@@ -474,10 +607,7 @@ export const initPanelController = async () => {
     const abrirMesaRealBtn = document.getElementById('abrirMesaBtn'); 
 
     if (abrirMesaBtn) abrirMesaBtn.addEventListener('click', handleAbrirMesa);
-    else console.error("[PanelController] Botão 'abrirMesaBtn' não encontrado.");
-
     if (searchTableBtn) searchTableBtn.addEventListener('click', handleSearchTable);
-    else console.error("[PanelController] Botão 'searchTableBtn' não encontrado.");
 
     if (sectorFiltersContainer) {
          sectorFiltersContainer.addEventListener('click', (e) => {
@@ -485,14 +615,10 @@ export const initPanelController = async () => {
             if (btn) {
                 const sector = btn.dataset.sector;
                 currentSectorFilter = sector;
-                
-                // Atualiza visual dos botões via re-renderização
                 renderTableFilters();
                 loadOpenTables(); 
             }
         });
-    } else {
-         console.error("[PanelController] Container 'sectorFilters' não encontrado.");
     }
 
     const checkInputs = () => {
@@ -507,7 +633,6 @@ export const initPanelController = async () => {
     if(pessoasInput) pessoasInput.addEventListener('input', checkInputs);
     if(sectorInput) sectorInput.addEventListener('change', checkInputs);
 
-
     panelInitialized = true;
-    console.log("[PanelController] Inicializando.");
+    console.log("[PanelController] Inicializado.");
 };

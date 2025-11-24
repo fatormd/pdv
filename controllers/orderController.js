@@ -1,24 +1,21 @@
-// --- CONTROLLERS/ORDERCONTROLLER.JS (ATUALIZADO com Obs Dinâmicas e Telefone Mascarado) ---
+// --- CONTROLLERS/ORDERCONTROLLER.JS (ATUALIZADO com Obs Dinâmicas, Telefone Mascarado e Top 10) ---
 import { getProducts, getCategories } from "/services/wooCommerceService.js";
-// ===== ATUALIZAÇÃO 1: Importa a nova função 'maskPhoneNumber' =====
 import { formatCurrency, formatElapsedTime, maskPhoneNumber } from "/utils.js";
 import { saveSelectedItemsToFirebase } from "/services/firebaseService.js";
 import { currentTableId, selectedItems, userRole, currentOrderSnapshot, screens } from "/app.js"; 
-// ==== NOVO: Importa getDocs e query ====
 import { arrayUnion, serverTimestamp, doc, setDoc, updateDoc, arrayRemove, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-// ==== NOVO: Importa a nova referência ====
 import { getKdsCollectionRef, getTableDocRef, getQuickObsCollectionRef } from "/services/firebaseService.js";
 import { goToScreen } from "/app.js"; 
 
 
-// --- VARIÁVEIS DE ELEMENTOS (Definidas na função init) ---
+// --- VARIÁVEIS DE ELEMENTOS ---
 let obsModal, obsItemName, obsInput, saveObsBtn, cancelObsBtn, esperaSwitch;
 let searchProductInput, categoryFiltersContainer, menuItemsGrid;
 let openOrderList, openItemsCount, sendSelectedItemsBtn;
-let quickObsButtons; // Container dos botões
+let quickObsButtons; 
 let clientPendingOrdersContainer; 
 
-// Estado local do módulo
+// Estado local
 let currentSearch = '';
 let currentCategoryFilter = 'all';
 let orderInitialized = false;
@@ -27,7 +24,6 @@ let orderInitialized = false;
 // --- FUNÇÕES DE AÇÃO GERAL ---
 
 export const increaseLocalItemQuantity = (itemId, noteKey) => {
-    // ... (seu código original sem alteração)
     const itemToCopy = selectedItems.findLast(item =>
         item.id == itemId && (item.note || '') === noteKey
     );
@@ -51,7 +47,6 @@ window.increaseLocalItemQuantity = increaseLocalItemQuantity;
 
 
 export const decreaseLocalItemQuantity = (itemId, noteKey) => {
-    // ... (seu código original sem alteração)
     let indexToRemove = -1;
     for (let i = selectedItems.length - 1; i >= 0; i--) {
         if (selectedItems[i].id == itemId && (selectedItems[i].note || '') === noteKey) {
@@ -72,7 +67,6 @@ window.decreaseLocalItemQuantity = decreaseLocalItemQuantity;
 // --- FUNÇÕES DE EXIBIÇÃO DE TELA E MODAL ---
 
 export const renderMenu = () => {
-    // ... (seu código original sem alteração)
     if (!menuItemsGrid || !categoryFiltersContainer) {
         return;
     }
@@ -97,20 +91,49 @@ export const renderMenu = () => {
     });
 
     let filteredProducts = products;
+    
+    // Filtro de Busca por Texto
     if (currentSearch) {
         const normalizedSearch = currentSearch.toLowerCase();
         filteredProducts = filteredProducts.filter(p => p.name.toLowerCase().includes(normalizedSearch));
     }
-    if (currentCategoryFilter !== 'all') {
+    
+    // Filtro de Categoria (Lógica do Top 10 inclusa)
+    if (currentCategoryFilter === 'top10') {
+        // Recupera a lista de IDs salva pelo Painel Gerencial
+        const top10Ids = JSON.parse(localStorage.getItem('top10_products') || '[]');
+        
+        // Filtra apenas os produtos que estão na lista Top 10
+        filteredProducts = filteredProducts.filter(p => top10Ids.includes(p.id.toString()));
+        
+        // Ordena para manter a ordem do 1º ao 10º
+        filteredProducts.sort((a, b) => {
+            return top10Ids.indexOf(a.id.toString()) - top10Ids.indexOf(b.id.toString());
+        });
+        
+    } else if (currentCategoryFilter !== 'all') {
         filteredProducts = filteredProducts.filter(p => p.category === currentCategoryFilter);
     }
 
     if (filteredProducts.length === 0) {
-        menuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-red-400 italic">Nenhum produto encontrado.</div>`;
+        const emptyMsg = currentCategoryFilter === 'top10' 
+            ? 'Ainda não há dados de vendas suficientes para o Top 10.' 
+            : 'Nenhum produto encontrado.';
+            
+        menuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-red-400 italic">${emptyMsg}</div>`;
     } else {
-        menuItemsGrid.innerHTML = filteredProducts.map(product => `
-            <div class="product-card bg-dark-card border border-gray-700 p-4 rounded-xl shadow-md cursor-pointer hover:shadow-lg transition duration-150 flex flex-col justify-between" style="min-height: 140px;">
-                <h4 class="font-bold text-base text-dark-text flex-grow">${product.name}</h4>
+        menuItemsGrid.innerHTML = filteredProducts.map((product, index) => {
+            // Adiciona medalha para os Top 3 se estiver na categoria Top 10
+            let badge = '';
+            if (currentCategoryFilter === 'top10' && index < 3) {
+                const colors = ['text-yellow-400', 'text-gray-300', 'text-orange-400'];
+                badge = `<i class="fas fa-medal ${colors[index]} absolute top-2 right-2 text-xl drop-shadow-md"></i>`;
+            }
+
+            return `
+            <div class="product-card bg-dark-card border border-gray-700 p-4 rounded-xl shadow-md cursor-pointer hover:shadow-lg transition duration-150 flex flex-col justify-between relative" style="min-height: 140px;">
+                ${badge}
+                <h4 class="font-bold text-base text-dark-text flex-grow pr-6">${product.name}</h4>
                 <div class="flex justify-between items-center mt-2">
                     <span class="font-bold text-lg text-pumpkin">${formatCurrency(product.price)}</span>
                     <button class="add-item-btn add-icon-btn bg-green-600 text-white hover:bg-green-700 transition"
@@ -119,12 +142,11 @@ export const renderMenu = () => {
                     </button>
                 </div>
             </div>
-        `).join('');
+        `}).join('');
     }
 };
 
 const _renderSelectedItemsList = () => {
-    // ... (seu código original sem alteração)
     if (!openOrderList || !openItemsCount || !sendSelectedItemsBtn) return;
 
     const openItemsCountValue = selectedItems.length;
@@ -165,7 +187,6 @@ const _renderSelectedItemsList = () => {
 };
 
 const _renderPendingClientOrders = (requestedOrders = []) => {
-    // ... (seu código original sem alteração)
     if (!clientPendingOrdersContainer) return;
 
     if (!requestedOrders || requestedOrders.length === 0) {
@@ -176,16 +197,14 @@ const _renderPendingClientOrders = (requestedOrders = []) => {
 
     clientPendingOrdersContainer.classList.remove('hidden'); 
 
-    // ===== ATUALIZAÇÃO 2: Pega o telefone e mascara =====
     clientPendingOrdersContainer.innerHTML = `
         <h3 class="text-lg font-semibold text-yellow-400 mb-2 flex items-center">
             <i class="fas fa-bell mr-2 animate-pulse"></i> Pedidos Pendentes do Cliente
         </h3>
         <div class="space-y-3">
             ${requestedOrders.map((order, index) => {
-                // Pega o telefone e mascara aqui
                 const phone = order.clientInfo?.phone || null;
-                const maskedPhone = maskPhoneNumber(phone) || 'N/A'; // Usa a função
+                const maskedPhone = maskPhoneNumber(phone) || 'N/A'; 
                 
                 return `
                 <div class="bg-indigo-900 border border-indigo-700 p-3 rounded-lg shadow-md">
@@ -217,14 +236,12 @@ const _renderPendingClientOrders = (requestedOrders = []) => {
 };
 
 export const renderOrderScreen = (orderSnapshot) => {
-    // ... (seu código original sem alteração)
     _renderSelectedItemsList(); 
     _renderPendingClientOrders(orderSnapshot?.requestedOrders); 
     renderMenu(); 
 };
 
 export const handleApproveClientOrder = async (orderId) => {
-    // ... (seu código original sem alteração)
     if (!currentTableId || !currentOrderSnapshot || !orderId) return;
 
     const requestedOrders = currentOrderSnapshot.requestedOrders || [];
@@ -262,7 +279,6 @@ window.handleApproveClientOrder = handleApproveClientOrder;
 
 
 export const handleRejectClientOrder = async (orderId) => {
-    // ... (seu código original sem alteração)
     if (!currentTableId || !currentOrderSnapshot || !orderId) return;
 
     const requestedOrders = currentOrderSnapshot.requestedOrders || [];
@@ -297,7 +313,6 @@ window.handleRejectClientOrder = handleRejectClientOrder;
 
 
 const _attachPendingOrderListeners = () => {
-    // ... (seu código original sem alteração)
      clientPendingOrdersContainer?.querySelectorAll('.approve-client-order-btn').forEach(btn => {
          const orderId = btn.dataset.orderId;
          const newBtn = btn.cloneNode(true);
@@ -314,16 +329,10 @@ const _attachPendingOrderListeners = () => {
 
 
 // ==================================================================
-//               OBSERVAÇÕES RÁPIDAS (NOVAS FUNÇÕES)
+//               OBSERVAÇÕES RÁPIDAS
 // ==================================================================
 
-/**
- * Renderiza os botões de observação rápida no container.
- * @param {HTMLElement} buttonsContainer - O div#quickObsButtons.
- * @param {Array} observations - Array de documentos { text: 'String' } do Firebase.
- */
 const renderQuickObsButtons = (buttonsContainer, observations) => {
-    // ... (seu código original sem alteração)
     if (!buttonsContainer) return;
 
     if (observations.length === 0) {
@@ -342,16 +351,10 @@ const renderQuickObsButtons = (buttonsContainer, observations) => {
     }).join('');
 };
 
-/**
- * Busca as observações rápidas do Firebase e chama o render.
- * @param {HTMLElement} buttonsContainer - O div#quickObsButtons.
- */
 const fetchQuickObservations = async (buttonsContainer) => {
-    // ... (seu código original sem alteração)
     if (!buttonsContainer) return;
     try {
         const obsCollectionRef = getQuickObsCollectionRef();
-        // Ordena por texto (alfabeticamente)
         const q = query(obsCollectionRef, orderBy('text', 'asc')); 
         const querySnapshot = await getDocs(q);
         
@@ -373,7 +376,6 @@ const fetchQuickObservations = async (buttonsContainer) => {
 // ==================================================================
 
 export const openObsModalForGroup = (itemId, noteKey) => {
-    // ... (seu código original sem alteração)
     const products = getProducts();
     const product = products.find(p => p.id == itemId);
 
@@ -401,7 +403,6 @@ window.openObsModalForGroup = openObsModalForGroup;
 
 
 export const addItemToSelection = (product) => {
-    // ... (seu código original sem alteração)
     if (!currentTableId) {
         alert("Selecione ou abra uma mesa primeiro.");
         return;
@@ -430,7 +431,6 @@ export const addItemToSelection = (product) => {
 
 
 export const handleSendSelectedItems = async () => {
-    // ... (seu código original sem alteração)
     if (!currentTableId || selectedItems.length === 0) return;
 
     if (!confirm(`Confirmar o envio de ${selectedItems.length} item(s) para a produção?`)) return;
@@ -464,7 +464,6 @@ export const handleSendSelectedItems = async () => {
 
     try {
         console.log("[Order] Enviando para KDS:", itemsForFirebase);
-        // Envio KDS
         await setDoc(kdsOrderRef, {
             orderId: kdsOrderRef.id,
             tableNumber: parseInt(currentTableId),
@@ -479,7 +478,6 @@ export const handleSendSelectedItems = async () => {
         });
         console.log("[Order] KDS enviado com sucesso.");
 
-        // Atualização da Mesa
         const tableRef = getTableDocRef(currentTableId);
         console.log("[Order] Atualizando mesa:", currentTableId);
 
@@ -510,12 +508,11 @@ export const handleSendSelectedItems = async () => {
     }
 };
 
-// Função de inicialização do Controller (chamada pelo app.js)
+// Função de inicialização do Controller
 export const initOrderController = () => {
     if(orderInitialized) return;
     console.log("[OrderController] Inicializando...");
 
-    // Mapeia elementos específicos deste painel
     searchProductInput = document.getElementById('searchProductInput');
     categoryFiltersContainer = document.getElementById('categoryFilters');
     menuItemsGrid = document.getElementById('menuItemsGrid');
@@ -524,7 +521,6 @@ export const initOrderController = () => {
     sendSelectedItemsBtn = document.getElementById('sendSelectedItemsBtn');
     clientPendingOrdersContainer = document.getElementById('clientPendingOrders'); 
 
-    // Mapeia elementos do modal OBS
     obsModal = document.getElementById('obsModal');
     obsItemName = document.getElementById('obsItemName');
     obsInput = document.getElementById('obsInput');
@@ -533,22 +529,18 @@ export const initOrderController = () => {
     esperaSwitch = document.getElementById('esperaSwitch');
     quickObsButtons = document.getElementById('quickObsButtons');
 
-    // Validação de elementos essenciais
-    if (!searchProductInput || !categoryFiltersContainer || !menuItemsGrid || !openOrderList || !sendSelectedItemsBtn || !obsModal || !clientPendingOrdersContainer || !quickObsButtons) { // Adicionado quickObsButtons
+    if (!searchProductInput || !categoryFiltersContainer || !menuItemsGrid || !openOrderList || !sendSelectedItemsBtn || !obsModal || !clientPendingOrdersContainer || !quickObsButtons) {
          console.error("[OrderController] Erro Fatal: Elementos críticos não encontrados. Abortando inicialização.");
          return; 
     }
 
-    // ==== NOVO: Busca os botões de OBS dinâmicos ====
     fetchQuickObservations(quickObsButtons);
 
-    // Listener para busca de produto
     searchProductInput.addEventListener('input', (e) => {
         currentSearch = e.target.value;
         renderMenu(); 
     });
 
-    // Listener para filtros de categoria (delegação de evento)
     categoryFiltersContainer.addEventListener('click', (e) => {
         const btn = e.target.closest('.category-btn');
         if (btn) {
@@ -557,7 +549,6 @@ export const initOrderController = () => {
         }
     });
 
-    // Listener para botões +/-/obs na lista de itens selecionados (delegação)
     openOrderList.addEventListener('click', (e) => {
         const target = e.target;
         const qtyBtn = target.closest('.qty-btn'); 
@@ -579,7 +570,6 @@ export const initOrderController = () => {
         }
     });
 
-     // Listener para adicionar item (delegação no menuItemsGrid)
      menuItemsGrid.addEventListener('click', (e) => {
          const addBtn = e.target.closest('.add-item-btn');
          if (addBtn && addBtn.dataset.product) {
@@ -592,10 +582,8 @@ export const initOrderController = () => {
          }
      });
 
-    // Listener para botão de enviar pedido
     sendSelectedItemsBtn.addEventListener('click', handleSendSelectedItems);
 
-    // Listeners do Modal OBS
     if (saveObsBtn) {
         saveObsBtn.addEventListener('click', () => {
             const itemId = obsModal.dataset.itemId;
@@ -662,7 +650,6 @@ export const initOrderController = () => {
         });
     }
 
-    // ==== ATUALIZADO: O listener agora usa delegação de evento ====
     if (quickObsButtons) {
         quickObsButtons.addEventListener('click', (e) => {
              const btn = e.target.closest('.quick-obs-btn');
