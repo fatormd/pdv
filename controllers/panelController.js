@@ -1,10 +1,10 @@
-// --- CONTROLLERS/PANELCONTROLLER.JS (ATUALIZADO: KDS STATUS + ALERTAS SONOROS) ---
+// --- CONTROLLERS/PANELCONTROLLER.JS ---
 import { 
     getTablesCollectionRef, 
     getTableDocRef, 
     db, 
     getSectorsCollectionRef,
-    getKdsCollectionRef // <--- NOVO IMPORT
+    getKdsCollectionRef 
 } from "/services/firebaseService.js";
 
 import { 
@@ -33,7 +33,7 @@ import {
     setCurrentTable, 
     userRole, 
     selectTableAndStartListener,
-    playNotificationSound // <--- NOVO IMPORT
+    playNotificationSound
 } from "/app.js";
 
 
@@ -105,7 +105,7 @@ export const renderTableFilters = () => {
 };
 
 
-// --- RENDERIZAÇÃO E CARREGAMENTO DE MESAS ---
+// --- RENDERIZAÇÃO DE MESAS ---
 const renderTables = (docs) => {
     const openTablesList = document.getElementById('openTablesList');
     const openTablesCount = document.getElementById('openTablesCount');
@@ -134,27 +134,24 @@ const renderTables = (docs) => {
                  cardColorClasses = 'bg-yellow-900 border-yellow-700 text-yellow-200 hover:bg-yellow-800';
                  attentionIconHtml = `<i class="fas fa-link attention-icon text-yellow-300" title="Agrupada: Mestra ${table.masterTable}"></i>`;
             } 
-            // 1. Prioridade Máxima: Solicitação de Conta (Verde)
             else if (isBillRequested) {
                  cardColorClasses = 'bg-green-900 border-green-700 text-white hover:bg-green-800 ring-2 ring-green-400 animate-pulse';
                  attentionIconHtml = `<button class="attention-icon-btn bill-request-icon" data-table-id="${tableId}" onclick="window.handleBillRequestConfirmation('${tableId}')" title="Cliente solicitou a conta! Clique para imprimir.">
                                         <i class="fas fa-print text-xl text-green-400 animate-pulse"></i>
                                      </button>`;
             }
-            // 2. Prioridade Média: Solicitação de Pedido (Azul/Amarelo)
             else if (isClientPending) {
                  cardColorClasses = 'bg-indigo-900 border-yellow-400 text-white hover:bg-indigo-800 ring-2 ring-yellow-400 animate-pulse';
                  attentionIconHtml = `<i class="fas fa-bell attention-icon text-yellow-400 animate-pulse" title="Pedido Cliente Pendente"></i>`;
+            }
+            else if (table.waiterNotification) {
+                 // Nova notificação da cozinha
+                 attentionIconHtml = `<i class="fas fa-utensils attention-icon text-orange-400 animate-bounce" title="${table.waiterNotification}"></i>`;
             }
             else if (total > 0) {
                  cardColorClasses = 'bg-red-900 border-red-700 text-red-200 hover:bg-red-800';
             } else {
                  cardColorClasses = 'bg-green-900 border-green-700 text-green-200 hover:bg-green-800';
-            }
-
-            const hasAguardandoItem = (table.selectedItems || []).some(item => item.note?.toLowerCase().includes('espera'));
-            if (!isBillRequested && !isClientPending && hasAguardandoItem) {
-                 attentionIconHtml = `<i class="fas fa-exclamation-triangle attention-icon" title="Itens em Espera"></i>`;
             }
 
             let lastSentAt = null;
@@ -164,16 +161,16 @@ const renderTables = (docs) => {
             const elapsedTime = lastSentAt ? formatElapsedTime(lastSentAt) : null;
             const timerHtml = elapsedTime ? `<div class="table-timer"><i class="fas fa-clock"></i> <span>${elapsedTime}</span></div>` : '';
             
-            // Botão KDS chama a nova função
+            // Botão KDS chama a função atualizada
             let kdsStatusButtonHtml = '';
             if (lastSentAt) {
                  kdsStatusButtonHtml = `<button class="kds-status-icon-btn" title="Status KDS" onclick="window.openKdsStatusModal('${tableId}')"><i class="fas fa-tasks"></i></button>`;
             }
             
-            const mergeIconHtml = isMerged ? '' : `<button class="merge-icon-btn" title="Agrupar Mesas" onclick="window.openManagerAuthModal('openTableMerge', ${tableId})"><i class="fas fa-people-arrows"></i></button>`;
+            // MUDANÇA: Botão Merge agora abre direto (sem senha)
+            const mergeIconHtml = isMerged ? '' : `<button class="merge-icon-btn" title="Agrupar Mesas" onclick="window.openTableMergeModal()"><i class="fas fa-people-arrows"></i></button>`;
             
             const clientInfo = table.clientName ? `<p class="text-xs font-semibold">${table.clientName}</p>` : '';
-            
             const statusText = isMerged ? `Agrupada (Mestra: ${table.masterTable})` : `Pessoas: ${table.diners}`;
 
             const cardHtml = `
@@ -217,25 +214,22 @@ export const loadOpenTables = () => {
     if (currentSectorFilter === 'Todos') q = query(tablesCollection, where('status', 'in', ['open', 'merged']), orderBy('tableNumber', 'asc'));
     else q = query(tablesCollection, where('status', 'in', ['open', 'merged']), where('sector', '==', currentSectorFilter), orderBy('tableNumber', 'asc'));
 
-    console.log(`[Panel] Configurando listener: ${currentSectorFilter === 'Todos' ? 'Todos' : `Setor ${currentSectorFilter}`}`);
+    console.log(`[Panel] Configurando listener: ${currentSectorFilter}`);
     
     unsubscribeTables = onSnapshot(q, (snapshot) => {
         console.log(`[Panel] Snapshot: ${snapshot.docs.length} mesas.`);
         
-        // --- LÓGICA DE SOM (NOTIFICAÇÕES) ---
         snapshot.docChanges().forEach((change) => {
             if (change.type === "modified" || change.type === "added") {
                 const data = change.doc.data();
-                // Toca som se pediu conta ou fez pedido
-                if (data.billRequested === true || data.clientOrderPending === true) {
+                // Toca som se pediu conta, fez pedido OU cozinha chamou (waiterNotification)
+                if (data.billRequested === true || data.clientOrderPending === true || data.waiterNotification) {
                     if(change.type === "modified") {
-                        console.log(`[Panel] Alerta na Mesa ${data.tableNumber}! Tocando som...`);
                         playNotificationSound();
                     }
                 }
             }
         });
-        // -------------------------------------
 
         renderTables(snapshot.docs);
     }, (error) => {
@@ -244,6 +238,83 @@ export const loadOpenTables = () => {
         if (openTablesList) openTablesList.innerHTML = `<div class="col-span-full text-sm text-red-400 font-bold italic p-4 content-card bg-dark-card border border-red-700">ERRO FIREBASE: ${errorMessage}</div>`;
         console.error("Erro fatal ao carregar mesas:", error);
     });
+};
+
+// --- STATUS KDS (LISTA DE CONFERÊNCIA DO GARÇOM) ---
+window.openKdsStatusModal = async (tableId) => {
+    const modal = document.getElementById('tableKdsModal');
+    const content = document.getElementById('tableKdsContent');
+    const title = document.getElementById('tableKdsTitle');
+    
+    if (!modal || !content) return;
+
+    title.textContent = `Cozinha - Mesa ${tableId}`;
+    content.innerHTML = `<div class="flex flex-col items-center justify-center py-8"><i class="fas fa-spinner fa-spin text-pumpkin text-3xl mb-3"></i><p class="text-gray-400">Verificando pedidos...</p></div>`;
+    modal.style.display = 'flex';
+
+    try {
+        // Busca pedidos da mesa (Incluindo 'finished' para o garçom conferir)
+        const q = query(
+            getKdsCollectionRef(), 
+            where('tableNumber', '==', parseInt(tableId)),
+            where('status', 'in', ['pending', 'preparing', 'finished']), // Inclui finished
+            orderBy('sentAt', 'desc')
+        );
+        
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+            content.innerHTML = `<div class="text-center py-6 opacity-50"><i class="fas fa-check-circle text-4xl text-gray-500 mb-2"></i><p class="text-gray-400">Nenhum pedido ativo.</p></div>`;
+            return;
+        }
+
+        // Separação em Grupos: Produzindo vs Pronto
+        let htmlProducing = '';
+        let htmlReady = '';
+        
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const isFinished = data.status === 'finished';
+            const time = data.sentAt?.toDate ? data.sentAt.toDate().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--:--';
+            
+            // Renderiza itens
+            let itemsHtml = '';
+            if (data.sectors) {
+                Object.entries(data.sectors).forEach(([sectorName, items]) => {
+                    itemsHtml += `<div class="mt-1"><p class="text-[10px] uppercase font-bold text-gray-500">${sectorName}</p>${items.map(item => `<div class="flex justify-between text-sm"><span class="text-gray-200 font-medium">${item.name}</span>${item.note ? `<span class="text-xs text-yellow-500 ml-2">(${item.note})</span>` : ''}</div>`).join('')}</div>`;
+                });
+            }
+
+            const card = `
+                <div class="bg-dark-input border ${isFinished ? 'border-green-500/50 bg-green-900/10' : 'border-gray-700'} rounded-lg p-3 shadow-sm mb-2 relative overflow-hidden">
+                    <div class="flex justify-between items-center mb-1 border-b border-gray-700/50 pb-1">
+                        <span class="text-xs font-mono text-gray-500">#${data.orderId.slice(-4)} - ${time}</span>
+                        <span class="text-xs font-bold uppercase ${isFinished ? 'text-green-400' : 'text-blue-400'}">${isFinished ? 'NO BALCÃO' : 'PREPARANDO'}</span>
+                    </div>
+                    ${itemsHtml}
+                </div>`;
+            
+            if (isFinished) htmlReady += card;
+            else htmlProducing += card;
+        });
+
+        content.innerHTML = '';
+        
+        if (htmlReady) {
+            content.innerHTML += `<div class="mb-4"><h4 class="text-green-400 font-bold text-sm uppercase mb-2 border-b border-green-900 pb-1"><i class="fas fa-bell mr-2"></i>PRONTO PARA LEVAR</h4>${htmlReady}</div>`;
+        }
+        if (htmlProducing) {
+            content.innerHTML += `<div><h4 class="text-blue-400 font-bold text-sm uppercase mb-2 border-b border-blue-900 pb-1"><i class="fas fa-fire mr-2"></i>NA COZINHA</h4>${htmlProducing}</div>`;
+        }
+        
+        // Limpa notificação da mesa ao abrir o modal
+        const tableRef = getTableDocRef(tableId);
+        await updateDoc(tableRef, { waiterNotification: null });
+
+    } catch (error) {
+        console.error("Erro ao buscar status KDS:", error);
+        content.innerHTML = `<div class="text-center py-4"><p class="text-red-400 font-bold mb-1">Erro ao carregar</p><p class="text-xs text-gray-500">${error.message}</p></div>`;
+    }
 };
 
 export const handleAbrirMesa = async () => {
@@ -267,8 +338,6 @@ export const handleAbrirMesa = async () => {
         }
         
         const accessPin = Math.floor(1000 + Math.random() * 9000).toString();
-        
-        console.log(`[Panel] Abrindo Mesa ${tableNumber} / ${sector} / ${diners}p. PIN: ${accessPin}`);
         
         await setDoc(tableRef, {
             tableNumber, diners, sector, status: 'open', createdAt: serverTimestamp(),
@@ -295,38 +364,24 @@ export const handleSearchTable = async () => {
     const tableRef = getTableDocRef(tableNumber);
     const docSnap = await getDoc(tableRef);
     if (docSnap.exists() && docSnap.data().status?.toLowerCase() === 'open') {
-        console.log(`[Panel] Mesa ${tableNumber} encontrada via busca.`);
         selectTableAndStartListener(tableNumber); 
         if(searchTableInput) searchTableInput.value = '';
     } else {
-        console.log(`[Panel] Mesa ${tableNumber} não encontrada ou fechada.`);
         alert(`A Mesa ${tableNumber} não está aberta.`);
     }
 };
 
-// --- AÇÃO DIRETA: CONFIRMAR PEDIDO DE CONTA ---
 async function handleBillRequestConfirmation(tableId) {
     if (!tableId) return;
-
     const tableRef = getTableDocRef(tableId);
-    
     try {
-        await updateDoc(tableRef, {
-            billRequested: false, 
-            waiterNotification: null 
-        });
-
+        await updateDoc(tableRef, { billRequested: false, waiterNotification: null });
         selectTableAndStartListener(tableId);
         goToScreen('paymentScreen');
-        
-    } catch (e) {
-        console.error("Erro ao confirmar recebimento da conta:", e);
-        alert("Erro ao processar a solicitação. Tente novamente.");
-    }
+    } catch (e) { console.error(e); alert("Erro ao processar."); }
 }
 window.handleBillRequestConfirmation = handleBillRequestConfirmation;
 
-// --- AGRUPAMENTO DE MESAS ---
 export const openTableMergeModal = () => {
     const managerModal = document.getElementById('managerModal');
     if (!managerModal) return;
@@ -345,8 +400,6 @@ export const openTableMergeModal = () => {
     managerModal.innerHTML = `
         <div class="bg-dark-card border border-gray-600 p-6 rounded-xl shadow-2xl w-full max-w-lg">
             <h3 class="text-xl font-bold mb-4 text-indigo-400">Agrupar Mesas para Grande Grupo</h3>
-            <p class="text-base mb-4 text-dark-text">Selecione a **Mesa Mestra (Destino)** e as **Mesas Secundárias (Origem)**. Os itens serão movidos para a Mestra e as Origens serão fechadas/marcadas como Agrupadas.</p>
-            
             <div class="mb-4">
                 <label for="masterTableSelect" class="block text-sm font-medium text-white mb-2">MESA MESTRA (DESTINO):</label>
                 <select id="masterTableSelect" class="w-full p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text">
@@ -354,7 +407,6 @@ export const openTableMergeModal = () => {
                     ${tableOptions}
                 </select>
             </div>
-            
             <div class="mb-4">
                 <label class="block text-sm font-medium text-white mb-2">MESAS SECUNDÁRIAS (ORIGEM):</label>
                 <div id="sourceTablesCheckboxes" class="space-y-2 max-h-40 overflow-y-auto p-2 bg-dark-input border border-gray-700 rounded-lg">
@@ -366,12 +418,10 @@ export const openTableMergeModal = () => {
                     `).join('')}
                 </div>
             </div>
-
             <div id="mergeErrorMsg" class="text-red-400 text-sm mb-3 hidden"></div>
-            
             <div class="flex justify-end space-x-3 mt-6">
                 <button class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition text-base" onclick="document.getElementById('managerModal').style.display='none'">Cancelar</button>
-                <button id="confirmMergeBtn" class="px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-base">Confirmar Agrupamento</button>
+                <button id="confirmMergeBtn" class="px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-base">Confirmar</button>
             </div>
         </div>
     `;
@@ -391,20 +441,13 @@ export const handleConfirmTableMerge = async () => {
     
     const sourceTableIds = Array.from(sourceTableCheckboxes).map(cb => cb.value).filter(id => id !== masterTableId);
 
-    if (!masterTableId) {
-        errorMsgEl.textContent = 'Selecione a Mesa Mestra.';
-        errorMsgEl.style.display = 'block';
-        return;
-    }
-    if (sourceTableIds.length === 0) {
-        errorMsgEl.textContent = 'Selecione pelo menos uma Mesa Secundária.';
+    if (!masterTableId || sourceTableIds.length === 0) {
+        errorMsgEl.textContent = 'Selecione Mesa Mestra e pelo menos uma Secundária.';
         errorMsgEl.style.display = 'block';
         return;
     }
 
-    if (!confirm(`Tem certeza que deseja mover todos os itens das Mesas ${sourceTableIds.join(', ')} para a MESA MESTRA ${masterTableId}? As mesas secundárias serão fechadas/agrupadas.`)) {
-        return;
-    }
+    if (!confirm(`Mover itens das Mesas ${sourceTableIds.join(', ')} para a MESA ${masterTableId}?`)) return;
     
     const confirmBtn = document.getElementById('confirmMergeBtn');
     const managerModal = document.getElementById('managerModal');
@@ -413,182 +456,49 @@ export const handleConfirmTableMerge = async () => {
     try {
         const masterTableRef = getTableDocRef(masterTableId);
         const masterSnap = await getDoc(masterTableRef);
+        if (!masterSnap.exists()) throw new Error("Mesa Mestra inválida.");
         
-        if (!masterSnap.exists() || masterSnap.data().status !== 'open') {
-             throw new Error(`A Mesa Mestra ${masterTableId} não está aberta.`);
-        }
-        
-        const dbInstance = db;
-        if (!dbInstance) throw new Error("Conexão com banco de dados indisponível.");
-        const batch = writeBatch(dbInstance);
-
+        const batch = writeBatch(db);
         let masterNewTotal = masterSnap.data().total || 0;
         let masterNewDiners = masterSnap.data().diners || 1;
-        let allItemsToMerge = []; 
-        let allSelectedItemsToMerge = []; 
-        let allRequestedOrdersToMerge = []; 
+        let allItemsToMerge = [], allSelected = [], allReq = [];
         
         for (const sourceId of sourceTableIds) {
             const sourceRef = getTableDocRef(sourceId);
             const sourceSnap = await getDoc(sourceRef);
-            
-            if (sourceSnap.exists() && sourceSnap.data().status === 'open') {
-                const sourceData = sourceSnap.data();
-                
-                masterNewTotal += (sourceData.total || 0);
-                masterNewDiners += (sourceData.diners || 0);
-
-                if (sourceData.sentItems) allItemsToMerge.push(...sourceData.sentItems);
-                if (sourceData.selectedItems) allSelectedItemsToMerge.push(...sourceData.selectedItems);
-                if (sourceData.requestedOrders) allRequestedOrdersToMerge.push(...sourceData.requestedOrders);
+            if (sourceSnap.exists()) {
+                const sData = sourceSnap.data();
+                masterNewTotal += (sData.total || 0);
+                masterNewDiners += (sData.diners || 0);
+                if (sData.sentItems) allItemsToMerge.push(...sData.sentItems);
+                if (sData.selectedItems) allSelected.push(...sData.selectedItems);
+                if (sData.requestedOrders) allReq.push(...sData.requestedOrders);
                 
                 batch.update(sourceRef, {
-                    status: 'merged', 
-                    masterTable: masterTableId,
-                    sentItems: [], 
-                    selectedItems: [],
-                    requestedOrders: [],
-                    clientOrderPending: false,
-                    total: 0,
-                    payments: [],
-                    diners: 0
+                    status: 'merged', masterTable: masterTableId, sentItems: [], selectedItems: [], requestedOrders: [], clientOrderPending: false, total: 0, payments: [], diners: 0
                 });
             }
         }
 
-        const masterExistingSentItems = masterSnap.data().sentItems || [];
-        const masterExistingSelectedItems = masterSnap.data().selectedItems || [];
-        const masterExistingRequestedOrders = masterSnap.data().requestedOrders || [];
-        const currentMergedTables = masterSnap.data().mergedTables || [];
-
         batch.update(masterTableRef, {
-            total: masterNewTotal,
-            diners: masterNewDiners,
-            sentItems: arrayUnion(...masterExistingSentItems, ...allItemsToMerge), 
-            selectedItems: arrayUnion(...masterExistingSelectedItems, ...allSelectedItemsToMerge), 
-            requestedOrders: arrayUnion(...masterExistingRequestedOrders, ...allRequestedOrdersToMerge),
-            mergedTables: arrayUnion(...currentMergedTables, ...sourceTableIds),
-            clientOrderPending: (masterExistingRequestedOrders.length + allRequestedOrdersToMerge.length) > 0, 
+            total: masterNewTotal, diners: masterNewDiners,
+            sentItems: arrayUnion(...(masterSnap.data().sentItems || []), ...allItemsToMerge),
+            selectedItems: arrayUnion(...(masterSnap.data().selectedItems || []), ...allSelected),
+            requestedOrders: arrayUnion(...(masterSnap.data().requestedOrders || []), ...allReq),
+            mergedTables: arrayUnion(...(masterSnap.data().mergedTables || []), ...sourceTableIds),
+            clientOrderPending: (masterSnap.data().requestedOrders?.length || 0) + allReq.length > 0, 
         });
 
         await batch.commit();
-        
         managerModal.style.display = 'none';
-        alert(`Agrupamento concluído! Mesas ${sourceTableIds.join(', ')} agrupadas na MESA ${masterTableId}.`);
         loadOpenTables(); 
         
     } catch (e) {
-        console.error("Erro no Agrupamento de Mesas:", e);
-        errorMsgEl.textContent = `Falha ao agrupar: ${e.message}`;
+        console.error(e);
+        errorMsgEl.textContent = `Erro: ${e.message}`;
         errorMsgEl.style.display = 'block';
     } finally {
-        if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Confirmar Agrupamento'; }
-    }
-};
-
-// --- NOVA FUNÇÃO DE STATUS KDS (VISUALIZAÇÃO DO MODAL) ---
-window.openKdsStatusModal = async (tableId) => {
-    const modal = document.getElementById('tableKdsModal');
-    const content = document.getElementById('tableKdsContent');
-    const title = document.getElementById('tableKdsTitle');
-    
-    if (!modal || !content) {
-        console.error("Modal KDS (tableKdsModal) não encontrado no DOM. Adicione-o ao index.html.");
-        return;
-    }
-
-    title.textContent = `Cozinha - Mesa ${tableId}`;
-    content.innerHTML = `
-        <div class="flex flex-col items-center justify-center py-8">
-            <i class="fas fa-spinner fa-spin text-pumpkin text-3xl mb-3"></i>
-            <p class="text-gray-400">Consultando cozinha...</p>
-        </div>`;
-    modal.style.display = 'flex';
-
-    try {
-        // Busca pedidos ativos dessa mesa no KDS
-        const q = query(
-            getKdsCollectionRef(), 
-            where('tableNumber', '==', parseInt(tableId)),
-            orderBy('sentAt', 'desc')
-        );
-        
-        const snapshot = await getDocs(q);
-
-        if (snapshot.empty) {
-            content.innerHTML = `
-                <div class="text-center py-6 opacity-50">
-                    <i class="fas fa-check-circle text-4xl text-gray-500 mb-2"></i>
-                    <p class="text-gray-400">Nenhum pedido ativo na cozinha.</p>
-                </div>`;
-            return;
-        }
-
-        let html = '';
-        
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            
-            const statusConfig = {
-                'pending': { label: 'Pendente', color: 'text-red-400 border-red-900/50 bg-red-900/20', icon: 'fa-clock' },
-                'preparing': { label: 'Preparando', color: 'text-blue-400 border-blue-900/50 bg-blue-900/20', icon: 'fa-fire' },
-                'ready': { label: 'Pronto', color: 'text-green-400 border-green-900/50 bg-green-900/20', icon: 'fa-check' },
-                'finished': { label: 'Entregue', color: 'text-gray-500 border-gray-700 bg-gray-800', icon: 'fa-history' },
-                'cancelled': { label: 'Cancelado', color: 'text-gray-400 border-gray-700 bg-red-900/10 line-through', icon: 'fa-ban' }
-            };
-            
-            const st = statusConfig[data.status] || { label: data.status, color: 'text-gray-400', icon: 'fa-question' };
-            const time = data.sentAt?.toDate ? data.sentAt.toDate().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--:--';
-
-            let itemsHtml = '';
-            if (data.sectors) {
-                Object.entries(data.sectors).forEach(([sectorName, items]) => {
-                    if(items && items.length > 0) {
-                        itemsHtml += `
-                            <div class="mt-2 border-t border-gray-700 pt-1 first:border-0 first:pt-0">
-                                <p class="text-[10px] uppercase font-bold text-gray-500 mb-1">${sectorName}</p>
-                                ${items.map(item => `
-                                    <div class="flex justify-between items-start text-sm mb-1">
-                                        <span class="text-gray-200 font-medium">${item.name}</span>
-                                        ${item.note ? `<span class="text-xs text-yellow-500 italic ml-2 bg-yellow-900/20 px-1 rounded max-w-[120px] truncate">${item.note}</span>` : ''}
-                                    </div>
-                                `).join('')}
-                            </div>
-                        `;
-                    }
-                });
-            }
-
-            const cancelReasonHtml = data.status === 'cancelled' ? `<p class="text-xs text-red-400 mt-2 italic border-t border-gray-700 pt-1">Motivo: ${data.cancellationReason || 'N/A'}</p>` : '';
-
-            html += `
-                <div class="bg-dark-input border border-gray-700 rounded-lg p-3 shadow-sm relative overflow-hidden">
-                    <div class="flex justify-between items-center mb-2">
-                        <div class="flex items-center space-x-2">
-                            <span class="text-xs font-mono text-gray-500">#${data.orderId.slice(-4)}</span>
-                            <span class="text-xs text-gray-400"><i class="far fa-clock mr-1"></i>${time}</span>
-                        </div>
-                        <span class="text-xs font-bold px-2 py-1 rounded border flex items-center ${st.color}">
-                            <i class="fas ${st.icon} mr-1.5"></i> ${st.label}
-                        </span>
-                    </div>
-                    <div class="pl-1">
-                        ${itemsHtml || '<p class="text-xs text-gray-500 italic">Sem itens registrados</p>'}
-                        ${cancelReasonHtml}
-                    </div>
-                </div>
-            `;
-        });
-
-        content.innerHTML = html;
-
-    } catch (error) {
-        console.error("Erro ao buscar status KDS:", error);
-        content.innerHTML = `
-            <div class="text-center py-4">
-                <p class="text-red-400 font-bold mb-1">Erro ao carregar</p>
-                <p class="text-xs text-gray-500">${error.message}</p>
-            </div>`;
+        if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Confirmar'; }
     }
 };
 

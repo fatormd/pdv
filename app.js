@@ -1,15 +1,16 @@
-// --- APP.JS (VERSÃO FINAL CORRIGIDA - COMPLETA) ---
+// --- APP.JS (VERSÃO FINAL COMPLETA) ---
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapshot, writeBatch, arrayRemove, arrayUnion, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { getFunctions } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
 
-// Importações dos Serviços e Utils
+// Serviços e Utils
 import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, auth, db, functions, appId } from '/services/firebaseService.js';
 import { fetchWooCommerceProducts, fetchWooCommerceCategories } from '/services/wooCommerceService.js';
 import { formatCurrency, formatElapsedTime, getNumericValueFromCurrency, maskPhoneNumber } from '/utils.js';
 
-// --- IMPORTS DOS CONTROLADORES ---
+// Controladores
 import { initPanelController, loadOpenTables, renderTableFilters, handleAbrirMesa, handleSearchTable, openTableMergeModal } from '/controllers/panelController.js';
 import { initOrderController, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity, openObsModalForGroup, renderMenu } from '/controllers/orderController.js';
 import { initPaymentController, renderPaymentSummary, deletePayment, handleMassActionRequest, handleFinalizeOrder, handleMassDeleteConfirmed, executeDeletePayment, openTableTransferModal, handleConfirmTableTransfer } from '/controllers/paymentController.js';
@@ -18,10 +19,9 @@ import { initUserManagementController, openUserManagementModal } from '/controll
 import { initCashierController } from '/controllers/cashierController.js';
 import { initKdsController } from '/controllers/kdsController.js';
 
-// Imports do Cliente
+// Controladores Cliente
 import { initClientOrderController, renderClientOrderScreen } from '/controllers/clientOrderController.js';
 import { initClientPaymentController } from '/controllers/clientPaymentController.js';
-
 
 // --- CONFIGURAÇÃO ---
 const FIREBASE_CONFIG = {
@@ -30,7 +30,7 @@ const FIREBASE_CONFIG = {
     projectId: "fator-pdv",
     storageBucket: "fator-pdv.appspot.com",
     messagingSenderId: "1097659747429",
-    appId: "1:1097659747429:web:8ec0a7c39777c311dbe0a8c"
+    appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c"
 };
 
 // --- VARIÁVEIS GLOBAIS ---
@@ -42,8 +42,9 @@ export const screens = {
     'managerScreen': 4,
     'kdsScreen': 5, 
     'clientOrderScreen': 0, 
-    'clientPaymentScreen': 1
+    'clientPaymentScreen': 1 
 };
+
 export let currentTableId = null; 
 export let selectedItems = []; 
 export let currentOrderSnapshot = null;
@@ -51,13 +52,14 @@ export let userRole = 'anonymous';
 export let userId = null; 
 export let unsubscribeTable = null;
 
-// --- ELEMENTOS UI ---
+// Elementos UI
 let statusScreen, mainContent, appContainer, loginScreen, mainHeader;
 let loginBtn, loginEmailInput, loginPasswordInput, loginErrorMsg;
 let clientLoginModal;
 
 
 // --- FUNÇÕES CORE E ROTEAMENTO ---
+
 export const hideStatus = () => {
     if (!statusScreen) statusScreen = document.getElementById('statusScreen');
     if (statusScreen) {
@@ -86,10 +88,14 @@ const showLoginScreen = () => {
     mainContent = document.getElementById('mainContent');
     mainHeader = document.getElementById('mainHeader');
     appContainer = document.getElementById('appContainer');
+    
     hideStatus();
+    
     if (mainHeader) mainHeader.style.display = 'none';
     if (mainContent) mainContent.style.display = 'block'; 
+    
     goToScreen('loginScreen'); 
+    
     document.body.classList.add('bg-dark-bg');
     document.body.classList.remove('bg-gray-900', 'logged-in');
 };
@@ -97,19 +103,49 @@ const showLoginScreen = () => {
 const hideLoginScreen = () => {
     mainHeader = document.getElementById('mainHeader');
     mainContent = document.getElementById('mainContent');
+    
     if (mainHeader) mainHeader.style.display = 'flex';
     if (mainContent) mainContent.style.display = 'block';
+    
     document.body.classList.add('logged-in');
     
     const logoutBtn = document.getElementById('logoutBtnHeader');
-    const managerBtn = document.getElementById('openManagerPanelBtn');
-    const cashierBtn = document.getElementById('openCashierBtn'); 
-    const kdsBtn = document.getElementById('openKdsBtn');
-    
     if (logoutBtn) logoutBtn.classList.remove('hidden');
-    if (cashierBtn) cashierBtn.classList.remove('hidden'); 
-    if (kdsBtn) kdsBtn.classList.remove('hidden'); 
-    if (managerBtn) managerBtn.classList.toggle('hidden', userRole !== 'gerente');
+};
+
+// --- LÓGICA DE PERMISSÕES DE UI (UX) ---
+const applyUserPermissions = (role) => {
+    const elements = {
+        managerBtn: document.getElementById('openManagerPanelBtn'),
+        kdsBtn: document.getElementById('openKdsBtn'),
+        cashierBtn: document.getElementById('openCashierBtn'),
+        finalizeBtn: document.getElementById('finalizeOrderBtn')
+    };
+
+    // Reset inicial (esconde tudo que é sensível)
+    if(elements.managerBtn) elements.managerBtn.classList.add('hidden');
+    if(elements.kdsBtn) elements.kdsBtn.classList.add('hidden');
+    if(elements.cashierBtn) elements.cashierBtn.classList.add('hidden');
+    
+    console.log(`[APP] Aplicando permissões para: ${role}`);
+
+    switch (role) {
+        case 'gerente':
+            // Gerente vê tudo
+            if(elements.managerBtn) elements.managerBtn.classList.remove('hidden');
+            if(elements.kdsBtn) elements.kdsBtn.classList.remove('hidden');
+            if(elements.cashierBtn) elements.cashierBtn.classList.remove('hidden');
+            break;
+        case 'caixa':
+            // Caixa vê Caixa e KDS (opcional), mas não Painel Gerencial
+            if(elements.cashierBtn) elements.cashierBtn.classList.remove('hidden');
+            if(elements.kdsBtn) elements.kdsBtn.classList.remove('hidden'); 
+            break;
+        case 'garcom':
+            // Garçom vê KDS (para saber se tá pronto), mas não mexe em caixa nem gerência
+            if(elements.kdsBtn) elements.kdsBtn.classList.remove('hidden');
+            break;
+    }
 };
 
 export const goToScreen = async (screenId) => {
@@ -123,9 +159,11 @@ export const goToScreen = async (screenId) => {
         
         if ((screenId === 'panelScreen' || screenId === 'loginScreen') && currentTableId && unsubscribeTable) {
             unsubscribeTable(); unsubscribeTable = null; currentTableId = null; currentOrderSnapshot = null; selectedItems.length = 0;
+            
             const currentTableNumEl = document.getElementById('current-table-number');
             const paymentTableNumEl = document.getElementById('payment-table-number');
             const orderScreenTableNumEl = document.getElementById('order-screen-table-number');
+            
             if(currentTableNumEl) currentTableNumEl.textContent = 'Fator MD';
             if(paymentTableNumEl) paymentTableNumEl.textContent = `Mesa`;
             if(orderScreenTableNumEl) orderScreenTableNumEl.textContent = 'Pedido';
@@ -140,7 +178,7 @@ export const goToScreen = async (screenId) => {
         }
     }
 
-    const screenIndex = isClientMode ? screens[screenId] : screens[screenId];
+    const screenIndex = screens[screenId];
 
     if (screenIndex !== undefined) {
         console.log(`[NAV] Navegando para ${screenId} (índice ${screenIndex})`);
@@ -225,11 +263,9 @@ window.openManagerAuthModal = (action, payload = null) => {
         <div class="bg-dark-card border border-gray-600 p-6 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 class="text-xl font-bold mb-4 text-red-400">Ação Gerencial Necessária</h3>
             <p class="text-base mb-3 text-dark-text">Insira a senha do gerente para prosseguir.</p>
-            
             <form id="managerAuthForm">
                 <input type="password" id="managerPasswordInput" placeholder="Senha" class="w-full p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text placeholder-dark-placeholder focus:ring-red-500 focus:border-red-500 text-base" maxlength="4" autocomplete="current-password">
             </form>
-
             <div class="flex justify-end space-x-3 mt-4">
                 <button class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition text-base" onclick="document.getElementById('managerModal').style.display='none'">Cancelar</button>
                 <button id="authManagerBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-base" form="managerAuthForm">Autenticar</button>
@@ -252,14 +288,8 @@ window.openManagerAuthModal = (action, payload = null) => {
                     case 'openTableMerge': openTableMergeModal(); break;
                     case 'deletePayment': executeDeletePayment(payload); break;
                     case 'goToManagerPanel': await goToScreen('managerScreen'); break;
-                    case 'openProductManagement': handleGerencialAction(action); break;
-                    case 'openCashManagementReport': handleGerencialAction(action); break; 
-                    case 'openCashManagement': handleGerencialAction(action); break;
-                    case 'openInventoryManagement': handleGerencialAction(action); break;
-                    case 'openRecipesManagement': handleGerencialAction(action); break;
-                    case 'openCustomerCRM': handleGerencialAction(action); break;
-                    case 'openWooSync': handleGerencialAction(action); break;
-                    case 'openSectorManagement': handleGerencialAction(action); break;
+                    case 'exportCsv': handleGerencialAction(action); break; // <--- NOVO (Exportar)
+                    // Outras ações gerenciais
                     default: handleGerencialAction(action, payload); break;
                 }
             } else {
@@ -280,12 +310,10 @@ window.openManagerAuthModal = (action, payload = null) => {
 window.openManagerAuthModal = openManagerAuthModal;
 
 // --- EXPOSIÇÃO DE FUNÇÕES GLOBAIS ---
-window.handleGerencialAction = handleGerencialAction; // IMPORTANTE: Expondo para o HTML
+window.handleGerencialAction = handleGerencialAction; 
 window.deletePayment = (timestamp) => window.openManagerAuthModal('deletePayment', timestamp);
 window.handleMassActionRequest = (action) => { if(action === 'delete') window.openManagerAuthModal('executeMassDelete'); else if (action === 'transfer') window.openManagerAuthModal('executeMassTransfer'); };
 window.openObsModalForGroup = openObsModalForGroup;
-window.openKdsStatusModal = (id) => alert(`Abrir status KDS ${id} (DEV)`);
-window.openNfeModal = () => { /* Lógica para abrir modal NFe */ };
 
 
 // --- LÓGICA DE LISTENER DA MESA ---
@@ -440,14 +468,19 @@ window.handleLogout = handleLogout;
 const initStaffApp = async (staffName) => { 
     console.log("[StaffApp] initStaffApp CALLED"); 
     try {
+        // Inicializa Controladores
         initPanelController();
         initOrderController();
         initPaymentController();
         initManagerController();
         initUserManagementController();
         initCashierController();
-        initKdsController(); // INICIALIZA KDS
+        initKdsController();
 
+        // Aplica Permissões de Visualização
+        applyUserPermissions(userRole);
+
+        // Carrega Dados Iniciais
         renderTableFilters();
         fetchWooCommerceProducts(renderMenu).catch(e => console.error("[INIT Staff] Falha produtos:", e));
         fetchWooCommerceCategories(renderMenu).catch(e => console.error("[INIT Staff] Falha categorias:", e));
@@ -488,8 +521,14 @@ const initClientApp = async () => {
 
 // --- DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', async () => { 
-    console.log("[APP] DOMContentLoaded"); 
+    console.log("[APP] 1. DOMContentLoaded iniciado"); 
+    
     try {
+        // 1. DECLARAÇÃO DA VARIÁVEL (ORDEM CRÍTICA)
+        const isClientMode = window.location.pathname.includes('/client');
+        console.log(`[APP] 2. Modo detectado: ${isClientMode ? 'CLIENTE' : 'STAFF'}`);
+
+        // 2. CONFIGURAÇÃO FIREBASE
         const firebaseConfigRaw = typeof window.__firebase_config !== 'undefined' ? window.__firebase_config : null;
         const firebaseConfig = firebaseConfigRaw ? JSON.parse(firebaseConfigRaw) : FIREBASE_CONFIG;
         const appIdentifier = typeof window.__app_id !== 'undefined' ? window.__app_id : "pdv_fator_instance_001";
@@ -500,52 +539,50 @@ document.addEventListener('DOMContentLoaded', async () => {
         const functionsInstance = getFunctions(app, 'us-central1');
         
         initializeFirebase(dbInstance, authInstance, appIdentifier, functionsInstance);
-        console.log("[APP] Firebase Initialized"); 
+        console.log("[APP] 3. Firebase Inicializado"); 
 
-        const isClientMode = window.location.pathname.includes('/client');
-        console.log(`[APP] Mode: ${isClientMode ? 'Client' : 'Staff'}`); 
-
+        // 3. MAPEAMENTO
         statusScreen = document.getElementById('statusScreen');
         mainContent = document.getElementById('mainContent');
         appContainer = document.getElementById('appContainer');
         mainHeader = document.getElementById('mainHeader');
 
+        // 4. INICIALIZAÇÃO CONDICIONAL
         if (isClientMode) {
-            initClientApp(); 
+            console.log("[APP] 4. Iniciando App Cliente");
+            await initClientApp(); 
+            
+            // Carregamento dinâmico para o cliente
             import('/controllers/clientOrderController.js').then(module => {
                  window.decreaseLocalItemQuantity = module.decreaseLocalItemQuantity;
                  window.increaseLocalItemQuantity = module.increaseLocalItemQuantity;
-             }).catch(err => console.error("Failed to dynamically load client quantity functions:", err));
+             }).catch(err => console.error("Erro ao carregar controllers dinâmicos:", err));
+
         } else {
+             console.log("[APP] 4. Iniciando App Staff");
+             
              const loginForm = document.getElementById('loginForm');
              loginBtn = document.getElementById('loginBtn');
              loginPasswordInput = document.getElementById('loginPassword');
 
-             if (loginForm) {
-                 loginForm.addEventListener('submit', handleStaffLogin);
-             }
-             
+             if (loginForm) loginForm.addEventListener('submit', handleStaffLogin);
              if (loginPasswordInput) {
                  loginPasswordInput.addEventListener('keydown', (e) => {
-                     if (e.key === 'Enter') {
-                         handleStaffLogin(e);
-                     }
+                     if (e.key === 'Enter') handleStaffLogin(e);
                  });
              }
 
-             // === TRAVA DE SEGURANÇA (FIXO PARA CONECTANDO...) ===
              const loginTimeout = setTimeout(() => {
                  if (statusScreen && statusScreen.style.display !== 'none' && !auth.currentUser) {
-                     console.warn("[APP] Firebase Auth demorou demais. Forçando tela de login.");
+                     console.warn("[APP] Timeout de Login. Forçando tela.");
                      showLoginScreen();
                  }
-             }, 3000); // 3 segundos de espera máxima
+             }, 3000);
 
              onAuthStateChanged(authInstance, async (user) => {
-                 clearTimeout(loginTimeout); // Cancela a trava se carregar a tempo
-
+                 clearTimeout(loginTimeout);
                  if (user && !user.isAnonymous) {
-                     console.log("[APP] Usuário Staff autenticado:", user.email);
+                     console.log("[APP] Usuário autenticado:", user.email);
                      
                      const usersCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'users');
                      const userDocRef = doc(usersCollectionRef, user.email);
@@ -554,22 +591,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                      if (docSnap.exists()) {
                          const userData = docSnap.data();
                          if (!userData.isActive) {
-                             alert("Sua conta foi desativada. Contate o gerente.");
+                             alert("Conta desativada.");
                              handleLogout();
                              return;
                          }
-                         
                          userId = user.email;
                          userRole = userData.role;
                          await initStaffApp(userData.name); 
                      } else {
-                         alert("Erro: Usuário autenticado, mas não encontrado no banco de dados. Contate o suporte.");
+                         alert("Usuário não encontrado no banco de dados.");
                          handleLogout();
                      }
-                 } else if (user && user.isAnonymous) {
-                     // Lógica para cliente anônimo se necessário no futuro
                  } else {
-                     console.log("[APP] Usuário não autenticado, mostrando tela de login.");
+                     console.log("[APP] Não autenticado. Mostrando login.");
                      showLoginScreen();
                  }
              });
@@ -582,21 +616,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
     } catch (e) {
+        console.error("Erro fatal na inicialização:", e);
         if(statusScreen) {
-             statusScreen.innerHTML = `<div class="flex flex-col items-center p-8 max-w-sm w-full text-center"><i class="fas fa-times-circle text-4xl text-red-500 mb-4"></i><h2 class="text-xl font-bold mb-2 text-red-400">Erro Crítico</h2><p class="text-dark-placeholder">${e.message}</p></div>`;
+             statusScreen.innerHTML = `<div class="flex flex-col items-center p-8 text-center"><h2 class="text-xl font-bold text-red-400">Erro Crítico</h2><p class="text-gray-400">${e.message}</p></div>`;
              statusScreen.style.display = 'flex';
         }
-        console.error("Erro fatal na inicialização:", e); 
-        return;
     }
 });
 
-// --- FUNÇÃO DE ALERTA SONORO (Adicionar no final do app.js) ---
+// --- FUNÇÃO DE ALERTA SONORO ---
 export const playNotificationSound = () => {
     const audio = document.getElementById('notificationSound');
     if (audio) {
-        audio.currentTime = 0; // Reinicia o som se já estiver tocando
-        audio.play().catch(e => console.warn("Reprodução de som bloqueada (interaja com a página primeiro)."));
+        audio.currentTime = 0; 
+        audio.play().catch(e => console.warn("Reprodução de som bloqueada."));
     }
 };
 window.playNotificationSound = playNotificationSound;

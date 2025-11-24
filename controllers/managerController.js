@@ -1,5 +1,5 @@
 // --- CONTROLLERS/MANAGERCONTROLLER.JS ---
-// VERSÃO FINAL COMPLETA E UNIFICADA
+// VERSÃO FINAL COMPLETA - DASHBOARD INTELIGENTE E GESTÃO TOTAL
 
 import { 
     db, appId, 
@@ -104,6 +104,7 @@ export const handleGerencialAction = (action, payload) => {
         case 'openCashManagementReport': openReportPanel('active-shifts'); break;
         case 'openHouse': handleOpenHouse(); break;
         case 'closeDay': handleCloseDay(); break;
+        case 'exportCsv': exportSalesToCSV(); break;
 
         case 'openCustomerCRM': renderCustomerCrmModal(); break;
 
@@ -299,10 +300,11 @@ window.openShiftDetails = async (shiftId) => {
     }
 };
 
-// --- DETALHES DO PEDIDO ---
+// --- DETALHES DO PEDIDO (Chamado pelo clique na tabela) ---
 window.showOrderDetails = async (docId) => {
     let modal = document.getElementById('orderDetailsModal');
     if (!modal) {
+        // Cria o modal dinamicamente se não existir
         const modalHtml = `
             <div id="orderDetailsModal" class="fixed inset-0 bg-gray-900 bg-opacity-95 flex items-center justify-center z-[60] hidden p-4 print-hide">
                 <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
@@ -434,7 +436,7 @@ const fetchDailySales = async (start, end) => {
         });
         totalSales += tableTotal; 
 
-        // Top 10 (Agrupa por ID para precisão)
+        // Top 10
         if (table.sentItems) {
             table.sentItems.forEach(item => {
                 const id = item.id;
@@ -469,7 +471,7 @@ const fetchDailySales = async (start, end) => {
         .sort((a, b) => b.qty - a.qty)
         .slice(0, 10);
     
-    // Salva lista de IDs do Top 10 para usar no Cardápio
+    // Salva lista de IDs do Top 10 para usar no Cardápio (Feature do OrderController)
     const top10Ids = Object.keys(productStats)
         .sort((a, b) => productStats[b].qty - productStats[a].qty)
         .slice(0, 10);
@@ -645,6 +647,60 @@ window.runDateComparison = async () => {
     } catch (e) {
         console.error("Erro comparativo:", e);
         alert("Erro ao comparar datas.");
+    }
+};
+
+// --- EXPORTAÇÃO DE CSV ---
+const exportSalesToCSV = async () => {
+    if (!reportDateInput) return;
+    const dateVal = reportDateInput.value;
+    if(!dateVal) { alert("Selecione uma data."); return; }
+
+    const start = Timestamp.fromDate(new Date(dateVal + 'T00:00:00'));
+    const end = Timestamp.fromDate(new Date(dateVal + 'T23:59:59'));
+
+    try {
+        const q = query(
+            collection(db, 'artifacts', appId, 'public', 'data', 'tables'), 
+            where('status', '==', 'closed'), 
+            where('closedAt', '>=', start), 
+            where('closedAt', '<=', end)
+        );
+        
+        const snapshot = await getDocs(q);
+        if (snapshot.empty) { alert("Sem dados para exportar nesta data."); return; }
+
+        let csvContent = "data:text/csv;charset=utf-8,";
+        csvContent += "Data/Hora,Mesa,Garcom,Total,Metodo Pagamento,Valor Pago\r\n";
+
+        snapshot.forEach(doc => {
+            const t = doc.data();
+            const time = t.closedAt ? t.closedAt.toDate().toLocaleString('pt-BR') : '';
+            const waiter = t.waiterId || t.closedBy || 'N/A';
+            const total = (t.total || 0).toFixed(2).replace('.', ',');
+            
+            if (t.payments && t.payments.length > 0) {
+                t.payments.forEach(p => {
+                    const row = `${time},${t.tableNumber},${waiter},${total},${p.method},${p.value}`;
+                    csvContent += row + "\r\n";
+                });
+            } else {
+                const row = `${time},${t.tableNumber},${waiter},${total},Sem Pagamento,0`;
+                csvContent += row + "\r\n";
+            }
+        });
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `vendas_${dateVal}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+    } catch (e) {
+        console.error("Erro export CSV:", e);
+        alert("Erro ao exportar.");
     }
 };
 

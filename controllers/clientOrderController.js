@@ -1,12 +1,12 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (VERSÃO FINAL - REABERTURA INTELIGENTE) ---
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (VERSÃO FINAL - COMPLETA) ---
 
-import { db, auth, getQuickObsCollectionRef, appId, getTablesCollectionRef, getTableDocRef, getCustomersCollectionRef } from "/services/firebaseService.js";
+import { db, auth, getQuickObsCollectionRef, appId, getTablesCollectionRef, getTableDocRef, getCustomersCollectionRef, getKdsCollectionRef } from "/services/firebaseService.js";
 import { formatCurrency } from "/utils.js";
 import { getProducts, getCategories, fetchWooCommerceCategories, fetchWooCommerceProducts } from "/services/wooCommerceService.js";
-import { onSnapshot, doc, updateDoc, arrayUnion, setDoc, getDoc, getDocs, query, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { onSnapshot, doc, updateDoc, arrayUnion, setDoc, getDoc, getDocs, query, serverTimestamp, orderBy, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-// Importa funções do app.js
+// Importa variáveis e funções globais do app.js
 import { showToast, currentTableId, setCurrentTable, setTableListener } from "/app.js"; 
 
 // --- Variáveis de Estado ---
@@ -17,7 +17,8 @@ const ESPERA_KEY = "(EM ESPERA)";
 let orderControllerInitialized = false;
 let localCurrentTableId = null;    
 let localCurrentClientUser = null; 
-let tempUserData = null;           
+let tempUserData = null;
+let unsubscribeClientKds = null; // Listener do KDS
 
 // --- Elementos da DOM ---
 let clientMenuContainer, clientCategoryFilters, sendOrderBtn, clientCartCount;
@@ -36,7 +37,7 @@ export const initClientOrderController = () => {
     if (orderControllerInitialized) return;
     console.log("[ClientOrder] Inicializando...");
 
-    // Mapeamento
+    // Mapeamento de Elementos
     clientMenuContainer = document.getElementById('client-menu-container');
     clientCategoryFilters = document.getElementById('client-category-filters');
     sendOrderBtn = document.getElementById('sendOrderBtn');
@@ -58,6 +59,7 @@ export const initClientOrderController = () => {
     assocErrorMsg = document.getElementById('assocErrorMsg');
     activateTableNumber = document.getElementById('activateTableNumber'); 
     
+    // Abas (Cardápio / Conta)
     tabButtons = document.querySelectorAll('.client-tab-btn');
     tabContents = document.querySelectorAll('.client-tab-content');
 
@@ -68,6 +70,7 @@ export const initClientOrderController = () => {
         });
     });
 
+    // Modal de Cadastro
     customerRegistrationModal = document.getElementById('customerRegistrationModal');
     customerRegistrationForm = document.getElementById('customerRegistrationForm');
     saveRegistrationBtn = document.getElementById('saveRegistrationBtn');
@@ -81,6 +84,7 @@ export const initClientOrderController = () => {
         customerRegistrationForm.addEventListener('submit', handleNewCustomerRegistration);
     }
     
+    // Modal de Observações
     clientObsModal = document.getElementById('clientObsModal'); 
     clientObsText = document.getElementById('clientObsText'); 
     clientQuickObsButtons = document.getElementById('clientQuickObsButtons'); 
@@ -111,7 +115,7 @@ export const initClientOrderController = () => {
                 let newNote = clientObsText.value.trim();
                 
                 const esperaSwitch = document.getElementById('esperaSwitch');
-                const isEspera = esperaSwitch.checked;
+                const isEspera = esperaSwitch ? esperaSwitch.checked : false;
                 const regexEspera = new RegExp(ESPERA_KEY.replace('(', '\\(').replace(')', '\\)'), 'ig');
                 const hasKey = newNote.toUpperCase().includes(ESPERA_KEY);
 
@@ -153,6 +157,7 @@ export const initClientOrderController = () => {
         }
     }
 
+    // Listeners de Ação
     if (sendOrderBtn) sendOrderBtn.onclick = handleSendOrderClick;
     if (authActionBtn) authActionBtn.onclick = handleAuthActionClick;
     if (googleLoginBtn) googleLoginBtn.onclick = signInWithGoogle;
@@ -170,8 +175,11 @@ export const initClientOrderController = () => {
         clientMenuContainer.addEventListener('click', (e) => {
             const card = e.target.closest('.product-card');
             if (!card) return;
+            
+            // Procura o produto na lista global
             const product = getProducts().find(p => p.id == card.dataset.productId);
             if (!product) return;
+
             if (e.target.closest('.info-item-btn')) {
                  openProductInfoModal(product);
             } else {
@@ -180,9 +188,11 @@ export const initClientOrderController = () => {
         });
     }
     
+    // Listener no Carrinho (Delegação)
     document.getElementById('client-cart-items-list')?.addEventListener('click', (e) => {
          const qtyBtn = e.target.closest('.qty-btn');
          const obsSpan = e.target.closest('.obs-span');
+         
          if (qtyBtn) {
              const itemId = qtyBtn.dataset.itemId;
              const noteKey = qtyBtn.dataset.itemNoteKey;
@@ -190,6 +200,7 @@ export const initClientOrderController = () => {
              if(action === 'increase') increaseCartItemQuantity(itemId, noteKey);
              if(action === 'decrease') decreaseCartItemQuantity(itemId, noteKey);
          }
+         
          if (obsSpan) {
              const itemId = obsSpan.dataset.itemId;
              const noteKey = obsSpan.dataset.itemNoteKey;
@@ -215,10 +226,89 @@ export const initClientOrderController = () => {
     loadMenu(); 
     fetchQuickObservations(); 
     
+    // Se já existir uma mesa carregada (ex: refresh da página), inicia o listener KDS
+    if (localCurrentTableId || currentTableId) {
+        startClientKdsListener(localCurrentTableId || currentTableId);
+    }
+
     orderControllerInitialized = true;
     console.log("[ClientOrder] Inicializado com sucesso.");
 };
 
+// --- LÓGICA DE STATUS KDS PARA O CLIENTE (NOVA) ---
+const startClientKdsListener = (tableId) => {
+    if (unsubscribeClientKds) unsubscribeClientKds();
+    if (!tableId) return;
+
+    console.log(`[ClientOrder] Iniciando KDS Listener para mesa ${tableId}`);
+    
+    const q = query(
+        getKdsCollectionRef(), 
+        where('tableNumber', '==', parseInt(tableId)),
+        where('status', 'in', ['pending', 'preparing', 'ready'])
+    );
+
+    unsubscribeClientKds = onSnapshot(q, (snapshot) => {
+        const orders = snapshot.docs.map(d => d.data());
+        updateClientStatusUI(orders);
+    }, (error) => {
+        console.error("[ClientOrder] Erro no KDS Listener:", error);
+    });
+};
+
+const updateClientStatusUI = (orders) => {
+    let statusBar = document.getElementById('clientKdsStatusBar');
+    
+    // Cria a barra se não existir
+    if (!statusBar) {
+        statusBar = document.createElement('div');
+        statusBar.id = 'clientKdsStatusBar';
+        statusBar.className = 'fixed top-0 left-0 right-0 bg-gray-900 text-white p-3 z-[60] shadow-lg border-b border-gray-700 flex justify-between items-center transform transition-transform duration-300 translate-y-[-100%]';
+        document.body.prepend(statusBar);
+        setTimeout(() => statusBar.classList.remove('translate-y-[-100%]'), 100);
+    }
+
+    if (orders.length === 0) {
+        statusBar.style.display = 'none';
+        return;
+    }
+
+    statusBar.style.display = 'flex';
+    
+    // Define prioridade de exibição: Ready > Preparing > Pending
+    let statusText = '';
+    let iconClass = '';
+    let bgClass = '';
+    
+    const hasReady = orders.some(o => o.status === 'ready');
+    const hasPreparing = orders.some(o => o.status === 'preparing');
+    
+    if (hasReady) {
+        statusText = 'Seu pedido está pronto!';
+        iconClass = 'fas fa-check-circle text-green-400';
+        bgClass = 'bg-gray-900 border-b-2 border-green-500';
+    } else if (hasPreparing) {
+        statusText = 'Preparando seu pedido...';
+        iconClass = 'fas fa-fire text-blue-400 animate-pulse';
+        bgClass = 'bg-gray-900 border-b-2 border-blue-500';
+    } else {
+        statusText = 'Pedido recebido na cozinha.';
+        iconClass = 'fas fa-clock text-yellow-400';
+        bgClass = 'bg-gray-900 border-b-2 border-yellow-500';
+    }
+
+    statusBar.className = `fixed top-0 left-0 right-0 p-3 z-[60] shadow-lg flex justify-between items-center ${bgClass}`;
+    statusBar.innerHTML = `
+        <div class="flex items-center">
+            <i class="${iconClass} text-xl mr-3"></i>
+            <span class="font-bold text-sm text-white">${statusText}</span>
+        </div>
+        <span class="text-xs text-gray-400 font-mono bg-gray-800 px-2 py-1 rounded">${orders.length} pedido(s)</span>
+    `;
+};
+
+
+// --- AUTH & USER ---
 function setupAuthStateObserver() {
     onAuthStateChanged(auth, (user) => {
         if (user && !user.isAnonymous) {
@@ -242,6 +332,7 @@ function setupAuthStateObserver() {
             tempUserData = null;
             updateAuthUI(null);
             updateCustomerInfo(null, false);
+            // Se não tem mesa e não tem user, pede associação
             if (!currentTableId) {
                 openAssociationModal();
             }
@@ -267,16 +358,19 @@ function handleAuthActionClick() {
     if (localCurrentClientUser) {
         signOut(auth).then(() => {
             showToast("Você saiu da sua conta.");
+            window.location.reload();
         });
     } else {
         openAssociationModal();
     }
 }
 
+// --- MENU & CART ---
 async function loadMenu() {
     try {
         const categories = await fetchWooCommerceCategories();
         const products = await fetchWooCommerceProducts();
+        
         if (categories.length > 0 && clientCategoryFilters) {
              clientCategoryFilters.innerHTML = categories.map(cat => {
                 const isActive = cat.slug === currentCategoryFilter ? 'bg-brand-primary text-white' : 'bg-dark-input text-dark-text border border-gray-600';
@@ -284,16 +378,18 @@ async function loadMenu() {
              }).join('');
         }
         renderMenu(); 
+        
         if (statusScreen) statusScreen.style.display = 'none';
         if (mainContent) mainContent.style.display = 'flex'; 
     } catch (error) {
         console.error("Erro ao carregar menu:", error);
-        if (statusScreen) statusScreen.innerHTML = '<p class="text-red-400">Erro ao carregar o cardápio. Verifique sua conexão.</p>';
+        if (statusScreen) statusScreen.innerHTML = '<p class="text-red-400 p-4 text-center">Erro ao carregar o cardápio. Verifique sua conexão.</p>';
     }
 }
 
 function renderMenu() {
     if (!clientMenuContainer) return;
+    
     if (clientCategoryFilters) {
         clientCategoryFilters.querySelectorAll('.category-btn').forEach(btn => {
             const isActive = btn.dataset.category === currentCategoryFilter;
@@ -303,11 +399,16 @@ function renderMenu() {
             btn.classList.toggle('text-dark-text', !isActive);
         });
     }
+
     const products = getProducts();
     let filteredProducts = products;
+
+    // Filtro por Categoria (incluindo Top 10 se houver lógica no backend, aqui simplificado)
     if (currentCategoryFilter !== 'all') {
         filteredProducts = products.filter(p => p.category === currentCategoryFilter);
     }
+
+    // Filtro de Busca
     let searchTerm = '';
     if (searchProductInputClient) { 
          searchTerm = searchProductInputClient.value.trim().toLowerCase();
@@ -386,6 +487,7 @@ function openProductInfoModal(product) {
     const priceEl = document.getElementById('infoProductPrice');
     const descEl = document.getElementById('infoProductDescription');
     const addBtn = document.getElementById('infoProductAddBtn');
+    
     if (!modal || !img || !nameEl || !priceEl || !descEl || !addBtn || !imgLink) return;
 
     img.src = product.image || 'https://placehold.co/600x400/1f2937/d1d5db?text=Produto';
@@ -394,13 +496,16 @@ function openProductInfoModal(product) {
     nameEl.textContent = product.name;
     priceEl.textContent = formatCurrency(product.price);
     descEl.innerHTML = product.description; 
+    
     const newAddBtn = addBtn.cloneNode(true);
     addBtn.parentNode.replaceChild(newAddBtn, addBtn);
+    
     newAddBtn.onclick = () => {
         addItemToCart(product);
         modal.style.display = 'none'; 
         showToast(`${product.name} adicionado ao carrinho!`);
     };
+    
     modal.style.display = 'flex';
 }
 
@@ -408,6 +513,7 @@ function openClientObsModal(itemId, noteKey) {
     const products = getProducts();
     const product = products.find(p => p.id == itemId);
     const esperaSwitch = document.getElementById('esperaSwitch'); 
+    
     if (!clientObsModal || !clientObsText || !product || !esperaSwitch) return;
 
     const regexEspera = new RegExp(ESPERA_KEY.replace('(', '\\(').replace(')', '\\)'), 'ig');
@@ -427,6 +533,7 @@ function openClientObsModal(itemId, noteKey) {
 function _renderClientCart() {
     const cartItemsList = document.getElementById('client-cart-items-list');
     if (!cartItemsList) return;
+    
     if (selectedItems.length === 0) {
         cartItemsList.innerHTML = `<div class="text-sm md:text-base text-dark-placeholder italic p-2">Nenhum item selecionado.</div>`;
     } else {
@@ -436,12 +543,14 @@ function _renderClientCart() {
             acc[key].count++;
             return acc;
         }, {});
+        
         cartItemsList.innerHTML = Object.values(groupedItems).map(group => {
             const note = group.note || '';
             const regexEspera = new RegExp(ESPERA_KEY.replace('(', '\\(').replace(')', '\\)'), 'ig');
             const isEspera = regexEspera.test(note);
             let displayNote = note.replace(regexEspera, '').trim();
             if (displayNote.startsWith(',')) displayNote = displayNote.substring(1).trim();
+            
             let noteHtml = '';
             if (isEspera) {
                 noteHtml = `<span class="text-yellow-400 font-semibold">${ESPERA_KEY}</span>`;
@@ -451,6 +560,7 @@ function _renderClientCart() {
             } else {
                 noteHtml = `(Adicionar Obs.)`;
             }
+            
             return `
             <div class="flex justify-between items-center bg-dark-input p-3 rounded-lg shadow-sm">
                 <div class="flex flex-col flex-grow min-w-0 mr-2">
@@ -461,11 +571,11 @@ function _renderClientCart() {
                     </span>
                 </div>
                 <div class="flex items-center space-x-2 flex-shrink-0">
-                    <button class="qty-btn bg-red-600 text-white rounded-full h-8 w-8"
+                    <button class="qty-btn bg-red-600 text-white rounded-full h-8 w-8 flex items-center justify-center"
                             data-item-id="${group.id}" data-item-note-key="${note}" data-action="decrease">
                         <i class="fas fa-minus pointer-events-none"></i>
                     </button>
-                    <button class="qty-btn bg-green-600 text-white rounded-full h-8 w-8"
+                    <button class="qty-btn bg-green-600 text-white rounded-full h-8 w-8 flex items-center justify-center"
                             data-item-id="${group.id}" data-item-note-key="${note}" data-action="increase">
                         <i class="fas fa-plus pointer-events-none"></i>
                     </button>
@@ -477,16 +587,19 @@ function _renderClientCart() {
 
 export function renderClientOrderScreen(tableData) {
     if (clientCartCount) clientCartCount.textContent = selectedItems.length;
+    
     if (sendOrderBtn) {
-        const billRequested = tableData?.waiterNotification?.includes('fechamento');
+        // Verifica se já pediu a conta
+        const billRequested = tableData?.waiterNotification?.includes('fechamento') || tableData?.billRequested === true;
+        
         if (billRequested) {
             sendOrderBtn.disabled = true;
-            sendOrderBtn.innerHTML = '<i class="fas fa-hourglass-half"></i>';
-            sendOrderBtn.title = 'Aguardando fechamento da conta...';
+            sendOrderBtn.innerHTML = '<i class="fas fa-hourglass-half"></i> Aguardando Conta';
+            sendOrderBtn.classList.add('opacity-50');
         } else {
             sendOrderBtn.disabled = selectedItems.length === 0;
-            sendOrderBtn.innerHTML = '<i class="fas fa-check-circle"></i>';
-            sendOrderBtn.title = 'Enviar Pedido para Confirmação';
+            sendOrderBtn.innerHTML = '<i class="fas fa-check-circle"></i> Enviar Pedido';
+            sendOrderBtn.classList.remove('opacity-50');
         }
     }
     _renderClientCart();
@@ -571,12 +684,21 @@ async function checkCustomerRegistration(user) {
 async function handleNewCustomerRegistration(e) {
     e.preventDefault();
     if (!tempUserData) { showAssocError("Erro: Dados do usuário perdidos. Tente logar novamente."); return; }
+    
     const whatsapp = regCustomerWhatsapp.value;
     const birthday = regCustomerBirthday.value;
-    if (!whatsapp || !birthday) { regErrorMsg.textContent = "Por favor, preencha todos os campos."; regErrorMsg.style.display = 'block'; return; }
+    
+    if (!whatsapp || !birthday) { 
+        regErrorMsg.textContent = "Por favor, preencha todos os campos."; 
+        regErrorMsg.style.display = 'block'; 
+        return; 
+    }
+    
     regErrorMsg.style.display = 'none';
     const completeUserData = { ...tempUserData, whatsapp: whatsapp, nascimento: birthday };
+    
     saveRegistrationBtn.disabled = true; saveRegistrationBtn.textContent = "Salvando...";
+    
     try {
         await saveCustomerData(completeUserData);
         if(localCurrentClientUser) localCurrentClientUser.phone = whatsapp;
@@ -624,7 +746,7 @@ function updateCustomerInfo(user, isNew = false) {
 }
 
 // ==================================================================
-//               LÓGICA DE ATIVAÇÃO DE MESA (CORRIGIDA)
+//               LÓGICA DE ATIVAÇÃO DE MESA (REABERTURA INTELIGENTE)
 // ==================================================================
 
 async function handleActivationAndSend(e) {
@@ -664,35 +786,31 @@ async function handleActivationAndSend(e) {
         if (tableSnap.exists()) {
             const tableData = tableSnap.data();
 
-            // CENÁRIO A: Mesa Aberta por OUTRA pessoa
+            // A. Mesa Ocupada por Outro
             if (tableData.status !== 'closed' && tableData.clientId && tableData.clientId !== clientData.uid) {
                 localCurrentTableId = null;
                 setCurrentTable(null, true, false);
                 throw new Error("Esta mesa está ocupada por outro cliente.");
             } 
             
-            // CENÁRIO B: Mesa FECHADA (Reabertura/Nova Sessão)
+            // B. Mesa Fechada -> REABERTURA (Arquiva e Reseta)
             else if (tableData.status === 'closed') {
                 console.log(`Mesa ${tableId} estava fechada. Arquivando sessão anterior e reabrindo...`);
                 
-                // 1. Arquivar a sessão anterior para não perder o relatório financeiro
-                // Criamos um ID único para o histórico: "7_closed_TIMESTAMP"
                 const historyId = `${tableId}_closed_${Date.now()}`;
                 const historyRef = doc(getTablesCollectionRef(), historyId);
                 
-                // Copia os dados exatos da mesa fechada para o histórico
                 await setDoc(historyRef, tableData);
 
-                // 2. Resetar a mesa original para a nova sessão (Limpa tudo)
                 const newSessionData = {
                     tableNumber: parseInt(tableId, 10),
                     diners: tableData.diners || 1, 
-                    sector: tableData.sector || 'Salão', // Mantém o setor
+                    sector: tableData.sector || 'Salão', 
                     status: 'open',
-                    createdAt: serverTimestamp(), // Nova data de abertura
+                    createdAt: serverTimestamp(),
                     total: 0,
                     sentItems: [],
-                    payments: [], // Limpa pagamentos antigos
+                    payments: [],
                     serviceTaxApplied: true,
                     selectedItems: [], 
                     requestedOrders: [],
@@ -700,17 +818,14 @@ async function handleActivationAndSend(e) {
                     clientName: clientData.name,
                     clientPhone: clientData.phone,
                     anonymousUid: null,
-                    
-                    // Remove campos de fechamento antigo
                     closedAt: null,
                     finalTotal: null
                 };
                 
-                // Sobrescreve a mesa principal com os dados limpos
                 await setDoc(tableRef, newSessionData);
             }
             
-            // CENÁRIO C: Mesa Aberta por MIM (Continuar pedindo)
+            // C. Mesa Aberta pelo Próprio Cliente
             else {
                 console.log(`Mesa ${tableId} encontrada e ativa. Atualizando dados...`);
                 await updateDoc(tableRef, {
@@ -722,7 +837,7 @@ async function handleActivationAndSend(e) {
             }
 
         } else {
-            // CENÁRIO D: Mesa Nova (Nunca existiu no banco)
+            // D. Mesa Nova (Nunca existiu)
             console.log(`Mesa ${tableId} não encontrada. Criando do zero...`);
             const newTableData = {
                 tableNumber: parseInt(tableId, 10),
@@ -744,9 +859,10 @@ async function handleActivationAndSend(e) {
             await setDoc(tableRef, newTableData);
         }
 
-        // 3. Inicia o Listener e envia o pedido se houver itens no carrinho
+        // 3. Inicia Listener e Status KDS
         console.log("Mesa configurada. Iniciando listener...");
         setTableListener(tableId, true);
+        startClientKdsListener(tableId); // <--- ATIVA O MONITORAMENTO DO KDS
 
         if (selectedItems.length > 0) {
             await sendOrderToFirebase(); 

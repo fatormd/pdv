@@ -40,6 +40,7 @@
             #paymentSummaryCard .text-pumpkin, #paymentSummaryCard .text-indigo-400, #paymentSummaryCard .text-green-400 { color: #000 !important; }
             ::-webkit-scrollbar { display: none; }
         }
+        /* Scrollbar personalizada para modais */
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #1f2937; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #4b5563; border-radius: 10px; }
@@ -298,6 +299,7 @@
 
             <div id="kdsScreen" class="flex-shrink-0 bg-gray-900 text-dark-text h-full flex flex-col print-hide w-screen">
                 <div class="flex flex-col md:flex-row items-center justify-between p-3 md:p-4 bg-dark-card border-b border-dark-border shadow-md z-10 gap-3">
+                    
                     <div class="flex items-center justify-between w-full md:w-auto">
                         <div class="flex items-center">
                             <button onclick="window.goToScreen('panelScreen')" class="mr-3 md:mr-4 text-xl md:text-2xl text-gray-400 hover:text-white transition">
@@ -307,6 +309,7 @@
                                 <i class="fas fa-fire text-orange-500 mr-2"></i>KDS
                             </h2>
                         </div>
+                        
                         <select id="kdsSectorFilter" class="ml-3 md:ml-4 bg-gray-700 text-white text-xs md:text-sm font-bold py-2 px-2 md:px-3 rounded border border-gray-600 focus:outline-none focus:border-pumpkin max-w-[140px] md:max-w-none">
                             <option value="all">Todos</option>
                             <option value="cozinha">Cozinha</option>
@@ -316,12 +319,14 @@
                             <option value="confeitaria">Confeitaria</option>
                         </select>
                     </div>
+
                     <div class="flex items-center justify-between w-full md:w-auto md:space-x-4">
                         <div class="flex items-center space-x-3 text-xs md:text-sm">
                             <div class="flex items-center"><span class="w-2 h-2 md:w-3 md:h-3 rounded-full bg-blue-500 mr-1.5"></span> <span class="text-gray-400">Prep.</span></div>
                             <div class="flex items-center"><span class="w-2 h-2 md:w-3 md:h-3 rounded-full bg-yellow-500 mr-1.5"></span> <span class="text-gray-400">10m</span></div>
                             <div class="flex items-center"><span class="w-2 h-2 md:w-3 md:h-3 rounded-full bg-red-500 mr-1.5"></span> <span class="text-gray-400">20m</span></div>
                         </div>
+                        
                         <div class="flex space-x-2 ml-auto md:ml-0">
                             <button id="historyKdsBtn" class="p-2 bg-gray-700 text-indigo-300 border border-gray-600 rounded hover:bg-gray-600 transition" title="Histórico de Produção">
                                 <i class="fas fa-history"></i>
@@ -332,6 +337,7 @@
                         </div>
                     </div>
                 </div>
+
                 <div id="kdsOrdersContainer" class="flex-grow p-2 md:p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4 overflow-y-auto custom-scrollbar content-start">
                     <p class="col-span-full text-center text-gray-500 mt-10">Carregando pedidos...</p>
                 </div>
@@ -342,6 +348,7 @@
     
     <div id="reportsModal" class="fixed inset-0 bg-gray-900 bg-opacity-95 flex items-center justify-center z-50 hidden p-4 print-hide">
          <div class="bg-dark-card border border-dark-border w-full max-w-5xl h-[90vh] flex flex-col rounded-xl shadow-2xl">
+            
             <div class="flex flex-col p-6 border-b border-gray-700 bg-gray-800 rounded-t-xl gap-4">
                 <div class="flex justify-between items-start">
                     <div>
@@ -354,11 +361,13 @@
                     <button onclick="window.handleGerencialAction('openHouse')" class="px-4 py-2 bg-blue-600 border border-blue-500 text-white rounded-lg hover:bg-blue-700 transition text-sm font-bold flex items-center shadow-sm">
                         <i class="fas fa-door-open mr-2"></i> Abrir Turno
                     </button>
+                    
                     <button onclick="window.handleGerencialAction('closeDay')" class="px-4 py-2 bg-red-900/50 border border-red-500 text-red-200 rounded-lg hover:bg-red-900 transition text-sm font-bold flex items-center shadow-sm">
                         <i class="fas fa-file-invoice-dollar mr-2"></i> Encerrar Turno
                     </button>
                 </div>
             </div>
+            
             <div class="p-4 bg-dark-bg border-b border-gray-700 flex justify-between items-center flex-wrap gap-4">
                 <div class="flex space-x-2">
                     <button class="report-tab-btn px-4 py-2 rounded-lg bg-indigo-600 text-white font-bold" data-tab="active-shifts">Abertos (Atual)</button>
@@ -371,24 +380,35 @@
                     <button id="refreshReportBtn" class="p-2 bg-pumpkin text-white rounded hover:bg-pumpkin-dark"><i class="fas fa-sync-alt"></i></button>
                 </div>
             </div>
+
             <div class="flex-grow overflow-y-auto p-6 custom-scrollbar bg-dark-bg">
+                
                 <div id="tab-active-shifts" class="report-content block space-y-4">
                     <h4 class="text-lg font-bold text-white mb-4">Turnos Ativos Agora</h4>
                     <div id="activeShiftsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <p class="text-gray-500 italic">Carregando caixas abertos...</p>
                     </div>
                 </div>
+
                 <div id="tab-closed-shifts" class="report-content hidden space-y-4">
                     <h4 class="text-lg font-bold text-white mb-4">Histórico de Turnos (Data Selecionada)</h4>
                     <div id="closedShiftsContainer" class="space-y-3">
                          <p class="text-gray-500 italic">Carregando histórico...</p>
                     </div>
                 </div>
+
                 <div id="tab-sales" class="report-content hidden space-y-8">
+                    
                     <section>
                         <div class="flex justify-between items-end mb-4">
                             <h4 class="text-lg font-bold text-white"><i class="fas fa-calendar-day mr-2 text-green-400"></i>Visão Geral do Dia</h4>
-                            <span id="salesTodayDate" class="text-xs text-gray-500 uppercase font-bold">--/--</span>
+                            
+                            <div class="flex items-center space-x-2">
+                                <span id="salesTodayDate" class="text-xs text-gray-500 uppercase font-bold mr-2">--/--</span>
+                                <button onclick="window.handleGerencialAction('exportCsv')" class="px-3 py-1 bg-green-700 hover:bg-green-600 text-white rounded text-xs font-bold transition flex items-center">
+                                    <i class="fas fa-file-csv mr-1"></i> Exportar CSV
+                                </button>
+                            </div>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div class="p-4 bg-gray-800 rounded-lg border border-green-500/30 relative overflow-hidden group">
@@ -409,6 +429,7 @@
                                 <p class="text-xl font-bold text-blue-400 mt-1" id="reportTicketMedio">R$ 0,00</p>
                             </div>
                         </div>
+
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
                             <div class="bg-gray-800 rounded-lg border border-gray-700 p-4">
                                 <h5 class="text-sm font-bold text-white uppercase mb-3"><i class="fas fa-trophy text-yellow-400 mr-2"></i>Top 10 Mais Vendidos</h5>
@@ -416,11 +437,13 @@
                                     <p class="text-xs text-gray-500">Carregando...</p>
                                 </div>
                             </div>
+
                             <div class="bg-gray-800 rounded-lg border border-gray-700 p-4 flex flex-col justify-center items-center text-center">
                                 <h5 class="text-sm font-bold text-gray-400 uppercase mb-2"><i class="fas fa-clock text-indigo-400 mr-2"></i>Horário de Pico</h5>
                                 <p class="text-2xl font-extrabold text-white" id="peakHourDisplay">--:--</p>
                                 <p class="text-xs text-gray-500 mt-1" id="peakHourVolume">0 vendas</p>
                             </div>
+
                             <div class="bg-gray-800 rounded-lg border border-gray-700 p-4">
                                 <h5 class="text-sm font-bold text-white uppercase mb-3"><i class="fas fa-users text-blue-400 mr-2"></i>Desempenho Equipe</h5>
                                 <div id="teamPerformanceList" class="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
@@ -429,11 +452,15 @@
                             </div>
                         </div>
                     </section>
+
                     <hr class="border-gray-700">
+
                     <section>
                         <div class="flex justify-between items-center mb-4">
                             <h4 class="text-lg font-bold text-white"><i class="fas fa-bullseye mr-2 text-red-400"></i>Desempenho Mensal</h4>
-                            <button onclick="window.setMonthlyGoal()" class="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded transition"><i class="fas fa-edit mr-1"></i> Definir Meta</button>
+                            <button onclick="window.setMonthlyGoal()" class="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded transition">
+                                <i class="fas fa-edit mr-1"></i> Definir Meta
+                            </button>
                         </div>
                         <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 relative">
                             <div class="flex justify-between text-sm mb-2">
@@ -445,28 +472,52 @@
                                     <span class="text-[10px] font-bold text-white drop-shadow-md" id="monthProgressPercent">0%</span>
                                 </div>
                             </div>
+                            
                             <div class="flex justify-between items-center text-xs text-gray-500">
                                 <p>Faltam: <span class="text-red-400 font-bold" id="monthMissing">R$ 0,00</span></p>
                                 <p>Previsão de Fechamento: <span class="text-indigo-400 font-bold" id="monthProjection">R$ 0,00</span></p>
                             </div>
                         </div>
                     </section>
+
                     <hr class="border-gray-700">
+
                     <section>
                         <h4 class="text-lg font-bold text-white mb-4"><i class="fas fa-balance-scale mr-2 text-yellow-400"></i>Comparativo de Datas</h4>
+                        
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-end mb-4">
-                            <div class="bg-gray-800 p-3 rounded border border-gray-600"><label class="block text-xs text-gray-400 mb-1">Data A (Base)</label><input type="date" id="compDateA" class="input-pdv py-1 px-2 text-sm w-full"></div>
-                            <div class="bg-gray-800 p-3 rounded border border-gray-600"><label class="block text-xs text-gray-400 mb-1">Data B (Comparação)</label><input type="date" id="compDateB" class="input-pdv py-1 px-2 text-sm w-full"></div>
+                            <div class="bg-gray-800 p-3 rounded border border-gray-600">
+                                <label class="block text-xs text-gray-400 mb-1">Data A (Base)</label>
+                                <input type="date" id="compDateA" class="input-pdv py-1 px-2 text-sm w-full">
+                            </div>
+                            <div class="bg-gray-800 p-3 rounded border border-gray-600">
+                                <label class="block text-xs text-gray-400 mb-1">Data B (Comparação)</label>
+                                <input type="date" id="compDateB" class="input-pdv py-1 px-2 text-sm w-full">
+                            </div>
                         </div>
-                        <button onclick="window.runDateComparison()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition mb-4">COMPARAR RESULTADOS</button>
+                        
+                        <button onclick="window.runDateComparison()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition mb-4">
+                            COMPARAR RESULTADOS
+                        </button>
+
                         <div id="comparisonResult" class="hidden bg-dark-input border border-gray-600 rounded-lg p-4">
                             <div class="grid grid-cols-3 gap-4 text-center">
-                                <div><p class="text-xs text-gray-400 uppercase" id="compLabelA">Data A</p><p class="text-lg font-bold text-white" id="compValueA">R$ 0,00</p></div>
-                                <div class="flex flex-col justify-center"><p class="text-xs text-gray-500 uppercase">Diferença</p><p class="text-xl font-extrabold" id="compDiffValue">0%</p></div>
-                                <div><p class="text-xs text-gray-400 uppercase" id="compLabelB">Data B</p><p class="text-lg font-bold text-white" id="compValueB">R$ 0,00</p></div>
+                                <div>
+                                    <p class="text-xs text-gray-400 uppercase" id="compLabelA">Data A</p>
+                                    <p class="text-lg font-bold text-white" id="compValueA">R$ 0,00</p>
+                                </div>
+                                <div class="flex flex-col justify-center">
+                                    <p class="text-xs text-gray-500 uppercase">Diferença</p>
+                                    <p class="text-xl font-extrabold" id="compDiffValue">0%</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-400 uppercase" id="compLabelB">Data B</p>
+                                    <p class="text-lg font-bold text-white" id="compValueB">R$ 0,00</p>
+                                </div>
                             </div>
                         </div>
                     </section>
+
                 </div>
             </div>
          </div>
@@ -475,14 +526,24 @@
     <div id="shiftDetailsModal" class="fixed inset-0 bg-gray-900 bg-opacity-95 flex items-center justify-center z-[60] hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border w-full max-w-4xl max-h-[90vh] flex flex-col rounded-xl shadow-2xl">
             <div class="flex justify-between items-center p-5 border-b border-gray-700 bg-gray-800 rounded-t-xl">
-                <div><h3 class="text-xl font-bold text-indigo-400">Auditoria de Turno</h3><p class="text-sm text-gray-400" id="shiftDetailsHeader">Carregando...</p></div>
+                <div>
+                    <h3 class="text-xl font-bold text-indigo-400">Auditoria de Turno</h3>
+                    <p class="text-sm text-gray-400" id="shiftDetailsHeader">Carregando...</p>
+                </div>
                 <button class="text-gray-400 hover:text-white text-2xl" onclick="document.getElementById('shiftDetailsModal').style.display='none'">&times;</button>
             </div>
             <div class="flex-grow overflow-y-auto p-5 custom-scrollbar bg-dark-bg">
                 <h4 class="text-sm font-bold text-white uppercase mb-3 border-b border-gray-700 pb-2">Vendas Realizadas neste Turno</h4>
-                <table class="w-full text-left text-sm text-gray-400"><thead class="bg-gray-900 text-xs uppercase font-bold text-gray-300"><tr><th class="p-3">Hora</th><th class="p-3">Mesa</th><th class="p-3">Responsável</th><th class="p-3 text-right">Total</th></tr></thead><tbody id="shiftSalesTableBody" class="divide-y divide-gray-700"></tbody></table>
+                <table class="w-full text-left text-sm text-gray-400">
+                    <thead class="bg-gray-900 text-xs uppercase font-bold text-gray-300">
+                        <tr><th class="p-3">Hora</th><th class="p-3">Mesa</th><th class="p-3">Responsável</th><th class="p-3 text-right">Total</th></tr>
+                    </thead>
+                    <tbody id="shiftSalesTableBody" class="divide-y divide-gray-700"></tbody>
+                </table>
             </div>
-            <div class="p-4 border-t border-gray-700 bg-gray-800 rounded-b-xl text-right"><button onclick="document.getElementById('shiftDetailsModal').style.display='none'" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-500 font-bold">Fechar</button></div>
+            <div class="p-4 border-t border-gray-700 bg-gray-800 rounded-b-xl text-right">
+                <button onclick="document.getElementById('shiftDetailsModal').style.display='none'" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-500 font-bold">Fechar</button>
+            </div>
         </div>
     </div>
 
@@ -606,22 +667,6 @@
                 <button id="closeCustomerRegModalBtn" class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('customerRegModal').style.display='none'">Fechar</button>
                 <button id="saveCustomerBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50" disabled>Salvar Cliente</button>
                 <button id="linkCustomerToTableBtn" class="px-4 py-3 bg-pumpkin text-white rounded-lg hover:bg-pumpkin-dark transition disabled:opacity-50" disabled>Associar à Mesa</button>
-            </div>
-        </div>
-    </div>
-    
-    <div id="nfeModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
-        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
-            <h3 class="text-xl font-bold mb-4 text-indigo-400">Emissão de Nota Fiscal</h3>
-            <div id="nfeError" class="hidden p-3 rounded-lg bg-red-900 border border-red-700 text-red-200 mb-4"><p id="nfeErrorMessage" class="font-semibold">Erro aqui</p></div>
-            <div id="nfeDetails">
-                <div class="mb-4"><label class="block text-sm font-medium text-dark-placeholder mb-1">Cliente</label><p id="nfeCustomerName" class="text-lg font-semibold text-dark-text">Carregando...</p></div>
-                <div class="mb-4"><label class="block text-sm font-medium text-dark-placeholder mb-1">Documento</label><p id="nfeCustomerDoc" class="text-lg font-semibold text-dark-text">Carregando...</p></div>
-                <div class="mb-4"><label class="block text-sm font-medium text-dark-placeholder mb-1">Valor Total</label><p id="nfeTotalValue" class="text-2xl font-bold text-pumpkin">R$ 0,00</p></div>
-            </div>
-            <div class="flex justify-end space-x-3 mt-6">
-                <button class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('nfeModal').style.display='none'">Cancelar</button>
-                <button id="nfeConfirmBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"><i class="fas fa-check-circle"></i> Emitir</button>
             </div>
         </div>
     </div>
