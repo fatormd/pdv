@@ -1,4 +1,6 @@
 // --- SERVICES/WOOCOMMERCESERVICE.JS ---
+// VERSÃO FINAL COM GESTÃO DE HIERARQUIA (CATEGORIAS)
+
 import { getNumericValueFromCurrency } from "/utils.js";
 import { functions } from "/services/firebaseService.js";
 import { httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
@@ -121,6 +123,7 @@ export const fetchWooCommerceProducts = async (renderMenuCallback) => {
             name: p.name,
             price: parseFloat(p.price || 0),
             regular_price: parseFloat(p.regular_price || 0),
+            // Categoria principal (para compatibilidade simples)
             category: p.categories && p.categories.length > 0 ? p.categories[0].slug : 'uncategorized',
             categoryId: p.categories && p.categories.length > 0 ? p.categories[0].id : null,
             sector: 'cozinha', 
@@ -145,11 +148,20 @@ export const fetchWooCommerceCategories = async (renderCategoryFiltersCallback) 
             endpoint: 'products/categories?per_page=100'
         });
 
-        // ADICIONA A CATEGORIA TOP 10 AQUI
+        // MAPEAR ESTRUTURA COM PARENT (HIERARQUIA)
+        const mappedCategories = categories.map(c => ({
+            id: c.id,
+            name: c.name,
+            slug: c.slug,
+            parent: c.parent || 0, // ID do pai (0 se for raiz)
+            count: c.count
+        }));
+
+        // ADICIONA A CATEGORIA TOP 10 MANUALMENTE (Virtual)
         WOOCOMMERCE_CATEGORIES = [
-            { id: 'all', name: 'Novidades', slug: 'all' }, 
-            { id: 'top10', name: '🔥 Top 10', slug: 'top10' }, // <--- NOVO
-            ...categories.map(c => ({ id: c.id, name: c.name, slug: c.slug }))
+            { id: 'all', name: 'Novidades', slug: 'all', parent: 0 }, 
+            { id: 'top10', name: '🔥 Top 10', slug: 'top10', parent: 0 }, 
+            ...mappedCategories
         ];
 
         if (renderCategoryFiltersCallback) renderCategoryFiltersCallback();
@@ -157,7 +169,7 @@ export const fetchWooCommerceCategories = async (renderCategoryFiltersCallback) 
 
     } catch (error) {
          console.error("[Woo] Falha ao buscar categorias:", error.message);
-         return [{ id: 'all', name: 'Novidades', slug: 'all' }];
+         return [{ id: 'all', name: 'Novidades', slug: 'all', parent: 0 }];
     }
 };
 
@@ -198,6 +210,44 @@ export const deleteWooProduct = async (id, force = false) => {
     return result;
 };
 
+// ==================================================================
+//               GESTÃO DE CATEGORIAS (CRUD HIERÁRQUICO)
+// ==================================================================
+
+export const createWooCategory = async (name, parentId = 0) => {
+    console.log(`[Woo] Criando categoria: ${name} (Pai: ${parentId})`);
+    const result = await callWooProxy({
+        method: 'POST',
+        endpoint: 'products/categories',
+        payload: { 
+            name: name,
+            parent: parentId
+        }
+    });
+    await fetchWooCommerceCategories();
+    return result;
+};
+
+export const updateWooCategory = async (id, data) => {
+    console.log(`[Woo] Atualizando categoria ${id}:`, data);
+    const result = await callWooProxy({
+        method: 'PUT',
+        endpoint: `products/categories/${id}`,
+        payload: data
+    });
+    await fetchWooCommerceCategories();
+    return result;
+};
+
+export const deleteWooCategory = async (id) => {
+    console.log(`[Woo] Excluindo categoria ${id}`);
+    const result = await callWooProxy({
+        method: 'DELETE',
+        endpoint: `products/categories/${id}?force=true`
+    });
+    await fetchWooCommerceCategories();
+    return result;
+};
 
 // ==================================================================
 //               SINCRONIZAÇÃO
@@ -223,6 +273,7 @@ export const syncWithWooCommerce = async () => {
         if (data.success) {
             alert(`Sincronização concluída! ${data.count || 0} produtos processados.`);
             await fetchWooCommerceProducts(); 
+            await fetchWooCommerceCategories();
         } else {
             alert(`Aviso da Sincronização: ${data.message}`);
         }
