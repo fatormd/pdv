@@ -1,4 +1,4 @@
-// --- utils.js (COM TODAS AS FUNÇÕES CORRIGIDAS) ---
+// --- utils.js (VERSÃO DEFINITIVA) ---
 
 // Formata um valor numérico para BRL
 export const formatCurrency = (value) => {
@@ -14,68 +14,78 @@ export const formatElapsedTime = (timestamp) => {
     return `${minutes} min`;
 };
 
-/**
- * Converte uma string de moeda (ex: "R$ 50,00") para um número (ex: 50.00)
- * (Corrige o bug do wooCommerceService.js)
- */
 export const getNumericValueFromCurrency = (currencyString) => {
     if (!currencyString) return 0;
-    // 1. Remove "R$", " ", etc.
-    // 2. Troca a vírgula decimal brasileira (,) por ponto (.)
     const cleanedValue = String(currencyString)
         .replace(/[^0-9,-]/g, '')
         .replace(',', '.');
-        
     return parseFloat(cleanedValue) || 0;
 };
 
-/**
- * Mascara um número de telefone, exibindo apenas o DDD e os últimos 4 dígitos.
- * (Corrige a privacidade do staff no orderController.js)
- */
 export const maskPhoneNumber = (phone) => {
     if (!phone) return null;
-    
-    // Limpa qualquer caractere que não seja dígito
     const cleaned = String(phone).replace(/\D/g, '');
-
-    // Celular com 9 dígitos (Ex: 11987654321) - 11 dígitos no total
     if (cleaned.length === 11) {
         const ddd = cleaned.substring(0, 2);
         const lastFour = cleaned.substring(7);
         return `(${ddd}) *****-${lastFour}`;
     }
-    
-    // Fixo com 8 dígitos (Ex: 1140044004) - 10 dígitos no total
     if (cleaned.length === 10) {
         const ddd = cleaned.substring(0, 2);
         const lastFour = cleaned.substring(6);
         return `(${ddd}) ****-${lastFour}`;
     }
-
-    // Se for um formato inesperado, apenas mostra os últimos 4
     if (cleaned.length > 4) {
         const lastFour = cleaned.slice(-4);
         return `*****-${lastFour}`;
     }
-    
-    // Se for muito curto, retorna como está (não deve acontecer)
     return phone;
 };
 
-// =======================================================
-// ===== ADIÇÃO: Função 'calculateItemsValue' (Faltando) =====
-// (Corrige o bug do paymentController.js)
-// =======================================================
-/**
- * Calcula o valor total de um array de itens (somando o campo 'price').
- */
 export const calculateItemsValue = (itemsArray) => {
     if (!itemsArray || !Array.isArray(itemsArray)) return 0;
-    
     return itemsArray.reduce((total, item) => {
-        // Garante que o preço é um número antes de somar
         const price = parseFloat(item.price) || 0;
         return total + price;
     }, 0);
+};
+
+// --- UI HELPERS ---
+
+export const toggleLoading = (btnElement, isLoading, loadingText = 'Aguarde...') => {
+    if (!btnElement) return;
+    if (isLoading) {
+        if (!btnElement.dataset.originalText) {
+            btnElement.dataset.originalText = btnElement.innerHTML;
+        }
+        btnElement.disabled = true;
+        btnElement.style.minWidth = btnElement.offsetWidth + 'px';
+        btnElement.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${loadingText}`;
+        btnElement.classList.add('opacity-75', 'cursor-not-allowed');
+    } else {
+        btnElement.disabled = false;
+        btnElement.style.minWidth = '';
+        btnElement.innerHTML = btnElement.dataset.originalText || 'Confirmar';
+        btnElement.classList.remove('opacity-75', 'cursor-not-allowed');
+    }
+};
+
+export const showToast = (message, isError = false) => {
+    try {
+        const toast = document.createElement('div');
+        toast.textContent = message;
+        toast.className = 'fixed bottom-5 right-5 p-4 rounded-lg shadow-lg text-white z-[9999] transition-opacity duration-300 ease-out font-bold flex items-center';
+        toast.style.backgroundColor = isError ? '#ef4444' : '#22c55e'; // Red-500 ou Green-500
+        toast.innerHTML = `<i class="fas ${isError ? 'fa-exclamation-circle' : 'fa-check-circle'} mr-2"></i> ${message}`;
+        
+        toast.style.opacity = '0'; 
+        document.body.appendChild(toast);
+        
+        requestAnimationFrame(() => { toast.style.opacity = '1'; });
+        
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 300); 
+        }, 3000); 
+    } catch (e) { console.error("Falha ao mostrar toast:", e); alert(message); }
 };

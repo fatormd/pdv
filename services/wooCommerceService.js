@@ -1,36 +1,144 @@
-// --- SERVICES/WOOCOMMERCESERVICE.JS ---
-// VERSÃO FINAL COM GESTÃO DE HIERARQUIA (CATEGORIAS)
+// --- SERVICES/WOOCOMMERCESERVICE.JS (VERSÃO FINAL OTIMIZADA) ---
+// Implementa Paginação, Busca Sob Demanda e Cache Inteligente
 
-import { getNumericValueFromCurrency } from "/utils.js";
-import { functions } from "/services/firebaseService.js";
+import { functions } from "/services/firebaseService.js"; 
 import { httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
 
-// ==================================================================
-//               FUNÇÃO PROXY (HELPER GERAL)
-// ==================================================================
+// --- ESTADO LOCAL (CACHE) ---
+let WOOCOMMERCE_PRODUCTS = [];
+let WOOCOMMERCE_CATEGORIES = [];
 
+// Expor getters para acessar o cache atual
+export const getProducts = () => WOOCOMMERCE_PRODUCTS;
+export const getCategories = () => WOOCOMMERCE_CATEGORIES;
+
+// --- FUNÇÃO PROXY (HELPER) ---
 const callWooProxy = async (data) => {
     try {
-        if (!functions) {
-            throw new Error("Serviço Firebase Functions não inicializado. Verifique sua conexão.");
-        }
+        if (!functions) throw new Error("Firebase Functions não inicializado.");
         
         const callWooApi = httpsCallable(functions, 'proxyWooCommerce');
-
-        console.log(`[WooProxy] Chamando: ${data.method} ${data.endpoint}`);
-        const result = await callWooApi(data);
+        console.log(`[WooProxy] ${data.method} ${data.endpoint}`);
         
+        const result = await callWooApi(data);
         return result.data;
     } catch (error) {
-        console.error(`[WooProxy] Erro ao chamar a Cloud Function '${data.endpoint}':`, error);
-        const details = error.details || error.message;
-        throw new Error(`Erro na Cloud Function: ${details}`);
+        console.error(`[WooProxy] Erro:`, error);
+        throw new Error(error.message || "Erro na comunicação com WooCommerce.");
     }
 };
 
+// ==================================================================
+//               BUSCA DE PRODUTOS (PAGINADA & OTIMIZADA)
+// ==================================================================
+
+/**
+ * Busca produtos com paginação e filtro de texto diretamente da API.
+ * @param {number} page - Número da página (1, 2, 3...)
+ * @param {string} search - Termo de busca (opcional)
+ * @param {string} category - ID da categoria (opcional - filtro server-side)
+ * @param {boolean} append - Se true, adiciona aos existentes (Load More). Se false, substitui a lista.
+ */
+export const fetchWooCommerceProducts = async (page = 1, search = '', category = '', append = false) => {
+    try {
+        // Constrói a query string para a API do Woo
+        let endpoint = `products?per_page=50&page=${page}&status=publish`;
+        
+        if (search) {
+            endpoint += `&search=${encodeURIComponent(search)}`;
+        }
+        
+        // Filtra por categoria na API apenas se não for uma categoria especial (All ou Top10)
+        if (category && category !== 'all' && category !== 'top10') {
+            endpoint += `&category=${category}`;
+        }
+
+        const products = await callWooProxy({
+            method: 'GET',
+            endpoint: endpoint
+        });
+
+        const mappedProducts = products.map(p => ({
+            id: p.id,
+            name: p.name,
+            price: parseFloat(p.price || 0),
+            regular_price: parseFloat(p.regular_price || 0),
+            // Pega a primeira categoria ou 'uncategorized'
+            category: p.categories && p.categories.length > 0 ? p.categories[0].slug : 'uncategorized',
+            categoryId: p.categories && p.categories.length > 0 ? p.categories[0].id : null,
+            // Tenta pegar o setor do meta_data, senão define padrão
+            sector: getMetaValue(p.meta_data, 'sector') || 'cozinha',
+            status: p.status,
+            description: p.description || '',
+            image: (p.images && p.images.length > 0) ? p.images[0].src : 'https://placehold.co/600x400/1f2937/d1d5db?text=Produto'
+        }));
+
+        if (append) {
+            // MODO CARREGAR MAIS: Adiciona ao final, evitando duplicatas por ID
+            const newIds = new Set(mappedProducts.map(p => p.id));
+            WOOCOMMERCE_PRODUCTS = [
+                ...WOOCOMMERCE_PRODUCTS.filter(p => !newIds.has(p.id)),
+                ...mappedProducts
+            ];
+        } else {
+            // MODO SUBSTITUIÇÃO: Troca a lista inteira (nova busca ou filtro)
+            WOOCOMMERCE_PRODUCTS = mappedProducts;
+        }
+
+        return mappedProducts; // Retorna apenas o lote atual para controle (saber se acabou)
+
+    } catch (error) {
+        console.error("[Woo] Falha ao buscar produtos:", error.message);
+        return [];
+    }
+};
+
+// Helper para extrair valores de meta_data do array do Woo
+const getMetaValue = (metaData, key) => {
+    if (!metaData || !Array.isArray(metaData)) return null;
+    const meta = metaData.find(m => m.key === key);
+    return meta ? meta.value : null;
+};
 
 // ==================================================================
-//               MÉTODOS EXPORTADOS (PEDIDOS)
+//               CATEGORIAS (MANTIDO)
+// ==================================================================
+
+export const fetchWooCommerceCategories = async (callback) => {
+   try {
+        const categories = await callWooProxy({ 
+            method: 'GET', 
+            endpoint: 'products/categories?per_page=100' 
+        });
+        
+        const mapped = categories.map(c => ({
+            id: c.id, 
+            name: c.name, 
+            slug: c.slug, 
+            parent: c.parent || 0, 
+            count: c.count
+        }));
+
+        // Categorias Virtuais + Reais
+        WOOCOMMERCE_CATEGORIES = [
+            { id: 'all', name: 'Novidades', slug: 'all', parent: 0 }, 
+            { id: 'top10', name: '🔥 Top 10', slug: 'top10', parent: 0 }, 
+            ...mapped
+        ];
+
+        if (callback) callback();
+        return WOOCOMMERCE_CATEGORIES;
+
+    } catch (error) {
+         console.error("[Woo] Erro ao buscar categorias:", error);
+         // Fallback mínimo
+         WOOCOMMERCE_CATEGORIES = [{ id: 'all', name: 'Novidades', slug: 'all', parent: 0 }];
+         return WOOCOMMERCE_CATEGORIES;
+    }
+};
+
+// ==================================================================
+//               PEDIDOS (WOOCOMMERCE)
 // ==================================================================
 
 export const createWooCommerceOrder = async (orderSnapshot) => {
@@ -53,7 +161,6 @@ export const createWooCommerceOrder = async (orderSnapshot) => {
     }));
 
     if (line_items.length === 0) {
-        console.warn("[Woo] Nenhum item na lista 'sentItems'. Pedido para Woo cancelado.");
         throw new Error("A conta não possui itens enviados para registrar no WooCommerce.");
     }
 
@@ -73,7 +180,7 @@ export const createWooCommerceOrder = async (orderSnapshot) => {
     }
 
     const orderPayload = {
-        payment_method: "bacs",
+        payment_method: "bacs", // Transferência bancária (placeholder padrão para PDV)
         payment_method_title: payment_method_title,
         set_paid: true,
         status: "completed",
@@ -83,99 +190,19 @@ export const createWooCommerceOrder = async (orderSnapshot) => {
         customer_note: `Pedido do PDV - Mesa ${orderSnapshot.tableNumber || 'N/A'}.`
     };
 
-    console.log("[Woo] Enviando payload para Cloud Function:", orderPayload);
+    const createdOrder = await callWooProxy({
+        method: 'POST',
+        endpoint: 'orders',
+        payload: orderPayload
+    });
 
-    try {
-        const createdOrder = await callWooProxy({
-            method: 'POST',
-            endpoint: 'orders',
-            payload: orderPayload
-        });
-
-        console.log("[Woo] Pedido criado com sucesso! ID:", createdOrder.id);
-        return createdOrder;
-    } catch (error) {
-        console.error("[Woo] Falha ao criar pedido:", error.message);
-        throw new Error(`Falha no WooCommerce: ${error.message}`);
-    }
+    console.log("[Woo] Pedido criado com sucesso! ID:", createdOrder.id);
+    return createdOrder;
 };
 
 
 // ==================================================================
-//               CACHE E LEITURA DE DADOS
-// ==================================================================
-
-let WOOCOMMERCE_PRODUCTS = [];
-let WOOCOMMERCE_CATEGORIES = [];
-
-export const getProducts = () => WOOCOMMERCE_PRODUCTS;
-export const getCategories = () => WOOCOMMERCE_CATEGORIES;
-
-export const fetchWooCommerceProducts = async (renderMenuCallback) => {
-    try {
-        const products = await callWooProxy({
-            method: 'GET',
-            endpoint: 'products?per_page=100'
-        });
-
-        WOOCOMMERCE_PRODUCTS = products.map(p => ({
-            id: p.id,
-            name: p.name,
-            price: parseFloat(p.price || 0),
-            regular_price: parseFloat(p.regular_price || 0),
-            // Categoria principal (para compatibilidade simples)
-            category: p.categories && p.categories.length > 0 ? p.categories[0].slug : 'uncategorized',
-            categoryId: p.categories && p.categories.length > 0 ? p.categories[0].id : null,
-            sector: 'cozinha', 
-            status: p.status,
-            description: p.description || '',
-            image: (p.images && p.images.length > 0 && p.images[0].src) ? p.images[0].src : 'https://placehold.co/600x400/1f2937/d1d5db?text=Produto'
-        }));
-
-        if (renderMenuCallback) renderMenuCallback();
-        return WOOCOMMERCE_PRODUCTS;
-
-    } catch (error) {
-        console.error("[Woo] Falha ao buscar produtos:", error.message);
-        return [];
-    }
-};
-
-export const fetchWooCommerceCategories = async (renderCategoryFiltersCallback) => {
-   try {
-        const categories = await callWooProxy({
-            method: 'GET',
-            endpoint: 'products/categories?per_page=100'
-        });
-
-        // MAPEAR ESTRUTURA COM PARENT (HIERARQUIA)
-        const mappedCategories = categories.map(c => ({
-            id: c.id,
-            name: c.name,
-            slug: c.slug,
-            parent: c.parent || 0, // ID do pai (0 se for raiz)
-            count: c.count
-        }));
-
-        // ADICIONA A CATEGORIA TOP 10 MANUALMENTE (Virtual)
-        WOOCOMMERCE_CATEGORIES = [
-            { id: 'all', name: 'Novidades', slug: 'all', parent: 0 }, 
-            { id: 'top10', name: '🔥 Top 10', slug: 'top10', parent: 0 }, 
-            ...mappedCategories
-        ];
-
-        if (renderCategoryFiltersCallback) renderCategoryFiltersCallback();
-        return WOOCOMMERCE_CATEGORIES;
-
-    } catch (error) {
-         console.error("[Woo] Falha ao buscar categorias:", error.message);
-         return [{ id: 'all', name: 'Novidades', slug: 'all', parent: 0 }];
-    }
-};
-
-
-// ==================================================================
-//               GESTÃO DE PRODUTOS (CRUD)
+//               CRUD DE PRODUTOS (INTEGRADO AO CACHE)
 // ==================================================================
 
 export const createWooProduct = async (productData) => {
@@ -185,51 +212,48 @@ export const createWooProduct = async (productData) => {
         endpoint: 'products',
         payload: productData
     });
-    await fetchWooCommerceProducts(); 
+    // Recarrega a primeira página para mostrar o novo item
+    await fetchWooCommerceProducts(1, '', '', false); 
     return result;
 };
 
 export const updateWooProduct = async (id, productData) => {
-    console.log("[Woo] Atualizando produto:", id, productData);
+    console.log("[Woo] Atualizando produto:", id);
     const result = await callWooProxy({
         method: 'PUT',
         endpoint: `products/${id}`,
         payload: productData
     });
-    await fetchWooCommerceProducts();
+    // Recarrega para refletir a edição
+    await fetchWooCommerceProducts(1, '', '', false);
     return result;
 };
 
 export const deleteWooProduct = async (id, force = false) => {
-    console.log("[Woo] Excluindo produto:", id, "Force:", force);
+    console.log("[Woo] Excluindo produto:", id);
     const result = await callWooProxy({
         method: 'DELETE',
         endpoint: `products/${id}?force=${force}` 
     });
-    await fetchWooCommerceProducts();
+    await fetchWooCommerceProducts(1, '', '', false);
     return result;
 };
 
 // ==================================================================
-//               GESTÃO DE CATEGORIAS (CRUD HIERÁRQUICO)
+//               CRUD DE CATEGORIAS
 // ==================================================================
 
 export const createWooCategory = async (name, parentId = 0) => {
-    console.log(`[Woo] Criando categoria: ${name} (Pai: ${parentId})`);
     const result = await callWooProxy({
         method: 'POST',
         endpoint: 'products/categories',
-        payload: { 
-            name: name,
-            parent: parentId
-        }
+        payload: { name: name, parent: parentId }
     });
     await fetchWooCommerceCategories();
     return result;
 };
 
 export const updateWooCategory = async (id, data) => {
-    console.log(`[Woo] Atualizando categoria ${id}:`, data);
     const result = await callWooProxy({
         method: 'PUT',
         endpoint: `products/categories/${id}`,
@@ -240,7 +264,6 @@ export const updateWooCategory = async (id, data) => {
 };
 
 export const deleteWooCategory = async (id) => {
-    console.log(`[Woo] Excluindo categoria ${id}`);
     const result = await callWooProxy({
         method: 'DELETE',
         endpoint: `products/categories/${id}?force=true`
@@ -250,39 +273,22 @@ export const deleteWooCategory = async (id) => {
 };
 
 // ==================================================================
-//               SINCRONIZAÇÃO
+//               SINCRONIZAÇÃO MANUAL
 // ==================================================================
 
 export const syncWithWooCommerce = async () => {
-    console.log("[Sync] Solicitando sincronização ao servidor...");
+    console.log("[Sync] Solicitando sincronização...");
     
-    if (!functions) {
-        const msg = "Firebase Functions não inicializado. Recarregue a página.";
-        console.error(msg);
-        alert(msg);
-        return;
-    }
+    if (!functions) throw new Error("Firebase Functions indisponível.");
 
-    try {
-        const syncFunc = httpsCallable(functions, 'syncProductsFromWoo');
-        const result = await syncFunc();
-        const data = result.data;
-        
-        console.log("[Sync] Resultado:", data);
-        
-        if (data.success) {
-            alert(`Sincronização concluída! ${data.count || 0} produtos processados.`);
-            await fetchWooCommerceProducts(); 
-            await fetchWooCommerceCategories();
-        } else {
-            alert(`Aviso da Sincronização: ${data.message}`);
-        }
-        return data;
-
-    } catch (error) {
-        console.error("[Sync] Erro fatal:", error);
-        const userMsg = error.message || "Erro desconhecido";
-        alert(`Falha na sincronização: ${userMsg}`);
-        throw error;
+    const syncFunc = httpsCallable(functions, 'syncProductsFromWoo');
+    const result = await syncFunc();
+    const data = result.data;
+    
+    if (data.success) {
+        // Se sincronizou com sucesso, reseta o cache local para a página 1
+        await fetchWooCommerceProducts(1, '', '', false); 
+        await fetchWooCommerceCategories();
     }
+    return data;
 };

@@ -1,4 +1,4 @@
-// --- APP.JS (VERSÃO FINAL COMPLETA) ---
+// --- APP.JS (VERSÃO FINAL - CORREÇÃO DE DEPENDÊNCIA CIRCULAR) ---
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -6,14 +6,17 @@ import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapsh
 import { getFunctions } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
 
 // Serviços e Utils
-import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, auth, db, functions, appId } from '/services/firebaseService.js';
+import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef } from '/services/firebaseService.js';
 import { fetchWooCommerceProducts, fetchWooCommerceCategories } from '/services/wooCommerceService.js';
-import { formatCurrency, formatElapsedTime, getNumericValueFromCurrency, maskPhoneNumber } from '/utils.js';
+import { showToast } from '/utils.js'; 
+
+// Re-exporta para uso nos controllers
+export { showToast };
 
 // Controladores
-import { initPanelController, loadOpenTables, renderTableFilters, handleAbrirMesa, handleSearchTable, openTableMergeModal } from '/controllers/panelController.js';
-import { initOrderController, renderOrderScreen, increaseLocalItemQuantity, decreaseLocalItemQuantity, openObsModalForGroup, renderMenu } from '/controllers/orderController.js';
-import { initPaymentController, renderPaymentSummary, deletePayment, handleMassActionRequest, handleFinalizeOrder, handleMassDeleteConfirmed, executeDeletePayment, openTableTransferModal, handleConfirmTableTransfer } from '/controllers/paymentController.js';
+import { initPanelController, loadOpenTables, renderTableFilters, openTableMergeModal } from '/controllers/panelController.js';
+import { initOrderController, renderOrderScreen, renderMenu } from '/controllers/orderController.js';
+import { initPaymentController, renderPaymentSummary, handleMassActionRequest, openTableTransferModal, handleMassDeleteConfirmed, executeDeletePayment, handleConfirmTableTransfer } from '/controllers/paymentController.js';
 import { initManagerController, handleGerencialAction } from '/controllers/managerController.js';
 import { initUserManagementController, openUserManagementModal } from '/controllers/userManagementController.js';
 import { initCashierController } from '/controllers/cashierController.js';
@@ -53,34 +56,24 @@ export let userId = null;
 export let unsubscribeTable = null;
 
 // Elementos UI
-let statusScreen, mainContent, appContainer, loginScreen, mainHeader;
-let loginBtn, loginEmailInput, loginPasswordInput, loginErrorMsg;
+export let db = null;
+export let auth = null;
+export let functions = null;
+export let appId = null;
+
+let statusScreen, mainContent, appContainer, mainHeader;
 let clientLoginModal;
 
+// Garante compatibilidade global apenas para o que não depende de controllers
+window.showToast = showToast;
 
-// --- FUNÇÕES CORE E ROTEAMENTO ---
+// --- FUNÇÕES DE ROTEAMENTO ---
 
 export const hideStatus = () => {
     if (!statusScreen) statusScreen = document.getElementById('statusScreen');
     if (statusScreen) {
         statusScreen.style.cssText = 'display: none !important';
     }
-};
-
-export const showToast = (message, isError = false) => {
-    try {
-        const toast = document.createElement('div');
-        toast.textContent = message;
-        toast.className = 'fixed bottom-5 right-5 p-4 rounded-lg shadow-lg text-white z-[9999] transition-opacity duration-300 ease-out';
-        toast.style.backgroundColor = isError ? 'rgb(220, 38, 38)' : 'rgb(22, 163, 74)';
-        toast.style.opacity = '0'; 
-        document.body.appendChild(toast);
-        setTimeout(() => { toast.style.opacity = '1'; }, 10);
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 300); 
-        }, 3000); 
-    } catch (e) { console.error("Falha ao mostrar toast:", e); alert(message); }
 };
 
 const showLoginScreen = () => {
@@ -113,41 +106,6 @@ const hideLoginScreen = () => {
     if (logoutBtn) logoutBtn.classList.remove('hidden');
 };
 
-// --- LÓGICA DE PERMISSÕES DE UI (UX) ---
-const applyUserPermissions = (role) => {
-    const elements = {
-        managerBtn: document.getElementById('openManagerPanelBtn'),
-        kdsBtn: document.getElementById('openKdsBtn'),
-        cashierBtn: document.getElementById('openCashierBtn'),
-        finalizeBtn: document.getElementById('finalizeOrderBtn')
-    };
-
-    // Reset inicial (esconde tudo que é sensível)
-    if(elements.managerBtn) elements.managerBtn.classList.add('hidden');
-    if(elements.kdsBtn) elements.kdsBtn.classList.add('hidden');
-    if(elements.cashierBtn) elements.cashierBtn.classList.add('hidden');
-    
-    console.log(`[APP] Aplicando permissões para: ${role}`);
-
-    switch (role) {
-        case 'gerente':
-            // Gerente vê tudo
-            if(elements.managerBtn) elements.managerBtn.classList.remove('hidden');
-            if(elements.kdsBtn) elements.kdsBtn.classList.remove('hidden');
-            if(elements.cashierBtn) elements.cashierBtn.classList.remove('hidden');
-            break;
-        case 'caixa':
-            // Caixa vê Caixa e KDS (opcional), mas não Painel Gerencial
-            if(elements.cashierBtn) elements.cashierBtn.classList.remove('hidden');
-            if(elements.kdsBtn) elements.kdsBtn.classList.remove('hidden'); 
-            break;
-        case 'garcom':
-            // Garçom vê KDS (para saber se tá pronto), mas não mexe em caixa nem gerência
-            if(elements.kdsBtn) elements.kdsBtn.classList.remove('hidden');
-            break;
-    }
-};
-
 export const goToScreen = async (screenId) => {
     if (!appContainer) appContainer = document.getElementById('appContainer');
     if (!mainContent) mainContent = document.getElementById('mainContent');
@@ -160,13 +118,11 @@ export const goToScreen = async (screenId) => {
         if ((screenId === 'panelScreen' || screenId === 'loginScreen') && currentTableId && unsubscribeTable) {
             unsubscribeTable(); unsubscribeTable = null; currentTableId = null; currentOrderSnapshot = null; selectedItems.length = 0;
             
-            const currentTableNumEl = document.getElementById('current-table-number');
-            const paymentTableNumEl = document.getElementById('payment-table-number');
-            const orderScreenTableNumEl = document.getElementById('order-screen-table-number');
-            
-            if(currentTableNumEl) currentTableNumEl.textContent = 'Fator MD';
-            if(paymentTableNumEl) paymentTableNumEl.textContent = `Mesa`;
-            if(orderScreenTableNumEl) orderScreenTableNumEl.textContent = 'Pedido';
+            const els = ['current-table-number', 'payment-table-number', 'order-screen-table-number'];
+            els.forEach(id => {
+                const el = document.getElementById(id);
+                if(el) el.textContent = id === 'current-table-number' ? 'Fator MD' : 'Mesa';
+            });
         }
     }
 
@@ -181,7 +137,6 @@ export const goToScreen = async (screenId) => {
     const screenIndex = screens[screenId];
 
     if (screenIndex !== undefined) {
-        console.log(`[NAV] Navegando para ${screenId} (índice ${screenIndex})`);
         if (appContainer) appContainer.style.transform = `translateX(-${screenIndex * 100}vw)`;
         if (mainContent) mainContent.style.display = 'block';
         
@@ -195,128 +150,12 @@ export const goToScreen = async (screenId) => {
             const event = new CustomEvent('screenChanged', { detail: { screenId: screenId } });
             window.dispatchEvent(event);
         }
-    } else { console.error(`[NAV] Tentativa de navegar para tela inválida: ${screenId}`); }
+    }
 };
 window.goToScreen = goToScreen;
 
-export const handleTableTransferConfirmed = async (originTableId, targetTableId, itemsToTransfer, newDiners = 0, newSector = '') => {
-    if (!originTableId || !targetTableId || itemsToTransfer.length === 0) { return; }
-    if (originTableId === targetTableId) { return; }
+// --- LÓGICA CENTRAL DA MESA ---
 
-    const originTableRef = getTableDocRef(originTableId);
-    const targetTableRef = getTableDocRef(targetTableId);
-
-    const dbInstance = db;
-    if (!dbInstance) { return; }
-    const batch = writeBatch(dbInstance);
-
-    try {
-        const targetSnap = await getDoc(targetTableRef);
-        const targetTableIsOpen = targetSnap.exists() && targetSnap.data().status?.toLowerCase() === 'open';
-
-        if (!targetTableIsOpen) {
-            if (!newDiners || !newSector) { return; }
-            batch.set(targetTableRef, {
-                 tableNumber: parseInt(targetTableId), diners: newDiners, sector: newSector,
-                 status: 'open', createdAt: serverTimestamp(),
-                 total: 0, sentItems: [], payments: [], serviceTaxApplied: true, selectedItems: []
-            });
-        }
-
-        const transferValue = itemsToTransfer.reduce((sum, item) => sum + (item.price || 0), 0);
-        const originCurrentTotal = currentOrderSnapshot?.tableNumber == originTableId ? (currentOrderSnapshot.total || 0) : (await getDoc(originTableRef)).data()?.total || 0;
-        const originNewTotal = Math.max(0, originCurrentTotal - transferValue);
-
-        itemsToTransfer.forEach(item => { batch.update(originTableRef, { sentItems: arrayRemove(item) }); });
-        batch.update(originTableRef, { total: originNewTotal });
-
-        const targetData = targetTableIsOpen ? targetSnap.data() : { total: 0, sentItems: [] };
-        const targetNewTotal = (targetData.total || 0) + transferValue;
-
-        batch.update(targetTableRef, {
-             sentItems: arrayUnion(...itemsToTransfer),
-             total: targetNewTotal
-        });
-
-        await batch.commit();
-        goToScreen('panelScreen');
-
-    } catch (e) { console.error("Erro na transferência de mesa:", e); alert(`Falha na transferência dos itens: ${e.message}`); }
-};
-window.handleTableTransferConfirmed = handleTableTransferConfirmed;
-
-// --- MODAL DE AUTENTICAÇÃO DE GERENTE ---
-window.openManagerAuthModal = (action, payload = null) => {
-    if (userRole !== 'gerente') {
-        alert("Acesso negado. Apenas o perfil 'Gerente' pode realizar esta ação.");
-        return;
-    }
-    if (action === 'openWaiterReg') {
-        openUserManagementModal();
-        return;
-    }
-
-    const managerModal = document.getElementById('managerModal');
-    if (!managerModal) { console.error("Modal Gerente não encontrado!"); return; }
-
-    managerModal.innerHTML = `
-        <div class="bg-dark-card border border-gray-600 p-6 rounded-xl shadow-2xl w-full max-w-sm">
-            <h3 class="text-xl font-bold mb-4 text-red-400">Ação Gerencial Necessária</h3>
-            <p class="text-base mb-3 text-dark-text">Insira a senha do gerente para prosseguir.</p>
-            <form id="managerAuthForm">
-                <input type="password" id="managerPasswordInput" placeholder="Senha" class="w-full p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text placeholder-dark-placeholder focus:ring-red-500 focus:border-red-500 text-base" maxlength="4" autocomplete="current-password">
-            </form>
-            <div class="flex justify-end space-x-3 mt-4">
-                <button class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition text-base" onclick="document.getElementById('managerModal').style.display='none'">Cancelar</button>
-                <button id="authManagerBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-base" form="managerAuthForm">Autenticar</button>
-            </div>
-        </div>
-    `;
-
-    managerModal.style.display = 'flex';
-    const input = document.getElementById('managerPasswordInput');
-    const authBtn = document.getElementById('authManagerBtn');
-    const authForm = document.getElementById('managerAuthForm');
-
-    if(authBtn && input && authForm) {
-        const handleAuthClick = async () => {
-            if (input.value === '1234') { 
-                managerModal.style.display = 'none';
-                switch (action) {
-                    case 'executeMassDelete': handleMassDeleteConfirmed(); break;
-                    case 'executeMassTransfer': openTableTransferModal(); break;
-                    case 'openTableMerge': openTableMergeModal(); break;
-                    case 'deletePayment': executeDeletePayment(payload); break;
-                    case 'goToManagerPanel': await goToScreen('managerScreen'); break;
-                    case 'exportCsv': handleGerencialAction(action); break; // <--- NOVO (Exportar)
-                    // Outras ações gerenciais
-                    default: handleGerencialAction(action, payload); break;
-                }
-            } else {
-                alert("Senha incorreta.");
-                input.value = '';
-                input.focus();
-            }
-        };
-
-        authBtn.onclick = handleAuthClick;
-        authForm.addEventListener('submit', (e) => {
-            e.preventDefault(); 
-            handleAuthClick();
-        });
-        input.onkeydown = (e) => { if (e.key === 'Enter') handleAuthClick(); };
-    }
-};
-window.openManagerAuthModal = openManagerAuthModal;
-
-// --- EXPOSIÇÃO DE FUNÇÕES GLOBAIS ---
-window.handleGerencialAction = handleGerencialAction; 
-window.deletePayment = (timestamp) => window.openManagerAuthModal('deletePayment', timestamp);
-window.handleMassActionRequest = (action) => { if(action === 'delete') window.openManagerAuthModal('executeMassDelete'); else if (action === 'transfer') window.openManagerAuthModal('executeMassTransfer'); };
-window.openObsModalForGroup = openObsModalForGroup;
-
-
-// --- LÓGICA DE LISTENER DA MESA ---
 export const setTableListener = (tableId, isClientMode = false) => {
     if (unsubscribeTable) unsubscribeTable();
     const tableRef = getTableDocRef(tableId);
@@ -328,17 +167,11 @@ export const setTableListener = (tableId, isClientMode = false) => {
             if (isClientMode && currentOrderSnapshot.status === 'merged') {
                  if (unsubscribeTable) unsubscribeTable(); unsubscribeTable = null;
                  currentTableId = null;
-                 const masterTable = currentOrderSnapshot.masterTable || 'Mestra';
-                 clientLoginModal = document.getElementById('associationModal');
-                 if (clientLoginModal) clientLoginModal.style.display = 'flex';
-                 alert(`Esta mesa foi agrupada na Mesa ${masterTable}. Por favor, insira o número da Mesa ${masterTable}.`);
-                 const assocTableInput = document.getElementById('assocTableNumber');
-                 if (assocTableInput) assocTableInput.value = '';
+                 alert(`Esta mesa foi agrupada na Mesa ${currentOrderSnapshot.masterTable}.`);
                  return;
             }
 
             const firebaseSelectedItems = currentOrderSnapshot.selectedItems || [];
-
             if (JSON.stringify(firebaseSelectedItems) !== JSON.stringify(selectedItems)) {
                  if (!isClientMode || (isClientMode && selectedItems.length === 0)){
                      selectedItems.length = 0;
@@ -355,30 +188,22 @@ export const setTableListener = (tableId, isClientMode = false) => {
 
         } else {
              if (currentTableId === tableId) {
-                 alert(`Mesa ${tableId} foi fechada ou removida.`);
-                 if (unsubscribeTable) unsubscribeTable(); unsubscribeTable = null;
+                 showToast(`Mesa ${tableId} fechada.`, true);
+                 if (unsubscribeTable) unsubscribeTable(); 
                  currentTableId = null; currentOrderSnapshot = null; selectedItems.length = 0;
-                 if (isClientMode) {
-                     clientLoginModal = document.getElementById('associationModal');
-                     if(clientLoginModal) clientLoginModal.style.display = 'flex';
-                     alert('A mesa foi fechada. Você pode tentar se associar a outra mesa.');
-                 } else {
-                     goToScreen('panelScreen');
-                 }
+                 if (!isClientMode) goToScreen('panelScreen');
              }
         }
     }, (error) => {
-        console.error(`[APP] Erro no listener da mesa ${tableId}:`, error);
-         if (unsubscribeTable) unsubscribeTable(); unsubscribeTable = null;
+        console.error(`[APP] Erro listener mesa ${tableId}:`, error);
     });
 };
 
 export const setCurrentTable = (tableId, isClientMode = false, shouldListen = true) => {
     if (currentTableId === tableId && unsubscribeTable && shouldListen) {
-        if(currentOrderSnapshot){
-             if (isClientMode) {
-                 renderClientOrderScreen(currentOrderSnapshot);
-             } else {
+        if(currentOrderSnapshot) {
+             if (isClientMode) renderClientOrderScreen(currentOrderSnapshot);
+             else {
                  renderOrderScreen(currentOrderSnapshot);
                  renderPaymentSummary(currentTableId, currentOrderSnapshot);
              }
@@ -390,7 +215,7 @@ export const setCurrentTable = (tableId, isClientMode = false, shouldListen = tr
     selectedItems.length = 0;
     currentOrderSnapshot = null;
 
-    const els = ['current-table-number', 'payment-table-number', 'order-screen-table-number', 'client-table-number'];
+    const els = ['current-table-number', 'payment-table-number', 'order-screen-table-number'];
     els.forEach(id => {
         const el = document.getElementById(id);
         if(el) el.textContent = `Mesa ${tableId}`;
@@ -402,15 +227,153 @@ export const setCurrentTable = (tableId, isClientMode = false, shouldListen = tr
 };
 window.setCurrentTable = setCurrentTable;
 
-
 export const selectTableAndStartListener = async (tableId) => {
     try {
         await goToScreen('orderScreen'); 
         setCurrentTable(tableId); 
-    } catch (error) { console.error(`[APP] Erro ao selecionar mesa ${tableId}:`, error); alert("Erro ao abrir a mesa. Verifique a conexão."); }
+    } catch (error) { 
+        console.error(`[APP] Erro ao selecionar mesa ${tableId}:`, error); 
+        showToast("Erro ao abrir a mesa.", true); 
+    }
 };
 window.selectTableAndStartListener = selectTableAndStartListener;
 
+// --- LÓGICA DE TRANSFERÊNCIA DE MESA ---
+export const handleTableTransferConfirmed = async (originTableId, targetTableId, itemsToTransfer, newDiners = 0, newSector = '') => {
+    if (!originTableId || !targetTableId || itemsToTransfer.length === 0) return;
+    if (originTableId === targetTableId) return;
+
+    const originTableRef = getTableDocRef(originTableId);
+    const targetTableRef = getTableDocRef(targetTableId);
+    const batch = writeBatch(db);
+
+    try {
+        const targetSnap = await getDoc(targetTableRef);
+        const targetTableIsOpen = targetSnap.exists() && targetSnap.data().status?.toLowerCase() === 'open';
+
+        if (!targetTableIsOpen) {
+            if (!newDiners || !newSector) return;
+            batch.set(targetTableRef, {
+                 tableNumber: parseInt(targetTableId), diners: newDiners, sector: newSector,
+                 status: 'open', createdAt: serverTimestamp(),
+                 total: 0, sentItems: [], payments: [], serviceTaxApplied: true, selectedItems: []
+            });
+        }
+
+        const transferValue = itemsToTransfer.reduce((sum, item) => sum + (item.price || 0), 0);
+        const originData = currentOrderSnapshot?.tableNumber == originTableId ? currentOrderSnapshot : (await getDoc(originTableRef)).data();
+        const originNewTotal = Math.max(0, (originData?.total || 0) - transferValue);
+
+        itemsToTransfer.forEach(item => { batch.update(originTableRef, { sentItems: arrayRemove(item) }); });
+        batch.update(originTableRef, { total: originNewTotal });
+
+        const targetData = targetTableIsOpen ? targetSnap.data() : { total: 0, sentItems: [] };
+        const targetNewTotal = (targetData.total || 0) + transferValue;
+
+        batch.update(targetTableRef, {
+             sentItems: arrayUnion(...itemsToTransfer),
+             total: targetNewTotal
+        });
+
+        await batch.commit();
+        goToScreen('panelScreen');
+
+    } catch (e) { 
+        console.error("Erro transferência:", e); 
+        throw e; 
+    }
+};
+window.handleTableTransferConfirmed = handleTableTransferConfirmed;
+
+// --- MODAL DE AUTENTICAÇÃO DE GERENTE ---
+window.openManagerAuthModal = (action, payload = null) => {
+    if (userRole !== 'gerente') {
+        showToast("Acesso negado. Apenas Gerentes.", true);
+        return;
+    }
+    if (action === 'openWaiterReg') {
+        openUserManagementModal();
+        return;
+    }
+
+    const managerModal = document.getElementById('managerModal');
+    if (!managerModal) return;
+
+    managerModal.innerHTML = `
+        <div class="bg-dark-card border border-gray-600 p-6 rounded-xl shadow-2xl w-full max-w-sm">
+            <h3 class="text-xl font-bold mb-4 text-red-400">Senha de Gerente</h3>
+            <form id="managerAuthForm">
+                <input type="password" id="managerPasswordInput" placeholder="Senha" class="w-full p-3 bg-dark-input border border-gray-600 rounded-lg text-dark-text focus:ring-red-500 focus:border-red-500 text-base" maxlength="4" autocomplete="current-password">
+            </form>
+            <div class="flex justify-end space-x-3 mt-4">
+                <button class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition text-base" onclick="document.getElementById('managerModal').style.display='none'">Cancelar</button>
+                <button id="authManagerBtn" class="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-base" form="managerAuthForm">Confirmar</button>
+            </div>
+        </div>
+    `;
+
+    managerModal.style.display = 'flex';
+    const input = document.getElementById('managerPasswordInput');
+    const authBtn = document.getElementById('authManagerBtn');
+    const authForm = document.getElementById('managerAuthForm');
+
+    if(input) input.focus();
+
+    const handleAuthClick = async () => {
+        if (input.value === '1234') { 
+            managerModal.style.display = 'none';
+            switch (action) {
+                case 'executeMassDelete': handleMassDeleteConfirmed(); break;
+                case 'executeMassTransfer': openTableTransferModal(); break;
+                case 'openTableMerge': openTableMergeModal(); break; 
+                case 'deletePayment': executeDeletePayment(payload); break;
+                case 'goToManagerPanel': await goToScreen('managerScreen'); break;
+                case 'exportCsv': handleGerencialAction(action); break;
+                default: handleGerencialAction(action, payload); break;
+            }
+        } else {
+            showToast("Senha incorreta.", true);
+            input.value = '';
+            input.focus();
+        }
+    };
+
+    if(authBtn) authBtn.onclick = handleAuthClick;
+    if(authForm) authForm.addEventListener('submit', (e) => { e.preventDefault(); handleAuthClick(); });
+    if(input) input.onkeydown = (e) => { if (e.key === 'Enter') handleAuthClick(); };
+};
+window.openManagerAuthModal = openManagerAuthModal;
+
+// --- PERMISSÕES ---
+const applyUserPermissions = (role) => {
+    const elements = {
+        managerBtn: document.getElementById('openManagerPanelBtn'),
+        kdsBtn: document.getElementById('openKdsBtn'),
+        cashierBtn: document.getElementById('openCashierBtn'),
+        finalizeBtn: document.getElementById('finalizeOrderBtn')
+    };
+
+    if(elements.managerBtn) elements.managerBtn.classList.add('hidden');
+    if(elements.kdsBtn) elements.kdsBtn.classList.add('hidden');
+    if(elements.cashierBtn) elements.cashierBtn.classList.add('hidden');
+    
+    console.log(`[APP] Permissões: ${role}`);
+
+    switch (role) {
+        case 'gerente':
+            if(elements.managerBtn) elements.managerBtn.classList.remove('hidden');
+            if(elements.kdsBtn) elements.kdsBtn.classList.remove('hidden');
+            if(elements.cashierBtn) elements.cashierBtn.classList.remove('hidden');
+            break;
+        case 'caixa':
+            if(elements.cashierBtn) elements.cashierBtn.classList.remove('hidden');
+            if(elements.kdsBtn) elements.kdsBtn.classList.remove('hidden'); 
+            break;
+        case 'garcom':
+            if(elements.kdsBtn) elements.kdsBtn.classList.remove('hidden');
+            break;
+    }
+};
 
 // --- LÓGICA DE LOGIN ---
 const handleStaffLogin = async (event) => {
@@ -421,13 +384,13 @@ const handleStaffLogin = async (event) => {
     const loginBtn = document.getElementById('loginBtn');
     const loginErrorMsg = document.getElementById('loginErrorMsg');
 
-    if (!loginEmailInput || !loginPasswordInput || !loginBtn || !loginErrorMsg) return;
+    if (!loginEmailInput || !loginPasswordInput) return;
 
     const email = loginEmailInput.value;
     const password = loginPasswordInput.value;
 
     if (!email || !password) {
-        loginErrorMsg.textContent = "Por favor, preencha o e-mail e a senha.";
+        loginErrorMsg.textContent = "Preencha e-mail e senha.";
         loginErrorMsg.style.display = 'block';
         return;
     }
@@ -437,38 +400,35 @@ const handleStaffLogin = async (event) => {
     loginErrorMsg.style.display = 'none';
 
     try {
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        console.log("Login com Firebase Auth bem-sucedido!", userCredential.user);
-
+        await signInWithEmailAndPassword(auth, email, password);
     } catch (error) {
-        console.error("Erro no login Firebase Auth:", error.code, error.message);
-        loginErrorMsg.textContent = "E-mail ou senha inválidos.";
+        console.error("Erro login:", error);
+        loginErrorMsg.textContent = "Dados inválidos.";
         loginErrorMsg.style.display = 'block';
         loginBtn.disabled = false;
         loginBtn.textContent = 'Entrar';
     }
 };
 
-
 const handleLogout = () => {
     userId = null; currentTableId = null; selectedItems.length = 0; userRole = 'anonymous'; currentOrderSnapshot = null;
     if (unsubscribeTable) { unsubscribeTable(); unsubscribeTable = null; }
-
-    if (auth) {
-        signOut(auth).catch(error => console.error("Erro ao deslogar:", error));
-    }
-
+    if (auth) signOut(auth);
     showLoginScreen();
     const userIdDisplay = document.getElementById('user-id-display');
-    if(userIdDisplay) userIdDisplay.textContent = 'Usuário ID: Carregando...';
+    if(userIdDisplay) userIdDisplay.textContent = 'ID: Carregando...';
 };
 window.handleLogout = handleLogout;
 
 // --- FUNÇÕES DE INICIALIZAÇÃO ---
 const initStaffApp = async (staffName) => { 
-    console.log("[StaffApp] initStaffApp CALLED"); 
+    console.log("[StaffApp] Iniciando..."); 
     try {
-        // Inicializa Controladores
+        // HELPERS GLOBAIS PARA HTML (Definidos aqui para evitar erro de inicialização)
+        window.handleMassActionRequest = handleMassActionRequest;
+        window.openTableTransferModal = openTableTransferModal;
+        window.openTableMergeModal = openTableMergeModal; 
+
         initPanelController();
         initOrderController();
         initPaymentController();
@@ -477,13 +437,12 @@ const initStaffApp = async (staffName) => {
         initCashierController();
         initKdsController();
 
-        // Aplica Permissões de Visualização
         applyUserPermissions(userRole);
 
-        // Carrega Dados Iniciais
         renderTableFilters();
-        fetchWooCommerceProducts(renderMenu).catch(e => console.error("[INIT Staff] Falha produtos:", e));
-        fetchWooCommerceCategories(renderMenu).catch(e => console.error("[INIT Staff] Falha categorias:", e));
+        
+        fetchWooCommerceProducts().catch(e => console.error("[INIT] Falha produtos:", e));
+        fetchWooCommerceCategories(renderMenu).catch(e => console.error("[INIT] Falha categorias:", e));
 
         hideStatus();
         hideLoginScreen(); 
@@ -492,78 +451,60 @@ const initStaffApp = async (staffName) => {
         if(userIdDisplay) userIdDisplay.textContent = `Usuário: ${staffName} | ${userRole.toUpperCase()}`;
 
         loadOpenTables(); 
-
         await goToScreen('panelScreen'); 
-        console.log("[StaffApp] initStaffApp FINISHED."); 
 
     } catch (error) {
-        console.error("Erro CRÍTICO durante initStaffApp:", error);
+        console.error("Erro CRÍTICO no initStaffApp:", error);
         showLoginScreen(); 
     }
 };
 
 const initClientApp = async () => {
-    console.log("[ClientApp] initClientApp CALLED"); 
+    console.log("[ClientApp] Iniciando..."); 
     try {
-        if (auth && !auth.currentUser) {
-             await signInAnonymously(auth); 
-        }
+        if (auth && !auth.currentUser) await signInAnonymously(auth); 
         initClientOrderController();
         initClientPaymentController();
         clientLoginModal = document.getElementById('associationModal');
         if (clientLoginModal) clientLoginModal.style.display = 'none';
-        console.log("[ClientApp] initClientApp FINISHED"); 
+        
+        import('/controllers/clientOrderController.js').then(module => {
+             window.decreaseLocalItemQuantity = module.decreaseLocalItemQuantity;
+             window.increaseLocalItemQuantity = module.increaseLocalItemQuantity;
+        });
     } catch (error) {
-        console.error("Erro CRÍTICO durante initClientApp:", error);
+        console.error("Erro CRÍTICO no initClientApp:", error);
     }
 };
 
-
 // --- DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', async () => { 
-    console.log("[APP] 1. DOMContentLoaded iniciado"); 
-    
     try {
-        // 1. DECLARAÇÃO DA VARIÁVEL (ORDEM CRÍTICA)
         const isClientMode = window.location.pathname.includes('/client');
-        console.log(`[APP] 2. Modo detectado: ${isClientMode ? 'CLIENTE' : 'STAFF'}`);
+        console.log(`[APP] Modo: ${isClientMode ? 'CLIENTE' : 'STAFF'}`);
 
-        // 2. CONFIGURAÇÃO FIREBASE
         const firebaseConfigRaw = typeof window.__firebase_config !== 'undefined' ? window.__firebase_config : null;
         const firebaseConfig = firebaseConfigRaw ? JSON.parse(firebaseConfigRaw) : FIREBASE_CONFIG;
         const appIdentifier = typeof window.__app_id !== 'undefined' ? window.__app_id : "pdv_fator_instance_001";
+        appId = appIdentifier;
         
         const app = initializeApp(firebaseConfig);
-        const dbInstance = getFirestore(app);
-        const authInstance = getAuth(app);
-        const functionsInstance = getFunctions(app, 'us-central1');
+        db = getFirestore(app);
+        auth = getAuth(app);
+        functions = getFunctions(app, 'us-central1');
         
-        initializeFirebase(dbInstance, authInstance, appIdentifier, functionsInstance);
-        console.log("[APP] 3. Firebase Inicializado"); 
+        initializeFirebase(db, auth, appId, functions);
 
-        // 3. MAPEAMENTO
         statusScreen = document.getElementById('statusScreen');
         mainContent = document.getElementById('mainContent');
         appContainer = document.getElementById('appContainer');
         mainHeader = document.getElementById('mainHeader');
 
-        // 4. INICIALIZAÇÃO CONDICIONAL
         if (isClientMode) {
-            console.log("[APP] 4. Iniciando App Cliente");
             await initClientApp(); 
-            
-            // Carregamento dinâmico para o cliente
-            import('/controllers/clientOrderController.js').then(module => {
-                 window.decreaseLocalItemQuantity = module.decreaseLocalItemQuantity;
-                 window.increaseLocalItemQuantity = module.increaseLocalItemQuantity;
-             }).catch(err => console.error("Erro ao carregar controllers dinâmicos:", err));
-
         } else {
-             console.log("[APP] 4. Iniciando App Staff");
-             
              const loginForm = document.getElementById('loginForm');
-             loginBtn = document.getElementById('loginBtn');
-             loginPasswordInput = document.getElementById('loginPassword');
+             const loginPasswordInput = document.getElementById('loginPassword');
 
              if (loginForm) loginForm.addEventListener('submit', handleStaffLogin);
              if (loginPasswordInput) {
@@ -574,17 +515,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
              const loginTimeout = setTimeout(() => {
                  if (statusScreen && statusScreen.style.display !== 'none' && !auth.currentUser) {
-                     console.warn("[APP] Timeout de Login. Forçando tela.");
                      showLoginScreen();
                  }
              }, 3000);
 
-             onAuthStateChanged(authInstance, async (user) => {
+             onAuthStateChanged(auth, async (user) => {
                  clearTimeout(loginTimeout);
                  if (user && !user.isAnonymous) {
-                     console.log("[APP] Usuário autenticado:", user.email);
-                     
-                     const usersCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'users');
+                     console.log("[APP] Autenticado.");
+                     const usersCollectionRef = collection(db, 'artifacts', appIdentifier, 'public', 'data', 'users');
                      const userDocRef = doc(usersCollectionRef, user.email);
                      const docSnap = await getDoc(userDocRef);
 
@@ -599,24 +538,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                          userRole = userData.role;
                          await initStaffApp(userData.name); 
                      } else {
-                         alert("Usuário não encontrado no banco de dados.");
+                         alert("Usuário não encontrado.");
                          handleLogout();
                      }
                  } else {
-                     console.log("[APP] Não autenticado. Mostrando login.");
                      showLoginScreen();
                  }
              });
 
              const openManagerPanelBtn = document.getElementById('openManagerPanelBtn');
              const logoutBtnHeader = document.getElementById('logoutBtnHeader');
-             
              if (openManagerPanelBtn) openManagerPanelBtn.addEventListener('click', () => { window.openManagerAuthModal('goToManagerPanel'); });
              if (logoutBtnHeader) logoutBtnHeader.addEventListener('click', handleLogout);
         }
 
     } catch (e) {
-        console.error("Erro fatal na inicialização:", e);
+        console.error("Erro fatal:", e);
         if(statusScreen) {
              statusScreen.innerHTML = `<div class="flex flex-col items-center p-8 text-center"><h2 class="text-xl font-bold text-red-400">Erro Crítico</h2><p class="text-gray-400">${e.message}</p></div>`;
              statusScreen.style.display = 'flex';
@@ -624,12 +561,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// --- FUNÇÃO DE ALERTA SONORO ---
 export const playNotificationSound = () => {
     const audio = document.getElementById('notificationSound');
     if (audio) {
         audio.currentTime = 0; 
-        audio.play().catch(e => console.warn("Reprodução de som bloqueada."));
+        audio.play().catch(e => console.warn("Som bloqueado."));
     }
 };
-window.playNotificationSound = playNotificationSound;

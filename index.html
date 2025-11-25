@@ -458,7 +458,100 @@
     <div id="sangriaModal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[60] hidden p-4 print-hide"><div class="bg-dark-card border border-red-500/50 p-5 rounded-lg shadow-xl w-full max-w-xs"><h4 class="text-lg font-bold text-red-400 mb-3">Nova Sangria</h4><p class="text-xs text-gray-400 mb-3">Registre o valor entregue ao gerente.</p><input type="number" id="sangriaValueInput" class="input-pdv w-full mb-2" placeholder="Valor (R$)" step="0.01"><input type="text" id="sangriaReasonInput" class="input-pdv w-full mb-4" placeholder="Motivo (Ex: Recolhimento)"><div class="flex space-x-2"><button class="flex-1 bg-gray-600 text-white py-2 rounded hover:bg-gray-500" onclick="document.getElementById('sangriaModal').style.display='none'">Cancelar</button><button id="confirmSangriaBtn" class="flex-1 bg-red-600 text-white py-2 rounded hover:bg-red-700 font-bold">Salvar</button></div></div></div>
     <div id="waiterRegModal" class="hidden"></div>
     <div id="selectiveTransferModal" class="hidden"></div>
-    <div id="productManagementModal" class="hidden"></div>
+    <div id="productManagementModal" class="hidden"></div><div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center z-[80] hidden p-4 print-hide">
+        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
+            <h3 class="text-xl font-bold text-pumpkin mb-2" id="obsItemName">Item</h3>
+            <p class="text-sm text-gray-400 mb-3">Adicione observações para a cozinha.</p>
+            
+            <textarea id="obsInput" class="input-pdv w-full h-24 mb-4 p-3 text-white bg-dark-input border-gray-600 rounded-lg focus:ring-pumpkin focus:border-pumpkin" placeholder="Ex: Sem cebola, bem passado..."></textarea>
+            
+            <div class="flex items-center justify-between mb-4 p-3 bg-dark-input rounded-lg border border-gray-700">
+                <label class="flex items-center space-x-3 text-dark-text cursor-pointer w-full">
+                    <input type="checkbox" id="esperaSwitch" class="h-5 w-5 rounded text-pumpkin bg-gray-700 border-gray-500 focus:ring-pumpkin">
+                    <span class="font-bold text-yellow-400"><i class="fas fa-pause-circle mr-1"></i> Em Espera (Não enviar agora)</span>
+                </label>
+            </div>
+
+            <p class="text-xs text-gray-500 mb-2 uppercase font-bold">Obs. Rápidas:</p>
+            <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-6">
+                <span class="text-xs text-gray-600 italic">Carregando...</span>
+            </div>
+
+            <div class="flex space-x-3">
+                <button id="cancelObsBtn" class="flex-1 bg-gray-600 hover:bg-gray-500 text-white py-3 rounded-lg font-bold transition">Cancelar</button>
+                <button id="saveObsBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold transition shadow-lg">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="calculatorModal" class="fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center z-[90] hidden p-4 print-hide">
+        <div class="bg-dark-card border border-dark-border p-5 rounded-xl shadow-2xl w-full max-w-xs">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-indigo-400"><i class="fas fa-calculator mr-2"></i>Calculadora</h3>
+                <button id="closeCalcBtnX" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+            </div>
+            
+            <input type="text" id="calcDisplay" class="w-full bg-dark-bg text-right text-3xl font-mono text-white p-4 rounded-lg mb-4 border border-gray-600 shadow-inner focus:outline-none" readonly value="0">
+            
+            <div class="calculator-buttons grid grid-cols-4 gap-2">
+                <button class="calc-btn bg-gray-600 text-white p-4 rounded-lg font-bold hover:bg-gray-500 text-lg shadow" data-action="clear">C</button>
+                <button class="calc-btn bg-gray-700 text-indigo-300 p-4 rounded-lg font-bold hover:bg-gray-600 text-lg shadow" data-action="operator" data-value="/">÷</button>
+                <button class="calc-btn bg-gray-700 text-indigo-300 p-4 rounded-lg font-bold hover:bg-gray-600 text-lg shadow" data-action="operator" data-value="*">×</button>
+                <button class="calc-btn bg-red-900/50 text-red-200 p-4 rounded-lg font-bold hover:bg-red-900 text-lg shadow" data-action="backspace">⌫</button>
+
+                <button class="calc-btn bg-gray-800 text-white p-4 rounded-lg font-bold hover:bg-gray-700 text-xl shadow" data-action="number" data-value="7">7</button>
+                <button class="calc-btn bg-gray-800 text-white p-4 rounded-lg font-bold hover:bg-gray-700 text-xl shadow" data-action="number" data-value="8">8</button>
+                <button class="calc-btn bg-gray-800 text-white p-4 rounded-lg font-bold hover:bg-gray-700 text-xl shadow" data-action="number" data-value="9">9</button>
+                <button class="calc-btn bg-gray-700 text-indigo-300 p-4 rounded-lg font-bold hover:bg-gray-600 text-lg shadow" data-action="operator" data-value="-">-</button>
+
+                <button class="calc-btn bg-gray-800 text-white p-4 rounded-lg font-bold hover:bg-gray-700 text-xl shadow" data-action="number" data-value="4">4</button>
+                <button class="calc-btn bg-gray-800 text-white p-4 rounded-lg font-bold hover:bg-gray-700 text-xl shadow" data-action="number" data-value="5">5</button>
+                <button class="calc-btn bg-gray-800 text-white p-4 rounded-lg font-bold hover:bg-gray-700 text-xl shadow" data-action="number" data-value="6">6</button>
+                <button class="calc-btn bg-gray-700 text-indigo-300 p-4 rounded-lg font-bold hover:bg-gray-600 text-lg shadow" data-action="operator" data-value="+">+</button>
+
+                <button class="calc-btn bg-gray-800 text-white p-4 rounded-lg font-bold hover:bg-gray-700 text-xl shadow" data-action="number" data-value="1">1</button>
+                <button class="calc-btn bg-gray-800 text-white p-4 rounded-lg font-bold hover:bg-gray-700 text-xl shadow" data-action="number" data-value="2">2</button>
+                <button class="calc-btn bg-gray-800 text-white p-4 rounded-lg font-bold hover:bg-gray-700 text-xl shadow" data-action="number" data-value="3">3</button>
+                <button class="calc-btn bg-blue-600 text-white p-4 rounded-lg font-bold hover:bg-blue-700 row-span-2 flex items-center justify-center text-2xl shadow" data-action="calculate">=</button>
+
+                <button class="calc-btn bg-gray-800 text-white p-4 rounded-lg font-bold hover:bg-gray-700 col-span-2 text-xl shadow" data-action="number" data-value="0">0</button>
+                <button class="calc-btn bg-gray-800 text-white p-4 rounded-lg font-bold hover:bg-gray-700 text-xl shadow" data-action="decimal">,</button>
+            </div>
+            <button id="confirmCalcBtn" class="w-full mt-4 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold transition shadow-lg">Confirmar Valor</button>
+        </div>
+    </div>
+
+    <div id="tableTransferModal" class="fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center z-[80] hidden p-4 print-hide">
+        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-indigo-400">Transferir Itens</h3>
+                <button onclick="document.getElementById('tableTransferModal').style.display='none'" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            
+            <p class="text-sm text-gray-400 mb-4">Mova os itens selecionados para outra mesa.</p>
+
+            <div class="mb-4">
+                <label class="block text-xs text-gray-500 uppercase font-bold mb-1">Mesa de Destino</label>
+                <input type="number" id="targetTableInput" class="input-pdv w-full text-center text-xl font-bold p-3" placeholder="Nº Mesa">
+            </div>
+
+            <div id="newTableDinersInput" class="space-y-3 p-3 bg-gray-800 rounded-lg border border-gray-700 mb-6">
+                <p class="text-xs text-yellow-400 flex items-center"><i class="fas fa-info-circle mr-1"></i> Se a mesa não existir, preencha:</p>
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="number" id="newTableDiners" class="input-pdv w-full text-sm p-2 text-center" placeholder="Pessoas" value="1" min="1">
+                    <select id="newTableSector" class="input-pdv w-full text-sm p-2">
+                        </select>
+                </div>
+            </div>
+
+            <div id="transferStatus" class="text-sm text-center mb-4 text-yellow-400 hidden font-bold animate-pulse">Processando...</div>
+
+            <div class="flex space-x-3">
+                <button onclick="document.getElementById('tableTransferModal').style.display='none'" class="flex-1 bg-gray-600 hover:bg-gray-500 text-white py-3 rounded-lg font-bold transition">Cancelar</button>
+                <button id="confirmTableTransferBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-bold transition shadow-lg">Transferir</button>
+            </div>
+        </div>
+    </div>
 
     <audio id="notificationSound" src="ding.mp3" preload="auto"></audio>
 

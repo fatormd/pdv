@@ -1,5 +1,5 @@
-// --- CONTROLLERS/MANAGERCONTROLLER.JS ---
-// VERSÃO FINAL COMPLETA - MOBILE FIRST & HIERARQUIA
+// --- CONTROLLERS/MANAGERCONTROLLER.JS (VERSÃO FINAL INTEGRADA) ---
+// Inclui: Paginação no Hub, Busca Otimizada, UX/UI e Gestão Completa
 
 import { 
     db, appId, 
@@ -17,20 +17,27 @@ import {
     doc, setDoc, deleteDoc, updateDoc, serverTimestamp, getDoc, limit
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-import { formatCurrency } from "/utils.js";
+import { formatCurrency, toggleLoading } from "/utils.js"; //
 import { openUserManagementModal } from "/controllers/userManagementController.js";
 import { 
     syncWithWooCommerce, getProducts, getCategories, 
     createWooProduct, updateWooProduct, deleteWooProduct, fetchWooCommerceProducts, 
     createWooCategory, updateWooCategory, deleteWooCategory 
-} from "/services/wooCommerceService.js";
+} from "/services/wooCommerceService.js"; //
+import { showToast } from "/app.js"; 
 
 // --- VARIÁVEIS DE ESTADO ---
 let managerModal; 
-let managerAuthCallback;
 let voucherManagementModal, voucherListContainer, voucherForm;
 let reportDateInput;
 let managerControllerInitialized = false;
+
+// --- ESTADO DO HUB DE PRODUTOS (PAGINAÇÃO) ---
+let hubPage = 1;
+let hubSearch = '';
+let hubCategory = 'all';
+let hubSearchTimeout = null;
+let hubLoadMoreBtn;
 
 // --- INICIALIZAÇÃO ---
 export const initManagerController = () => {
@@ -106,7 +113,7 @@ export const handleGerencialAction = (action, payload) => {
 
         case 'openVoucherManagement': openVoucherManagementModal(); break;
         case 'openSectorManagement': renderSectorManagementModal(); break;
-        case 'openWooSync': syncWithWooCommerce(); break;
+        case 'openWooSync': handleSyncAction(); break;
         
         case 'openCashManagementReport': openReportPanel('active-shifts'); break;
         case 'openHouse': handleOpenHouse(); break;
@@ -122,9 +129,21 @@ export const handleGerencialAction = (action, payload) => {
     }
 };
 
+// --- AÇÃO DE SINCRONIZAÇÃO (UX MELHORADA) ---
+const handleSyncAction = async () => {
+    showToast("Iniciando sincronização...", false);
+    try {
+        await syncWithWooCommerce();
+        showToast("Sincronização concluída!", false);
+    } catch (e) {
+        console.error(e);
+        showToast("Erro na sincronização.", true);
+    }
+};
+
 
 // =================================================================
-//           GESTÃO DE PRODUTOS (HUB MOBILE-FIRST)
+//           GESTÃO DE PRODUTOS (HUB MOBILE-FIRST OTIMIZADO)
 // =================================================================
 const renderProductHub = async (activeTab = 'products') => {
     if (!managerModal) return;
@@ -139,7 +158,11 @@ const renderProductHub = async (activeTab = 'products') => {
         });
     }
 
-    // LAYOUT: Fullscreen no mobile (h-full w-full rounded-none), Card no desktop
+    // Reset Estado do Hub
+    hubPage = 1;
+    hubSearch = '';
+    hubCategory = 'all';
+
     managerModal.innerHTML = `
         <div class="bg-dark-card border-0 md:border md:border-dark-border w-full h-full md:h-[90vh] md:max-w-6xl flex flex-col md:rounded-xl shadow-2xl overflow-hidden">
             <div class="flex justify-between items-center p-4 md:p-6 border-b border-gray-700 bg-gray-800 flex-shrink-0">
@@ -169,7 +192,6 @@ const renderProductHub = async (activeTab = 'products') => {
     `;
     
     managerModal.style.display = 'flex';
-    // Remover padding do container pai no mobile (opcional, mas ajuda no full screen)
     managerModal.classList.remove('p-4');
     managerModal.classList.add('p-0', 'md:p-4');
 
@@ -191,7 +213,7 @@ const renderProductHub = async (activeTab = 'products') => {
         contentDiv.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500"><i class="fas fa-spinner fa-spin text-3xl"></i></div>';
 
         if (tabName === 'products') {
-            // TOOLBAR PRODUTOS
+            // TOOLBAR PRODUTOS (Com Busca e Filtro)
             toolbarDiv.innerHTML = `
                 <div class="flex items-center space-x-2 w-full md:w-auto">
                     <select id="hubCategoryFilter" class="bg-gray-700 text-white text-sm py-3 px-3 rounded-lg border border-gray-600 w-full md:w-[200px]">
@@ -209,24 +231,36 @@ const renderProductHub = async (activeTab = 'products') => {
                 </div>
             `;
             
-            document.getElementById('hubNewProductBtn').onclick = () => renderProductForm(null, contentDiv, () => renderProductList(contentDiv, 'all', ''));
+            document.getElementById('hubNewProductBtn').onclick = () => renderProductForm(null, contentDiv, () => renderProductList(contentDiv, hubCategory, hubSearch));
             const catSelect = document.getElementById('hubCategoryFilter');
             const searchInput = document.getElementById('hubSearchInput');
             
-            catSelect.onchange = (e) => renderProductList(contentDiv, e.target.value, searchInput.value);
-            searchInput.oninput = (e) => renderProductList(contentDiv, catSelect.value, e.target.value);
+            catSelect.onchange = (e) => {
+                hubCategory = e.target.value;
+                hubPage = 1;
+                renderProductList(contentDiv, hubCategory, hubSearch);
+            };
+
+            searchInput.oninput = (e) => {
+                hubSearch = e.target.value;
+                hubPage = 1;
+                clearTimeout(hubSearchTimeout);
+                hubSearchTimeout = setTimeout(() => {
+                    renderProductList(contentDiv, hubCategory, hubSearch);
+                }, 600);
+            };
             
+            // Carrega primeira página
+            await fetchWooCommerceProducts(1, '', 'all', false);
             await renderProductList(contentDiv, 'all', '');
 
         } else if (tabName === 'categories') {
-            // TOOLBAR CATEGORIAS
             toolbarDiv.innerHTML = `
                 <div class="flex-grow"></div>
                 <button id="hubNewRootCatBtn" class="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition shadow-lg flex items-center justify-center">
                     <i class="fas fa-plus mr-2"></i> Nova Categoria
                 </button>
             `;
-            
             document.getElementById('hubNewRootCatBtn').onclick = () => renderCategoryForm(null, contentDiv, () => renderCategoryManagement(contentDiv));
             await renderCategoryManagement(contentDiv);
         }
@@ -236,16 +270,21 @@ const renderProductHub = async (activeTab = 'products') => {
     switchTab(activeTab === 'inventory' || activeTab === 'recipes' || activeTab === 'obs' ? 'products' : activeTab);
 };
 
-// --- 1. LISTA DE PRODUTOS ---
-const renderProductList = async (container, catFilter, searchTerm) => {
-    let products = getProducts();
-    if (!products || products.length === 0) products = await fetchWooCommerceProducts();
-
-    if (catFilter && catFilter !== 'all') {
-        products = products.filter(p => p.categoryId == catFilter);
+// --- 1. LISTA DE PRODUTOS (COM PAGINAÇÃO E LOAD MORE) ---
+const renderProductList = async (container, catFilter, searchTerm, append = false) => {
+    
+    if (!append) {
+        container.innerHTML = '<div class="flex justify-center py-10"><i class="fas fa-spinner fa-spin text-3xl text-gray-500"></i></div>';
+        // Busca inicial (reset ou filtro)
+        await fetchWooCommerceProducts(1, searchTerm, catFilter, false);
     }
-    if (searchTerm) {
-        products = products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    let products = getProducts();
+    
+    // Se vazio e não é append
+    if (products.length === 0 && !append) {
+        container.innerHTML = '<p class="text-center text-gray-500 py-10">Nenhum produto encontrado.</p>';
+        return;
     }
 
     const listHtml = products.map(p => `
@@ -268,14 +307,57 @@ const renderProductList = async (container, catFilter, searchTerm) => {
             </div>
         </div>`).join('');
 
-    container.innerHTML = `<div class="pb-20">${products.length ? listHtml : '<p class="text-center text-gray-500 py-10">Nenhum produto encontrado.</p>'}</div>`;
+    // Botão Load More
+    const loadMoreHtml = `
+        <div class="pt-4 pb-20 text-center" id="hubLoadMoreContainer">
+            <button id="hubLoadMoreBtn" class="w-full md:w-1/2 py-3 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition font-bold border border-gray-600">
+                Carregar Mais Produtos
+            </button>
+        </div>
+    `;
 
+    if (!append) {
+        container.innerHTML = `<div class="pb-4">${listHtml}</div>${loadMoreHtml}`;
+    } else {
+        // Append logic
+        const loadMoreContainer = document.getElementById('hubLoadMoreContainer');
+        if(loadMoreContainer) loadMoreContainer.remove();
+        container.insertAdjacentHTML('beforeend', `<div class="pb-4">${listHtml}</div>${loadMoreHtml}`);
+    }
+
+    // Re-attach listeners (Edit/Delete)
+    // Nota: Ao usar insertAdjacentHTML, listeners antigos podem ser perdidos se não for delegado.
+    // Para simplificar no Manager, reatribuímos a todos.
     container.querySelectorAll('.btn-edit-prod').forEach(btn => 
-        btn.onclick = () => renderProductForm(products.find(p => p.id == btn.dataset.id), container, () => renderProductList(container, catFilter, searchTerm))
+        btn.onclick = () => {
+            const prod = products.find(p => p.id == btn.dataset.id);
+            renderProductForm(prod, container, () => renderProductList(container, catFilter, searchTerm));
+        }
     );
+    
     container.querySelectorAll('.btn-del-prod').forEach(btn => 
         btn.onclick = () => handleDeleteProduct(btn.dataset.id, () => renderProductList(container, catFilter, searchTerm))
     );
+
+    // Listener Load More
+    const loadBtn = document.getElementById('hubLoadMoreBtn');
+    if (loadBtn) {
+        loadBtn.onclick = async () => {
+            toggleLoading(loadBtn, true, 'Carregando...');
+            hubPage++;
+            const newItems = await fetchWooCommerceProducts(hubPage, searchTerm, catFilter, true); // Append=true
+            
+            if (newItems.length === 0) {
+                showToast("Não há mais produtos.", false);
+                loadBtn.style.display = 'none';
+            } else {
+                // A renderização "inteligente" aqui seria apenas adicionar o HTML novo, 
+                // mas para simplificar a lógica de listeners, chamamos renderProductList completo
+                // usando o cache atualizado.
+                renderProductList(container, catFilter, searchTerm);
+            }
+        };
+    }
 };
 
 // --- 2. CATEGORIAS ---
@@ -325,7 +407,7 @@ const renderCategoryManagement = async (container) => {
         btn.onclick = async () => {
             if(confirm("Excluir categoria?")) {
                 try { await deleteWooCategory(btn.dataset.id); renderCategoryManagement(container); } 
-                catch(e) { alert(e.message); }
+                catch(e) { showToast(e.message, true); }
             }
         };
     });
@@ -362,8 +444,9 @@ const renderCategoryForm = (category = null, container, onBack) => {
         try {
             if (isEdit && category.id) await updateWooCategory(category.id, { name });
             else await createWooCategory(name, parentId);
+            showToast("Categoria salva!", false);
             onBack();
-        } catch (err) { alert("Erro: " + err.message); }
+        } catch (err) { showToast("Erro: " + err.message, true); }
     };
 };
 
@@ -391,7 +474,6 @@ const renderProductForm = async (product = null, container, onBack) => {
     const sectorsSnap = await getDocs(query(getSectorsCollectionRef(), where('type', '==', 'production'), orderBy('name')));
     const sectors = sectorsSnap.docs.map(d => d.data().name);
 
-    // Layout Mobile-First: h-full, sem padding extra, botões grandes
     container.innerHTML = `
         <div class="w-full h-full flex flex-col bg-dark-bg">
             <div class="flex justify-between items-center mb-2 pb-2 border-b border-gray-700 flex-shrink-0">
@@ -562,7 +644,8 @@ const renderProductForm = async (product = null, container, onBack) => {
     // Salvar
     document.getElementById('btnSaveProduct').onclick = async () => {
         const submitBtn = document.getElementById('btnSaveProduct');
-        submitBtn.disabled = true; submitBtn.innerHTML = 'Salvando...';
+        toggleLoading(submitBtn, true, 'Salvando...');
+        
         const selectedCatId = finalIdInput.value; 
         const data = {
             name: document.getElementById('prodName').value,
@@ -574,14 +657,32 @@ const renderProductForm = async (product = null, container, onBack) => {
             images: [{ src: document.getElementById('prodImg').value }],
             meta_data: [ { key: 'sector', value: document.getElementById('prodSector').value }, { key: 'is_composite', value: document.getElementById('isComposite').checked ? 'yes' : 'no' } ]
         };
-        try { if(isEdit) await updateWooProduct(product.id, data); else await createWooProduct(data); alert("Salvo!"); if(onBack) onBack(); } 
-        catch(e) { alert(e.message); submitBtn.disabled = false; submitBtn.innerHTML = 'Salvar'; }
+        try { 
+            if(isEdit) await updateWooProduct(product.id, data); else await createWooProduct(data); 
+            showToast("Produto salvo com sucesso!", false);
+            if(onBack) onBack(); 
+        } 
+        catch(e) { 
+            showToast(e.message, true); 
+        } finally {
+            toggleLoading(submitBtn, false);
+        }
     };
     document.getElementById('btnBackToHub').onclick = onBack;
     document.getElementById('btnCancelForm').onclick = onBack;
 };
 
-const handleDeleteProduct = async (id, callback) => { if(confirm("Excluir?")) { try { await deleteWooProduct(id); if(callback) callback(); } catch(e) { alert(e.message); } } };
+const handleDeleteProduct = async (id, callback) => { 
+    if(confirm("Excluir?")) { 
+        try { 
+            await deleteWooProduct(id); 
+            showToast("Produto excluído.", false);
+            if(callback) callback(); 
+        } catch(e) { 
+            showToast(e.message, true); 
+        } 
+    } 
+};
 
 // =================================================================
 //              OUTROS MÓDULOS (MANTIDOS)
@@ -628,10 +729,10 @@ const fetchMonthlyPerformance = async () => {
     const now = new Date(); const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1); const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59); try { const goalSnap = await getDoc(getFinancialGoalsDocRef()); const meta = goalSnap.exists() ? (goalSnap.data().monthlyGoal || 0) : 0; const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'tables'), where('status', '==', 'closed'), where('closedAt', '>=', Timestamp.fromDate(startOfMonth)), where('closedAt', '<=', Timestamp.fromDate(endOfMonth))); const snapshot = await getDocs(q); let totalMonth = 0; snapshot.forEach(doc => { (doc.data().payments || []).forEach(p => { const v = parseFloat(p.value.toString().replace(/[^\d,.-]/g,'').replace(',','.')); if (!isNaN(v)) totalMonth += v; }); }); const percent = meta > 0 ? Math.min(100, (totalMonth / meta) * 100) : 0; const missing = Math.max(0, meta - totalMonth); const projection = now.getDate() > 0 ? (totalMonth / now.getDate()) * endOfMonth.getDate() : 0; document.getElementById('monthSoldDisplay').textContent = formatCurrency(totalMonth); document.getElementById('monthGoalDisplay').textContent = formatCurrency(meta); document.getElementById('monthMissing').textContent = formatCurrency(missing); document.getElementById('monthProjection').textContent = formatCurrency(projection); document.getElementById('monthProgressBar').style.width = `${percent}%`; } catch (e) { console.error(e); }
 };
 window.setMonthlyGoal = async () => { const newVal = prompt("Defina a Meta de Vendas (R$):"); if (newVal) { const numVal = parseFloat(newVal.replace('.','').replace(',','.')); if (!isNaN(numVal)) { await setDoc(getFinancialGoalsDocRef(), { monthlyGoal: numVal }, { merge: true }); fetchMonthlyPerformance(); } } };
-window.runDateComparison = async () => { const dateA = document.getElementById('compDateA').value; const dateB = document.getElementById('compDateB').value; if (!dateA || !dateB) { alert("Selecione datas."); return; } const getDayTotal = async (dateStr) => { const start = Timestamp.fromDate(new Date(dateStr + 'T00:00:00')); const end = Timestamp.fromDate(new Date(dateStr + 'T23:59:59')); const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'tables'), where('status', '==', 'closed'), where('closedAt', '>=', start), where('closedAt', '<=', end)); const snap = await getDocs(q); let total = 0; snap.forEach(d => { (d.data().payments || []).forEach(p => { const v = parseFloat(p.value.toString().replace(/[^\d,.-]/g,'').replace(',','.')); if(!isNaN(v)) total += v; }); }); return total; }; const [totalA, totalB] = await Promise.all([getDayTotal(dateA), getDayTotal(dateB)]); document.getElementById('compValueA').textContent = formatCurrency(totalA); document.getElementById('compValueB').textContent = formatCurrency(totalB); const diff = totalA > 0 ? ((totalB - totalA) / totalA) * 100 : (totalB > 0 ? 100 : 0); const el = document.getElementById('compDiffValue'); el.textContent = `${diff > 0 ? '+' : ''}${diff.toFixed(1)}%`; el.className = `text-xl font-extrabold ${diff >= 0 ? 'text-green-400' : 'text-red-400'}`; document.getElementById('comparisonResult').classList.remove('hidden'); };
-const handleOpenHouse = async () => { if (confirm("Abrir Turno?")) { try { await setDoc(getSystemStatusDocRef(), { startAt: serverTimestamp(), status: 'open' }, { merge: true }); alert("Turno Aberto!"); loadReports(); } catch (e) { alert(e.message); } } };
-const handleCloseDay = async () => { if (confirm("Encerrar Turno?")) { try { await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'daily_reports'), `daily_${new Date().toISOString().split('T')[0]}`), { closedAt: serverTimestamp() }); alert("Turno Encerrado!"); loadReports(); } catch (e) { alert(e.message); } } };
-const exportSalesToCSV = async () => { if (!reportDateInput) return; const dateVal = reportDateInput.value; if(!dateVal) { alert("Selecione data."); return; } const start = Timestamp.fromDate(new Date(dateVal + 'T00:00:00')); const end = Timestamp.fromDate(new Date(dateVal + 'T23:59:59')); const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'tables'), where('status', '==', 'closed'), where('closedAt', '>=', start), where('closedAt', '<=', end)); const snapshot = await getDocs(q); if (snapshot.empty) { alert("Sem dados."); return; } let csv = "Data,Mesa,Garcom,Total\r\n"; snapshot.forEach(doc => { const t = doc.data(); csv += `${t.closedAt?.toDate().toLocaleString() || ''},${t.tableNumber},${t.waiterId || 'N/A'},${t.total}\r\n`; }); const link = document.createElement("a"); link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8," + csv)); link.setAttribute("download", `vendas_${dateVal}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); };
+window.runDateComparison = async () => { const dateA = document.getElementById('compDateA').value; const dateB = document.getElementById('compDateB').value; if (!dateA || !dateB) { showToast("Selecione datas.", true); return; } const getDayTotal = async (dateStr) => { const start = Timestamp.fromDate(new Date(dateStr + 'T00:00:00')); const end = Timestamp.fromDate(new Date(dateStr + 'T23:59:59')); const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'tables'), where('status', '==', 'closed'), where('closedAt', '>=', start), where('closedAt', '<=', end)); const snap = await getDocs(q); let total = 0; snap.forEach(d => { (d.data().payments || []).forEach(p => { const v = parseFloat(p.value.toString().replace(/[^\d,.-]/g,'').replace(',','.')); if(!isNaN(v)) total += v; }); }); return total; }; const [totalA, totalB] = await Promise.all([getDayTotal(dateA), getDayTotal(dateB)]); document.getElementById('compValueA').textContent = formatCurrency(totalA); document.getElementById('compValueB').textContent = formatCurrency(totalB); const diff = totalA > 0 ? ((totalB - totalA) / totalA) * 100 : (totalB > 0 ? 100 : 0); const el = document.getElementById('compDiffValue'); el.textContent = `${diff > 0 ? '+' : ''}${diff.toFixed(1)}%`; el.className = `text-xl font-extrabold ${diff >= 0 ? 'text-green-400' : 'text-red-400'}`; document.getElementById('comparisonResult').classList.remove('hidden'); };
+const handleOpenHouse = async () => { if (confirm("Abrir Turno?")) { try { await setDoc(getSystemStatusDocRef(), { startAt: serverTimestamp(), status: 'open' }, { merge: true }); showToast("Turno Aberto!", false); loadReports(); } catch (e) { showToast(e.message, true); } } };
+const handleCloseDay = async () => { if (confirm("Encerrar Turno?")) { try { await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'daily_reports'), `daily_${new Date().toISOString().split('T')[0]}`), { closedAt: serverTimestamp() }); showToast("Turno Encerrado!", false); loadReports(); } catch (e) { showToast(e.message, true); } } };
+const exportSalesToCSV = async () => { if (!reportDateInput) return; const dateVal = reportDateInput.value; if(!dateVal) { showToast("Selecione data.", true); return; } const start = Timestamp.fromDate(new Date(dateVal + 'T00:00:00')); const end = Timestamp.fromDate(new Date(dateVal + 'T23:59:59')); const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'tables'), where('status', '==', 'closed'), where('closedAt', '>=', start), where('closedAt', '<=', end)); const snapshot = await getDocs(q); if (snapshot.empty) { showToast("Sem dados.", true); return; } let csv = "Data,Mesa,Garcom,Total\r\n"; snapshot.forEach(doc => { const t = doc.data(); csv += `${t.closedAt?.toDate().toLocaleString() || ''},${t.tableNumber},${t.waiterId || 'N/A'},${t.total}\r\n`; }); const link = document.createElement("a"); link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8," + csv)); link.setAttribute("download", `vendas_${dateVal}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); };
 const renderSectorManagementModal = async () => { if (!managerModal) return; managerModal.innerHTML = `<div class="bg-dark-card border border-dark-border p-6 rounded-xl w-full max-w-lg h-[80vh] flex flex-col"><div class="flex justify-between mb-4"><h3 class="text-xl font-bold text-pumpkin">Setores</h3><button onclick="document.getElementById('managerModal').style.display='none'" class="text-white text-2xl">&times;</button></div><form id="addSectorForm" class="flex space-x-2 mb-4"><input type="text" id="newSectorName" class="input-pdv w-full" required><button type="submit" class="bg-green-600 px-4 rounded font-bold">+</button></form><div id="sectorListContainer" class="flex-grow overflow-y-auto custom-scrollbar space-y-2"></div></div>`; managerModal.style.display = 'flex'; const container = document.getElementById('sectorListContainer'); const snap = await getDocs(query(getSectorsCollectionRef(), orderBy('name'))); container.innerHTML = snap.docs.map(d => `<div class="flex justify-between bg-dark-input p-3 rounded border border-gray-700"><span class="text-white">${d.data().name}</span><button onclick="window.deleteSector('${doc.id}')" class="text-red-400"><i class="fas fa-trash"></i></button></div>`).join(''); document.getElementById('addSectorForm').onsubmit = async (e) => { e.preventDefault(); const val = document.getElementById('newSectorName').value; if(val) { await setDoc(doc(getSectorsCollectionRef(), val.toLowerCase()), { name: val, type: 'service' }); renderSectorManagementModal(); }}; };
 const renderCustomerCrmModal = async () => { if (!managerModal) return; managerModal.innerHTML = `<div class="bg-dark-card border border-dark-border p-6 rounded-xl w-full max-w-4xl h-[85vh] flex flex-col"><div class="flex justify-between mb-4"><h3 class="text-2xl font-bold text-indigo-400">CRM</h3><button onclick="document.getElementById('managerModal').style.display='none'" class="text-white text-3xl">&times;</button></div><input type="text" id="crmSearch" class="input-pdv mb-4" placeholder="Buscar..."><div id="crmList" class="flex-grow overflow-y-auto custom-scrollbar"></div></div>`; managerModal.style.display = 'flex'; const container = document.getElementById('crmList'); const snap = await getDocs(query(getCustomersCollectionRef(), limit(50))); container.innerHTML = snap.docs.map(d => `<div class="p-3 border-b border-gray-700 text-white">${d.data().name} - ${d.data().phone}</div>`).join(''); };
 const openVoucherManagementModal = async () => { if (!voucherManagementModal) return; managerModal.style.display = 'none'; voucherManagementModal.style.display = 'flex'; await fetchVouchers(); };

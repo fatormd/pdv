@@ -1,30 +1,27 @@
-// --- CONTROLLERS/PAYMENTCONTROLLER.JS (VERSÃO FINAL - ARQUIVAMENTO E PROTEÇÃO) ---
-import { currentTableId, currentOrderSnapshot, userId, goToScreen } from "/app.js";
-import { formatCurrency, calculateItemsValue, getNumericValueFromCurrency } from "/utils.js";
-import { getTableDocRef, getCustomersCollectionRef, db, getTablesCollectionRef } from "/services/firebaseService.js";
+// --- CONTROLLERS/PAYMENTCONTROLLER.JS (VERSÃO FINAL - COM FECHAMENTO DE MESA VAZIA/ORFÃ) ---
+import { currentTableId, currentOrderSnapshot, userId, goToScreen, showToast } from "/app.js"; //
+import { formatCurrency, calculateItemsValue, getNumericValueFromCurrency } from "/utils.js"; //
+import { getTableDocRef, getCustomersCollectionRef, db, getTablesCollectionRef } from "/services/firebaseService.js"; //
 import {
-    updateDoc, arrayUnion, arrayRemove, writeBatch, getFirestore, getDoc, serverTimestamp,
-    collection, query, where, getDocs, addDoc, setDoc, doc, increment
+    updateDoc, arrayUnion, arrayRemove, writeBatch, getDoc, serverTimestamp,
+    setDoc, doc, increment, query, where, getDocs
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { createWooCommerceOrder } from "/services/wooCommerceService.js";
-
+import { createWooCommerceOrder } from "/services/wooCommerceService.js"; //
 
 // --- VARIÁVEIS DE ELEMENTOS ---
-let paymentSplitsContainer, addSplitAccountBtn;
 let reviewItemsList;
 let orderSubtotalDisplay, orderServiceTaxDisplay, orderTotalDisplay, valuePerDinerDisplay, remainingBalanceDisplay;
 let toggleServiceTaxBtn, dinersSplitInput;
 let paymentSummaryList, chargeInputs, openCustomerRegBtn, customerSearchInput, paymentMethodButtonsContainer, paymentValueInput, openCalculatorBtn, addPaymentBtn;
 let finalizeOrderBtn, openNfeModalBtn;
 let calculatorModal, calcDisplay, calcButtonsContainer, closeCalcBtnX, confirmCalcBtn; 
-let selectiveTransferModal, targetTableInput, checkTargetTableBtn, confirmTransferBtn, transferStatus, transferItemsList;
-let tableTransferModal;
+let tableTransferModal, targetTableInput, confirmTransferBtn;
+let printSummaryBtn;
 let customerRegModal, customerSearchCpfInput, searchCustomerByCpfBtn, customerSearchResultsDiv;
 let customerNameInput, customerCpfInput, customerPhoneInput, customerEmailInput;
 let closeCustomerRegModalBtn, saveCustomerBtn, linkCustomerToTableBtn;
 let currentFoundCustomer = null;
 let decreaseDinersBtn, increaseDinersBtn;
-let printSummaryBtn;
 
 // Estado local
 let isMassSelectionActive = false;
@@ -33,12 +30,21 @@ let paymentInitialized = false;
 // Constante de métodos de pagamento
 const PAYMENT_METHODS = ['Dinheiro', 'Pix', 'Crédito', 'Débito', 'Ticket', 'Voucher'];
 
-
-// --- FUNÇÕES DE CÁLCULO E UTILIDADE ---
-const calculateTotal = (subtotal, applyServiceTax) => {
-    const serviceTax = applyServiceTax ? subtotal * 0.10 : 0;
-    return subtotal + serviceTax;
+// --- HELPER DE UI: LOADING STATE ---
+const toggleLoading = (btnElement, isLoading, loadingText = 'Processando...') => {
+    if (!btnElement) return;
+    if (isLoading) {
+        btnElement.dataset.originalText = btnElement.innerHTML;
+        btnElement.disabled = true;
+        btnElement.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${loadingText}`;
+        btnElement.classList.add('opacity-75', 'cursor-not-allowed');
+    } else {
+        btnElement.disabled = false;
+        btnElement.innerHTML = btnElement.dataset.originalText || 'Confirmar';
+        btnElement.classList.remove('opacity-75', 'cursor-not-allowed');
+    }
 };
+
 const updateText = (id, value) => {
     const el = document.getElementById(id);
     if (el) el.textContent = value;
@@ -130,45 +136,39 @@ function backspace() {
      calculatorState.displayValue = displayValue.length > 1 ? displayValue.slice(0, -1) : '0';
 }
 
-
 // --- FUNÇÕES DE AÇÃO (PAGAMENTO) ---
+
 export const executeDeletePayment = async (timestamp) => {
     if (!currentTableId || !timestamp) return;
     const tableRef = getTableDocRef(currentTableId);
+    
     const paymentToDelete = currentOrderSnapshot?.payments.find(p => p.timestamp == timestamp); 
     
-    if (!paymentToDelete) {
-        const paymentsArray = currentOrderSnapshot?.payments || [];
-        const paymentIndex = paymentsArray.findIndex(p => p.timestamp == timestamp);
-        if (paymentIndex === -1) {
-            alert("Erro: Pagamento não encontrado para exclusão.");
-            return;
-        }
-        const paymentToRemove = paymentsArray[paymentIndex];
-
-        try {
-            await updateDoc(tableRef, { payments: arrayRemove(paymentToRemove) });
-            alert("Pagamento removido com sucesso (via arrayRemove).");
-        } catch (e) {
-             console.error("Erro ao remover pagamento:", e);
-             alert("Falha ao remover pagamento. Tente recarregar a mesa.");
-        }
-        return;
-    }
-    
     try {
-        await updateDoc(tableRef, { payments: arrayRemove(paymentToDelete) });
-        alert("Pagamento removido com sucesso.");
+        if (paymentToDelete) {
+            await updateDoc(tableRef, { payments: arrayRemove(paymentToDelete) });
+        } else {
+            const paymentsArray = currentOrderSnapshot?.payments || [];
+            const idx = paymentsArray.findIndex(p => p.timestamp == timestamp);
+            if (idx > -1) {
+                const freshSnap = await getDoc(tableRef);
+                const freshPayments = freshSnap.data()?.payments || [];
+                const freshPaymentToDelete = freshPayments.find(p => p.timestamp == timestamp);
+                if (freshPaymentToDelete) {
+                    await updateDoc(tableRef, { payments: arrayRemove(freshPaymentToDelete) });
+                }
+            }
+        }
+        showToast("Pagamento removido com sucesso.", false);
     } catch (e) {
         console.error("Erro ao remover pagamento:", e);
-        alert("Falha ao remover pagamento.");
+        showToast("Falha ao remover pagamento.", true);
     }
 };
 
-export const deletePayment = async (timestamp) => {
+window.deletePayment = (timestamp) => {
     window.openManagerAuthModal('deletePayment', timestamp); 
 };
-window.deletePayment = deletePayment;
 
 const _validatePaymentInputs = () => {
     if (!addPaymentBtn) return;
@@ -180,7 +180,8 @@ const _validatePaymentInputs = () => {
     addPaymentBtn.classList.toggle('cursor-not-allowed', !isValid); 
 };
 
-// --- FUNÇÕES DE RENDERIZAÇÃO (PAGAMENTO) ---
+// --- FUNÇÕES DE RENDERIZAÇÃO ---
+
 const renderRegisteredPayments = (payments) => {
     if (!paymentSummaryList) return;
     if (!payments || payments.length === 0) {
@@ -209,19 +210,13 @@ const renderRegisteredPayments = (payments) => {
 
 const renderPaymentMethodButtons = () => {
     if (!paymentMethodButtonsContainer) return;
-    
     paymentMethodButtonsContainer.innerHTML = PAYMENT_METHODS.map(method => `
-        <button class="payment-method-btn" data-method="${method}">
-            ${method}
-        </button>
+        <button class="payment-method-btn" data-method="${method}">${method}</button>
     `).join('');
 };
 
-const renderPaymentSplits = (orderSnapshot) => { /* Função desativada */ };
-
 export const renderPaymentSummary = (tableId, orderSnapshot) => {
-    if (!paymentInitialized) return; 
-    if (!orderSnapshot) return; 
+    if (!paymentInitialized || !orderSnapshot) return; 
 
     const payments = orderSnapshot.payments || [];
     const sentItems = orderSnapshot.sentItems || [];
@@ -242,38 +237,36 @@ export const renderPaymentSummary = (tableId, orderSnapshot) => {
     updateText('orderServiceTaxDisplayPayment', formatCurrency(serviceTax));
     updateText('orderTotalDisplayPayment', formatCurrency(totalPrincipalAccount));
     updateText('valuePerDinerDisplay', formatCurrency(valuePerDiner));
-    updateText('remainingBalanceDisplay', formatCurrency(remainingBalancePrincipal > 0 ? remainingBalancePrincipal : 0));
+    updateText('remainingBalanceDisplay', formatCurrency(Math.max(0, remainingBalancePrincipal)));
     updateText('valuePerDinerDisplayPrint', formatCurrency(valuePerDiner));
-
 
     if (toggleServiceTaxBtn) {
         toggleServiceTaxBtn.textContent = applyServiceTax ? 'Remover' : 'Aplicar';
         toggleServiceTaxBtn.classList.toggle('bg-red-600', applyServiceTax);
         toggleServiceTaxBtn.classList.toggle('bg-green-600', !applyServiceTax);
         toggleServiceTaxBtn.disabled = false;
-        toggleServiceTaxBtn.style.opacity = '1';
     }
     
     if (finalizeOrderBtn) {
         const canFinalize = remainingBalancePrincipal <= 0.01;
-        
         if (!finalizeOrderBtn.innerHTML.includes('fa-spinner')) {
             finalizeOrderBtn.disabled = !canFinalize;
+            finalizeOrderBtn.classList.toggle('opacity-50', !canFinalize);
+            finalizeOrderBtn.classList.toggle('cursor-not-allowed', !canFinalize);
         }
-        
-        finalizeOrderBtn.classList.toggle('opacity-50', !canFinalize);
-        finalizeOrderBtn.classList.toggle('cursor-not-allowed', !canFinalize);
     }
     
     renderReviewItemsList(orderSnapshot);
     renderRegisteredPayments(payments); 
     
-    if (customerSearchInput && orderSnapshot?.clientName) {
-        customerSearchInput.value = orderSnapshot.clientName;
-        customerSearchInput.disabled = true;
-    } else if (customerSearchInput) {
-        customerSearchInput.value = '';
-        customerSearchInput.disabled = false;
+    if (customerSearchInput) {
+        if (orderSnapshot?.clientName) {
+            customerSearchInput.value = orderSnapshot.clientName;
+            customerSearchInput.disabled = true;
+        } else {
+            customerSearchInput.value = '';
+            customerSearchInput.disabled = false;
+        }
     }
 };
 
@@ -282,10 +275,12 @@ const renderReviewItemsList = (orderSnapshot) => {
     const items = orderSnapshot?.sentItems || [];
     const oldActionBar = document.getElementById('reviewActionBar');
     if (oldActionBar) oldActionBar.remove();
+
     if (items.length === 0) {
-        reviewItemsList.innerHTML = `<div class="text-sm text-dark-placeholder italic p-2">Nenhum item na conta principal para revisão.</div>`;
+        reviewItemsList.innerHTML = `<div class="text-sm text-dark-placeholder italic p-2">Nenhum item na conta principal.</div>`;
         return;
     }
+
     const groupedItems = items.reduce((acc, item) => { 
         const key = `${item.id}-${item.note || ''}`;
         if (!acc[key]) {
@@ -295,6 +290,7 @@ const renderReviewItemsList = (orderSnapshot) => {
         acc[key].originalItems.push(item);
         return acc;
      }, {});
+
     let itemsHtml = Object.values(groupedItems).map(group => { 
         const itemData = JSON.stringify(group.originalItems).replace(/'/g, '&#39;');
         return `
@@ -311,18 +307,17 @@ const renderReviewItemsList = (orderSnapshot) => {
             </div>
              <div class="flex flex-col min-w-0 mr-2 hidden print:block">
                  <span class="font-semibold text-dark-text truncate">${group.name} (${group.count}x)</span>
-                 <span class="text-xs text-dark-placeholder">${group.note || ''}</span>
              </div>
             <span class="font-bold text-pumpkin flex-shrink-0">${formatCurrency(group.price * group.count)}</span>
-        </div>
-        `;
+        </div>`;
      }).join('');
+
     const actionBarHtml = `
         <div id="reviewActionBar" class="flex justify-between items-center p-2 mt-4 bg-dark-input rounded-lg sticky bottom-0 print-hide">
             <div class="flex items-center">
                 <input type="checkbox" id="selectAllItems" class="mr-2 h-4 w-4"
                        onchange="window.activateItemSelection('toggleAll')">
-                <label for="selectAllItems" class="text-sm font-semibold">Selecionar Todos</label>
+                <label for="selectAllItems" class="text-sm font-semibold">Todos</label>
             </div>
             <div class="flex space-x-2">
                 <button id="massDeleteBtn" class="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm font-bold opacity-50 cursor-not-allowed" disabled>
@@ -332,23 +327,21 @@ const renderReviewItemsList = (orderSnapshot) => {
                     <i class="fas fa-arrow-right"></i> (<span id="transferCount">0</span>)
                 </button>
             </div>
-        </div>
-    `;
+        </div>`;
+        
     reviewItemsList.innerHTML = itemsHtml + actionBarHtml;
     attachReviewListListeners();
 };
 
 
-// --- LÓGICAS DE AÇÃO EM MASSA E TRANSFERÊNCIA ---
+// --- AÇÕES EM MASSA E TRANSFERÊNCIA ---
 window.activateItemSelection = (mode = null) => { 
     const allCheckboxes = document.querySelectorAll('#reviewItemsList input[type="checkbox"].item-select-checkbox');
     const selectAllBox = document.getElementById('selectAllItems');
     const deleteBtn = document.getElementById('massDeleteBtn');
     const transferBtn = document.getElementById('massTransferBtn');
 
-    if (!deleteBtn || !transferBtn || !selectAllBox) {
-        return;
-    }
+    if (!deleteBtn || !transferBtn || !selectAllBox) return;
 
     if (mode === 'toggleAll') {
         allCheckboxes.forEach(box => box.checked = selectAllBox.checked);
@@ -356,13 +349,10 @@ window.activateItemSelection = (mode = null) => {
 
     const selectedCheckboxes = document.querySelectorAll('#reviewItemsList input[type="checkbox"].item-select-checkbox:checked');
     const count = selectedCheckboxes.length;
-
     isMassSelectionActive = count > 0;
 
-    const deleteCountSpan = document.getElementById('deleteCount');
-    const transferCountSpan = document.getElementById('transferCount');
-    if (deleteCountSpan) deleteCountSpan.textContent = count;
-    if (transferCountSpan) transferCountSpan.textContent = count;
+    updateText('deleteCount', count);
+    updateText('transferCount', count);
 
     [deleteBtn, transferBtn].forEach(btn => {
         btn.disabled = !isMassSelectionActive;
@@ -379,15 +369,14 @@ window.activateItemSelection = (mode = null) => {
     window.itemsToTransfer = []; 
     selectedCheckboxes.forEach(box => {
         try {
-            const items = JSON.parse(box.dataset.items.replace(/&#39;/g, "'"));
-            window.itemsToTransfer.push(...items); 
+            window.itemsToTransfer.push(...JSON.parse(box.dataset.items.replace(/&#39;/g, "'")));
         } catch(e) { console.error("Erro ao ler dados de item para seleção:", e); }
     });
 };
 
 export const handleMassActionRequest = (action) => {
     if (!window.itemsToTransfer || window.itemsToTransfer.length === 0) { 
-        alert("Nenhum item selecionado.");
+        showToast("Nenhum item selecionado.", true);
         return;
     }
     if (action === 'delete') {
@@ -397,126 +386,79 @@ export const handleMassActionRequest = (action) => {
     }
 };
 
-// ===== FUNÇÃO PROTEGIDA CONTRA ERRO DE DOCUMENTO INEXISTENTE =====
 export const handleMassDeleteConfirmed = async () => {
-    if (!currentTableId) return; 
-
-    if (!window.itemsToTransfer || window.itemsToTransfer.length === 0) {
-        alert("Nenhum item selecionado para exclusão.");
+    if (!currentTableId || !window.itemsToTransfer || window.itemsToTransfer.length === 0) {
+        showToast("Nenhum item selecionado para exclusão.", true);
         return;
     }
 
-    // 1. BLOQUEIO DE UI (Previne clique duplo)
     const deleteBtn = document.getElementById('massDeleteBtn');
-    if (deleteBtn) deleteBtn.disabled = true;
+    toggleLoading(deleteBtn, true, '');
 
     const batch = writeBatch(db);
     const tableRef = getTableDocRef(currentTableId);
 
-    // 2. VERIFICAÇÃO DE EXISTÊNCIA
     try {
         const docSnap = await getDoc(tableRef);
         if (!docSnap.exists()) {
-            console.warn(`[MassDelete] Mesa ${currentTableId} não encontrada (já removida).`);
+            console.warn(`Mesa ${currentTableId} não encontrada.`);
             if (window.goToScreen) window.goToScreen('panelScreen');
             return;
         }
-    } catch (e) {
-        console.error("Erro ao verificar mesa:", e);
-        if (deleteBtn) deleteBtn.disabled = false; 
-        return;
-    }
 
-    const itemsToDelete = window.itemsToTransfer;
-    const currentSentItems = currentOrderSnapshot?.sentItems || [];
+        const itemsToDelete = window.itemsToTransfer;
+        const valueToDecrease = itemsToDelete.reduce((sum, item) => sum + (item.price || 0), 0);
+        const currentTotal = currentOrderSnapshot?.total || 0;
+        const newTotal = Math.max(0, currentTotal - valueToDecrease); 
 
-    const allItemsWillBeDeleted = currentSentItems.length === itemsToDelete.length && 
-        currentSentItems.every(sentItem => itemsToDelete.some(deleteItem => JSON.stringify(sentItem) === JSON.stringify(deleteItem)));
-
-    let closeTableConfirmed = false;
-    if (allItemsWillBeDeleted) {
-        closeTableConfirmed = confirm("Todos os itens serão removidos. Deseja FECHAR a mesa?");
-        if (!closeTableConfirmed) {
-             if (deleteBtn) deleteBtn.disabled = false; 
-             return; 
-        }
-    }
-
-    const valueToDecrease = itemsToDelete.reduce((sum, item) => sum + (item.price || 0), 0);
-    const currentTotal = currentOrderSnapshot?.total || 0;
-    const newTotal = Math.max(0, currentTotal - valueToDecrease); 
-
-    try {
         itemsToDelete.forEach(item => {
             batch.update(tableRef, { sentItems: arrayRemove(item) });
         });
 
         batch.update(tableRef, { total: newTotal });
 
-        if (closeTableConfirmed) {
-            batch.delete(tableRef); 
-        }
-
         await batch.commit();
-
-        alert(`${itemsToDelete.length} item(ns) removidos.`);
-        
+        showToast(`${itemsToDelete.length} item(ns) removidos.`, false);
         window.itemsToTransfer = []; 
-        window.activateItemSelection(); 
-
-        if (closeTableConfirmed && window.goToScreen) {
-            window.goToScreen('panelScreen');
-        } else {
-            if (deleteBtn) deleteBtn.disabled = false;
-        }
 
     } catch (e) {
-        if (e.code === 'not-found' || e.message.includes("No document to update")) {
-             console.warn("Conflito resolvido: Mesa já estava fechada.");
-             if (window.goToScreen) window.goToScreen('panelScreen');
-        } else {
-             console.error("Erro real ao excluir:", e);
-             alert("Erro: " + e.message);
-             if (deleteBtn) deleteBtn.disabled = false;
-        }
+        console.error("Erro mass delete:", e);
+        showToast("Erro ao excluir itens: " + e.message, true);
+    } finally {
+        toggleLoading(deleteBtn, false);
     }
 };
 
 export function openTableTransferModal() {
     if (!tableTransferModal) {
-        alert("Erro: Modal de transferência não inicializado.");
+        showToast("Erro: Modal de transferência não inicializado.", true);
         return;
     }
 
-    const targetInput = document.getElementById('targetTableInput');
+    if (targetTableInput) targetTableInput.value = '';
+    
     const newTableDinersDiv = document.getElementById('newTableDinersInput');
     const newTableDinersInput = document.getElementById('newTableDiners');
     const newTableSectorInput = document.getElementById('newTableSector');
-    const statusDiv = document.getElementById('transferStatus');
-    const confirmBtn = document.getElementById('confirmTableTransferBtn');
-
-    if (targetInput) targetInput.value = '';
+    
     if (newTableDinersDiv) newTableDinersDiv.style.display = 'none'; 
     if (newTableDinersInput) newTableDinersInput.value = '1';
     if (newTableSectorInput) newTableSectorInput.value = '';
-    if (statusDiv) {
-        statusDiv.style.display = 'none';
-        statusDiv.textContent = '';
-    }
-    if (confirmBtn) confirmBtn.disabled = true; 
+    
+    if (confirmTransferBtn) confirmTransferBtn.disabled = true; 
 
     tableTransferModal.style.display = 'flex';
-    if (targetInput) targetInput.focus(); 
+    if (targetTableInput) targetTableInput.focus(); 
 };
 
 export function handleConfirmTableTransfer() {
-    const targetTableId = document.getElementById('targetTableInput')?.value;
+    const targetTableId = targetTableInput?.value;
     const newDinersInput = document.getElementById('newTableDiners');
     const newSectorInput = document.getElementById('newTableSector');
     const newTableDinersDiv = document.getElementById('newTableDinersInput');
 
     if (!targetTableId || !window.itemsToTransfer || window.itemsToTransfer.length === 0) {
-        alert("Mesa de destino ou itens a transferir estão faltando.");
+        showToast("Destino ou itens inválidos.", true);
         return;
     }
 
@@ -527,45 +469,85 @@ export function handleConfirmTableTransfer() {
         newDiners = parseInt(newDinersInput?.value) || 0;
         newSector = newSectorInput?.value || '';
         if (newDiners <= 0 || !newSector) {
-            alert("Para abrir uma nova mesa, 'Pessoas' e 'Setor' são obrigatórios.");
+            showToast("Para nova mesa, Pessoas e Setor são obrigatórios.", true);
             return;
         }
     }
 
-    window.handleTableTransferConfirmed(currentTableId, targetTableId, window.itemsToTransfer, newDiners, newSector);
+    toggleLoading(confirmTransferBtn, true, 'Transferindo...');
 
-    if (tableTransferModal) tableTransferModal.style.display = 'none';
+    window.handleTableTransferConfirmed(currentTableId, targetTableId, window.itemsToTransfer, newDiners, newSector)
+        .then(() => {
+            if (tableTransferModal) tableTransferModal.style.display = 'none';
+            showToast("Transferência realizada!", false);
+        })
+        .catch((e) => {
+            showToast("Erro na transferência.", true);
+        })
+        .finally(() => {
+            toggleLoading(confirmTransferBtn, false);
+        });
 };
 
-// Placeholders
-const handleAddSplitAccount = () => { alert("Funcionalidade de divisão desativada.")};
-window.removeSplitAccount = (splitId) => { alert("Funcionalidade de divisão desativada.")};
-window.openPaymentModalForSplit = (splitId) => { alert("Funcionalidade de divisão desativada.")};
-window.openSplitTransferModal = (splitId, mode) => { alert("Funcionalidade de divisão desativada.")};
-
 // ==================================================================
-//           FUNÇÃO DE FECHAMENTO COM ARQUIVAMENTO NO HISTÓRICO
+//           FUNÇÃO DE FECHAMENTO COM LIMPEZA DE AGRUPADAS
 // ==================================================================
 export const handleFinalizeOrder = async () => {
-    if (!currentTableId || !currentOrderSnapshot) { alert("Erro: Nenhuma mesa carregada."); return; }
+    if (!currentTableId || !currentOrderSnapshot) return;
     
     const totalDaConta = currentOrderSnapshot.total || 0; 
     const payments = currentOrderSnapshot.payments || [];
     const totalPago = payments.reduce((sum, p) => sum + getNumericValueFromCurrency(p.value), 0);
     const remainingBalance = totalDaConta - totalPago;
+    const sentItems = currentOrderSnapshot.sentItems || [];
+
+    // --- LÓGICA DE MESA VAZIA/ORFÃ (NOVO) ---
+    if (sentItems.length === 0) {
+        if (!confirm(`Esta mesa não tem itens registrados. Deseja forçar o fechamento e limpar a mesa?`)) return;
+        
+        toggleLoading(finalizeOrderBtn, true, 'Limpando...');
+        
+        try {
+            const batch = writeBatch(db);
+            // Cria histórico de fechamento forçado
+            const historyRef = doc(getTablesCollectionRef(), `${currentTableId}_forced_close_${Date.now()}`);
+            batch.set(historyRef, { 
+                ...currentOrderSnapshot, 
+                status: 'forced_close', 
+                closedAt: serverTimestamp(), 
+                closedBy: userId || 'Staff',
+                note: 'Fechamento manual de mesa vazia/orfã'
+            });
+            
+            // Deleta a mesa
+            batch.delete(getTableDocRef(currentTableId));
+            
+            await batch.commit();
+            
+            showToast("Mesa limpa com sucesso.", false);
+            goToScreen('panelScreen');
+            return; // Sai da função
+
+        } catch (e) {
+            console.error("Erro ao limpar mesa:", e);
+            showToast(`Erro ao limpar: ${e.message}`, true);
+            toggleLoading(finalizeOrderBtn, false);
+            return;
+        }
+    }
+    // --------------------------------------------
 
     if (remainingBalance > 0.01) {
-         alert(`Ainda resta ${formatCurrency(remainingBalance)} a pagar.`);
+         showToast(`Ainda resta ${formatCurrency(remainingBalance)} a pagar.`, true);
          return;
     }
 
-    if (!confirm(`Tem certeza que deseja fechar a Mesa ${currentTableId}? Esta ação enviará o pedido ao WooCommerce e ARQUIVARÁ a mesa.`)) { return; }
+    if (!confirm(`Tem certeza que deseja fechar a Mesa ${currentTableId}?`)) return;
 
-    if(finalizeOrderBtn) finalizeOrderBtn.disabled = true;
-    const originalBtnText = finalizeOrderBtn.innerHTML;
-    finalizeOrderBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';
+    toggleLoading(finalizeOrderBtn, true, 'Fechando...');
 
     try {
+        // 1. Envia para WooCommerce
         const wooOrder = await createWooCommerceOrder(currentOrderSnapshot);
         
         const tableRef = getTableDocRef(currentTableId);
@@ -574,9 +556,8 @@ export const handleFinalizeOrder = async () => {
         
         const batch = writeBatch(db);
 
-        // 1. CRIA BACKUP (Histórico) - Essencial para Relatórios e Caixa
+        // 2. CRIA BACKUP (Histórico)
         const historyId = `${currentTableId}_closed_${Date.now()}`;
-        // IMPORTANTE: Usa a referência da coleção TABLES para criar o histórico
         const historyRef = doc(getTablesCollectionRef(), historyId);
 
         const closingData = {
@@ -590,10 +571,25 @@ export const handleFinalizeOrder = async () => {
 
         batch.set(historyRef, closingData);
 
-        // 2. DELETA A MESA ORIGINAL (Libera para novo cliente)
+        // 3. DELETA A MESA ORIGINAL
         batch.delete(tableRef); 
+
+        // 4. LIMPEZA DE MESAS FILHAS (AGRUPADAS)
+        // Busca todas as mesas que apontam para esta mesa como 'masterTable'
+        const mergedTablesQuery = query(
+            getTablesCollectionRef(), 
+            where('masterTable', '==', parseInt(currentTableId)), 
+            where('status', '==', 'merged')
+        );
         
-        // 3. ATUALIZA CRM
+        const mergedSnap = await getDocs(mergedTablesQuery);
+        
+        // Adiciona a deleção de cada mesa filha ao batch
+        mergedSnap.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+        
+        // 5. ATUALIZA CRM (Pontos)
         if (clientId) {
             const customerRef = doc(getCustomersCollectionRef(), clientId);
             batch.update(customerRef, {
@@ -611,24 +607,19 @@ export const handleFinalizeOrder = async () => {
         await batch.commit();
 
         const successMessage = clientId 
-            ? `Sucesso! Pedido Woo: #${wooOrder.id}. +${pointsEarned} pontos para o cliente.`
-            : `Sucesso! Pedido Woo: #${wooOrder.id}. Mesa fechada e arquivada.`;
+            ? `Sucesso! Pedido Woo: #${wooOrder.id}. +${pointsEarned} pontos.`
+            : `Sucesso! Pedido Woo: #${wooOrder.id}. Mesa arquivada.`;
             
-        alert(successMessage);
+        showToast(successMessage, false);
         window.goToScreen('panelScreen'); 
     
     } catch (e) {
         console.error("Erro ao finalizar:", e);
-        alert(`FALHA: ${e.message}. A mesa NÃO foi fechada.`);
-        
-        if(finalizeOrderBtn) {
-            finalizeOrderBtn.disabled = false; 
-            finalizeOrderBtn.innerHTML = originalBtnText;
-            finalizeOrderBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-        }
+        showToast(`FALHA: ${e.message}`, true);
+    } finally {
+        toggleLoading(finalizeOrderBtn, false, 'FINALIZAR CONTA');
     }
 };
-
 
 // --- GESTÃO DE CLIENTES ---
 const openCustomerRegModal = () => {
@@ -692,7 +683,7 @@ const saveCustomer = async () => {
     const email = customerEmailInput.value.trim().toLowerCase();
 
     if (!name || (documentNumber.length !== 11 && documentNumber.length !== 14)) {
-        alert("Nome e Documento obrigatórios.");
+        showToast("Nome e Documento obrigatórios.", true);
         return;
     }
 
@@ -713,15 +704,16 @@ const saveCustomer = async () => {
         if (customerSearchResultsDiv) customerSearchResultsDiv.innerHTML = `<p class="text-sm text-green-400">Salvo: <strong>${name}</strong></p>`;
         if (saveCustomerBtn) saveCustomerBtn.disabled = true;
         if (linkCustomerToTableBtn) linkCustomerToTableBtn.disabled = false;
+        showToast("Cliente salvo!", false);
     } catch (e) {
         console.error("Erro ao salvar:", e);
-        alert("Falha ao salvar cliente.");
+        showToast("Falha ao salvar cliente.", true);
     }
 };
 
 const linkCustomerToTable = async () => {
     if (!currentFoundCustomer || !currentTableId) {
-        alert("Selecione cliente e mesa.");
+        showToast("Selecione cliente e mesa.", true);
         return;
     }
     const tableRef = getTableDocRef(currentTableId);
@@ -737,9 +729,10 @@ const linkCustomerToTable = async () => {
         }
         if (customerRegModal) customerRegModal.style.display = 'none';
         currentFoundCustomer = null; 
+        showToast("Cliente associado.", false);
     } catch (e) {
         console.error("Erro ao associar:", e);
-        alert("Falha ao associar cliente.");
+        showToast("Falha ao associar cliente.", true);
     }
 };
 
@@ -774,9 +767,12 @@ export const initPaymentController = () => {
     if(paymentInitialized) return;
     console.log("[PaymentController] Inicializando...");
 
+    const splitContainer = document.getElementById('paymentSplitsContainer');
+    if (splitContainer) splitContainer.style.display = 'none';
+    const splitBtn = document.getElementById('addSplitAccountBtn');
+    if (splitBtn) splitBtn.style.display = 'none';
+
     reviewItemsList = document.getElementById('reviewItemsList');
-    paymentSplitsContainer = document.getElementById('paymentSplitsContainer');
-    addSplitAccountBtn = document.getElementById('addSplitAccountBtn');
     orderSubtotalDisplay = document.getElementById('orderSubtotalDisplayPayment');
     orderServiceTaxDisplay = document.getElementById('orderServiceTaxDisplayPayment');
     orderTotalDisplay = document.getElementById('orderTotalDisplayPayment');
@@ -820,7 +816,7 @@ export const initPaymentController = () => {
     saveCustomerBtn = document.getElementById('saveCustomerBtn');
     linkCustomerToTableBtn = document.getElementById('linkCustomerToTableBtn');
 
-    if (!reviewItemsList || !calculatorModal) { console.error("[PaymentController] Erro Fatal: Elementos não encontrados."); return; }
+    if (!reviewItemsList || !calculatorModal) return;
 
     renderPaymentMethodButtons();
 
@@ -863,30 +859,36 @@ export const initPaymentController = () => {
 
     if(addPaymentBtn) addPaymentBtn.addEventListener('click', async () => { 
         const selectedMethod = paymentMethodButtonsContainer?.querySelector('.active')?.dataset.method;
-        const rawValue = paymentValueInput?.value || '0';
-        const numericValue = getNumericValueFromCurrency(rawValue);
+        const numericValue = getNumericValueFromCurrency(paymentValueInput?.value || '0');
 
         if (!selectedMethod || numericValue <= 0 || !currentTableId) {
-            alert("Selecione método e valor.");
+            showToast("Selecione método e valor.", true);
             return;
         }
 
-        const tableRef = getTableDocRef(currentTableId);
-        const paymentData = {
-            method: selectedMethod,
-            value: formatCurrency(numericValue), 
-            timestamp: Date.now(),
-            byUser: userId || 'PDV Staff' 
-        };
+        toggleLoading(addPaymentBtn, true, '');
 
         try {
+            const tableRef = getTableDocRef(currentTableId);
+            const paymentData = {
+                method: selectedMethod,
+                value: formatCurrency(numericValue), 
+                timestamp: Date.now(),
+                byUser: userId || 'PDV Staff' 
+            };
+
             await updateDoc(tableRef, { payments: arrayUnion(paymentData) });
+            
             paymentValueInput.value = ''; 
             paymentMethodButtonsContainer.querySelectorAll('.payment-method-btn').forEach(b => b.classList.remove('active'));
             _validatePaymentInputs();
+            
+            showToast("Pagamento registrado!", false);
         } catch (e) {
             console.error("Erro pagamento:", e);
-            alert("Falha ao registrar pagamento.");
+            showToast("Falha ao registrar pagamento.", true);
+        } finally {
+            toggleLoading(addPaymentBtn, false);
         }
     });
 
