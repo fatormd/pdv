@@ -1,307 +1,250 @@
-// --- CONTROLLERS/KDSCONTROLLER.JS ---
-import { db, appId, getKdsCollectionRef, getTableDocRef } from "/services/firebaseService.js";
-import { onSnapshot, query, where, orderBy, updateDoc, doc, serverTimestamp, getDocs, deleteDoc, Timestamp, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { formatElapsedTime } from "/utils.js";
-import { showToast, playNotificationSound } from "/app.js";
+// --- CONTROLLERS/KDSCONTROLLER.JS (VERSÃO FINAL - COM NOTIFICAÇÃO DE MESA) ---
+import { getKdsCollectionRef, getTableDocRef, db } from "/services/firebaseService.js"; 
+import { query, where, orderBy, limit, onSnapshot, updateDoc, doc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { formatElapsedTime, toggleLoading } from "/utils.js"; 
+import { playNotificationSound, showToast } from "/app.js"; 
 
-let kdsInitialized = false;
+// Estado Local
 let unsubscribeKds = null;
-let kdsOrdersContainer;
-let sectorFilterSelect;
-let currentOrdersData = []; 
+let kdsInitialized = false;
+let currentSectorFilter = 'all'; 
 
 export const initKdsController = () => {
     if (kdsInitialized) return;
     console.log("[KDS] Inicializando...");
-
-    kdsOrdersContainer = document.getElementById('kdsOrdersContainer');
-    sectorFilterSelect = document.getElementById('kdsSectorFilter');
     
-    const savedFilter = localStorage.getItem('kds_sector_filter');
-    if (savedFilter && sectorFilterSelect) {
-        sectorFilterSelect.value = savedFilter;
-    }
+    // Elementos de UI
+    const filterSelect = document.getElementById('kdsSectorFilter');
+    const refreshBtn = document.getElementById('refreshKdsBtn');
+    const historyBtn = document.getElementById('historyKdsBtn');
 
-    if (sectorFilterSelect) {
-        sectorFilterSelect.addEventListener('change', (e) => {
-            localStorage.setItem('kds_sector_filter', e.target.value);
-            renderKdsScreen(currentOrdersData); 
+    // Listener do Filtro de Setor
+    if (filterSelect) {
+        filterSelect.addEventListener('change', (e) => {
+            currentSectorFilter = e.target.value;
+            loadKdsOrders(); 
         });
     }
     
-    document.getElementById('refreshKdsBtn')?.addEventListener('click', startKdsListener);
-    document.getElementById('historyKdsBtn')?.addEventListener('click', toggleKdsHistory);
+    // Botão de Atualização
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => {
+            loadKdsOrders();
+            showToast("Lista KDS atualizada.", false);
+        });
+    }
 
-    startKdsListener();
-    setInterval(updateKdsTimers, 60000);
+    // Botão de Histórico
+    if (historyBtn) {
+        historyBtn.addEventListener('click', () => {
+            const modal = document.getElementById('kdsHistoryModal');
+            if (modal) {
+                modal.style.display = 'flex';
+                loadKdsHistory(); 
+            }
+        });
+    }
 
+    loadKdsOrders();
     kdsInitialized = true;
 };
 
-const startKdsListener = () => {
-    if (unsubscribeKds) unsubscribeKds();
+// --- MONITORAMENTO EM TEMPO REAL ---
+const loadKdsOrders = () => {
+    if (unsubscribeKds) {
+        unsubscribeKds();
+    }
 
     const q = query(
-        getKdsCollectionRef(),
-        where('status', 'in', ['pending', 'preparing']),
+        getKdsCollectionRef(), 
+        where('status', 'in', ['pending', 'preparing']), 
         orderBy('sentAt', 'asc')
     );
 
     unsubscribeKds = onSnapshot(q, (snapshot) => {
+        const container = document.getElementById('kdsOrdersContainer');
+        if (!container) return;
+
+        container.innerHTML = '';
+        
+        // Filtra visualmente
+        const filteredDocs = snapshot.docs.filter(doc => {
+            const data = doc.data();
+            if (currentSectorFilter === 'all') return true;
+            return data.sectors && data.sectors[currentSectorFilter] && data.sectors[currentSectorFilter].length > 0;
+        });
+        
+        if (filteredDocs.length === 0) {
+            container.innerHTML = `<p class="col-span-full text-center text-gray-500 mt-10 text-lg">Sem pedidos na fila ${currentSectorFilter !== 'all' ? `do setor ${currentSectorFilter}` : ''}.</p>`;
+            return;
+        }
+
+        // Som
         snapshot.docChanges().forEach((change) => {
-            if (change.type === "added" && change.doc.data().status === 'pending') {
-                console.log("[KDS] Novo pedido! Tocando som...");
-                playNotificationSound();
+            if (change.type === 'added') {
+                const data = change.doc.data();
+                const hasSector = currentSectorFilter === 'all' || (data.sectors && data.sectors[currentSectorFilter]);
+                if (hasSector) {
+                    playNotificationSound();
+                }
             }
         });
 
-        currentOrdersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        renderKdsScreen(currentOrdersData);
+        filteredDocs.forEach(docSnap => {
+            renderKdsCard(container, docSnap.id, docSnap.data());
+        });
+
     }, (error) => {
-        console.error("[KDS] Erro no listener:", error);
-        if (kdsOrdersContainer) kdsOrdersContainer.innerHTML = `<p class="text-red-400 p-4">Erro de conexão: ${error.message}</p>`;
+        console.error("Erro KDS:", error);
+        const container = document.getElementById('kdsOrdersContainer');
+        if (container) container.innerHTML = `<p class="text-red-400 text-center mt-10">Erro de conexão: ${error.message}</p>`;
     });
 };
 
-const renderKdsScreen = (orders) => {
-    if (!kdsOrdersContainer) return;
+const renderKdsCard = (container, docId, data) => {
+    const card = document.createElement('div');
+    
+    const isPreparing = data.status === 'preparing';
+    const borderClass = isPreparing ? 'border-blue-500 ring-1 ring-blue-500' : 'border-gray-700 hover:border-gray-500';
+    const bgClass = isPreparing ? 'bg-gray-800' : 'bg-dark-card';
 
-    const currentFilter = sectorFilterSelect ? sectorFilterSelect.value.toLowerCase() : 'all';
+    card.className = `${bgClass} border ${borderClass} rounded-lg p-4 shadow-lg flex flex-col justify-between h-full animate-fade-in transition-all duration-300`;
+    
+    const time = data.sentAt ? formatElapsedTime(data.sentAt.toMillis ? data.sentAt.toMillis() : data.sentAt) : '--';
+    const tableDisplay = data.subTable ? `Mesa ${data.tableNumber} <span class="text-xs font-normal text-yellow-500">(Sub: ${data.subTable})</span>` : `Mesa ${data.tableNumber}`;
+    
+    let itemsHtml = '';
+    if (data.sectors) {
+        Object.entries(data.sectors).forEach(([sec, items]) => {
+            if (currentSectorFilter !== 'all' && currentSectorFilter !== sec) return;
 
-    const filteredOrdersHtml = orders.map(order => {
-        let hasItemsForView = false;
-        let itemsHtml = '';
-
-        if (order.sectors) {
-            Object.entries(order.sectors).forEach(([sectorName, items]) => {
-                const sectorNameLower = sectorName.toLowerCase();
-                if (currentFilter !== 'all' && sectorNameLower !== currentFilter) { return; }
-
-                if (items.length > 0) {
-                    hasItemsForView = true;
-                    itemsHtml += `<div class="mb-2 border-b border-gray-700 pb-1 last:border-0">
-                        <p class="text-[10px] md:text-xs uppercase font-bold text-pumpkin mb-1">${sectorName}</p>
-                        ${items.map(item => `
-                            <div class="flex justify-between items-start py-1">
-                                <div>
-                                    <span class="text-base md:text-lg font-bold text-gray-100 leading-tight">${item.name}</span>
-                                    ${item.note ? `<p class="text-xs md:text-sm text-yellow-400 bg-yellow-900/30 p-1 rounded mt-1"><i class="fas fa-exclamation-circle"></i> ${item.note}</p>` : ''}
-                                </div>
-                                <span class="text-gray-400 text-xs md:text-sm ml-2 whitespace-nowrap">1x</span>
-                            </div>
-                        `).join('')}
-                    </div>`;
-                }
-            });
-        }
-
-        if (!hasItemsForView) return '';
-
-        const sentAt = order.sentAt?.toDate ? order.sentAt.toDate() : new Date();
-        const elapsedTime = formatElapsedTime(sentAt.getTime());
-        
-        const diffMinutes = Math.floor((Date.now() - sentAt.getTime()) / 60000);
-        let timerColor = "text-gray-400";
-        let borderClass = "border-gray-700";
-        
-        if (diffMinutes >= 20) {
-            timerColor = "text-red-500 font-bold animate-pulse";
-            borderClass = "border-red-500";
-        } else if (diffMinutes >= 10) {
-            timerColor = "text-yellow-400";
-            borderClass = "border-yellow-500";
-        } else if (order.status === 'preparing') {
-            borderClass = "border-blue-500";
-        }
-
-        let actionBtns;
-        if (order.status === 'pending') {
-            actionBtns = `
-                <div class="flex space-x-2">
-                    <button onclick="window.rejectKdsOrder('${order.id}')" 
-                        class="w-1/3 py-2 md:py-3 bg-red-900/80 hover:bg-red-800 text-white rounded-lg font-bold text-base md:text-lg transition border border-red-700 flex items-center justify-center" title="Rejeitar">
-                        <i class="fas fa-times"></i>
-                    </button>
-                    <button onclick="window.advanceKdsStatus('${order.id}', 'preparing')" 
-                        class="w-2/3 py-2 md:py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-base md:text-lg transition flex items-center justify-center">
-                        <i class="fas fa-fire mr-2"></i> <span class="hidden md:inline">Preparar</span><span class="md:hidden">Prep.</span>
-                    </button>
-                </div>`;
-        } else {
-            actionBtns = `
-                <div class="flex space-x-2">
-                    <button onclick="window.printKdsOrder('${order.id}')" 
-                        class="w-1/3 py-2 md:py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold text-base md:text-lg transition border border-gray-600 flex items-center justify-center" title="Imprimir">
-                        <i class="fas fa-print"></i>
-                    </button>
-                    <button onclick="window.advanceKdsStatus('${order.id}', 'finished')" 
-                        class="w-2/3 py-2 md:py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-base md:text-lg transition flex items-center justify-center">
-                        <i class="fas fa-check mr-2"></i> Pronto
-                    </button>
-                </div>`;
-        }
-
-        return `
-            <div class="kds-card bg-dark-card border-l-4 ${borderClass} rounded-r-xl shadow-lg flex flex-col h-auto min-h-[220px] md:min-h-[300px]">
-                <div class="p-3 md:p-4 bg-gray-800 rounded-tr-xl flex justify-between items-start">
-                    <div>
-                        <h3 class="text-lg md:text-2xl font-extrabold text-white">Mesa ${order.tableNumber}</h3>
-                        <p class="text-[10px] md:text-xs text-gray-400 font-mono">#${order.orderId.slice(-4)}</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-base md:text-xl ${timerColor} kds-timer" data-time="${sentAt.getTime()}">${elapsedTime}</p>
-                        <p class="text-[10px] md:text-xs text-gray-500">${sentAt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
-                    </div>
+            itemsHtml += `
+                <div class="border-b border-gray-700/50 pb-2 mb-2 last:border-0 last:mb-0 last:pb-0">
+                    <p class="text-[10px] font-bold text-pumpkin uppercase mb-1 tracking-wider">${sec}</p>
+                    ${items.map(i => `
+                        <div class="flex justify-between items-start text-sm text-gray-200 mb-1">
+                            <span class="font-medium">${i.name}</span>
+                            ${i.note ? `<span class="text-xs text-yellow-400 font-bold ml-2 text-right bg-yellow-900/20 px-1 rounded max-w-[50%]">(${i.note})</span>` : ''}
+                        </div>
+                        ${i.origin ? `<p class="text-[10px] text-gray-500 italic text-right mt-[-2px]">Origem: ${i.origin}</p>` : ''}
+                    `).join('')}
                 </div>
-
-                <div class="p-3 md:p-4 flex-grow overflow-y-auto custom-scrollbar space-y-2">
-                    ${itemsHtml}
-                </div>
-
-                <div class="p-3 md:p-4 bg-gray-800/50 mt-auto">
-                    ${actionBtns}
-                </div>
-            </div>
-        `;
-    }).join('');
-
-    if (filteredOrdersHtml.trim() === '') {
-         kdsOrdersContainer.innerHTML = `
-            <div class="col-span-full flex flex-col items-center justify-center h-64 text-gray-500 opacity-50">
-                <i class="fas fa-check-circle text-5xl md:text-6xl mb-4"></i>
-                <p class="text-lg md:text-xl">Nenhum pedido pendente.</p>
-            </div>`;
-    } else {
-        kdsOrdersContainer.innerHTML = filteredOrdersHtml;
-    }
-};
-
-const updateKdsTimers = () => {
-    document.querySelectorAll('.kds-timer').forEach(el => {
-        const time = parseInt(el.dataset.time);
-        if (time) el.textContent = formatElapsedTime(time);
-    });
-};
-
-// --- FUNÇÕES DE AÇÃO ---
-
-window.advanceKdsStatus = async (orderId, newStatus) => {
-    try {
-        const orderRef = doc(db, 'artifacts', appId, 'public', 'data', 'kds_orders', orderId);
-        
-        // ATUALIZAÇÃO: Se ficar pronto, notifica a mesa para tocar som no painel
-        if (newStatus === 'finished') {
-            const orderSnap = await getDoc(orderRef);
-            if (orderSnap.exists()) {
-                const tableNum = orderSnap.data().tableNumber;
-                if (tableNum) {
-                    const tableRef = getTableDocRef(tableNum);
-                    await updateDoc(tableRef, {
-                        waiterNotification: "Pedido Pronto na Cozinha/Bar!"
-                    });
-                }
-            }
-            showToast("Pedido pronto! Garçom notificado.", false);
-        }
-
-        await updateDoc(orderRef, { 
-            status: newStatus,
-            completedAt: serverTimestamp()
+            `;
         });
-        
-    } catch (e) {
-        console.error("Erro ao atualizar:", e);
-        showToast("Erro ao atualizar.", true);
     }
+
+    const btnText = isPreparing ? 'Pronto / Servir' : 'Iniciar Preparo';
+    const btnColor = isPreparing ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700';
+    const btnIcon = isPreparing ? '<i class="fas fa-check mr-2"></i>' : '<i class="fas fa-fire mr-2"></i>';
+
+    card.innerHTML = `
+        <div class="flex justify-between items-start mb-3 border-b border-gray-700 pb-2">
+            <div>
+                <h3 class="text-xl font-bold text-white leading-tight">${tableDisplay}</h3>
+                <p class="text-xs text-gray-500 mt-1">Pedido #${data.orderId.slice(-4)}</p>
+                ${data.addedBy ? `<p class="text-[10px] text-indigo-400 mt-0.5"><i class="fas fa-user-tag mr-1"></i>${data.addedBy}</p>` : ''}
+            </div>
+            <div class="text-right flex flex-col items-end">
+                <div class="flex items-center text-gray-300 text-sm mb-1 font-mono bg-gray-900 px-2 py-1 rounded">
+                    <i class="fas fa-clock mr-1.5 text-gray-500"></i> <span>${time}</span>
+                </div>
+                ${isPreparing 
+                    ? '<span class="text-[10px] font-bold bg-blue-900/50 text-blue-300 px-2 py-0.5 rounded border border-blue-800">EM PREPARO</span>' 
+                    : '<span class="text-[10px] font-bold bg-gray-700 text-gray-400 px-2 py-0.5 rounded">PENDENTE</span>'}
+            </div>
+        </div>
+        
+        <div class="space-y-1 mb-4 flex-grow overflow-y-auto max-h-[60vh] custom-scrollbar pr-1">
+            ${itemsHtml}
+        </div>
+
+        <button class="w-full py-3 ${btnColor} text-white font-bold rounded-lg transition shadow-md btn-advance-status flex items-center justify-center uppercase tracking-wide text-sm">
+            ${btnIcon} ${btnText}
+        </button>
+    `;
+
+    container.appendChild(card);
+
+    // Listener do Botão
+    const btn = card.querySelector('.btn-advance-status');
+    btn.addEventListener('click', async () => {
+        const newStatus = data.status === 'pending' ? 'preparing' : 'finished';
+        const actionName = data.status === 'pending' ? 'Iniciando...' : 'Finalizando...';
+        
+        toggleLoading(btn, true, actionName);
+
+        try {
+            await updateDoc(doc(getKdsCollectionRef(), docId), { status: newStatus });
+            
+            // --- NOTIFICAÇÃO PARA O GARÇOM (PAINEL) ---
+            if (newStatus === 'finished') {
+                const tableRef = getTableDocRef(data.tableNumber); // Usa o ID numérico da mesa
+                await updateDoc(tableRef, { 
+                    kdsAlert: 'ready' // Marca a mesa como pronta
+                });
+            }
+
+        } catch (err) {
+            console.error("Erro status KDS:", err);
+            showToast("Erro ao atualizar status.", true);
+            toggleLoading(btn, false);
+        }
+    });
 };
 
-// ... (restante das funções toggleKdsHistory, printKdsOrder, rejectKdsOrder mantidas iguais) ...
-// Vou reincluir aqui para garantir que o arquivo fique completo
-
-const toggleKdsHistory = async () => {
-    const modal = document.getElementById('kdsHistoryModal');
+// --- HISTÓRICO (MANTIDO) ---
+const loadKdsHistory = async () => {
     const list = document.getElementById('kdsHistoryList');
-    if (!modal || !list) return;
+    if (!list) return;
 
-    modal.style.display = 'flex';
-    list.innerHTML = '<p class="text-center col-span-full text-gray-500 py-10"><i class="fas fa-spinner fa-spin"></i> Carregando histórico do turno...</p>';
+    list.innerHTML = '<div class="col-span-full text-center py-10"><i class="fas fa-spinner fa-spin text-pumpkin text-3xl"></i></div>';
 
     try {
-        const now = new Date();
-        const startOfShift = new Date();
-        if (now.getHours() < 6) { startOfShift.setDate(now.getDate() - 1); }
-        startOfShift.setHours(6, 0, 0, 0);
-        const startTimestamp = Timestamp.fromDate(startOfShift);
-
         const q = query(
             getKdsCollectionRef(),
             where('status', 'in', ['finished', 'cancelled']),
-            where('sentAt', '>=', startTimestamp), 
-            orderBy('sentAt', 'desc')
+            orderBy('sentAt', 'desc'),
+            limit(50)
         );
 
         const snapshot = await getDocs(q);
 
         if (snapshot.empty) {
-            list.innerHTML = '<p class="text-center col-span-full text-gray-500 py-10">Nenhum pedido finalizado neste turno.</p>';
+            list.innerHTML = '<p class="col-span-full text-center text-gray-500 italic">Nenhum histórico recente.</p>';
             return;
         }
 
-        list.innerHTML = snapshot.docs.map(doc => {
-            const d = doc.data();
-            const isCancelled = d.status === 'cancelled';
-            const statusColor = isCancelled ? 'text-red-400 border-red-900' : 'text-green-400 border-green-900';
-            const time = d.sentAt?.toDate ? d.sentAt.toDate().toLocaleString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--';
+        list.innerHTML = snapshot.docs.map(docSnap => {
+            const data = docSnap.data();
+            const time = data.sentAt ? new Date(data.sentAt.toMillis()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--';
             
-            let itemsSummary = '';
-            if (d.sectors) {
-                Object.values(d.sectors).forEach(items => {
-                    items.forEach(item => { itemsSummary += `<div class="text-sm text-gray-300 truncate">• ${item.name}</div>`; });
+            let itemsList = '';
+            if (data.sectors) {
+                Object.values(data.sectors).forEach(items => {
+                    items.forEach(i => {
+                        itemsList += `<span class="block text-xs text-gray-400">• ${i.name} ${i.note ? `(${i.note})` : ''}</span>`;
+                    });
                 });
             }
 
             return `
-                <div class="bg-gray-800 border border-gray-700 p-3 rounded-lg opacity-75 hover:opacity-100 transition">
-                    <div class="flex justify-between items-start mb-2 border-b border-gray-700 pb-2">
-                        <div><h4 class="font-bold text-white text-base">Mesa ${d.tableNumber}</h4><p class="text-xs text-gray-500">#${d.orderId.slice(-4)} - ${time}</p></div>
-                        <span class="px-2 py-1 rounded border text-[10px] uppercase font-bold ${statusColor}">${d.status === 'finished' ? 'Pronto' : 'Cancelado'}</span>
+                <div class="bg-dark-input p-3 rounded border border-gray-700 opacity-75 hover:opacity-100 transition">
+                    <div class="flex justify-between items-center mb-2 border-b border-gray-700 pb-1">
+                        <span class="font-bold text-gray-300">Mesa ${data.tableNumber}</span>
+                        <span class="text-xs font-mono text-gray-500">${time}</span>
                     </div>
-                    <div class="mb-3 pl-1 max-h-24 overflow-y-auto custom-scrollbar">${itemsSummary}</div>
-                    ${!isCancelled ? `<button onclick="window.advanceKdsStatus('${doc.id}', 'preparing')" class="w-full py-2 bg-gray-700 hover:bg-indigo-600 text-gray-300 hover:text-white rounded transition text-xs font-bold uppercase"><i class="fas fa-undo mr-2"></i> Retornar</button>` : ''}
+                    <div class="mb-2">${itemsList}</div>
+                    <div class="text-right">
+                        <span class="text-[10px] uppercase font-bold px-2 py-1 rounded ${data.status === 'finished' ? 'bg-green-900 text-green-400' : 'bg-red-900 text-red-400'}">
+                            ${data.status === 'finished' ? 'ENTREGUE' : 'CANCELADO'}
+                        </span>
+                    </div>
                 </div>
             `;
         }).join('');
-    } catch (e) {
-        console.error("Erro histórico:", e);
-        list.innerHTML = `<p class="text-center col-span-full text-red-400 py-10">Erro ao carregar: ${e.message}</p>`;
-    }
-};
 
-window.printKdsOrder = (orderId) => {
-    const order = currentOrdersData.find(o => o.id === orderId);
-    if (!order) return;
-    let itemsHtml = '';
-    if (order.sectors) {
-        Object.entries(order.sectors).forEach(([sector, items]) => {
-            itemsHtml += `<div style="margin-top: 15px; border-bottom: 1px solid #000; font-weight: bold; font-size: 1.1em;">${sector.toUpperCase()}</div>`;
-            items.forEach(item => {
-                itemsHtml += `<div style="margin-top: 8px;"><div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 1.2em;"><span>1x ${item.name}</span></div>${item.note ? `<div style="font-size: 0.9em; font-style: italic;">** ${item.note} **</div>` : ''}</div>`;
-            });
-        });
+    } catch (error) {
+        console.error("Erro histórico KDS:", error);
+        list.innerHTML = '<p class="col-span-full text-center text-red-400">Erro ao carregar histórico. Verifique índices.</p>';
     }
-    const printWindow = window.open('', '', 'width=400,height=600');
-    if (printWindow) {
-        printWindow.document.write(`<html><head><title>Cupom</title><style>body{font-family:'Courier New';padding:10px;margin:0;max-width:300px;}h1,h2,p{text-align:center;margin:5px 0;}.header{border-bottom:2px dashed #000;padding-bottom:10px;}</style></head><body><div class="header"><h1>MESA ${order.tableNumber}</h1><p>#${order.orderId.slice(-4)}</p><p>${new Date().toLocaleTimeString()}</p></div>${itemsHtml}</body></html>`);
-        printWindow.document.close();
-    }
-};
-
-window.rejectKdsOrder = async (orderId) => {
-    const reason = prompt("Motivo da rejeição:");
-    if (reason === null) return; 
-    try {
-        const orderRef = doc(db, 'artifacts', appId, 'public', 'data', 'kds_orders', orderId);
-        await updateDoc(orderRef, { status: 'cancelled', cancellationReason: reason || 'Sem motivo', cancelledAt: serverTimestamp() });
-        showToast("Pedido rejeitado.", true);
-    } catch (e) { console.error(e); showToast("Erro ao rejeitar.", true); }
 };

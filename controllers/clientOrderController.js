@@ -1,8 +1,8 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS ---
-// VERSÃO FINAL - RETIRADA, MESA E ENTREGA (MOTOCA)
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (VERSÃO FINAL INTEGRADA E COMPLETA) ---
+// Inclui: Paginação, Busca Otimizada, UX/UI + Toda a lógica de Auth/Associação/Motoca
 
 import { db, auth, getQuickObsCollectionRef, appId, getTablesCollectionRef, getTableDocRef, getCustomersCollectionRef, getKdsCollectionRef } from "/services/firebaseService.js";
-import { formatCurrency } from "/utils.js";
+import { formatCurrency, toggleLoading } from "/utils.js"; // Adicionado toggleLoading
 import { getProducts, getCategories, fetchWooCommerceCategories, fetchWooCommerceProducts } from "/services/wooCommerceService.js";
 import { onSnapshot, doc, updateDoc, arrayUnion, setDoc, getDoc, getDocs, query, serverTimestamp, orderBy, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -20,7 +20,13 @@ let localCurrentTableId = null;
 let localCurrentClientUser = null; 
 let tempUserData = null;
 let unsubscribeClientKds = null; 
-let currentAssociationTab = 'mesa'; // 'mesa', 'retirada' ou 'entrega'
+let currentAssociationTab = 'mesa';
+
+// Estado de Paginação e Busca (NOVO)
+let currentPage = 1;
+let currentSearch = '';
+let searchTimeout = null;
+let loadMoreBtn;
 
 // Elementos
 let clientMenuContainer, clientCategoryFilters, sendOrderBtn, clientCartCount;
@@ -71,11 +77,9 @@ export const initClientOrderController = () => {
     if (tabButtons) {
         tabButtons.forEach(button => {
             button.addEventListener('click', () => {
-                // Remove ativo de todos
                 tabButtons.forEach(btn => btn.classList.remove('active', 'border-brand-primary', 'text-brand-primary'));
                 tabContents.forEach(content => content.style.display = 'none');
                 
-                // Ativa o clicado
                 button.classList.add('active', 'border-brand-primary', 'text-brand-primary');
                 const tabName = button.dataset.tab;
                 currentAssociationTab = tabName;
@@ -83,7 +87,6 @@ export const initClientOrderController = () => {
                 const contentEl = document.getElementById(`content-${tabName}`);
                 if(contentEl) {
                     contentEl.style.display = 'block';
-                    // Foca no input correto e ajusta botões
                     if (tabName === 'mesa') { 
                         if(activateTableNumber) activateTableNumber.focus(); 
                         if(defaultActionButtons) defaultActionButtons.style.display = 'flex';
@@ -93,7 +96,6 @@ export const initClientOrderController = () => {
                         if(defaultActionButtons) defaultActionButtons.style.display = 'flex';
                     }
                     else if (tabName === 'entrega') {
-                        // Na entrega, o botão "Chamar Motoca" é a ação, então escondemos o "Confirmar" padrão
                         if(defaultActionButtons) defaultActionButtons.style.display = 'none';
                     }
                 }
@@ -148,7 +150,7 @@ export const initClientOrderController = () => {
                 let newNote = clientObsText.value.trim();
                 
                 const esperaSwitch = document.getElementById('esperaSwitch');
-                const isEspera = esperaSwitch.checked;
+                const isEspera = esperaSwitch ? esperaSwitch.checked : false;
                 const regexEspera = new RegExp(ESPERA_KEY.replace('(', '\\(').replace(')', '\\)'), 'ig');
                 const hasKey = newNote.toUpperCase().includes(ESPERA_KEY);
 
@@ -239,18 +241,13 @@ export const initClientOrderController = () => {
          }
     });
 
+    // Listeners de Filtro e Busca (ATUALIZADOS PARA PAGINAÇÃO)
     if (clientCategoryFilters) {
-        clientCategoryFilters.addEventListener('click', (e) => {
-            const btn = e.target.closest('.category-btn');
-            if (btn) {
-                currentCategoryFilter = btn.dataset.category;
-                renderMenu();
-            }
-        });
+        clientCategoryFilters.addEventListener('click', handleCategoryClick);
     }
     
     if (searchProductInputClient) {
-        searchProductInputClient.addEventListener('input', renderMenu);
+        searchProductInputClient.addEventListener('input', handleSearch);
     }
 
     setupAuthStateObserver();
@@ -265,15 +262,63 @@ export const initClientOrderController = () => {
     console.log("[ClientOrder] Inicializado.");
 };
 
+// --- LÓGICA DE PAGINAÇÃO E BUSCA (ADICIONADA) ---
+
+const handleSearch = (e) => {
+    currentSearch = e.target.value;
+    currentPage = 1;
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(async () => {
+        clientMenuContainer.innerHTML = '<div class="col-span-full text-center text-pumpkin py-8"><i class="fas fa-spinner fa-spin text-2xl"></i></div>';
+        // Chama serviço com paginação
+        await fetchWooCommerceProducts(1, currentSearch, currentCategoryFilter, false);
+        renderMenu(false);
+    }, 600);
+};
+
+const handleCategoryClick = async (e) => {
+    const btn = e.target.closest('.category-btn');
+    if (!btn) return;
+    
+    currentCategoryFilter = btn.dataset.category;
+    currentPage = 1;
+    
+    clientMenuContainer.innerHTML = '<div class="col-span-full text-center text-pumpkin py-8"><i class="fas fa-spinner fa-spin text-2xl"></i></div>';
+    
+    await fetchWooCommerceProducts(1, currentSearch, currentCategoryFilter, false);
+    renderMenu(false);
+};
+
+const handleLoadMore = async () => {
+    currentPage++;
+    toggleLoading(loadMoreBtn, true, 'Carregando...');
+    
+    const newItems = await fetchWooCommerceProducts(currentPage, currentSearch, currentCategoryFilter, true);
+    
+    if (newItems.length === 0) {
+        showToast("Fim da lista.", false);
+        loadMoreBtn.style.display = 'none';
+    } else {
+        renderMenu(true); // Append true
+    }
+};
+
+const renderLoadMoreButton = () => {
+    if (loadMoreBtn) loadMoreBtn.remove();
+    loadMoreBtn = document.createElement('button');
+    loadMoreBtn.className = 'col-span-full py-3 mt-4 bg-gray-800 text-gray-400 rounded-lg font-bold text-sm';
+    loadMoreBtn.innerText = 'Ver mais produtos';
+    loadMoreBtn.onclick = handleLoadMore;
+    clientMenuContainer.appendChild(loadMoreBtn);
+};
+
 // --- FUNÇÃO MOTOCA ---
 const handleCallMotoboy = () => {
     if (!localCurrentClientUser) {
         showAssocError("Faça login para chamar o entregador.");
         return;
     }
-    // Placeholder para redirecionamento futuro
     alert("Redirecionando para o sistema de entregas... (Em Breve)");
-    // window.location.href = "URL_DO_PROJETO_MOTOCA";
 };
 
 // --- STATUS KDS ---
@@ -401,16 +446,12 @@ function handleAuthActionClick() {
 // --- MENU & CART ---
 async function loadMenu() {
     try {
-        const categories = await fetchWooCommerceCategories();
-        const products = await fetchWooCommerceProducts();
+        // Carrega categorias e produtos (Página 1)
+        await fetchWooCommerceCategories(null);
+        await fetchWooCommerceProducts(1, '', 'all', false);
         
-        if (categories.length > 0 && clientCategoryFilters) {
-             clientCategoryFilters.innerHTML = categories.map(cat => {
-                const isActive = cat.slug === currentCategoryFilter ? 'bg-brand-primary text-white' : 'bg-dark-input text-dark-text border border-gray-600';
-                return `<button class="category-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap ${isActive}" data-category="${cat.slug || cat.id}">${cat.name}</button>`;
-             }).join('');
-        }
         renderMenu(); 
+        
         if (statusScreen) statusScreen.style.display = 'none';
         if (mainContent) mainContent.style.display = 'flex'; 
     } catch (error) {
@@ -419,40 +460,34 @@ async function loadMenu() {
     }
 }
 
-function renderMenu() {
+function renderMenu(append = false) {
     if (!clientMenuContainer) return;
     
-    if (clientCategoryFilters) {
-        clientCategoryFilters.querySelectorAll('.category-btn').forEach(btn => {
-            const isActive = btn.dataset.category === currentCategoryFilter;
-            btn.classList.toggle('bg-brand-primary', isActive);
-            btn.classList.toggle('text-white', isActive);
-            btn.classList.toggle('bg-dark-input', !isActive);
-            btn.classList.toggle('text-dark-text', !isActive);
-        });
+    if (clientCategoryFilters && (clientCategoryFilters.innerHTML.trim() === '' || !append)) {
+        const categories = getCategories();
+        clientCategoryFilters.innerHTML = categories.map(cat => {
+            const isActive = cat.slug === currentCategoryFilter ? 'bg-brand-primary text-white' : 'bg-dark-input text-dark-text border border-gray-600';
+            return `<button class="category-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap ${isActive}" data-category="${cat.slug || cat.id}">${cat.name}</button>`;
+        }).join('');
     }
 
     const products = getProducts();
     let filteredProducts = products;
 
-    if (currentCategoryFilter !== 'all') {
-        if (currentCategoryFilter === 'top10') {
-             const top10Ids = JSON.parse(localStorage.getItem('top10_products') || '[]');
-             filteredProducts = filteredProducts.filter(p => top10Ids.includes(p.id.toString()));
-             filteredProducts.sort((a, b) => top10Ids.indexOf(a.id.toString()) - top10Ids.indexOf(b.id.toString()));
-        } else {
-             filteredProducts = products.filter(p => p.category === currentCategoryFilter);
-        }
+    // Filtro visual para Top 10 (API não filtra isso)
+    if (currentCategoryFilter === 'top10') {
+        const top10Ids = JSON.parse(localStorage.getItem('top10_products') || '[]');
+        filteredProducts = products.filter(p => top10Ids.includes(p.id.toString()));
+        filteredProducts.sort((a, b) => top10Ids.indexOf(a.id.toString()) - top10Ids.indexOf(b.id.toString()));
     }
 
-    let searchTerm = '';
-    if (searchProductInputClient) searchTerm = searchProductInputClient.value.trim().toLowerCase();
-    if (searchTerm) filteredProducts = filteredProducts.filter(p => p.name.toLowerCase().includes(searchTerm));
+    // Se não for append, limpa o container
+    if (!append) clientMenuContainer.innerHTML = '';
     
     if (filteredProducts.length === 0) {
         clientMenuContainer.innerHTML = `<div class="col-span-full text-center p-6 text-yellow-400 italic">Nenhum produto encontrado.</div>`;
     } else {
-        clientMenuContainer.innerHTML = filteredProducts.map((product, index) => {
+        const html = filteredProducts.map((product, index) => {
             let badge = '';
             if (currentCategoryFilter === 'top10' && index < 3) {
                 const colors = ['text-yellow-400', 'text-gray-300', 'text-orange-400'];
@@ -478,6 +513,18 @@ function renderMenu() {
                 </div>
             </div>
         `}).join('');
+
+        if (append) {
+            if (loadMoreBtn) loadMoreBtn.remove();
+            clientMenuContainer.insertAdjacentHTML('beforeend', html);
+        } else {
+            clientMenuContainer.innerHTML = html;
+        }
+    }
+
+    // Adiciona botão Carregar Mais (se não for top10)
+    if (currentCategoryFilter !== 'top10') {
+        renderLoadMoreButton();
     }
 }
 
@@ -493,6 +540,7 @@ function addItemToCart(product) {
     };
     selectedItems.push(newItem); 
     renderClientOrderScreen(); 
+    showToast("Item adicionado!", false);
     openClientObsModal(product.id, '');
 }
 
@@ -540,7 +588,6 @@ function openProductInfoModal(product) {
     newAddBtn.onclick = () => {
         addItemToCart(product);
         modal.style.display = 'none'; 
-        showToast(`${product.name} adicionado ao carrinho!`);
     };
     modal.style.display = 'flex';
 }
@@ -650,7 +697,6 @@ function openAssociationModal() {
         if(assocErrorMsg) assocErrorMsg.style.display = 'none';
         associationModal.style.display = 'flex';
         
-        // Default tab MESA
         document.querySelectorAll('.assoc-tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.assoc-tab-content').forEach(c => c.style.display = 'none');
         
@@ -663,7 +709,6 @@ function openAssociationModal() {
         
         if (activateTableNumber) activateTableNumber.focus();
         
-        // Mostra o botão de confirmação por padrão (Mesa)
         const defaultActionButtons = document.getElementById('defaultActionButtons');
         if (defaultActionButtons) defaultActionButtons.style.display = 'flex';
     }
@@ -784,11 +829,10 @@ async function handleActivationAndSend(e) {
 
     if (!localCurrentClientUser) { showAssocError("Faça login para continuar."); return; }
 
-    activateAndSendBtn.disabled = true; activateAndSendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    toggleLoading(activateAndSendBtn, true);
     assocErrorMsg.style.display = 'none';
 
     try {
-        // Se for retirada, usa prefixo. Se for mesa, usa número direto.
         const tableDocId = isPickup ? `pickup_${identifier}` : identifier;
         const tableRef = getTableDocRef(tableDocId);
         const tableSnap = await getDoc(tableRef);
@@ -805,18 +849,15 @@ async function handleActivationAndSend(e) {
         if (tableSnap.exists()) {
             const tData = tableSnap.data();
             
-            // Bloqueio se ocupada por outro
             if (tData.status !== 'closed' && tData.clientId && tData.clientId !== clientData.uid) {
                 throw new Error("Esta mesa/PIN está em uso por outro cliente.");
             }
             
-            // Reabertura inteligente
             if (tData.status === 'closed') {
                 console.log(`Reabrindo ${tableDocId}...`);
                 const historyRef = doc(getTablesCollectionRef(), `${tableDocId}_closed_${Date.now()}`);
                 await setDoc(historyRef, tData); 
                 
-                // Reseta
                 await setDoc(tableRef, {
                     tableNumber: isPickup ? identifier : parseInt(identifier),
                     status: 'open',
@@ -829,17 +870,15 @@ async function handleActivationAndSend(e) {
                     anonymousUid: null
                 });
             } else {
-                // Atualiza dono se estava livre
                 if (!tData.clientId) {
                     await updateDoc(tableRef, { clientId: clientData.uid, clientName: clientData.name, clientPhone: clientData.phone });
                 }
             }
         } else {
-            // Criação de nova mesa/retirada
             if (!isPickup && !confirm(`Mesa ${identifier} não existe. Abrir nova?`)) throw new Error("Ação cancelada.");
             
             await setDoc(tableRef, {
-                tableNumber: isPickup ? identifier : parseInt(identifier), // PIN vira o número para retirada
+                tableNumber: isPickup ? identifier : parseInt(identifier), 
                 status: 'open',
                 sector: isPickup ? 'Retirada' : 'Cliente',
                 isPickup: isPickup,
@@ -851,20 +890,19 @@ async function handleActivationAndSend(e) {
             });
         }
 
-        // Inicia Listeners
         setTableListener(tableDocId, true);
         startClientKdsListener(tableDocId);
 
         if (selectedItems.length > 0) await sendOrderToFirebase();
         
         closeAssociationModal();
-        showToast(isPickup ? `Retirada #${identifier} iniciada!` : `Mesa ${identifier} vinculada!`);
+        showToast(isPickup ? `Retirada #${identifier} iniciada!` : `Mesa ${identifier} vinculada!`, false);
 
     } catch (error) {
         console.error(error);
         showAssocError(error.message);
     } finally {
-        activateAndSendBtn.disabled = false; activateAndSendBtn.innerHTML = 'Confirmar';
+        toggleLoading(activateAndSendBtn, false, 'Confirmar');
     }
 }
 
@@ -888,7 +926,9 @@ export const fetchQuickObservations = async () => {
 
 async function sendOrderToFirebase() {
     const tableId = localCurrentTableId || currentTableId; 
-    if (!tableId || selectedItems.length === 0) { alert("Vazio."); return; }
+    if (!tableId || selectedItems.length === 0) { showToast("Carrinho vazio.", true); return; }
+
+    toggleLoading(sendOrderBtn, true, 'Enviando...');
 
     const orderId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     const newOrderRequest = {
@@ -907,9 +947,11 @@ async function sendOrderToFirebase() {
         });
         selectedItems.length = 0;
         renderClientOrderScreen(); 
-        showToast("Pedido enviado!");
+        showToast("Pedido enviado! Aguarde confirmação.", false);
     } catch (e) {
         console.error("Erro envio:", e);
-        showToast("Falha ao enviar.", true);
+        showToast("Falha ao enviar pedido.", true);
+    } finally {
+        toggleLoading(sendOrderBtn, false, '<i class="fas fa-check-circle"></i>');
     }
 }

@@ -1,11 +1,13 @@
-import { db, auth, appId } from "/services/firebaseService.js";
-import { collection, query, where, limit, getDocs, addDoc, updateDoc, doc, serverTimestamp, arrayUnion, onSnapshot, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { formatCurrency } from "/utils.js";
-import { showToast } from "/app.js";
+// --- CONTROLLERS/CASHIERCONTROLLER.JS (VERSÃO FINAL COMPLETA E OTIMIZADA) ---
+import { db, appId, auth } from "/services/firebaseService.js";
+import { collection, query, where, limit, addDoc, updateDoc, doc, onSnapshot, serverTimestamp, arrayUnion, getDocs, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { formatCurrency, toggleLoading } from "/utils.js";
+import { showToast, userId } from "/app.js";
 
-let currentShift = null;
 let cashierModal, openScreen, statusScreen, sangriaModal;
+let currentShift = null;
 let unsubscribeShift = null;
+let isInitialized = false;
 
 // Elementos de Display
 let elSalesMoney, elSalesDigital, elSalesTotal, elSalesProducts, elSalesService;
@@ -13,6 +15,7 @@ let elTotalSangria, elExpectedMoney, elDifferenceValue, elDifferenceContainer, e
 let elTransactionsList;
 
 export const initCashierController = () => {
+    if (isInitialized) return;
     console.log("[Cashier] Inicializando Controller Avançado...");
     
     cashierModal = document.getElementById('cashierModal');
@@ -20,7 +23,7 @@ export const initCashierController = () => {
     openScreen = document.getElementById('cashierOpenScreen');
     statusScreen = document.getElementById('cashierStatusScreen');
 
-    // Mapeamento
+    // Mapeamento de Elementos de UI
     elSalesMoney = document.getElementById('cashierSalesMoney');
     elSalesDigital = document.getElementById('cashierSalesDigital');
     elSalesTotal = document.getElementById('cashierSalesTotal');
@@ -33,6 +36,7 @@ export const initCashierController = () => {
     elJustificationContainer = document.getElementById('cashierJustificationContainer');
     elTransactionsList = document.getElementById('cashierTransactionsList');
 
+    // Listeners Principais
     document.getElementById('openCashierBtn')?.addEventListener('click', openCashierUI);
     document.getElementById('confirmOpenCashierBtn')?.addEventListener('click', handleOpenShift);
     document.getElementById('confirmCloseCashierBtn')?.addEventListener('click', handleCloseShift);
@@ -40,28 +44,35 @@ export const initCashierController = () => {
     document.getElementById('openSangriaModalBtn')?.addEventListener('click', () => {
         document.getElementById('sangriaValueInput').value = '';
         document.getElementById('sangriaReasonInput').value = '';
-        sangriaModal.style.display = 'flex';
+        if(sangriaModal) sangriaModal.style.display = 'flex';
         document.getElementById('sangriaValueInput').focus();
     });
+    
     document.getElementById('confirmSangriaBtn')?.addEventListener('click', handleRegisterSangria);
-    document.getElementById('cashierEndFloat')?.addEventListener('input', calculateDifference);
-};
+    
+    // Listener para cálculo em tempo real no fechamento
+    const endFloatInput = document.getElementById('cashierEndFloat');
+    if (endFloatInput) endFloatInput.addEventListener('input', calculateDifference);
 
-const getShiftsCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'shifts');
+    isInitialized = true;
+};
 
 const openCashierUI = async () => {
     if (!auth.currentUser) {
         showToast("Você precisa estar logado.", true);
         return;
     }
-    cashierModal.style.display = 'flex';
+    if(cashierModal) cashierModal.style.display = 'flex';
     subscribeToCurrentShift(); 
 };
 
 const subscribeToCurrentShift = () => {
     if (unsubscribeShift) unsubscribeShift(); 
     const userEmail = auth.currentUser.email;
-    const q = query(getShiftsCollectionRef(), where('userId', '==', userEmail), where('status', '==', 'open'), limit(1));
+    const shiftsRef = collection(db, 'artifacts', appId, 'public', 'data', 'shifts');
+    
+    // Busca o turno ABERTO do usuário logado
+    const q = query(shiftsRef, where('userId', '==', userEmail), where('status', '==', 'open'), limit(1));
 
     unsubscribeShift = onSnapshot(q, (snapshot) => {
         if (!snapshot.empty) {
@@ -76,35 +87,34 @@ const subscribeToCurrentShift = () => {
 };
 
 const renderOpenScreen = () => {
-    openScreen.style.display = 'block';
-    statusScreen.style.display = 'none';
-    document.getElementById('cashierStartFloat').value = '';
-    document.getElementById('cashierModalTitle').textContent = "Abertura de Caixa";
+    if(openScreen) openScreen.style.display = 'block';
+    if(statusScreen) statusScreen.style.display = 'none';
+    const startInput = document.getElementById('cashierStartFloat');
+    if(startInput) startInput.value = '';
 };
 
 const renderStatusScreen = async () => {
-    openScreen.style.display = 'none';
-    statusScreen.style.display = 'block';
-    document.getElementById('cashierModalTitle').textContent = "Gestão de Caixa (Aberto)";
-
+    if(openScreen) openScreen.style.display = 'none';
+    if(statusScreen) statusScreen.style.display = 'block';
+    
     if (!currentShift) return;
 
     const openDate = currentShift.openedAt?.toDate ? currentShift.openedAt.toDate() : new Date();
     document.getElementById('cashierOpenedAtDisplay').textContent = openDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     document.getElementById('cashierStartFloatDisplay').textContent = formatCurrency(currentShift.initialBalance || 0);
 
-    // CÁLCULO DE VENDAS
+    // --- CÁLCULO DE VENDAS (PARTE CRÍTICA RESTAURADA) ---
     const { stats, transactions } = await fetchSalesForShift(currentShift);
     
-    elSalesMoney.textContent = formatCurrency(stats.totalMoney);
-    elSalesDigital.textContent = formatCurrency(stats.totalDigital);
-    elSalesTotal.textContent = formatCurrency(stats.totalMoney + stats.totalDigital);
-    elSalesProducts.textContent = formatCurrency(stats.totalProducts);
-    elSalesService.textContent = formatCurrency(stats.totalServiceTax);
+    if(elSalesMoney) elSalesMoney.textContent = formatCurrency(stats.totalMoney);
+    if(elSalesDigital) elSalesDigital.textContent = formatCurrency(stats.totalDigital);
+    if(elSalesTotal) elSalesTotal.textContent = formatCurrency(stats.totalMoney + stats.totalDigital);
+    if(elSalesProducts) elSalesProducts.textContent = formatCurrency(stats.totalProducts);
+    if(elSalesService) elSalesService.textContent = formatCurrency(stats.totalServiceTax);
 
     if (elTransactionsList) {
         if (transactions.length === 0) {
-            elTransactionsList.innerHTML = '<p class="text-center text-xs text-gray-600 italic p-2">Nenhuma movimentação neste turno.</p>';
+            elTransactionsList.innerHTML = '<p class="text-center text-xs text-gray-600 italic p-2">Nenhuma venda neste turno.</p>';
         } else {
             elTransactionsList.innerHTML = transactions.map(t => `
                 <div class="flex justify-between items-center py-1 border-b border-gray-800 last:border-b-0 text-xs">
@@ -120,43 +130,47 @@ const renderStatusScreen = async () => {
 
     const sangrias = currentShift.sangrias || [];
     const totalSangria = sangrias.reduce((sum, s) => sum + (s.value || 0), 0);
-    elTotalSangria.textContent = formatCurrency(totalSangria);
+    if(elTotalSangria) elTotalSangria.textContent = formatCurrency(totalSangria);
     
     const sangriaListEl = document.getElementById('sangriaList');
-    if (sangrias.length > 0) {
-        sangriaListEl.innerHTML = sangrias.map(s => `
-            <div class="flex justify-between border-b border-gray-800 pb-1">
-                <span>${s.reason}</span><span class="text-red-400">-${formatCurrency(s.value)}</span>
-            </div>`).join('');
-    } else {
-        sangriaListEl.innerHTML = '<p class="italic opacity-50">Nenhuma sangria registrada.</p>';
+    if (sangriaListEl) {
+        if (sangrias.length > 0) {
+            sangriaListEl.innerHTML = sangrias.map(s => `
+                <div class="flex justify-between border-b border-gray-800 pb-1 mb-1 text-xs">
+                    <span class="text-gray-400">${s.reason}</span>
+                    <span class="text-red-400 font-mono">-${formatCurrency(s.value)}</span>
+                </div>`).join('');
+        } else {
+            sangriaListEl.innerHTML = '<p class="italic opacity-50 text-xs">Nenhuma sangria.</p>';
+        }
     }
 
+    // Dinheiro Esperado = Fundo Inicial + Vendas em Dinheiro - Sangrias
     const expectedMoney = (currentShift.initialBalance || 0) + stats.totalMoney - totalSangria;
-    elExpectedMoney.dataset.value = expectedMoney;
-    elExpectedMoney.textContent = formatCurrency(expectedMoney);
+    if(elExpectedMoney) {
+        elExpectedMoney.dataset.value = expectedMoney;
+        elExpectedMoney.textContent = formatCurrency(expectedMoney);
+    }
 
     calculateDifference(); 
 };
 
-// ==================================================================
-// CORREÇÃO PRINCIPAL DA BUSCA DE VENDAS
-// ==================================================================
+// --- BUSCA DE VENDAS DO TURNO ---
 const fetchSalesForShift = async (shift) => {
-    const tablesRef = collection(db, 'artifacts', appId, 'public', 'data', 'tables');
+    const tablesRef = collection(db, 'artifacts', appId, 'public', 'data', 'tables'); // Usar coleção de histórico se houver, ou tables
     
-    // Converter Timestamp do shift para objeto Date nativo se necessário
+    // O ideal é buscar na coleção de mesas FECHADAS (ex: tables_history ou manter em tables com status closed)
+    // Assumindo que as mesas fechadas permanecem na coleção 'tables' ou vão para 'tables_history'
+    // No paymentController, nós salvamos o histórico em `tables` com status `closed`.
+    
     const shiftStartDate = shift.openedAt?.toDate ? shift.openedAt.toDate() : new Date();
     const shiftStartTimestamp = Timestamp.fromDate(shiftStartDate);
 
-    // QUERY CORRIGIDA:
-    // 1. status == 'closed' (Mesas fechadas)
-    // 2. closedBy == EU (Mesas que EU fechei/recebi) <--- MUDANÇA AQUI
-    // 3. closedAt >= Abertura do Caixa (Mesas deste turno)
+    // Query: Mesas fechadas por MIM, depois que abri o caixa
     const q = query(
         tablesRef,
         where('status', '==', 'closed'),
-        where('closedBy', '==', auth.currentUser.email), // Alterado de waiterId para closedBy
+        where('closedBy', '==', auth.currentUser.email),
         where('closedAt', '>=', shiftStartTimestamp) 
     );
 
@@ -164,11 +178,7 @@ const fetchSalesForShift = async (shift) => {
     try {
         snapshot = await getDocs(q);
     } catch (e) {
-        console.error("Erro ao buscar vendas do caixa (Provável falta de índice):", e);
-        // Se der erro de índice, retorne vazio para não quebrar a tela, mas avise no console
-        if(e.code === 'failed-precondition') {
-             alert("O sistema está criando um índice interno. Tente novamente em 2 minutos.");
-        }
+        console.error("Erro ao buscar vendas (Índice pode ser necessário):", e);
         return { stats: { totalMoney: 0, totalDigital: 0, totalProducts: 0, totalServiceTax: 0 }, transactions: [] };
     }
 
@@ -184,15 +194,23 @@ const fetchSalesForShift = async (shift) => {
         let paymentMethods = [];
         
         payments.forEach(pay => {
-            const val = parseFloat(pay.value.toString().replace(/[^\d,.-]/g, '').replace(',', '.'));
+            const val = typeof pay.value === 'string' 
+                ? parseFloat(pay.value.replace(/[^\d,.-]/g, '').replace(',', '.')) 
+                : pay.value;
+
             if (!isNaN(val)) {
                 tablePaidTotal += val;
                 if (!paymentMethods.includes(pay.method)) paymentMethods.push(pay.method);
-                if (pay.method.toLowerCase().includes('dinheiro')) stats.totalMoney += val;
-                else stats.totalDigital += val;
+                
+                if (pay.method.toLowerCase().includes('dinheiro')) {
+                    stats.totalMoney += val;
+                } else {
+                    stats.totalDigital += val;
+                }
             }
         });
 
+        // Estimativa simples de serviço (se aplicado)
         let serviceVal = 0;
         let productsVal = tablePaidTotal;
         if (table.serviceTaxApplied) {
@@ -218,23 +236,41 @@ const fetchSalesForShift = async (shift) => {
 const handleRegisterSangria = async () => {
     const valInput = document.getElementById('sangriaValueInput');
     const reasonInput = document.getElementById('sangriaReasonInput');
+    const btn = document.getElementById('confirmSangriaBtn');
+    
     const amount = parseFloat(valInput.value);
     const reason = reasonInput.value.trim();
 
-    if (isNaN(amount) || amount <= 0) { alert("Informe um valor válido."); return; }
-    if (!reason) { alert("Informe o motivo."); return; }
+    if (isNaN(amount) || amount <= 0) { showToast("Valor inválido.", true); return; }
+    if (!reason) { showToast("Informe o motivo.", true); return; }
+
+    toggleLoading(btn, true, 'Salvando...');
 
     try {
-        const shiftRef = doc(getShiftsCollectionRef(), currentShift.id);
-        await updateDoc(shiftRef, {
+        // Pega referência da coleção de shifts
+        const shiftsRef = collection(db, 'artifacts', appId, 'public', 'data', 'shifts');
+        const shiftDocRef = doc(shiftsRef, currentShift.id);
+
+        await updateDoc(shiftDocRef, {
             sangrias: arrayUnion({ value: amount, reason: reason, timestamp: new Date().toISOString() })
         });
-        sangriaModal.style.display = 'none';
-        showToast("Sangria registrada!");
-    } catch (e) { console.error("Erro sangria:", e); alert("Erro ao salvar sangria."); }
+        
+        if(sangriaModal) sangriaModal.style.display = 'none';
+        showToast("Sangria registrada!", false);
+        valInput.value = ''; 
+        reasonInput.value = '';
+
+    } catch (e) { 
+        console.error("Erro sangria:", e); 
+        showToast("Erro ao salvar sangria.", true); 
+    } finally {
+        toggleLoading(btn, false);
+    }
 };
 
 const calculateDifference = () => {
+    if (!elExpectedMoney || !elDifferenceValue) return;
+    
     const expected = parseFloat(elExpectedMoney.dataset.value || 0);
     const inputVal = document.getElementById('cashierEndFloat').value;
     const actual = parseFloat(inputVal);
@@ -262,9 +298,13 @@ const calculateDifference = () => {
 };
 
 const handleOpenShift = async () => {
-    const initialValInput = document.getElementById('cashierStartFloat').value;
-    const initialBalance = parseFloat(initialValInput);
-    if (isNaN(initialBalance)) { alert("Valor inválido."); return; }
+    const initialValInput = document.getElementById('cashierStartFloat');
+    const btn = document.getElementById('confirmOpenCashierBtn');
+    const initialBalance = parseFloat(initialValInput.value);
+    
+    if (isNaN(initialBalance)) { showToast("Valor inválido.", true); return; }
+
+    toggleLoading(btn, true, 'Abrindo...');
 
     const user = auth.currentUser;
     const newShift = {
@@ -277,29 +317,41 @@ const handleOpenShift = async () => {
     };
 
     try {
-        await addDoc(getShiftsCollectionRef(), newShift);
-        showToast("Caixa aberto com sucesso!");
-    } catch (e) { console.error(e); alert("Erro ao abrir."); }
+        const shiftsRef = collection(db, 'artifacts', appId, 'public', 'data', 'shifts');
+        await addDoc(shiftsRef, newShift);
+        showToast("Caixa aberto com sucesso!", false);
+    } catch (e) { 
+        console.error(e); 
+        showToast("Erro ao abrir caixa.", true); 
+    } finally {
+        toggleLoading(btn, false);
+    }
 };
 
 const handleCloseShift = async () => {
-    const finalValInput = document.getElementById('cashierEndFloat').value;
-    const finalCashBalance = parseFloat(finalValInput);
+    const finalValInput = document.getElementById('cashierEndFloat');
+    const btn = document.getElementById('confirmCloseCashierBtn');
+    const finalCashBalance = parseFloat(finalValInput.value);
     const expected = parseFloat(elExpectedMoney.dataset.value || 0);
     
-    if (isNaN(finalCashBalance)) { alert("Informe a contagem final."); return; }
+    if (isNaN(finalCashBalance)) { showToast("Informe a contagem final.", true); return; }
 
     const diff = finalCashBalance - expected;
     const justification = document.getElementById('cashierClosingNote').value.trim();
 
     if (Math.abs(diff) > 0.10 && !justification) {
-        alert("Diferença detectada. Preencha a justificativa.");
+        showToast("Diferença detectada. Justifique.", true);
         return;
     }
-    if (!confirm("Fechar caixa?")) return;
+    
+    if (!confirm("Tem certeza que deseja fechar o caixa?")) return;
+
+    toggleLoading(btn, true, 'Fechando...');
 
     try {
-        const shiftRef = doc(getShiftsCollectionRef(), currentShift.id);
+        const shiftsRef = collection(db, 'artifacts', appId, 'public', 'data', 'shifts');
+        const shiftRef = doc(shiftsRef, currentShift.id);
+        
         await updateDoc(shiftRef, {
             status: 'closed',
             closedAt: serverTimestamp(),
@@ -307,12 +359,21 @@ const handleCloseShift = async () => {
             expectedCash: expected,
             difference: diff,
             justification: justification || null,
+            // Salva snapshot dos totais calculados para relatório estático
             reportSalesMoney: parseFloat(elSalesMoney.textContent.replace(/[^\d,]/g,'').replace(',','.')),
             reportSalesDigital: parseFloat(elSalesDigital.textContent.replace(/[^\d,]/g,'').replace(',','.'))
         });
+        
         if(unsubscribeShift) unsubscribeShift();
         currentShift = null;
-        cashierModal.style.display = 'none';
-        showToast("Turno encerrado!");
-    } catch (e) { console.error(e); alert("Erro ao fechar."); }
+        if(cashierModal) cashierModal.style.display = 'none';
+        showToast("Turno encerrado com sucesso!", false);
+        finalValInput.value = '';
+
+    } catch (e) { 
+        console.error(e); 
+        showToast("Erro ao fechar caixa.", true); 
+    } finally {
+        toggleLoading(btn, false);
+    }
 };
