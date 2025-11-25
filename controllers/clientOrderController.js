@@ -148,7 +148,7 @@ export const initClientOrderController = () => {
                 let newNote = clientObsText.value.trim();
                 
                 const esperaSwitch = document.getElementById('esperaSwitch');
-                const isEspera = esperaSwitch ? esperaSwitch.checked : false;
+                const isEspera = esperaSwitch.checked;
                 const regexEspera = new RegExp(ESPERA_KEY.replace('(', '\\(').replace(')', '\\)'), 'ig');
                 const hasKey = newNote.toUpperCase().includes(ESPERA_KEY);
 

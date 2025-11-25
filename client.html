@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fator PDV - Cliente</title>
+    <title>Fator PDV - Cliente (Comanda Digital)</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="style.css"> 
@@ -51,8 +51,6 @@
         .slider-obs:before { background-color: white; height: 20px; width: 20px; left: 4px; bottom: 4px; border-radius: 50%; position: absolute; content: ""; transition: .4s;}
         input:checked + .slider-obs { background-color: #fbbf24; }
         input:checked + .slider-obs:before { transform: translateX(22px); }
-        
-        /* Abas do CRM */
         .crm-tab-btn { padding: 0.75rem 1rem; font-size: 0.875rem; font-weight: 600; color: #9ca3af; border-bottom: 2px solid transparent; transition: all 0.2s; }
         .crm-tab-btn:hover { color: #d1d5db; }
         .crm-tab-btn.active { color: #ff7518; border-bottom-color: #ff7518; }
@@ -281,16 +279,61 @@
     <div id="clientObsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"><div class="bg-dark-card border border-dark-border p-4 md:p-6 rounded-xl shadow-2xl w-full max-w-sm"><h3 id="obsItemName" class="text-lg md:text-xl font-bold mb-4 text-indigo-400">Observação</h3><div id="clientQuickObsButtons" class="flex flex-wrap gap-2 mb-4"></div><textarea id="clientObsText" rows="2" class="input-pdv w-full p-3 text-sm" placeholder="Ex: Sem cebola..."></textarea><div class="flex items-center justify-between mt-3 mb-4"><span class="text-gray-300 text-sm">Em Espera?</span><label class="switch-obs"><input type="checkbox" id="esperaSwitch"><span class="slider-obs"></span></label></div><div class="flex justify-end space-x-2"><button id="clientCancelObsBtn" class="px-3 py-2 bg-red-600 text-white rounded-lg">Cancelar</button><button id="clientConfirmObsBtn" class="px-3 py-2 bg-green-600 text-white rounded-lg">Salvar</button></div></div></div>
     <div id="customAlertModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
     <div id="productInfoModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"><div class="bg-dark-card border border-dark-border p-5 rounded-xl shadow-2xl w-full max-w-md relative"><button onclick="document.getElementById('productInfoModal').style.display='none'" class="absolute top-2 right-2 text-gray-400 text-2xl">&times;</button><div class="w-full h-48 mb-4 rounded-lg overflow-hidden"><img id="infoProductImage" src="" class="w-full h-full object-cover"></div><h3 id="infoProductName" class="text-xl font-bold text-pumpkin mb-1"></h3><p id="infoProductPrice" class="text-lg font-bold text-white mb-3"></p><div id="infoProductDescription" class="text-sm text-gray-400 mb-4"></div><button id="infoProductAddBtn" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg">Adicionar</button></div></div>
-    <div id="calculatorModal" class="hidden"></div><div id="tableTransferModal" class="hidden"></div><p class="mt-8 text-center text-xs text-dark-placeholder" id="user-id-display">.</p>
+
+
+    <div id="calculatorModal" class="hidden"></div>
+    <div id="tableTransferModal" class="hidden"></div>
+
+    <p class="mt-8 text-center text-xs text-dark-placeholder" id="user-id-display">.</p>
 
     <script>
-        window.printSummaryClient = () => { const valueEl = document.getElementById('valuePerDinerDisplayPrint'); const tableEl = document.getElementById('payment-table-number-print'); if(valueEl) valueEl.textContent = document.getElementById('valuePerDinerDisplay')?.textContent || ''; if(tableEl) tableEl.textContent = document.getElementById('payment-table-number')?.textContent || ''; window.print(); };
+        // Função para imprimir o resumo da conta no modo cliente
+        window.printSummaryClient = () => {
+             const valuePerDinerText = document.getElementById('valuePerDinerDisplay')?.textContent || 'R$ 0,00';
+             const tableNumber = document.getElementById('payment-table-number')?.textContent || 'Mesa Selecionada';
+             const valuePrintEl = document.getElementById('valuePerDinerDisplayPrint');
+             const tableNumPrintEl = document.getElementById('payment-table-number-print');
+             if(valuePrintEl) valuePrintEl.textContent = valuePerDinerText;
+             if(tableNumPrintEl) tableNumPrintEl.textContent = tableNumber;
+             window.print();
+        };
+        
+        // Placeholders
         window.openManagerAuthModal = () => {};
-        window.goToScreen = (screenId) => { const appContainer = document.getElementById('appContainer'); const index = { 'clientOrderScreen': 0, 'clientPaymentScreen': 1 }[screenId]; if (appContainer && index !== undefined) appContainer.style.transform = `translateX(-${index * 100}vw)`; };
-        window.openKdsStatusModal = () => {}; window.handleTableTransferConfirmed = () => {};
+        
+        // O app.js agora define a função window.goToScreen, então este é apenas um fallback
+        if (!window.goToScreen) {
+            window.goToScreen = (screenId) => {
+                 const appContainer = document.getElementById('appContainer');
+                 const clientScreens = { 'clientOrderScreen': 0, 'clientPaymentScreen': 1 };
+                 const index = clientScreens[screenId];
+                 
+                 if (appContainer && index !== undefined) {
+                      console.log(`[NAV CLIENT] Going to ${screenId} (index ${index})`);
+                      appContainer.style.transform = `translateX(-${index * 100}vw)`;
+                      const event = new CustomEvent('screenChanged', { detail: { screenId: screenId } });
+                      window.dispatchEvent(event);
+                 } else { 
+                      console.error(`[NAV CLIENT] Invalid screen ID: ${screenId}`); 
+                 }
+            };
+        }
+
+        window.openKdsStatusModal = () => {};
+        window.handleTableTransferConfirmed = () => {};
+
+        // IDs do Firebase
         window.__app_id = "1:1097659747429:web:8ec0a7c3978c311dbe0a8c";
-        window.__firebase_config = JSON.stringify({ apiKey: "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY", authDomain: "fator-pdv.firebaseapp.com", projectId: "fator-pdv", storageBucket: "fator-pdv.appspot.com", messagingSenderId: "1097659747429", appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c" });
+        window.__firebase_config = JSON.stringify({
+            apiKey: "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY",
+            authDomain: "fator-pdv.firebaseapp.com",
+            projectId: "fator-pdv",
+            storageBucket: "fator-pdv.appspot.com",
+            messagingSenderId: "1097659747429",
+            appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c"
+        });
     </script>
+
     <script type="module" src="app.js"></script>
 </body>
 </html>
