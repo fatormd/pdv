@@ -1,5 +1,5 @@
-// --- CONTROLLERS/MANAGERCONTROLLER.JS (VERSÃO FINAL INTEGRADA) ---
-// Inclui: Paginação no Hub, Busca Otimizada, UX/UI e Gestão Completa
+// --- CONTROLLERS/MANAGERCONTROLLER.JS (VERSÃO FINAL COMPLETA) ---
+// Inclui: Hub de Produtos (Formulário Completo), Gestão de Caixas, Relatórios Detalhados e UX
 
 import { 
     db, appId, 
@@ -10,7 +10,7 @@ import {
     getSectorsCollectionRef, 
     getSystemStatusDocRef, 
     getFinancialGoalsDocRef 
-} from "/services/firebaseService.js";
+} from "/services/firebaseService.js"; //
 
 import { 
     collection, query, where, getDocs, orderBy, Timestamp, 
@@ -18,7 +18,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 import { formatCurrency, toggleLoading } from "/utils.js"; //
-import { openUserManagementModal } from "/controllers/userManagementController.js";
+import { openUserManagementModal } from "/controllers/userManagementController.js"; //
 import { 
     syncWithWooCommerce, getProducts, getCategories, 
     createWooProduct, updateWooProduct, deleteWooProduct, fetchWooCommerceProducts, 
@@ -32,12 +32,11 @@ let voucherManagementModal, voucherListContainer, voucherForm;
 let reportDateInput;
 let managerControllerInitialized = false;
 
-// --- ESTADO DO HUB DE PRODUTOS (PAGINAÇÃO) ---
+// --- ESTADO DO HUB DE PRODUTOS ---
 let hubPage = 1;
 let hubSearch = '';
 let hubCategory = 'all';
 let hubSearchTimeout = null;
-let hubLoadMoreBtn;
 
 // --- INICIALIZAÇÃO ---
 export const initManagerController = () => {
@@ -50,6 +49,10 @@ export const initManagerController = () => {
              if (e.target === managerModal) managerModal.style.display = 'none';
         });
     }
+
+    // LIMPEZA DE UI: Remove o botão "Abrir Turno" antigo
+    const openHouseBtn = document.querySelector('button[onclick*="openHouse"]');
+    if (openHouseBtn) openHouseBtn.style.display = 'none';
 
     // Vouchers
     voucherManagementModal = document.getElementById('voucherManagementModal'); 
@@ -95,7 +98,6 @@ export const initManagerController = () => {
 
 // --- ROTEADOR DE AÇÕES ---
 export const handleGerencialAction = (action, payload) => {
-    console.log(`[Manager] Ação: ${action}`);
     if (managerModal) managerModal.style.display = 'none';
 
     switch (action) {
@@ -116,7 +118,7 @@ export const handleGerencialAction = (action, payload) => {
         case 'openWooSync': handleSyncAction(); break;
         
         case 'openCashManagementReport': openReportPanel('active-shifts'); break;
-        case 'openHouse': handleOpenHouse(); break;
+        case 'openHouse': /* Removido */ break;
         case 'closeDay': handleCloseDay(); break;
         case 'exportCsv': exportSalesToCSV(); break;
 
@@ -129,7 +131,6 @@ export const handleGerencialAction = (action, payload) => {
     }
 };
 
-// --- AÇÃO DE SINCRONIZAÇÃO (UX MELHORADA) ---
 const handleSyncAction = async () => {
     showToast("Iniciando sincronização...", false);
     try {
@@ -143,7 +144,7 @@ const handleSyncAction = async () => {
 
 
 // =================================================================
-//           GESTÃO DE PRODUTOS (HUB MOBILE-FIRST OTIMIZADO)
+//           GESTÃO DE PRODUTOS (HUB COMPLETO)
 // =================================================================
 const renderProductHub = async (activeTab = 'products') => {
     if (!managerModal) return;
@@ -158,7 +159,7 @@ const renderProductHub = async (activeTab = 'products') => {
         });
     }
 
-    // Reset Estado do Hub
+    // Reset Estado
     hubPage = 1;
     hubSearch = '';
     hubCategory = 'all';
@@ -213,7 +214,6 @@ const renderProductHub = async (activeTab = 'products') => {
         contentDiv.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500"><i class="fas fa-spinner fa-spin text-3xl"></i></div>';
 
         if (tabName === 'products') {
-            // TOOLBAR PRODUTOS (Com Busca e Filtro)
             toolbarDiv.innerHTML = `
                 <div class="flex items-center space-x-2 w-full md:w-auto">
                     <select id="hubCategoryFilter" class="bg-gray-700 text-white text-sm py-3 px-3 rounded-lg border border-gray-600 w-full md:w-[200px]">
@@ -231,14 +231,14 @@ const renderProductHub = async (activeTab = 'products') => {
                 </div>
             `;
             
-            document.getElementById('hubNewProductBtn').onclick = () => renderProductForm(null, contentDiv, () => renderProductList(contentDiv, hubCategory, hubSearch));
+            document.getElementById('hubNewProductBtn').onclick = () => renderProductForm(null, contentDiv, () => renderProductList(contentDiv, 'all', '', false));
             const catSelect = document.getElementById('hubCategoryFilter');
             const searchInput = document.getElementById('hubSearchInput');
             
             catSelect.onchange = (e) => {
                 hubCategory = e.target.value;
                 hubPage = 1;
-                renderProductList(contentDiv, hubCategory, hubSearch);
+                renderProductList(contentDiv, hubCategory, hubSearch, false);
             };
 
             searchInput.oninput = (e) => {
@@ -246,13 +246,12 @@ const renderProductHub = async (activeTab = 'products') => {
                 hubPage = 1;
                 clearTimeout(hubSearchTimeout);
                 hubSearchTimeout = setTimeout(() => {
-                    renderProductList(contentDiv, hubCategory, hubSearch);
+                    renderProductList(contentDiv, hubCategory, hubSearch, false);
                 }, 600);
             };
             
-            // Carrega primeira página
             await fetchWooCommerceProducts(1, '', 'all', false);
-            await renderProductList(contentDiv, 'all', '');
+            await renderProductList(contentDiv, 'all', '', false);
 
         } else if (tabName === 'categories') {
             toolbarDiv.innerHTML = `
@@ -261,6 +260,7 @@ const renderProductHub = async (activeTab = 'products') => {
                     <i class="fas fa-plus mr-2"></i> Nova Categoria
                 </button>
             `;
+            
             document.getElementById('hubNewRootCatBtn').onclick = () => renderCategoryForm(null, contentDiv, () => renderCategoryManagement(contentDiv));
             await renderCategoryManagement(contentDiv);
         }
@@ -270,18 +270,16 @@ const renderProductHub = async (activeTab = 'products') => {
     switchTab(activeTab === 'inventory' || activeTab === 'recipes' || activeTab === 'obs' ? 'products' : activeTab);
 };
 
-// --- 1. LISTA DE PRODUTOS (COM PAGINAÇÃO E LOAD MORE) ---
+// --- 1. LISTA DE PRODUTOS ---
 const renderProductList = async (container, catFilter, searchTerm, append = false) => {
     
     if (!append) {
         container.innerHTML = '<div class="flex justify-center py-10"><i class="fas fa-spinner fa-spin text-3xl text-gray-500"></i></div>';
-        // Busca inicial (reset ou filtro)
         await fetchWooCommerceProducts(1, searchTerm, catFilter, false);
     }
 
     let products = getProducts();
     
-    // Se vazio e não é append
     if (products.length === 0 && !append) {
         container.innerHTML = '<p class="text-center text-gray-500 py-10">Nenhum produto encontrado.</p>';
         return;
@@ -307,7 +305,6 @@ const renderProductList = async (container, catFilter, searchTerm, append = fals
             </div>
         </div>`).join('');
 
-    // Botão Load More
     const loadMoreHtml = `
         <div class="pt-4 pb-20 text-center" id="hubLoadMoreContainer">
             <button id="hubLoadMoreBtn" class="w-full md:w-1/2 py-3 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition font-bold border border-gray-600">
@@ -319,42 +316,34 @@ const renderProductList = async (container, catFilter, searchTerm, append = fals
     if (!append) {
         container.innerHTML = `<div class="pb-4">${listHtml}</div>${loadMoreHtml}`;
     } else {
-        // Append logic
         const loadMoreContainer = document.getElementById('hubLoadMoreContainer');
         if(loadMoreContainer) loadMoreContainer.remove();
         container.insertAdjacentHTML('beforeend', `<div class="pb-4">${listHtml}</div>${loadMoreHtml}`);
     }
 
-    // Re-attach listeners (Edit/Delete)
-    // Nota: Ao usar insertAdjacentHTML, listeners antigos podem ser perdidos se não for delegado.
-    // Para simplificar no Manager, reatribuímos a todos.
     container.querySelectorAll('.btn-edit-prod').forEach(btn => 
         btn.onclick = () => {
             const prod = products.find(p => p.id == btn.dataset.id);
-            renderProductForm(prod, container, () => renderProductList(container, catFilter, searchTerm));
+            renderProductForm(prod, container, () => renderProductList(container, catFilter, searchTerm, false));
         }
     );
     
     container.querySelectorAll('.btn-del-prod').forEach(btn => 
-        btn.onclick = () => handleDeleteProduct(btn.dataset.id, () => renderProductList(container, catFilter, searchTerm))
+        btn.onclick = () => handleDeleteProduct(btn.dataset.id, () => renderProductList(container, catFilter, searchTerm, false))
     );
 
-    // Listener Load More
     const loadBtn = document.getElementById('hubLoadMoreBtn');
     if (loadBtn) {
         loadBtn.onclick = async () => {
             toggleLoading(loadBtn, true, 'Carregando...');
             hubPage++;
-            const newItems = await fetchWooCommerceProducts(hubPage, searchTerm, catFilter, true); // Append=true
+            const newItems = await fetchWooCommerceProducts(hubPage, searchTerm, catFilter, true); 
             
             if (newItems.length === 0) {
                 showToast("Não há mais produtos.", false);
                 loadBtn.style.display = 'none';
             } else {
-                // A renderização "inteligente" aqui seria apenas adicionar o HTML novo, 
-                // mas para simplificar a lógica de listeners, chamamos renderProductList completo
-                // usando o cache atualizado.
-                renderProductList(container, catFilter, searchTerm);
+                renderProductList(container, catFilter, searchTerm, true);
             }
         };
     }
@@ -685,54 +674,391 @@ const handleDeleteProduct = async (id, callback) => {
 };
 
 // =================================================================
-//              OUTROS MÓDULOS (MANTIDOS)
+//           RELATÓRIOS E CAIXA (COM FORCE CLOSE & ORIGEM)
 // =================================================================
+
 const openReportPanel = (tabName = 'active-shifts') => {
     const modal = document.getElementById('reportsModal');
-    if(modal) { modal.style.display = 'flex'; const btn = document.querySelector(`.report-tab-btn[data-tab="${tabName}"]`); if(btn) btn.click(); else loadReports(); }
+    if(modal) { 
+        modal.style.display = 'flex'; 
+        const btn = document.querySelector(`.report-tab-btn[data-tab="${tabName}"]`); 
+        if(btn) btn.click(); else loadReports(); 
+    }
 };
+
 const loadReports = async () => {
-    if (!reportDateInput) return; const dateVal = reportDateInput.value; if(!dateVal) return;
-    const startOfDay = Timestamp.fromDate(new Date(dateVal + 'T00:00:00')); const endOfDay = Timestamp.fromDate(new Date(dateVal + 'T23:59:59'));
-    const dateEl = document.getElementById('salesTodayDate'); if (dateEl) dateEl.textContent = new Date(dateVal).toLocaleDateString('pt-BR');
-    try { await Promise.all([ fetchActiveShifts(), fetchClosedShifts(startOfDay, endOfDay), fetchDailySales(startOfDay, endOfDay) ]); } catch (e) { console.error(e); }
+    if (!reportDateInput) return; 
+    const dateVal = reportDateInput.value; 
+    if(!dateVal) return;
+    
+    const startOfDay = Timestamp.fromDate(new Date(dateVal + 'T00:00:00')); 
+    const endOfDay = Timestamp.fromDate(new Date(dateVal + 'T23:59:59'));
+    
+    const dateEl = document.getElementById('salesTodayDate'); 
+    if (dateEl) dateEl.textContent = new Date(dateVal).toLocaleDateString('pt-BR');
+    
+    try { 
+        await Promise.all([ 
+            fetchActiveShifts(), 
+            fetchClosedShifts(startOfDay, endOfDay), 
+            fetchDailySales(startOfDay, endOfDay) 
+        ]); 
+    } catch (e) { console.error(e); }
 };
+
+// --- 1. CAIXAS ABERTOS (COM BOTÃO DE FECHAR) ---
 const fetchActiveShifts = async () => {
-    const container = document.getElementById('activeShiftsContainer'); if (!container) return;
+    const container = document.getElementById('activeShiftsContainer'); 
+    if (!container) return;
+    
     const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'shifts'), where('status', '==', 'open'));
-    const snap = await getDocs(q); if (snap.empty) { container.innerHTML = '<p class="text-gray-500 col-span-full text-center py-8 italic">Nenhum caixa aberto.</p>'; return; }
-    container.innerHTML = snap.docs.map(doc => { const s = doc.data(); const openTime = s.openedAt?.toDate ? s.openedAt.toDate().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--:--'; return `<div class="bg-gray-800 border border-green-500/50 rounded-xl p-5 shadow-lg relative flex flex-col"><div class="absolute top-3 right-3"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-900 text-green-300 border border-green-700 animate-pulse">Ativo</span></div><div class="flex items-center mb-4"><div class="h-12 w-12 rounded-full bg-gray-700 flex items-center justify-center text-2xl mr-4 border border-gray-600"><i class="fas fa-user-circle text-green-400"></i></div><div><h5 class="text-white font-bold text-lg leading-tight">${s.userName || 'Operador'}</h5><p class="text-xs text-gray-400 mt-1">Aberto às ${openTime}</p></div></div><div class="bg-gray-900/50 rounded-lg p-3 mb-4 border border-gray-700"><div class="flex justify-between text-sm mb-1"><span class="text-gray-400">Fundo Inicial:</span><span class="text-white font-mono font-bold">${formatCurrency(s.initialBalance || 0)}</span></div></div></div>`; }).join('');
+    const snap = await getDocs(q); 
+    
+    if (snap.empty) { 
+        container.innerHTML = '<p class="text-gray-500 col-span-full text-center py-8 italic">Nenhum caixa aberto.</p>'; 
+        return; 
+    }
+    
+    container.innerHTML = snap.docs.map(doc => { 
+        const s = doc.data(); 
+        const openTime = s.openedAt?.toDate ? s.openedAt.toDate().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--:--'; 
+        
+        return `
+        <div class="bg-gray-800 border border-green-500/50 rounded-xl p-5 shadow-lg relative flex flex-col">
+            <div class="absolute top-3 right-3">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-900 text-green-300 border border-green-700 animate-pulse">Ativo</span>
+            </div>
+            <div class="flex items-center mb-4">
+                <div class="h-12 w-12 rounded-full bg-gray-700 flex items-center justify-center text-2xl mr-4 border border-gray-600">
+                    <i class="fas fa-user-circle text-green-400"></i>
+                </div>
+                <div>
+                    <h5 class="text-white font-bold text-lg leading-tight">${s.userName || 'Operador'}</h5>
+                    <p class="text-xs text-gray-400 mt-1">Aberto às ${openTime}</p>
+                </div>
+            </div>
+            <div class="bg-gray-900/50 rounded-lg p-3 mb-4 border border-gray-700">
+                <div class="flex justify-between text-sm mb-1">
+                    <span class="text-gray-400">Fundo Inicial:</span>
+                    <span class="text-white font-mono font-bold">${formatCurrency(s.initialBalance || 0)}</span>
+                </div>
+            </div>
+            <button onclick="window.handleForceCloseShift('${doc.id}', '${s.userId}')" class="w-full py-2 bg-red-900/50 hover:bg-red-800 text-red-200 border border-red-700 rounded-lg text-sm font-bold transition flex items-center justify-center">
+                <i class="fas fa-power-off mr-2"></i> Forçar Fechamento
+            </button>
+        </div>`; 
+    }).join('');
 };
+
+// Função Global para Fechamento Gerencial
+window.handleForceCloseShift = async (shiftId, shiftUserId) => {
+    if (!confirm("ATENÇÃO: Deseja forçar o fechamento deste caixa?\nO sistema irá calcular as vendas e encerrar o turno.")) return;
+    
+    try {
+        // 1. Busca dados do turno
+        const shiftRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'shifts'), shiftId);
+        const shiftSnap = await getDoc(shiftRef);
+        if (!shiftSnap.exists()) throw new Error("Turno não encontrado.");
+        const shiftData = shiftSnap.data();
+
+        // 2. Calcula totais (mesma lógica do caixa)
+        const tablesQ = query(
+            getTablesCollectionRef(),
+            where('status', '==', 'closed'),
+            where('closedBy', '==', shiftUserId),
+            where('closedAt', '>=', shiftData.openedAt)
+        );
+        const salesSnap = await getDocs(tablesQ);
+        
+        let totalMoney = 0;
+        let totalDigital = 0;
+        
+        salesSnap.forEach(tDoc => {
+            const t = tDoc.data();
+            (t.payments || []).forEach(p => {
+                const val = parseFloat(p.value.replace(/[^\d,.-]/g, '').replace(',', '.'));
+                if (!isNaN(val)) {
+                    if (p.method.toLowerCase().includes('dinheiro')) totalMoney += val;
+                    else totalDigital += val;
+                }
+            });
+        });
+
+        // 3. Fecha o turno
+        await updateDoc(shiftRef, {
+            status: 'closed',
+            closedAt: serverTimestamp(),
+            finalCashInDrawer: 0, // Gerente não conta gaveta física remotamente
+            difference: 0,
+            justification: "Fechamento Forçado pelo Gerente",
+            reportSalesMoney: totalMoney,
+            reportSalesDigital: totalDigital
+        });
+
+        showToast("Caixa encerrado com sucesso!", false);
+        loadReports(); // Atualiza lista
+
+    } catch (e) {
+        console.error(e);
+        showToast("Erro ao fechar caixa: " + e.message, true);
+    }
+};
+
+// --- 2. HISTÓRICO DE CAIXAS ---
 const fetchClosedShifts = async (start, end) => {
     const container = document.getElementById('closedShiftsContainer'); if (!container) return;
+    
     const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'shifts'), where('status', '==', 'closed'), where('openedAt', '>=', start), where('openedAt', '<', end), orderBy('openedAt', 'desc'));
-    const snap = await getDocs(q); if (snap.empty) { container.innerHTML = '<p class="text-gray-500 text-center py-8 italic">Nenhum caixa fechado.</p>'; return; }
-    container.innerHTML = snap.docs.map(doc => { const s = doc.data(); const diff = s.difference || 0; const diffColor = diff < -0.5 ? 'text-red-400' : (diff > 0.5 ? 'text-blue-400' : 'text-green-500'); const openTime = s.openedAt?.toDate().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); const closeTime = s.closedAt?.toDate().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); return `<div class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex flex-col md:flex-row justify-between items-center gap-4 hover:bg-gray-750 transition"><div class="flex items-center w-full md:w-1/3"><div class="mr-4 text-gray-500 bg-gray-900 h-10 w-10 flex items-center justify-center rounded-full"><i class="fas fa-history"></i></div><div><h4 class="text-white font-bold text-base">${s.userName}</h4><p class="text-xs text-gray-400"><i class="far fa-clock mr-1"></i> ${openTime} - ${closeTime}</p></div></div><div class="flex space-x-2 w-full md:w-2/3 justify-between md:justify-end items-center bg-gray-900/30 p-2 rounded-lg md:bg-transparent md:p-0"><div class="text-right px-2 md:px-4 border-r border-gray-700"><p class="text-[10px] text-gray-500 uppercase tracking-wider">Vendas</p><p class="text-white font-bold text-sm">${formatCurrency(s.reportSalesMoney + s.reportSalesDigital)}</p></div><div class="text-right px-2 md:px-4 border-r border-gray-700"><p class="text-[10px] text-gray-500 uppercase tracking-wider">Quebra</p><p class="${diffColor} font-bold text-sm">${formatCurrency(diff)}</p></div><button onclick="window.openShiftDetails('${doc.id}')" class="ml-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-bold flex items-center"><i class="fas fa-list mr-1"></i> Ver Vendas</button></div></div>`; }).join('');
+    const snap = await getDocs(q); 
+    
+    if (snap.empty) { 
+        container.innerHTML = '<p class="text-gray-500 text-center py-8 italic">Nenhum caixa fechado.</p>'; 
+        return; 
+    }
+    
+    container.innerHTML = snap.docs.map(doc => { 
+        const s = doc.data(); 
+        const diff = s.difference || 0; 
+        const diffColor = diff < -0.5 ? 'text-red-400' : (diff > 0.5 ? 'text-blue-400' : 'text-green-500'); 
+        const openTime = s.openedAt?.toDate().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); 
+        const closeTime = s.closedAt?.toDate().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); 
+        
+        return `
+        <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex flex-col md:flex-row justify-between items-center gap-4 hover:bg-gray-750 transition">
+            <div class="flex items-center w-full md:w-1/3">
+                <div class="mr-4 text-gray-500 bg-gray-900 h-10 w-10 flex items-center justify-center rounded-full"><i class="fas fa-history"></i></div>
+                <div>
+                    <h4 class="text-white font-bold text-base">${s.userName}</h4>
+                    <p class="text-xs text-gray-400"><i class="far fa-clock mr-1"></i> ${openTime} - ${closeTime}</p>
+                    ${s.justification ? `<p class="text-[10px] text-yellow-500 mt-1">Obs: ${s.justification}</p>` : ''}
+                </div>
+            </div>
+            <div class="flex space-x-2 w-full md:w-2/3 justify-between md:justify-end items-center bg-gray-900/30 p-2 rounded-lg md:bg-transparent md:p-0">
+                <div class="text-right px-2 md:px-4 border-r border-gray-700">
+                    <p class="text-[10px] text-gray-500 uppercase tracking-wider">Vendas</p>
+                    <p class="text-white font-bold text-sm">${formatCurrency((s.reportSalesMoney || 0) + (s.reportSalesDigital || 0))}</p>
+                </div>
+                <div class="text-right px-2 md:px-4 border-r border-gray-700">
+                    <p class="text-[10px] text-gray-500 uppercase tracking-wider">Quebra</p>
+                    <p class="${diffColor} font-bold text-sm">${formatCurrency(diff)}</p>
+                </div>
+                <button onclick="window.openShiftDetails('${doc.id}')" class="ml-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-bold flex items-center">
+                    <i class="fas fa-list mr-1"></i> Ver Vendas
+                </button>
+            </div>
+        </div>`; 
+    }).join('');
 };
+
+// --- 3. DETALHES DO TURNO (COM ORIGEM) ---
 window.openShiftDetails = async (shiftId) => {
-    const modal = document.getElementById('shiftDetailsModal'); const tableBody = document.getElementById('shiftSalesTableBody'); const header = document.getElementById('shiftDetailsHeader');
-    if (!modal || !tableBody) return; modal.style.display = 'flex'; tableBody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-500 italic">Carregando...</td></tr>';
-    try { const shiftSnap = await getDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'shifts'), shiftId)); if (!shiftSnap.exists()) throw new Error("Turno não encontrado."); const shift = shiftSnap.data(); header.textContent = `${shift.userName} | ${shift.openedAt.toDate().toLocaleString()}`; const tablesQ = query(getTablesCollectionRef(), where('status', '==', 'closed'), where('closedAt', '>=', shift.openedAt), where('closedAt', '<=', shift.closedAt), orderBy('closedAt', 'desc')); const snapshot = await getDocs(tablesQ); if (snapshot.empty) { tableBody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-500 italic">Nenhuma venda.</td></tr>'; return; }
-        tableBody.innerHTML = snapshot.docs.map(docSnap => { const table = docSnap.data(); let tableTotal = 0; (table.payments || []).forEach(p => { const val = parseFloat(p.value.toString().replace(/[^\d,.-]/g,'').replace(',','.')); if (!isNaN(val)) tableTotal += val; }); return `<tr class="hover:bg-gray-700 transition border-b border-gray-800 cursor-pointer" onclick="window.showOrderDetails('${docSnap.id}')"><td class="p-3 text-gray-300">${table.closedAt ? table.closedAt.toDate().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--'}</td><td class="p-3 font-bold text-white">Mesa ${table.tableNumber}</td><td class="p-3 text-gray-400 text-sm">${table.waiterId || table.closedBy || 'Staff'}</td><td class="p-3 text-right text-green-400 font-bold">${formatCurrency(tableTotal)}</td></tr>`; }).join('');
-    } catch (e) { tableBody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-red-400">Erro: ${e.message}</td></tr>`; }
+    const modal = document.getElementById('shiftDetailsModal'); 
+    const tableBody = document.getElementById('shiftSalesTableBody'); 
+    const header = document.getElementById('shiftDetailsHeader');
+    
+    if (!modal || !tableBody) return; 
+    modal.style.display = 'flex'; 
+    tableBody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-500 italic">Carregando...</td></tr>';
+    
+    try { 
+        const shiftSnap = await getDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'shifts'), shiftId)); 
+        if (!shiftSnap.exists()) throw new Error("Turno não encontrado."); 
+        const shift = shiftSnap.data(); 
+        header.textContent = `${shift.userName} | ${shift.openedAt.toDate().toLocaleString()}`; 
+        
+        const tablesQ = query(getTablesCollectionRef(), where('status', '==', 'closed'), where('closedAt', '>=', shift.openedAt), where('closedAt', '<=', shift.closedAt), orderBy('closedAt', 'desc')); 
+        const snapshot = await getDocs(tablesQ); 
+        
+        if (snapshot.empty) { 
+            tableBody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-500 italic">Nenhuma venda.</td></tr>'; 
+            return; 
+        }
+        
+        tableBody.innerHTML = snapshot.docs.map(docSnap => { 
+            const table = docSnap.data(); 
+            let tableTotal = 0; 
+            (table.payments || []).forEach(p => { 
+                const val = parseFloat(p.value.toString().replace(/[^\d,.-]/g,'').replace(',','.')); 
+                if (!isNaN(val)) tableTotal += val; 
+            }); 
+
+            // ORIGEM DO PEDIDO
+            const originBadge = table.isPickup 
+                ? '<span class="text-[10px] bg-blue-900 text-blue-300 px-1.5 rounded ml-2">RETIRADA</span>' 
+                : (table.sector ? `<span class="text-[10px] bg-gray-700 text-gray-300 px-1.5 rounded ml-2">${table.sector}</span>` : '');
+
+            return `
+            <tr class="hover:bg-gray-700 transition border-b border-gray-800 cursor-pointer" onclick="window.showOrderDetails('${docSnap.id}')">
+                <td class="p-3 text-gray-300">${table.closedAt ? table.closedAt.toDate().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--'}</td>
+                <td class="p-3 font-bold text-white">
+                    Mesa ${table.tableNumber}
+                    ${originBadge}
+                </td>
+                <td class="p-3 text-gray-400 text-sm">${table.closedBy || 'Staff'}</td>
+                <td class="p-3 text-right text-green-400 font-bold">${formatCurrency(tableTotal)}</td>
+            </tr>`; 
+        }).join('');
+    } catch (e) { 
+        tableBody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-red-400">Erro: ${e.message}</td></tr>`; 
+    }
 };
+
+// --- 4. TOTAIS DIÁRIOS (COM RELATÓRIO POR ORIGEM) ---
 const fetchDailySales = async (start, end) => {
-    const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'tables'), where('status', '==', 'closed'), where('closedAt', '>=', start), where('closedAt', '<', end)); const snapshot = await getDocs(q); let totalSales = 0, totalMoney = 0, totalDigital = 0, count = 0; const productStats = {}; const salesByHour = {}; const salesByWaiter = {};
-    snapshot.forEach(docSnap => { const table = docSnap.data(); let tableTotal = 0; count++; (table.payments || []).forEach(p => { const val = parseFloat(p.value.toString().replace(/[^\d,.-]/g,'').replace(',','.')); if (!isNaN(val)) { tableTotal += val; if (p.method.toLowerCase().includes('dinheiro')) totalMoney += val; else totalDigital += val; } }); totalSales += tableTotal; if (table.sentItems) { table.sentItems.forEach(item => { const id = item.id; if (!productStats[id]) { productStats[id] = { name: item.name, qty: 0 }; } productStats[id].qty += 1; }); } if (table.closedAt) { const hour = table.closedAt.toDate().getHours(); const hourKey = `${hour}h - ${hour+1}h`; salesByHour[hourKey] = (salesByHour[hourKey] || 0) + 1; } const waiter = table.waiterId || table.closedBy || 'Não Identificado'; salesByWaiter[waiter] = (salesByWaiter[waiter] || 0) + tableTotal; });
-    document.getElementById('reportTotalSales').textContent = formatCurrency(totalSales); document.getElementById('reportTotalMoney').textContent = formatCurrency(totalMoney); document.getElementById('reportTotalDigital').textContent = formatCurrency(totalDigital); document.getElementById('reportTicketMedio').textContent = formatCurrency(count > 0 ? totalSales / count : 0);
-    const topProducts = Object.values(productStats).sort((a, b) => b.qty - a.qty).slice(0, 10); const top10Ids = Object.keys(productStats).sort((a, b) => productStats[b].qty - productStats[a].qty).slice(0, 10); localStorage.setItem('top10_products', JSON.stringify(top10Ids));
-    const topListEl = document.getElementById('topProductsList'); if(topListEl) topListEl.innerHTML = topProducts.length ? topProducts.map((p, i) => `<div class="flex justify-between items-center text-sm border-b border-gray-700 pb-1 last:border-0"><span class="text-gray-300"><b class="text-pumpkin mr-2">#${i+1}</b> ${p.name}</span><span class="font-mono text-white font-bold">${p.qty}</span></div>`).join('') : '<p class="text-xs text-gray-500 italic">Sem dados.</p>';
-    let peakHour = '--:--'; let peakCount = 0; Object.entries(salesByHour).forEach(([hour, count]) => { if(count > peakCount) { peakCount = count; peakHour = hour; } }); document.getElementById('peakHourDisplay').textContent = peakHour; document.getElementById('peakHourVolume').textContent = `${peakCount} vendas`;
-    const teamListEl = document.getElementById('teamPerformanceList'); if (teamListEl) { const sortedTeam = Object.entries(salesByWaiter).sort(([,a], [,b]) => b - a); teamListEl.innerHTML = sortedTeam.length ? sortedTeam.map(([name, total], i) => `<div class="flex justify-between items-center text-sm border-b border-gray-700 pb-1 last:border-0"><span class="text-gray-300 truncate"><b class="text-blue-400 mr-2">${i+1}.</b> ${name}</span><span class="font-mono text-white font-bold text-xs">${formatCurrency(total)}</span></div>`).join('') : '<p class="text-xs text-gray-500 italic">Sem vendas.</p>'; }
+    const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'tables'), where('status', '==', 'closed'), where('closedAt', '>=', start), where('closedAt', '<', end)); 
+    const snapshot = await getDocs(q); 
+    let totalSales = 0, totalMoney = 0, totalDigital = 0, count = 0; 
+    const productStats = {}; 
+    const salesByHour = {}; 
+    const salesByWaiter = {};
+    const salesByOrigin = {}; // NOVO: Acumulador por origem
+    
+    snapshot.forEach(docSnap => { 
+        const table = docSnap.data(); 
+        let tableTotal = 0; 
+        count++; 
+        (table.payments || []).forEach(p => { 
+            const val = parseFloat(p.value.toString().replace(/[^\d,.-]/g,'').replace(',','.')); 
+            if (!isNaN(val)) { 
+                tableTotal += val; 
+                if (p.method.toLowerCase().includes('dinheiro')) totalMoney += val; else totalDigital += val; 
+            } 
+        }); 
+        totalSales += tableTotal; 
+        
+        // Agrupa por Origem (Setor)
+        const origin = table.isPickup ? 'Retirada' : (table.sector || 'Salão');
+        salesByOrigin[origin] = (salesByOrigin[origin] || 0) + tableTotal;
+
+        if (table.sentItems) { 
+            table.sentItems.forEach(item => { 
+                const id = item.id; 
+                if (!productStats[id]) { productStats[id] = { name: item.name, qty: 0 }; } 
+                productStats[id].qty += 1; 
+            }); 
+        } 
+        if (table.closedAt) { 
+            const hour = table.closedAt.toDate().getHours(); 
+            const hourKey = `${hour}h - ${hour+1}h`; 
+            salesByHour[hourKey] = (salesByHour[hourKey] || 0) + 1; 
+        } 
+        const waiter = table.closedBy || 'Não Identificado'; 
+        salesByWaiter[waiter] = (salesByWaiter[waiter] || 0) + tableTotal; 
+    });
+    
+    document.getElementById('reportTotalSales').textContent = formatCurrency(totalSales); 
+    document.getElementById('reportTotalMoney').textContent = formatCurrency(totalMoney); 
+    document.getElementById('reportTotalDigital').textContent = formatCurrency(totalDigital); 
+    document.getElementById('reportTicketMedio').textContent = formatCurrency(count > 0 ? totalSales / count : 0);
+    
+    const topProducts = Object.values(productStats).sort((a, b) => b.qty - a.qty).slice(0, 10); 
+    const topListEl = document.getElementById('topProductsList'); 
+    if(topListEl) topListEl.innerHTML = topProducts.length ? topProducts.map((p, i) => `<div class="flex justify-between items-center text-sm border-b border-gray-700 pb-1 last:border-0"><span class="text-gray-300"><b class="text-pumpkin mr-2">#${i+1}</b> ${p.name}</span><span class="font-mono text-white font-bold">${p.qty}</span></div>`).join('') : '<p class="text-xs text-gray-500 italic">Sem dados.</p>';
+    
+    let peakHour = '--:--'; let peakCount = 0; 
+    Object.entries(salesByHour).forEach(([hour, count]) => { if(count > peakCount) { peakCount = count; peakHour = hour; } }); 
+    document.getElementById('peakHourDisplay').textContent = peakHour; 
+    document.getElementById('peakHourVolume').textContent = `${peakCount} vendas`;
+    
+    const teamListEl = document.getElementById('teamPerformanceList'); 
+    if (teamListEl) { 
+        const sortedTeam = Object.entries(salesByWaiter).sort(([,a], [,b]) => b - a); 
+        teamListEl.innerHTML = sortedTeam.length ? sortedTeam.map(([name, total], i) => `<div class="flex justify-between items-center text-sm border-b border-gray-700 pb-1 last:border-0"><span class="text-gray-300 truncate"><b class="text-blue-400 mr-2">${i+1}.</b> ${name}</span><span class="font-mono text-white font-bold text-xs">${formatCurrency(total)}</span></div>`).join('') : '<p class="text-xs text-gray-500 italic">Sem vendas.</p>'; 
+    }
+
+    // NOVO: Renderiza Vendas por Origem
+    // Injeta o container se não existir
+    let originContainer = document.getElementById('salesByOriginWrapper');
+    if (!originContainer && teamListEl) {
+        const parent = teamListEl.closest('.bg-gray-800').parentNode;
+        const newCard = document.createElement('div');
+        newCard.className = "bg-gray-800 rounded-lg border border-gray-700 p-4 mt-4";
+        newCard.id = "salesByOriginWrapper";
+        newCard.innerHTML = `
+            <h5 class="text-sm font-bold text-white uppercase mb-3"><i class="fas fa-map-marker-alt text-pink-500 mr-2"></i>Vendas por Origem</h5>
+            <div id="salesByOriginList" class="space-y-2 max-h-40 overflow-y-auto custom-scrollbar"></div>
+        `;
+        parent.appendChild(newCard);
+    }
+
+    const originListEl = document.getElementById('salesByOriginList');
+    if (originListEl) {
+        const sortedOrigins = Object.entries(salesByOrigin).sort(([,a], [,b]) => b - a);
+        originListEl.innerHTML = sortedOrigins.length 
+            ? sortedOrigins.map(([name, total]) => `
+                <div class="flex justify-between items-center text-sm border-b border-gray-700 pb-1 last:border-0">
+                    <span class="text-gray-300">${name}</span>
+                    <span class="font-mono text-white font-bold text-xs">${formatCurrency(total)}</span>
+                </div>`).join('') 
+            : '<p class="text-xs text-gray-500 italic">Sem dados.</p>';
+    }
 };
+
 const fetchMonthlyPerformance = async () => {
-    const now = new Date(); const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1); const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59); try { const goalSnap = await getDoc(getFinancialGoalsDocRef()); const meta = goalSnap.exists() ? (goalSnap.data().monthlyGoal || 0) : 0; const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'tables'), where('status', '==', 'closed'), where('closedAt', '>=', Timestamp.fromDate(startOfMonth)), where('closedAt', '<=', Timestamp.fromDate(endOfMonth))); const snapshot = await getDocs(q); let totalMonth = 0; snapshot.forEach(doc => { (doc.data().payments || []).forEach(p => { const v = parseFloat(p.value.toString().replace(/[^\d,.-]/g,'').replace(',','.')); if (!isNaN(v)) totalMonth += v; }); }); const percent = meta > 0 ? Math.min(100, (totalMonth / meta) * 100) : 0; const missing = Math.max(0, meta - totalMonth); const projection = now.getDate() > 0 ? (totalMonth / now.getDate()) * endOfMonth.getDate() : 0; document.getElementById('monthSoldDisplay').textContent = formatCurrency(totalMonth); document.getElementById('monthGoalDisplay').textContent = formatCurrency(meta); document.getElementById('monthMissing').textContent = formatCurrency(missing); document.getElementById('monthProjection').textContent = formatCurrency(projection); document.getElementById('monthProgressBar').style.width = `${percent}%`; } catch (e) { console.error(e); }
+    const now = new Date(); 
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1); 
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59); 
+    try { 
+        const goalSnap = await getDoc(getFinancialGoalsDocRef()); 
+        const meta = goalSnap.exists() ? (goalSnap.data().monthlyGoal || 0) : 0; 
+        const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'tables'), where('status', '==', 'closed'), where('closedAt', '>=', Timestamp.fromDate(startOfMonth)), where('closedAt', '<=', Timestamp.fromDate(endOfMonth))); 
+        const snapshot = await getDocs(q); 
+        let totalMonth = 0; 
+        snapshot.forEach(doc => { 
+            (doc.data().payments || []).forEach(p => { 
+                const v = parseFloat(p.value.toString().replace(/[^\d,.-]/g,'').replace(',','.')); 
+                if (!isNaN(v)) totalMonth += v; 
+            }); 
+        }); 
+        const percent = meta > 0 ? Math.min(100, (totalMonth / meta) * 100) : 0; 
+        const missing = Math.max(0, meta - totalMonth); 
+        const projection = now.getDate() > 0 ? (totalMonth / now.getDate()) * endOfMonth.getDate() : 0; 
+        
+        document.getElementById('monthSoldDisplay').textContent = formatCurrency(totalMonth); 
+        document.getElementById('monthGoalDisplay').textContent = formatCurrency(meta); 
+        document.getElementById('monthMissing').textContent = formatCurrency(missing); 
+        document.getElementById('monthProjection').textContent = formatCurrency(projection); 
+        document.getElementById('monthProgressBar').style.width = `${percent}%`; 
+    } catch (e) { console.error(e); }
 };
+
 window.setMonthlyGoal = async () => { const newVal = prompt("Defina a Meta de Vendas (R$):"); if (newVal) { const numVal = parseFloat(newVal.replace('.','').replace(',','.')); if (!isNaN(numVal)) { await setDoc(getFinancialGoalsDocRef(), { monthlyGoal: numVal }, { merge: true }); fetchMonthlyPerformance(); } } };
-window.runDateComparison = async () => { const dateA = document.getElementById('compDateA').value; const dateB = document.getElementById('compDateB').value; if (!dateA || !dateB) { showToast("Selecione datas.", true); return; } const getDayTotal = async (dateStr) => { const start = Timestamp.fromDate(new Date(dateStr + 'T00:00:00')); const end = Timestamp.fromDate(new Date(dateStr + 'T23:59:59')); const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'tables'), where('status', '==', 'closed'), where('closedAt', '>=', start), where('closedAt', '<=', end)); const snap = await getDocs(q); let total = 0; snap.forEach(d => { (d.data().payments || []).forEach(p => { const v = parseFloat(p.value.toString().replace(/[^\d,.-]/g,'').replace(',','.')); if(!isNaN(v)) total += v; }); }); return total; }; const [totalA, totalB] = await Promise.all([getDayTotal(dateA), getDayTotal(dateB)]); document.getElementById('compValueA').textContent = formatCurrency(totalA); document.getElementById('compValueB').textContent = formatCurrency(totalB); const diff = totalA > 0 ? ((totalB - totalA) / totalA) * 100 : (totalB > 0 ? 100 : 0); const el = document.getElementById('compDiffValue'); el.textContent = `${diff > 0 ? '+' : ''}${diff.toFixed(1)}%`; el.className = `text-xl font-extrabold ${diff >= 0 ? 'text-green-400' : 'text-red-400'}`; document.getElementById('comparisonResult').classList.remove('hidden'); };
-const handleOpenHouse = async () => { if (confirm("Abrir Turno?")) { try { await setDoc(getSystemStatusDocRef(), { startAt: serverTimestamp(), status: 'open' }, { merge: true }); showToast("Turno Aberto!", false); loadReports(); } catch (e) { showToast(e.message, true); } } };
+
+window.runDateComparison = async () => { 
+    const dateA = document.getElementById('compDateA').value; 
+    const dateB = document.getElementById('compDateB').value; 
+    if (!dateA || !dateB) { showToast("Selecione datas.", true); return; } 
+    
+    const getDayTotal = async (dateStr) => { 
+        const start = Timestamp.fromDate(new Date(dateStr + 'T00:00:00')); 
+        const end = Timestamp.fromDate(new Date(dateStr + 'T23:59:59')); 
+        const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'tables'), where('status', '==', 'closed'), where('closedAt', '>=', start), where('closedAt', '<=', end)); 
+        const snap = await getDocs(q); 
+        let total = 0; 
+        snap.forEach(d => { 
+            (d.data().payments || []).forEach(p => { 
+                const v = parseFloat(p.value.toString().replace(/[^\d,.-]/g,'').replace(',','.')); 
+                if(!isNaN(v)) total += v; 
+            }); 
+        }); 
+        return total; 
+    }; 
+    
+    const [totalA, totalB] = await Promise.all([getDayTotal(dateA), getDayTotal(dateB)]); 
+    document.getElementById('compValueA').textContent = formatCurrency(totalA); 
+    document.getElementById('compValueB').textContent = formatCurrency(totalB); 
+    const diff = totalA > 0 ? ((totalB - totalA) / totalA) * 100 : (totalB > 0 ? 100 : 0); 
+    const el = document.getElementById('compDiffValue'); 
+    el.textContent = `${diff > 0 ? '+' : ''}${diff.toFixed(1)}%`; 
+    el.className = `text-xl font-extrabold ${diff >= 0 ? 'text-green-400' : 'text-red-400'}`; 
+    document.getElementById('comparisonResult').classList.remove('hidden'); 
+};
+
+// handleOpenHouse Removido, pois agora é automático pelo Caixa.
 const handleCloseDay = async () => { if (confirm("Encerrar Turno?")) { try { await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'daily_reports'), `daily_${new Date().toISOString().split('T')[0]}`), { closedAt: serverTimestamp() }); showToast("Turno Encerrado!", false); loadReports(); } catch (e) { showToast(e.message, true); } } };
-const exportSalesToCSV = async () => { if (!reportDateInput) return; const dateVal = reportDateInput.value; if(!dateVal) { showToast("Selecione data.", true); return; } const start = Timestamp.fromDate(new Date(dateVal + 'T00:00:00')); const end = Timestamp.fromDate(new Date(dateVal + 'T23:59:59')); const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'tables'), where('status', '==', 'closed'), where('closedAt', '>=', start), where('closedAt', '<=', end)); const snapshot = await getDocs(q); if (snapshot.empty) { showToast("Sem dados.", true); return; } let csv = "Data,Mesa,Garcom,Total\r\n"; snapshot.forEach(doc => { const t = doc.data(); csv += `${t.closedAt?.toDate().toLocaleString() || ''},${t.tableNumber},${t.waiterId || 'N/A'},${t.total}\r\n`; }); const link = document.createElement("a"); link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8," + csv)); link.setAttribute("download", `vendas_${dateVal}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); };
+const exportSalesToCSV = async () => { if (!reportDateInput) return; const dateVal = reportDateInput.value; if(!dateVal) { showToast("Selecione data.", true); return; } const start = Timestamp.fromDate(new Date(dateVal + 'T00:00:00')); const end = Timestamp.fromDate(new Date(dateVal + 'T23:59:59')); const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'tables'), where('status', '==', 'closed'), where('closedAt', '>=', start), where('closedAt', '<=', end)); const snapshot = await getDocs(q); if (snapshot.empty) { showToast("Sem dados.", true); return; } let csv = "Data,Mesa,Garcom,Total\r\n"; snapshot.forEach(doc => { const t = doc.data(); csv += `${t.closedAt?.toDate().toLocaleString() || ''},${t.tableNumber},${t.closedBy || 'N/A'},${t.total}\r\n`; }); const link = document.createElement("a"); link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8," + csv)); link.setAttribute("download", `vendas_${dateVal}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); };
+
+// --- MANUTENÇÃO DE SETORES/CRM/VOUCHERS (MANTIDO) ---
 const renderSectorManagementModal = async () => { if (!managerModal) return; managerModal.innerHTML = `<div class="bg-dark-card border border-dark-border p-6 rounded-xl w-full max-w-lg h-[80vh] flex flex-col"><div class="flex justify-between mb-4"><h3 class="text-xl font-bold text-pumpkin">Setores</h3><button onclick="document.getElementById('managerModal').style.display='none'" class="text-white text-2xl">&times;</button></div><form id="addSectorForm" class="flex space-x-2 mb-4"><input type="text" id="newSectorName" class="input-pdv w-full" required><button type="submit" class="bg-green-600 px-4 rounded font-bold">+</button></form><div id="sectorListContainer" class="flex-grow overflow-y-auto custom-scrollbar space-y-2"></div></div>`; managerModal.style.display = 'flex'; const container = document.getElementById('sectorListContainer'); const snap = await getDocs(query(getSectorsCollectionRef(), orderBy('name'))); container.innerHTML = snap.docs.map(d => `<div class="flex justify-between bg-dark-input p-3 rounded border border-gray-700"><span class="text-white">${d.data().name}</span><button onclick="window.deleteSector('${doc.id}')" class="text-red-400"><i class="fas fa-trash"></i></button></div>`).join(''); document.getElementById('addSectorForm').onsubmit = async (e) => { e.preventDefault(); const val = document.getElementById('newSectorName').value; if(val) { await setDoc(doc(getSectorsCollectionRef(), val.toLowerCase()), { name: val, type: 'service' }); renderSectorManagementModal(); }}; };
 const renderCustomerCrmModal = async () => { if (!managerModal) return; managerModal.innerHTML = `<div class="bg-dark-card border border-dark-border p-6 rounded-xl w-full max-w-4xl h-[85vh] flex flex-col"><div class="flex justify-between mb-4"><h3 class="text-2xl font-bold text-indigo-400">CRM</h3><button onclick="document.getElementById('managerModal').style.display='none'" class="text-white text-3xl">&times;</button></div><input type="text" id="crmSearch" class="input-pdv mb-4" placeholder="Buscar..."><div id="crmList" class="flex-grow overflow-y-auto custom-scrollbar"></div></div>`; managerModal.style.display = 'flex'; const container = document.getElementById('crmList'); const snap = await getDocs(query(getCustomersCollectionRef(), limit(50))); container.innerHTML = snap.docs.map(d => `<div class="p-3 border-b border-gray-700 text-white">${d.data().name} - ${d.data().phone}</div>`).join(''); };
 const openVoucherManagementModal = async () => { if (!voucherManagementModal) return; managerModal.style.display = 'none'; voucherManagementModal.style.display = 'flex'; await fetchVouchers(); };
