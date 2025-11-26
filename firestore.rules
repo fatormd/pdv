@@ -7,18 +7,14 @@ service cloud.firestore {
     match /artifacts/{appId}/public/data {
 
       // --- FUNÇÕES AUXILIARES (Helpers) ---
-      
-      // Verifica se o usuário está autenticado
       function isAuthenticated() {
         return request.auth != null;
       }
 
-      // Verifica se é um login de Staff (email/senha) e não anônimo (cliente)
       function isStaff() {
         return isAuthenticated() && request.auth.token.firebase.sign_in_provider != 'anonymous';
       }
 
-      // Verifica se o usuário tem a role 'gerente' no documento de usuários
       function isGerente() {
         return isStaff() && 
           get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.token.email)).data.role == 'gerente';
@@ -26,15 +22,18 @@ service cloud.firestore {
 
       // --- REGRAS DAS COLEÇÕES ---
 
-      // 1. STATUS DO SISTEMA (NOVO)
-      // Essencial para: Abertura de Casa, Metas Mensais, Business Day
+      // 1. STATUS DO SISTEMA & CONFIGURAÇÕES GERAIS
       match /system_status/{docId} {
-        allow read: if isAuthenticated(); // Todos podem ver se a casa está aberta
-        allow write: if isGerente();      // Apenas gerente define metas e abre casa
+        allow read: if isAuthenticated();
+        allow write: if isGerente();
+      }
+      
+      match /financial_goals/{docId} {
+        allow read: if isStaff();
+        allow write: if isGerente();
       }
 
-      // 2. SETORES (NOVO)
-      // Essencial para: Filtros do Painel e KDS
+      // 2. SETORES
       match /sectors/{sectorId} {
         allow read: if isAuthenticated();
         allow write: if isGerente();
@@ -42,8 +41,6 @@ service cloud.firestore {
 
       // 3. KDS (PEDIDOS DA COZINHA)
       match /kds_orders/{orderId} {
-        // Staff cria, atualiza (status) e lê. 
-        // Clientes podem criar indiretamente via Cloud Function ou regra de mesa, mas aqui focamos no Staff.
         allow read, write: if isAuthenticated();
       }
 
@@ -64,22 +61,20 @@ service cloud.firestore {
       }
       match /quick_obs/{obsId} {
         allow read: if isAuthenticated();
-        allow write: if isStaff(); // Staff pode criar obs rápidas se necessário
+        allow write: if isStaff(); 
       }
 
       // 6. USUÁRIOS (STAFF)
       match /users/{userId} {
-        allow read: if isStaff(); // Staff precisa ler para saber seu próprio cargo
-        allow write: if false;    // Escrita somente via Cloud Function (segurança)
+        allow read: if isStaff();
+        allow write: if false; 
       }
 
       // 7. MESAS (CORE)
       match /tables/{tableId} {
-        // Staff tem acesso total
         allow read: if isAuthenticated();
-        allow create: if isAuthenticated(); // Staff ou Cliente anônimo iniciando
+        allow create: if isAuthenticated();
         
-        // Regras de atualização complexas para permitir Cliente e Staff
         allow update: if isAuthenticated() && (
           isStaff() || 
           resource.data.clientId == request.auth.uid ||
@@ -90,41 +85,56 @@ service cloud.firestore {
             'clientOrderPending', 'waiterNotification', 'billRequested', 
             'payments', 'serviceTaxApplied', 
             'accessPin', 'lastKdsSentAt', 'masterTable', 'mergedTables', 'waiterId',
-            'closedAt', 'finalTotal', 'wooOrderId', 'closedBy'
+            'closedAt', 'finalTotal', 'wooOrderId', 'closedBy', 'kdsAlert', 'isPickup', 'note'
           ])
         );
         
-        allow delete: if isStaff(); // Apenas staff fecha/deleta mesa
+        allow delete: if isStaff();
       }
       
       // 8. CLIENTES (CRM)
       match /customers/{customerId} {
-        allow read, write: if isStaff(); // Staff gerencia CRM
-        allow read, write: if request.auth.uid == customerId; // O próprio cliente
+        allow read, write: if isStaff();
+        allow read, write: if request.auth.uid == customerId;
       }
 
       // 9. TURNOS DE CAIXA (SHIFTS)
       match /shifts/{shiftId} {
-        // O próprio usuário pode gerenciar seu turno
         allow read, update: if isStaff() && resource.data.userId == request.auth.token.email;
         allow create: if isStaff() && request.resource.data.userId == request.auth.token.email;
-        // Gerente pode ver e editar qualquer turno
         allow read, write: if isGerente();
       }
 
-      // 10. RELATÓRIOS DIÁRIOS (FECHAMENTO)
+      // 10. RELATÓRIOS DIÁRIOS
       match /daily_reports/{reportId} {
         allow read: if isStaff();
         allow write: if isGerente();
       }
+
+      // 11. DESPESAS (FINANCEIRO)
+      match /expenses/{expenseId} {
+        allow read: if isGerente();
+        allow write: if isGerente();
+      }
+
+      // 12. ESTOQUE E MOVIMENTAÇÕES (NOVO)
+      match /stock/{itemId} {
+        allow read: if isAuthenticated(); // Todos autenticados podem ver estoque (para validar venda)
+        allow write: if isStaff();        // Staff pode dar baixa (venda) e Gerente pode dar entrada
+      }
       
-      // Bloqueio padrão para qualquer outra coisa não mapeada
+      match /inventory_movements/{movementId} {
+        allow read: if isGerente();       // Histórico de entradas (XML) apenas gerente
+        allow write: if isGerente();      
+      }
+      
+      // Bloqueio padrão
       match /{document=**} {
         allow read, write: if false;
       }
     }
 
-    // Configurações Públicas (Se houver)
+    // Configurações Públicas
     match /artifacts/{appId}/public/product_config {
       allow read: if isAuthenticated();
       allow write: if isGerente();
