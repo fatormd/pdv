@@ -2,6 +2,7 @@
 // IMPORTS GLOBAIS
 // =======================================================
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onDocumentCreated } = require("firebase-functions/v2/firestore"); // <--- NOVO IMPORT ADICIONADO
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
@@ -36,7 +37,7 @@ const wooClient = axios.create({
 const WOOCOMMERCE_URL = "https://nossotempero.fatormd.com";
 
 // =======================================================
-// 1. PROXY WOOCOMMERCE (ATUALIZADO COM PUT/DELETE)
+// 1. PROXY WOOCOMMERCE (LEGADO / SÍNCRONO)
 // =======================================================
 exports.proxyWooCommerce = onCall({ timeoutSeconds: 300, memory: "512MiB" }, async (request) => {
   const { method, endpoint, payload } = request.data;
@@ -61,10 +62,9 @@ exports.proxyWooCommerce = onCall({ timeoutSeconds: 300, memory: "512MiB" }, asy
       response = await wooClient.get(url);
     } else if (method.toUpperCase() === "POST") {
       response = await wooClient.post(url, payload);
-    } else if (method.toUpperCase() === "PUT") { // Adicionado
+    } else if (method.toUpperCase() === "PUT") { 
       response = await wooClient.put(url, payload);
-    } else if (method.toUpperCase() === "DELETE") { // Adicionado
-      // O Axios trata query params no delete de forma diferente, mas como passamos na URL, funciona.
+    } else if (method.toUpperCase() === "DELETE") { 
       response = await wooClient.delete(url);
     }
     
@@ -91,6 +91,7 @@ exports.syncProductsFromWoo = onCall({ timeoutSeconds: 540, memory: "1GiB" }, as
   const consumerKey = process.env.WOO_APP_KEY;
   const consumerSecret = process.env.WOO_APP_SECRET;
   const firestore = getFirestore();
+  // Idealmente, torne este APP_ID dinâmico no futuro (ex: request.data.appId)
   const APP_ID = "1:1097659747429:web:8ec0a7c3978c311dbe0a8c"; 
 
   try {
@@ -128,7 +129,6 @@ exports.syncProductsFromWoo = onCall({ timeoutSeconds: 540, memory: "1GiB" }, as
 // =======================================================
 // 3. GERENCIAMENTO DE USUÁRIOS
 // =======================================================
-// Mantendo as funções de usuário essenciais
 exports.createNewUser = onCall(async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Login necessário.");
   const { email, password, name, role, isActive } = request.data;
@@ -162,4 +162,88 @@ exports.deleteUser = onCall(async (request) => {
     await getFirestore().collection("artifacts").doc(APP_ID).collection("public").doc("data").collection("users").doc(email).delete();
     return { status: "success" };
   } catch (error) { throw new HttpsError("internal", error.message); }
+});
+
+// =======================================================
+// 4. PROCESSADOR DE FILA DE PEDIDOS (NOVO - ASSÍNCRONO)
+// =======================================================
+/**
+ * Gatilho: Dispara sempre que um documento é criado na coleção 'orders_queue'.
+ * Caminho: artifacts/{appId}/public/data/orders_queue/{orderId}
+ */
+exports.processOrderQueue = onDocumentCreated(
+  { 
+    document: "artifacts/{appId}/public/data/orders_queue/{orderId}",
+    timeoutSeconds: 300, // 5 minutos para tentar processar
+    memory: "256MiB"
+  }, 
+  async (event) => {
+    const snapshot = event.data;
+    if (!snapshot) {
+        console.log("Nenhum dado associado ao evento.");
+        return;
+    }
+
+    const orderData = snapshot.data();
+    const orderId = event.params.orderId;
+    // const appId = event.params.appId; // Disponível se precisar tornar dinâmico no futuro
+
+    // Evita loop infinito se a função for re-executada num documento já processado
+    if (orderData.status === 'completed' || orderData.status === 'processing') {
+        return;
+    }
+
+    // 1. Marcar como "Em processamento" (para ninguém mais mexer)
+    await snapshot.ref.update({ 
+        status: 'processing', 
+        attempts: FieldValue.increment(1),
+        lastAttempt: FieldValue.serverTimestamp()
+    });
+
+    try {
+        const consumerKey = process.env.WOO_APP_KEY;
+        const consumerSecret = process.env.WOO_APP_SECRET;
+        
+        // Monta a URL para criar pedido (endpoint /orders)
+        const authParams = `consumer_key=${consumerKey}&consumer_secret=${consumerSecret}`;
+        const url = `${WOOCOMMERCE_URL}/wp-json/wc/v3/orders?${authParams}`;
+
+        console.log(`[Queue] Processando pedido ${orderId} para o Woo...`);
+
+        // ---------------------------------------------------
+        // ENVIO PARA O WOOCOMMERCE
+        // ---------------------------------------------------
+        const response = await wooClient.post(url, orderData.payload);
+
+        // ---------------------------------------------------
+        // SUCESSO
+        // ---------------------------------------------------
+        console.log(`[Queue] Sucesso! ID Woo: ${response.data.id}`);
+        
+        await snapshot.ref.update({
+            status: 'completed',
+            wooId: response.data.id, // Salva o ID real do WooCommerce
+            wooOrderKey: response.data.order_key,
+            processedAt: FieldValue.serverTimestamp(),
+            error: null // Limpa erros anteriores
+        });
+
+    } catch (error) {
+        // ---------------------------------------------------
+        // TRATAMENTO DE ERRO
+        // ---------------------------------------------------
+        console.error(`[Queue] Falha no pedido ${orderId}:`, error.message);
+        
+        let errorMessage = error.message;
+        if (error.response) {
+            console.error("Detalhes Woo:", error.response.data);
+            errorMessage = JSON.stringify(error.response.data);
+        }
+
+        await snapshot.ref.update({
+            status: 'error',
+            error: errorMessage,
+            retryEligible: true // Pode ser usado para retentativas futuras
+        });
+    }
 });
