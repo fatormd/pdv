@@ -33,7 +33,7 @@ service cloud.firestore {
         allow write: if isGerente();
       }
 
-      // 2. SETORES
+      // 2. SETORES (Mesas)
       match /sectors/{sectorId} {
         allow read: if isAuthenticated();
         allow write: if isGerente();
@@ -67,7 +67,7 @@ service cloud.firestore {
       // 6. USUÁRIOS (STAFF)
       match /users/{userId} {
         allow read: if isStaff();
-        allow write: if false; 
+        allow write: if false; // Apenas via Admin SDK ou console por segurança, ou ajuste para isGerente() se tiver cadastro no app
       }
 
       // 7. MESAS (CORE)
@@ -88,7 +88,6 @@ service cloud.firestore {
             'closedAt', 'finalTotal', 'wooOrderId', 'closedBy', 'kdsAlert', 'isPickup', 'note'
           ])
         );
-        
         allow delete: if isStaff();
       }
       
@@ -117,15 +116,45 @@ service cloud.firestore {
         allow write: if isGerente();
       }
 
-      // 12. ESTOQUE E MOVIMENTAÇÕES (NOVO)
+      // 12. INSUMOS (COMPOSIÇÃO)
+      match /ingredients/{ingredientId} {
+        allow read: if isAuthenticated(); // Staff precisa ler para montar fichas
+        allow write: if isGerente();
+      }
+
+      // 13. FORNECEDORES
+      match /suppliers/{supplierId} {
+        allow read: if isAuthenticated(); // Necessário para vincular despesas
+        allow write: if isGerente();
+      }
+
+      // 14. BANCO DE TALENTOS (EXTRAS / MOTOBOYS)
+      match /external_candidates/{candidateId} {
+        allow read: if isAuthenticated(); // Staff pode ler para "Chamar Motoca"
+        allow write: if isGerente();      // Apenas Gerente cadastra/avalia
+      }
+
+      // 15. ESTOQUE E MOVIMENTAÇÕES
       match /stock/{itemId} {
-        allow read: if isAuthenticated(); // Todos autenticados podem ver estoque (para validar venda)
-        allow write: if isStaff();        // Staff pode dar baixa (venda) e Gerente pode dar entrada
+        allow read: if isAuthenticated();
+        allow write: if isStaff(); // Baixa de estoque na venda
       }
       
       match /inventory_movements/{movementId} {
-        allow read: if isGerente();       // Histórico de entradas (XML) apenas gerente
-        allow write: if isGerente();      
+        allow read: if isGerente();
+        allow write: if isGerente();
+      }
+
+      // 16. TIPOS DE INSUMO (AUXILIAR)
+      match /ingredient_types/{docId} {
+        allow read: if isAuthenticated();
+        allow write: if isGerente();
+      }
+
+      // 17. CATEGORIAS DE FORNECEDOR (AUXILIAR)
+      match /supplier_categories/{docId} {
+        allow read: if isAuthenticated();
+        allow write: if isGerente();
       }
       
       // Bloqueio padrão

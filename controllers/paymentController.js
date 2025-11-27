@@ -1,12 +1,12 @@
-// --- CONTROLLERS/PAYMENTCONTROLLER.JS (VERSÃO FINAL - COM FECHAMENTO DE MESA VAZIA/ORFÃ) ---
-import { currentTableId, currentOrderSnapshot, userId, goToScreen, showToast } from "/app.js"; //
-import { formatCurrency, calculateItemsValue, getNumericValueFromCurrency } from "/utils.js"; //
-import { getTableDocRef, getCustomersCollectionRef, db, getTablesCollectionRef } from "/services/firebaseService.js"; //
+// --- CONTROLLERS/PAYMENTCONTROLLER.JS (VERSÃO FINAL - ATUALIZADA COM CHAMADA DE MOTOBOY) ---
+import { currentTableId, currentOrderSnapshot, userId, goToScreen, showToast } from "/app.js"; 
+import { formatCurrency, calculateItemsValue, getNumericValueFromCurrency } from "/utils.js"; 
+import { getTableDocRef, getCustomersCollectionRef, db, getTablesCollectionRef } from "/services/firebaseService.js"; 
 import {
     updateDoc, arrayUnion, arrayRemove, writeBatch, getDoc, serverTimestamp,
     setDoc, doc, increment, query, where, getDocs
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { createWooCommerceOrder } from "/services/wooCommerceService.js"; //
+import { createWooCommerceOrder } from "/services/wooCommerceService.js"; 
 
 // --- VARIÁVEIS DE ELEMENTOS ---
 let reviewItemsList;
@@ -19,7 +19,7 @@ let tableTransferModal, targetTableInput, confirmTransferBtn;
 let printSummaryBtn;
 let customerRegModal, customerSearchCpfInput, searchCustomerByCpfBtn, customerSearchResultsDiv;
 let customerNameInput, customerCpfInput, customerPhoneInput, customerEmailInput;
-let closeCustomerRegModalBtn, saveCustomerBtn, linkCustomerToTableBtn;
+let closeCustomerRegModalBtn, saveCustomerBtn, linkCustomerToTableBtn, callMotoboyBtn; // Adicionado callMotoboyBtn
 let currentFoundCustomer = null;
 let decreaseDinersBtn, increaseDinersBtn;
 
@@ -501,7 +501,7 @@ export const handleFinalizeOrder = async () => {
     const remainingBalance = totalDaConta - totalPago;
     const sentItems = currentOrderSnapshot.sentItems || [];
 
-    // --- LÓGICA DE MESA VAZIA/ORFÃ (NOVO) ---
+    // --- LÓGICA DE MESA VAZIA/ORFÃ ---
     if (sentItems.length === 0) {
         if (!confirm(`Esta mesa não tem itens registrados. Deseja forçar o fechamento e limpar a mesa?`)) return;
         
@@ -535,7 +535,6 @@ export const handleFinalizeOrder = async () => {
             return;
         }
     }
-    // --------------------------------------------
 
     if (remainingBalance > 0.01) {
          showToast(`Ainda resta ${formatCurrency(remainingBalance)} a pagar.`, true);
@@ -815,6 +814,9 @@ export const initPaymentController = () => {
     closeCustomerRegModalBtn = document.getElementById('closeCustomerRegModalBtn');
     saveCustomerBtn = document.getElementById('saveCustomerBtn');
     linkCustomerToTableBtn = document.getElementById('linkCustomerToTableBtn');
+    
+    // Seleção do botão Motoboy
+    callMotoboyBtn = document.getElementById('callMotoboyBtn');
 
     if (!reviewItemsList || !calculatorModal) return;
 
@@ -966,6 +968,18 @@ export const initPaymentController = () => {
     if (saveCustomerBtn) saveCustomerBtn.addEventListener('click', saveCustomer); 
     if (linkCustomerToTableBtn) linkCustomerToTableBtn.addEventListener('click', linkCustomerToTable); 
     
+    // --- LISTENER DO BOTÃO CHAMAR MOTOBOY ---
+    if (callMotoboyBtn) {
+        callMotoboyBtn.addEventListener('click', () => {
+            // Verifica se a função global do managerController está disponível
+            if (window.renderExternalRecruitmentModal) {
+                window.renderExternalRecruitmentModal('motoboy');
+            } else {
+                showToast("Módulo de RH não disponível.", true);
+            }
+        });
+    }
+
     const enableSaveButtonCheck = () => {
         if (!saveCustomerBtn || !customerNameInput || !customerCpfInput) return;
         const name = customerNameInput.value.trim();
