@@ -1,4 +1,4 @@
-// --- CONTROLLERS/MANAGERCONTROLLER.JS (VERSÃO FINAL: TODAS AS FUNÇÕES INCLUÍDAS) ---
+// --- CONTROLLERS/MANAGERCONTROLLER.JS (PARTE 1/5) ---
 import { 
     db, appId, 
     getVouchersCollectionRef, 
@@ -55,6 +55,31 @@ const toLocalISO = (date) => {
 
 const getCollectionRef = (name) => collection(db, 'artifacts', appId, 'public', 'data', name);
 
+// --- FUNÇÕES DE BUSCA (CORREÇÃO DE ERRO) ---
+async function fetchIngredients() {
+    try {
+        const q = query(getCollectionRef('ingredients'), orderBy('name'));
+        const snap = await getDocs(q);
+        ingredientsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        return ingredientsCache;
+    } catch (e) {
+        console.error("Erro ao buscar insumos:", e);
+        return [];
+    }
+}
+
+async function fetchSuppliers() {
+    try {
+        const q = query(getCollectionRef('suppliers'), orderBy('name'));
+        const snap = await getDocs(q);
+        suppliersCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        return suppliersCache;
+    } catch (e) {
+        console.error("Erro ao buscar fornecedores:", e);
+        return [];
+    }
+}
+
 // --- CÁLCULOS TRABALHISTAS (CLT 2024) ---
 function calculateINSS(grossSalary) {
     let inss = 0;
@@ -78,6 +103,8 @@ function calculateIRRF(baseSalary, dependents) {
     return Math.max(0, irrf);
 }
 
+// --- CONTROLLERS/MANAGERCONTROLLER.JS (PARTE 2/5) ---
+
 // =================================================================
 //           3. AÇÕES DE NEGÓCIO (LÓGICA)
 // =================================================================
@@ -91,135 +118,6 @@ async function handleSyncAction() {
     } catch (e) {
         console.error(e);
         showToast("Erro na sincronização.", true);
-    }
-}
-
-// --- CADASTROS AUXILIARES (SETORES, TIPOS, CATEGORIAS) --- 
-// (ESTA PARTE ESTAVA EM FALTA E FOI RESTAURADA)
-async function renderSectorManagementModal() {
-    if (!managerModal) return;
-    
-    managerModal.innerHTML = `
-        <div class="bg-dark-card border border-gray-600 w-full max-w-2xl p-6 rounded-xl shadow-2xl flex flex-col max-h-[90vh]">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-bold text-white">Cadastros Auxiliares</h3>
-                <button class="text-gray-400 hover:text-white text-2xl leading-none" onclick="document.getElementById('managerModal').style.display='none'">&times;</button>
-            </div>
-            
-            <div class="flex space-x-2 mb-4 border-b border-gray-700 pb-2 overflow-x-auto">
-                <button class="aux-tab-btn px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-bold whitespace-nowrap" onclick="window.switchAuxTab('sectors')">Setores</button>
-                <button class="aux-tab-btn px-4 py-2 rounded-lg bg-dark-input text-gray-300 text-sm font-bold hover:bg-gray-700 whitespace-nowrap" onclick="window.switchAuxTab('ingredient_types')">Tipos Insumo</button>
-                <button class="aux-tab-btn px-4 py-2 rounded-lg bg-dark-input text-gray-300 text-sm font-bold hover:bg-gray-700 whitespace-nowrap" onclick="window.switchAuxTab('supplier_categories')">Cat. Fornecedor</button>
-            </div>
-
-            <div id="auxContent" class="flex-grow overflow-y-auto custom-scrollbar mb-4">
-                <div class="text-center text-gray-500 py-4"><i class="fas fa-spinner fa-spin"></i></div>
-            </div>
-
-            <form id="auxForm" class="flex gap-2 mt-auto pt-4 border-t border-gray-700">
-                <input type="hidden" id="auxType" value="sectors">
-                <input type="text" id="auxName" placeholder="Novo item..." class="input-pdv flex-grow p-2 text-sm" required>
-                <select id="auxExtra" class="input-pdv p-2 text-sm hidden">
-                    <option value="production">Produção (KDS)</option>
-                    <option value="service">Serviço (Salão)</option>
-                </select>
-                <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-4 rounded-lg font-bold"><i class="fas fa-plus"></i></button>
-            </form>
-        </div>
-    `;
-    
-    managerModal.style.display = 'flex';
-    await switchAuxTab('sectors');
-
-    const form = document.getElementById('auxForm');
-    if (form) {
-        form.onsubmit = async (e) => {
-            e.preventDefault();
-            const type = document.getElementById('auxType').value;
-            const name = document.getElementById('auxName').value;
-            const extra = document.getElementById('auxExtra').value;
-            
-            const data = { name };
-            if (type === 'sectors') data.type = extra; 
-
-            await saveAuxiliary(type, data);
-            document.getElementById('auxName').value = '';
-            switchAuxTab(type);
-        };
-    }
-}
-
-async function switchAuxTab(type) {
-    const content = document.getElementById('auxContent');
-    const typeInput = document.getElementById('auxType');
-    const extraInput = document.getElementById('auxExtra');
-    
-    if (!content) return;
-    typeInput.value = type;
-    
-    document.querySelectorAll('.aux-tab-btn').forEach(btn => {
-        const txt = btn.textContent.toLowerCase();
-        const match = (type === 'sectors' && txt.includes('setores')) || 
-                      (type === 'ingredient_types' && txt.includes('insumo')) || 
-                      (type === 'supplier_categories' && txt.includes('fornecedor'));
-        
-        if(match) {
-            btn.classList.add('bg-indigo-600', 'text-white'); btn.classList.remove('bg-dark-input', 'text-gray-300');
-        } else {
-            btn.classList.remove('bg-indigo-600', 'text-white'); btn.classList.add('bg-dark-input', 'text-gray-300');
-        }
-    });
-
-    if (type === 'sectors') extraInput.classList.remove('hidden'); else extraInput.classList.add('hidden');
-
-    try {
-        let colRef = type === 'sectors' ? getSectorsCollectionRef() : getCollectionRef(type);
-        const snap = await getDocs(query(colRef, orderBy('name')));
-        
-        if (snap.empty) {
-            content.innerHTML = '<p class="text-gray-500 italic text-center p-4">Nenhum item cadastrado.</p>';
-            return;
-        }
-
-        content.innerHTML = snap.docs.map(d => {
-            const item = d.data();
-            let extraInfo = '';
-            if (type === 'sectors') {
-                extraInfo = item.type === 'production' ? '<span class="ml-2 text-[10px] bg-orange-900 text-orange-300 px-1 rounded">Cozinha</span>' : '<span class="ml-2 text-[10px] bg-blue-900 text-blue-300 px-1 rounded">Salão</span>';
-            }
-            return `
-                <div class="flex justify-between items-center bg-dark-bg p-3 rounded border border-gray-700 mb-2">
-                    <span class="text-white font-bold flex items-center">${item.name} ${extraInfo}</span>
-                    <button onclick="window.deleteAuxiliary('${type}', '${d.id}')" class="text-red-400 hover:text-red-300 p-2"><i class="fas fa-trash"></i></button>
-                </div>`;
-        }).join('');
-
-    } catch (e) {
-        console.error(e);
-        content.innerHTML = '<p class="text-red-400 p-4">Erro ao carregar dados.</p>';
-    }
-}
-
-async function saveAuxiliary(collectionName, data) {
-    try {
-        let colRef = collectionName === 'sectors' ? getSectorsCollectionRef() : getCollectionRef(collectionName);
-        await addDoc(colRef, data);
-        showToast("Salvo com sucesso!");
-    } catch (e) {
-        console.error(e);
-        showToast("Erro ao salvar.", true);
-    }
-}
-
-async function deleteAuxiliary(collectionName, id) {
-    if (!confirm("Tem certeza?")) return;
-    try {
-        let colRef = collectionName === 'sectors' ? getSectorsCollectionRef() : getCollectionRef(collectionName);
-        await deleteDoc(doc(colRef, id));
-        switchAuxTab(collectionName);
-        showToast("Excluído.");
-    } catch (e) {
-        showToast("Erro ao excluir.", true);
     }
 }
 
@@ -262,7 +160,7 @@ async function openVoucherManagementModal() {
     await fetchVouchers();
 }
 
-// --- FINANCEIRO ---
+// --- LÓGICA FINANCEIRA ---
 async function saveExpense() {
     const btn = document.getElementById('btnSaveExpense');
     const desc = document.getElementById('expDesc').value;
@@ -494,6 +392,8 @@ async function runDateComparison() {
     document.getElementById('comparisonResult').classList.remove('hidden'); 
 }
 
+// --- CONTROLLERS/MANAGERCONTROLLER.JS (PARTE 3/5) ---
+
 // --- ESTOQUE / XML / MANUAL ---
 async function handleImportXML(input) {
     const file = input.files[0];
@@ -601,7 +501,7 @@ async function saveManualStockEntry() {
     } catch(e) { console.error(e); showToast("Erro ao salvar.", true); } finally { toggleLoading(btn, false); }
 }
 
-// --- PRODUTOS (ACTIONS) ---
+// --- LÓGICA DE PRODUTOS/INSUMOS ---
 async function handleDeleteProduct(id, callback) { 
     if(confirm("Excluir produto?")) { 
         try { 
@@ -697,7 +597,517 @@ async function deleteSupplier(id) {
     }
 }
 
-// --- CADASTROS AUXILIARES (SETORES, TIPOS, CATEGORIAS) ---
+// =================================================================
+//           4. INICIALIZAÇÃO (INIT)
+// =================================================================
+
+export const initManagerController = () => {
+    if (managerControllerInitialized) return;
+    console.log("[ManagerController] Inicializando...");
+    
+    managerModal = document.getElementById('managerModal');
+    if (managerModal) {
+        managerModal.addEventListener('click', (e) => { if (e.target === managerModal) managerModal.style.display = 'none'; });
+    }
+
+    // Vouchers
+    voucherManagementModal = document.getElementById('voucherManagementModal'); 
+    voucherListContainer = document.getElementById('voucherListContainer');     
+    voucherForm = document.getElementById('voucherForm');                       
+    const voucherBtn = document.getElementById('showVoucherFormBtn');
+    
+    if(voucherBtn) {
+        voucherBtn.addEventListener('click', () => { 
+            if(voucherForm) { voucherForm.style.display = 'block'; voucherForm.reset(); }
+        });
+    }
+    if (voucherForm) {
+        voucherForm.addEventListener('submit', handleSaveVoucher);
+    }
+
+    // Relatórios
+    reportDateInput = document.getElementById('reportDateInput');
+    if (reportDateInput) {
+        reportDateInput.valueAsDate = new Date(); 
+        reportDateInput.addEventListener('change', () => {
+            loadReports();
+            if (managerModal && managerModal.style.display === 'flex' && document.getElementById('finContent')) {
+                switchFinTab(currentFinTab);
+            }
+        });
+    }
+    
+    const refreshBtn = document.getElementById('refreshReportBtn');
+    if(refreshBtn) refreshBtn.addEventListener('click', loadReports);
+
+    // Abas de Relatório
+    const tabBtns = document.querySelectorAll('.report-tab-btn');
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            tabBtns.forEach(b => { b.classList.remove('bg-indigo-600', 'text-white'); b.classList.add('bg-dark-input', 'text-gray-300'); });
+            btn.classList.remove('bg-dark-input', 'text-gray-300'); btn.classList.add('bg-indigo-600', 'text-white');
+            document.querySelectorAll('.report-content').forEach(c => c.classList.add('hidden'));
+            const targetContent = document.getElementById(`tab-${btn.dataset.tab}`);
+            if(targetContent) targetContent.classList.remove('hidden');
+            if (btn.dataset.tab === 'sales') fetchMonthlyPerformance();
+            loadReports();
+        });
+    });
+
+    // --- ATRIBUIÇÕES GLOBAIS (SEGURANÇA) ---
+    window.handleSaveVoucher = handleSaveVoucher;
+    window.handleDeleteVoucher = handleDeleteVoucher;
+    window.toggleExpenseForm = toggleExpenseForm;
+    window.saveExpense = saveExpense;
+    window.deleteExpense = deleteExpense;
+    window.handleForceCloseShift = handleForceCloseShift;
+    window.openShiftDetails = openShiftDetails;
+    window.deleteSector = deleteSector;
+    window.setMonthlyGoal = setMonthlyGoal;
+    window.runDateComparison = runDateComparison;
+    window.switchFinTab = switchFinTab;
+    window.openReportPanel = openReportPanel;
+    
+    // Hub / Estoque / Fornecedores
+    window.renderProductHub = renderProductHub; 
+    window.renderCategoryManagement = renderCategoryManagement; 
+    window.renderCategoryForm = renderCategoryForm; 
+    window.switchHubTab = switchHubTab;
+    window.handleDeleteProduct = handleDeleteProduct;
+    window.handleImportXML = handleImportXML;
+    window.toggleCheckItem = toggleCheckItem;
+    window.confirmStockEntry = confirmStockEntry;
+    window.openManualStockEntry = openManualStockEntry;
+    window.saveManualStockEntry = saveManualStockEntry;
+    
+    window.saveSupplier = saveSupplier;
+    window.deleteSupplier = deleteSupplier;
+    
+    window.renderSectorManagementModal = renderSectorManagementModal;
+    window.switchAuxTab = switchAuxTab;
+    window.saveAuxiliary = saveAuxiliary;
+    window.deleteAuxiliary = deleteAuxiliary;
+    
+    window.addCompItem = addCompItem;
+    window.removeCompItem = removeCompItem;
+    window.updateCompItem = updateCompItem;
+    window.saveIngredient = saveIngredient;
+    window.deleteIngredient = deleteIngredient;
+
+    // RH
+    window.renderHRPanel = renderHRPanel;
+    window.switchHRTab = switchHRTab;
+    window.generatePayslip = generatePayslip;
+    window.renderExternalRecruitmentModal = renderExternalRecruitmentModal;
+
+    // Helpers UI (Injetados)
+    window.editIngredient = (id) => {
+        const ing = ingredientsCache.find(i => i.id === id);
+        if (!ing) return;
+        document.getElementById('ingId').value = ing.id;
+        document.getElementById('ingName').value = ing.name;
+        document.getElementById('ingUnit').value = ing.unit;
+        document.getElementById('ingCost').value = ing.cost;
+        document.getElementById('ingStock').value = ing.stock;
+        document.getElementById('ingMinStock').value = ing.minStock;
+        if(document.getElementById('ingType')) document.getElementById('ingType').value = ing.type || '';
+        document.getElementById('ingModalTitle').textContent = 'Editar Insumo';
+        document.getElementById('ingredientFormModal').style.display = 'flex';
+    };
+
+    window.editSupplier = (id) => {
+        const sup = suppliersCache.find(s => s.id === id);
+        if (!sup) return;
+        document.getElementById('supId').value = sup.id;
+        document.getElementById('supName').value = sup.name;
+        document.getElementById('supPhone').value = sup.phone || '';
+        document.getElementById('supDoc').value = sup.document || '';
+        document.getElementById('supCategory').value = sup.category || '';
+        document.getElementById('supModalTitle').textContent = 'Editar Fornecedor';
+        document.getElementById('supplierFormModal').style.display = 'flex';
+    };
+
+    managerControllerInitialized = true;
+};
+
+// =================================================================
+//           5. ROTEADOR DE AÇÕES (EXPORTADO)
+// =================================================================
+
+export const handleGerencialAction = (action, payload) => {
+    if (managerModal) managerModal.style.display = 'none';
+
+    switch (action) {
+        case 'openWaiterReg': openUserManagementModal(); break;
+        case 'openProductHub': renderProductHub(payload || 'products'); break;
+        case 'openProductManagement': renderProductHub('products'); break;
+        case 'openVoucherManagement': openVoucherManagementModal(); break;
+        case 'openSectorManagement': renderSectorManagementModal(); break;
+        case 'openCustomerCRM': renderCustomerCrmModal(); break;
+        case 'openWooSync': handleSyncAction(); break;
+        case 'openCashManagementReport': openReportPanel('active-shifts'); break;
+        case 'openFinancialModule': renderFinancialModule(); break;
+        case 'closeDay': handleCloseDay(); break;
+        case 'exportCsv': exportSalesToCSV(); break;
+        case 'openHRPanel': renderHRPanel(); break; 
+        default: console.warn(`Ação não mapeada: ${action}`);
+    }
+};
+
+// --- CONTROLLERS/MANAGERCONTROLLER.JS (PARTE 4/5) ---
+
+// =================================================================
+//           6. MÓDULOS DE RENDERIZAÇÃO (UI)
+// =================================================================
+
+// --- HUB ---
+async function renderProductHub(activeTab = 'products') {
+    if (!managerModal) return;
+    await fetchIngredients(); 
+    
+    // Buscamos as opções dinâmicas antes de renderizar
+    let typeOptions = '<option value="">Geral</option>';
+    try {
+        const snapTypes = await getDocs(query(getCollectionRef('ingredient_types'), orderBy('name')));
+        snapTypes.forEach(doc => { typeOptions += `<option value="${doc.data().name}">${doc.data().name}</option>`; });
+    } catch(e) { console.error("Erro ao carregar tipos insumo", e); }
+
+    let catOptionsSup = '<option value="">Geral</option>';
+    try {
+        const snapCats = await getDocs(query(getCollectionRef('supplier_categories'), orderBy('name')));
+        snapCats.forEach(doc => { catOptionsSup += `<option value="${doc.data().name}">${doc.data().name}</option>`; });
+    } catch(e) { console.error("Erro ao carregar cat fornecedor", e); }
+
+    managerModal.innerHTML = `
+        <div class="bg-dark-card border-0 md:border md:border-dark-border w-full h-full md:h-[90vh] md:max-w-6xl flex flex-col md:rounded-xl shadow-2xl overflow-hidden">
+            <div class="flex justify-between items-center p-4 md:p-6 border-b border-gray-700 bg-gray-800 flex-shrink-0">
+                <div><h3 class="text-xl md:text-2xl font-bold text-white">Gestão de Produtos</h3><p class="text-xs md:text-sm text-gray-400">Cardápio, Estoque e Fornecedores</p></div>
+                <button class="text-gray-400 hover:text-white text-3xl leading-none p-2" onclick="document.getElementById('managerModal').style.display='none'">&times;</button>
+            </div>
+            <div class="flex items-center space-x-2 p-3 bg-dark-bg border-b border-gray-700 overflow-x-auto flex-shrink-0 whitespace-nowrap">
+                <button class="hub-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition flex items-center" onclick="window.switchHubTab('products')"><i class="fas fa-hamburger mr-2"></i> Produtos</button>
+                <button class="hub-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition flex items-center" onclick="window.switchHubTab('ingredients')"><i class="fas fa-cubes mr-2"></i> Insumos</button>
+                <button class="hub-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition flex items-center" onclick="window.switchHubTab('suppliers')"><i class="fas fa-truck mr-2"></i> Fornecedores</button>
+                <button class="hub-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition flex items-center" onclick="window.switchHubTab('shoppingList')"><i class="fas fa-shopping-cart mr-2"></i> Compras</button>
+                <button class="hub-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition flex items-center" onclick="window.switchHubTab('categories')"><i class="fas fa-tags mr-2"></i> Categorias</button>
+            </div>
+            <div id="productActionsToolbar" class="flex flex-col md:flex-row items-stretch md:items-center justify-between p-3 bg-dark-bg border-b border-gray-700 gap-3 flex-shrink-0"></div>
+            <div id="hubContent" class="flex-grow overflow-y-auto p-3 md:p-4 custom-scrollbar bg-dark-bg relative"><div class="flex items-center justify-center h-full text-gray-500"><i class="fas fa-spinner fa-spin text-3xl"></i></div></div>
+        </div>
+        
+        <div id="ingredientFormModal" class="absolute inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
+            <div class="bg-gray-800 p-6 rounded-lg w-full max-w-md border border-gray-600">
+                <h3 class="text-lg font-bold text-white mb-4" id="ingModalTitle">Novo Insumo</h3>
+                <input type="hidden" id="ingId">
+                <div class="space-y-3">
+                    <div><label class="text-xs text-gray-400">Nome</label><input id="ingName" type="text" class="input-pdv w-full p-2"></div>
+                    <div>
+                        <label class="text-xs text-gray-400">Tipo / Seção</label>
+                        <select id="ingType" class="input-pdv w-full p-2">${typeOptions}</select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div><label class="text-xs text-gray-400">Unidade</label><select id="ingUnit" class="input-pdv w-full p-2"><option value="un">Unidade (un)</option><option value="kg">Quilo (kg)</option><option value="l">Litro (l)</option><option value="g">Grama (g)</option><option value="ml">Mililitro (ml)</option></select></div>
+                        <div><label class="text-xs text-gray-400">Custo (R$)</label><input id="ingCost" type="number" step="0.01" class="input-pdv w-full p-2"></div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div><label class="text-xs text-gray-400">Estoque Atual</label><input id="ingStock" type="number" step="0.001" class="input-pdv w-full p-2"></div>
+                        <div><label class="text-xs text-gray-400">Estoque Mínimo</label><input id="ingMinStock" type="number" step="0.001" class="input-pdv w-full p-2"></div>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-2 mt-6">
+                    <button onclick="document.getElementById('ingredientFormModal').style.display='none'" class="px-4 py-2 bg-gray-600 text-white rounded">Cancelar</button>
+                    <button onclick="window.saveIngredient()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold">Salvar</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="supplierFormModal" class="absolute inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
+            <div class="bg-gray-800 p-6 rounded-lg w-full max-w-md border border-gray-600">
+                <h3 class="text-lg font-bold text-white mb-4" id="supModalTitle">Novo Fornecedor</h3>
+                <input type="hidden" id="supId">
+                <div class="space-y-3">
+                    <div><label class="text-xs text-gray-400">Nome / Empresa</label><input id="supName" type="text" class="input-pdv w-full p-2"></div>
+                    <div><label class="text-xs text-gray-400">Telefone</label><input id="supPhone" type="text" class="input-pdv w-full p-2"></div>
+                    <div><label class="text-xs text-gray-400">CNPJ / CPF</label><input id="supDoc" type="text" class="input-pdv w-full p-2"></div>
+                    <div><label class="text-xs text-gray-400">Categoria Principal</label><select id="supCategory" class="input-pdv w-full p-2">${catOptionsSup}</select></div>
+                </div>
+                <div class="flex justify-end space-x-2 mt-6">
+                    <button onclick="document.getElementById('supplierFormModal').style.display='none'" class="px-4 py-2 bg-gray-600 text-white rounded">Cancelar</button>
+                    <button onclick="window.saveSupplier()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold">Salvar</button>
+                </div>
+            </div>
+        </div>`;
+    
+    managerModal.style.display = 'flex';
+    managerModal.classList.remove('p-4'); managerModal.classList.add('p-0', 'md:p-4');
+    await switchHubTab(activeTab);
+}
+
+async function switchHubTab(tab) {
+    currentHubTab = tab;
+    const contentDiv = document.getElementById('hubContent');
+    const toolbarDiv = document.getElementById('productActionsToolbar');
+    
+    document.querySelectorAll('.hub-tab-btn').forEach(btn => {
+        const iconClass = tab === 'products' ? 'fa-hamburger' : 
+                          tab === 'ingredients' ? 'fa-cubes' : 
+                          tab === 'shoppingList' ? 'fa-shopping-cart' : 
+                          tab === 'suppliers' ? 'fa-truck' : 'fa-tags';
+        
+        if(btn.innerHTML.includes(iconClass)) {
+            btn.classList.add('bg-indigo-600', 'text-white'); btn.classList.remove('bg-dark-input', 'text-gray-300');
+        } else {
+            btn.classList.remove('bg-indigo-600', 'text-white'); btn.classList.add('bg-dark-input', 'text-gray-300');
+        }
+    });
+
+    contentDiv.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500"><i class="fas fa-spinner fa-spin text-3xl"></i></div>';
+    toolbarDiv.innerHTML = '';
+
+    if (tab === 'products') await renderProductListConfig(contentDiv, toolbarDiv);
+    else if (tab === 'ingredients') await renderIngredientsScreen(contentDiv, toolbarDiv);
+    else if (tab === 'suppliers') await renderSuppliersScreen(contentDiv, toolbarDiv);
+    else if (tab === 'shoppingList') await renderShoppingListScreen(contentDiv, toolbarDiv);
+    else if (tab === 'categories') await renderCategoryManagement(contentDiv);
+}
+
+async function renderIngredientsScreen(container, toolbar) {
+    toolbar.innerHTML = `<div class="flex-grow text-white font-bold text-sm items-center flex gap-2"><i class="fas fa-cubes text-blue-400"></i> Cadastro de Insumos</div><button onclick="document.getElementById('ingredientFormModal').style.display='flex'; document.getElementById('ingId').value=''; document.getElementById('ingName').value=''; document.getElementById('ingModalTitle').textContent='Novo Insumo';" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg flex items-center"><i class="fas fa-plus mr-2"></i> Novo</button>`;
+    const ingredients = await fetchIngredients();
+    if (ingredients.length === 0) { container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-500"><i class="fas fa-box-open text-4xl mb-3"></i><p>Nenhum insumo cadastrado.</p></div>'; return; }
+    
+    container.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">${ingredients.map(ing => `
+        <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex justify-between items-center group hover:border-gray-500 transition">
+            <div>
+                <h4 class="font-bold text-white text-base">${ing.name}</h4>
+                <div class="flex items-center gap-2 mt-1">
+                    <span class="text-[10px] uppercase px-2 py-0.5 bg-gray-700 text-gray-300 rounded">${ing.type || 'Geral'}</span>
+                </div>
+                <p class="text-xs text-gray-400 mt-1">Custo: R$ ${ing.cost.toFixed(2)} / ${ing.unit}</p>
+            </div>
+            <div class="text-right">
+                <div class="font-mono text-xl font-bold ${ing.stock <= ing.minStock ? 'text-red-500' : 'text-green-400'}">${ing.stock} <span class="text-xs text-gray-500">${ing.unit}</span></div>
+                <div class="flex space-x-2 mt-2 justify-end opacity-50 group-hover:opacity-100 transition">
+                    <button onclick="window.editIngredient('${ing.id}')" class="text-blue-400 hover:text-white"><i class="fas fa-edit"></i></button>
+                    <button onclick="window.deleteIngredient('${ing.id}')" class="text-red-400 hover:text-white"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+        </div>`).join('')}</div>`;
+}
+
+async function renderSuppliersScreen(container, toolbar) {
+    toolbar.innerHTML = `<div class="flex-grow text-white font-bold text-sm items-center flex gap-2"><i class="fas fa-truck text-orange-400"></i> Base de Fornecedores</div><button onclick="document.getElementById('supplierFormModal').style.display='flex'; document.getElementById('supId').value=''; document.getElementById('supName').value=''; document.getElementById('supModalTitle').textContent='Novo Fornecedor';" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg flex items-center"><i class="fas fa-plus mr-2"></i> Novo</button>`;
+    const suppliers = await fetchSuppliers();
+    if (suppliers.length === 0) { container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-500"><i class="fas fa-users-slash text-4xl mb-3"></i><p>Nenhum fornecedor cadastrado.</p></div>'; return; }
+    
+    container.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">${suppliers.map(sup => `
+        <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex justify-between items-center group hover:border-gray-500 transition">
+            <div>
+                <h4 class="font-bold text-white text-base">${sup.name}</h4>
+                <p class="text-xs text-gray-400 mt-1"><i class="fas fa-phone mr-1"></i> ${sup.phone || 'Sem telefone'}</p>
+                <span class="text-[10px] uppercase px-2 py-0.5 bg-gray-700 text-gray-300 rounded mt-2 inline-block">${sup.category || 'Geral'}</span>
+            </div>
+            <div class="flex flex-col space-y-2 items-end">
+                <button onclick="window.editSupplier('${sup.id}')" class="text-blue-400 hover:text-white p-2"><i class="fas fa-edit"></i></button>
+                <button onclick="window.deleteSupplier('${sup.id}')" class="text-red-400 hover:text-white p-2"><i class="fas fa-trash"></i></button>
+            </div>
+        </div>`).join('')}</div>`;
+}
+
+async function renderShoppingListScreen(container, toolbar) {
+    toolbar.innerHTML = `<div class="flex-grow text-white font-bold text-sm items-center flex gap-2"><i class="fas fa-shopping-cart text-yellow-400"></i> Itens para Reposição</div><button onclick="window.print()" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow flex items-center"><i class="fas fa-print mr-2"></i> Imprimir</button>`;
+    const ingredients = await fetchIngredients();
+    // Agrupa por tipo para facilitar a compra
+    const shoppingList = ingredients.filter(ing => ing.stock <= ing.minStock).sort((a,b) => (a.type || '').localeCompare(b.type || ''));
+    
+    if (shoppingList.length === 0) { container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-green-500"><i class="fas fa-check-circle text-5xl mb-3"></i><p class="text-lg">Tudo certo! Estoque em dia.</p></div>'; return; }
+    
+    container.innerHTML = `<div class="bg-gray-800 rounded-xl overflow-hidden border border-gray-700"><table class="w-full text-left text-gray-300"><thead class="bg-gray-900 text-xs uppercase font-bold text-gray-500"><tr><th class="p-4">Item</th><th class="p-4">Tipo</th><th class="p-4 text-center">Estoque Atual</th><th class="p-4 text-center">Mínimo</th><th class="p-4 text-right">Comprar</th></tr></thead><tbody class="divide-y divide-gray-700">${shoppingList.map(ing => { 
+        const needed = (ing.minStock - ing.stock); 
+        const buyQty = needed > 0 ? needed : ing.minStock; 
+        return `<tr class="hover:bg-gray-700/50">
+            <td class="p-4 font-bold text-white">${ing.name}</td>
+            <td class="p-4 text-xs text-gray-400 uppercase">${ing.type || '-'}</td>
+            <td class="p-4 text-center text-red-400 font-mono">${ing.stock} ${ing.unit}</td>
+            <td class="p-4 text-center text-gray-500 font-mono">${ing.minStock} ${ing.unit}</td>
+            <td class="p-4 text-right font-bold text-yellow-400 text-lg"><i class="fas fa-arrow-right text-xs mr-2"></i> ${buyQty.toFixed(2)} ${ing.unit}</td>
+        </tr>`; 
+    }).join('')}</tbody></table></div>`;
+}
+
+async function renderProductListConfig(contentDiv, toolbarDiv) {
+    const categories = getCategories();
+    let catOptions = '<option value="all">Todas as Categorias</option>';
+    if (categories.length > 0) categories.forEach(c => { if(c.id !== 'all' && c.id !== 'top10') catOptions += `<option value="${c.id}">${c.name}</option>`; });
+    toolbarDiv.innerHTML = `<div class="flex items-center space-x-2 w-full md:w-auto"><select id="hubCategoryFilter" class="bg-gray-700 text-white text-sm py-3 px-3 rounded-lg border border-gray-600 w-full md:w-[200px]">${catOptions}</select></div><div class="flex items-center space-x-2 w-full md:w-auto"><div class="relative w-full md:w-64"><input type="text" id="hubSearchInput" placeholder="Pesquisar..." class="bg-dark-input text-white text-sm py-3 pl-3 pr-8 rounded-lg border border-gray-600 w-full focus:border-indigo-500"><i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i></div><button id="hubNewProductBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition shadow-lg flex items-center justify-center whitespace-nowrap"><i class="fas fa-plus mr-2"></i> <span class="hidden md:inline">Novo</span></button></div>`;
+    document.getElementById('hubNewProductBtn').onclick = () => renderProductForm(null, contentDiv, () => renderProductList(contentDiv, 'all', '', false));
+    const catSelect = document.getElementById('hubCategoryFilter');
+    const searchInput = document.getElementById('hubSearchInput');
+    catSelect.onchange = (e) => { hubCategory = e.target.value; hubPage = 1; renderProductList(contentDiv, hubCategory, hubSearch, false); };
+    searchInput.oninput = (e) => { hubSearch = e.target.value; hubPage = 1; clearTimeout(hubSearchTimeout); hubSearchTimeout = setTimeout(() => { renderProductList(contentDiv, hubCategory, hubSearch, false); }, 600); };
+    await fetchWooCommerceProducts(1, '', 'all', false);
+    await renderProductList(contentDiv, 'all', '', false);
+}
+
+async function renderProductList(container, catFilter, searchTerm, append = false) {
+    if (!append) { container.innerHTML = '<div class="flex justify-center py-10"><i class="fas fa-spinner fa-spin text-3xl text-gray-500"></i></div>'; await fetchWooCommerceProducts(1, searchTerm, catFilter, false); }
+    let products = getProducts();
+    if (products.length === 0 && !append) { container.innerHTML = '<p class="text-center text-gray-500 py-10">Nenhum produto encontrado.</p>'; return; }
+    const listHtml = products.map(p => `<div class="flex justify-between items-center bg-dark-input p-3 rounded-lg mb-2 border border-gray-700 hover:border-gray-500 transition group"><div class="flex items-center space-x-3 overflow-hidden"><div class="w-12 h-12 rounded-lg bg-gray-800 overflow-hidden flex-shrink-0 border border-gray-600"><img src="${p.image || 'https://placehold.co/50'}" class="w-full h-full object-cover"></div><div class="min-w-0"><h4 class="font-bold text-white text-sm truncate">${p.name}</h4><div class="flex items-center text-xs space-x-2 mt-1"><span class="text-green-400 font-mono bg-green-900/30 px-1.5 py-0.5 rounded">${formatCurrency(p.price)}</span>${p.status !== 'publish' ? '<span class="text-yellow-500 bg-yellow-900/30 px-1.5 rounded">Oculto</span>' : ''}</div></div></div><div class="flex space-x-2 flex-shrink-0"><button class="bg-indigo-600 hover:bg-indigo-500 text-white p-2 rounded-lg text-sm btn-edit-prod shadow" data-id="${p.id}"><i class="fas fa-edit"></i></button><button class="bg-red-600 hover:bg-red-500 text-white p-2 rounded-lg text-sm btn-del-prod shadow" data-id="${p.id}"><i class="fas fa-trash"></i></button></div></div>`).join('');
+    const loadMoreHtml = `<div class="pt-4 pb-20 text-center" id="hubLoadMoreContainer"><button id="hubLoadMoreBtn" class="w-full md:w-1/2 py-3 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition font-bold border border-gray-600">Carregar Mais Produtos</button></div>`;
+    if (!append) container.innerHTML = `<div class="pb-4">${listHtml}</div>${loadMoreHtml}`; else { const loadMoreContainer = document.getElementById('hubLoadMoreContainer'); if(loadMoreContainer) loadMoreContainer.remove(); container.insertAdjacentHTML('beforeend', `<div class="pb-4">${listHtml}</div>${loadMoreHtml}`); }
+    container.querySelectorAll('.btn-edit-prod').forEach(btn => btn.onclick = () => { const prod = products.find(p => p.id == btn.dataset.id); renderProductForm(prod, container, () => renderProductList(container, catFilter, searchTerm, false)); });
+    container.querySelectorAll('.btn-del-prod').forEach(btn => btn.onclick = () => handleDeleteProduct(btn.dataset.id, () => renderProductList(container, catFilter, searchTerm, false)));
+    const loadBtn = document.getElementById('hubLoadMoreBtn');
+    if (loadBtn) { loadBtn.onclick = async () => { toggleLoading(loadBtn, true, 'Carregando...'); hubPage++; const newItems = await fetchWooCommerceProducts(hubPage, searchTerm, catFilter, true); if (newItems.length === 0) { showToast("Não há mais produtos.", false); loadBtn.style.display = 'none'; } else { renderProductList(container, catFilter, searchTerm, true); } }; }
+}
+
+async function renderProductForm(product = null, container, onBack) {
+    const isEdit = !!product;
+    const sectorsSnap = await getDocs(query(getSectorsCollectionRef(), where('type', '==', 'production'), orderBy('name')));
+    const sectors = sectorsSnap.docs.map(d => d.data().name);
+    currentComposition = product?.composition || [];
+    
+    container.innerHTML = `
+        <div class="w-full h-full flex flex-col bg-dark-bg">
+            <div class="flex justify-between items-center mb-2 pb-2 border-b border-gray-700 flex-shrink-0"><h4 class="text-lg font-bold text-white flex items-center truncate"><i class="fas ${isEdit ? 'fa-edit text-blue-400' : 'fa-plus-circle text-green-400'} mr-2"></i>${isEdit ? 'Editar' : 'Novo'}</h4><button id="btnBackToHub" class="text-gray-400 hover:text-white flex items-center text-sm py-2 px-3 rounded bg-gray-800"><i class="fas fa-arrow-left mr-1"></i> Voltar</button></div>
+            <div class="flex space-x-2 mb-4 overflow-x-auto pb-2 flex-shrink-0"><button class="form-tab-btn px-4 py-2 rounded-full bg-indigo-600 text-white text-sm font-bold whitespace-nowrap" data-target="tab-general">Geral</button><button class="form-tab-btn px-4 py-2 rounded-full bg-gray-700 text-gray-300 text-sm font-bold whitespace-nowrap" data-target="tab-hierarchy">Hierarquia</button><button class="form-tab-btn px-4 py-2 rounded-full bg-gray-700 text-gray-300 text-sm font-bold whitespace-nowrap" data-target="tab-recipe">Ficha Técnica</button><button class="form-tab-btn px-4 py-2 rounded-full bg-gray-700 text-gray-300 text-sm font-bold whitespace-nowrap" data-target="tab-obs">Obs</button></div>
+            <div class="flex-grow overflow-y-auto custom-scrollbar pr-1 pb-20">
+                <form id="productForm" class="space-y-6">
+                    <div id="tab-general" class="form-tab-content"><div class="space-y-4"><div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Nome</label><input type="text" id="prodName" class="input-pdv w-full text-lg p-3" value="${product?.name || ''}" required></div><div class="grid grid-cols-2 gap-4"><div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Preço</label><input type="number" id="prodPrice" class="input-pdv w-full font-mono text-green-400 font-bold text-lg p-3" step="0.01" value="${product?.price || ''}" required></div><div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Promo</label><input type="number" id="prodRegPrice" class="input-pdv w-full font-mono text-yellow-400 text-lg p-3" step="0.01" value="${product?.regular_price || ''}"></div></div><div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Status</label><select id="prodStatus" class="input-pdv w-full p-3"><option value="publish" ${product?.status === 'publish' ? 'selected' : ''}>Publicado</option><option value="draft" ${product?.status === 'draft' ? 'selected' : ''}>Rascunho</option></select></div><div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">URL Imagem</label><input type="text" id="prodImg" class="input-pdv w-full text-xs p-3" value="${product?.image || ''}"></div><div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Descrição</label><textarea id="prodDesc" class="input-pdv w-full text-sm p-3" rows="3">${product?.description || ''}</textarea></div></div></div>
+                    <div id="tab-hierarchy" class="form-tab-content hidden"><div class="bg-gray-800 p-4 rounded-xl border border-gray-600 space-y-4"><p class="text-sm text-pumpkin font-bold uppercase mb-2">Classificação</p><div><label class="text-xs text-gray-500 block mb-1">1. Grupo</label><select id="catLvl1" class="input-pdv w-full text-sm p-2"></select></div><div><label class="text-xs text-gray-500 block mb-1">2. Subgrupo</label><select id="catLvl2" class="input-pdv w-full text-sm p-2" disabled></select></div><div><label class="text-xs text-gray-500 block mb-1">3. Categoria</label><select id="catLvl3" class="input-pdv w-full text-sm p-2" disabled></select></div><div><label class="text-xs text-gray-500 block mb-1">4. Variação</label><select id="catLvl4" class="input-pdv w-full text-sm p-2" disabled></select></div><input type="hidden" id="finalCategoryId" value="${product?.categoryId || ''}"><div class="pt-4 border-t border-gray-600"><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Setor de Produção (KDS)</label><select id="prodSector" class="input-pdv w-full p-2">${sectors.length > 0 ? sectors.map(s => `<option value="${s}">${s}</option>`).join('') : '<option value="cozinha">Cozinha</option>'}</select></div></div></div>
+                    <div id="tab-recipe" class="form-tab-content hidden space-y-6">
+                         <div class="bg-gray-800 p-4 rounded-xl border border-gray-600"><label class="flex items-center space-x-3 cursor-pointer mb-4"><input type="checkbox" id="isComposite" class="w-6 h-6 rounded bg-dark-input border-gray-500 text-indigo-600" ${product?.composition?.length > 0 ? 'checked' : ''}><span class="text-white font-bold">Este Produto Consome Insumos?</span></label><div id="compositionContainer" class="space-y-2 ${product?.composition?.length > 0 ? '' : 'hidden'}"><h5 class="text-xs font-bold text-gray-500 uppercase mb-2">Ingredientes (Baixa Automática)</h5><div id="compositionList"></div><button type="button" onclick="window.addCompItem()" class="text-xs bg-indigo-600 text-white px-3 py-2 rounded w-full font-bold mt-2 hover:bg-indigo-500"><i class="fas fa-plus mr-2"></i> Adicionar Ingrediente</button></div></div>
+                    </div>
+                    <div id="tab-obs" class="form-tab-content hidden"><div class="bg-gray-800 p-4 rounded-xl border border-gray-600"><p class="text-sm text-gray-300 mb-3">Obs. específicas.</p><div class="flex space-x-2 mb-4"><input type="text" id="newQuickObsInput" placeholder="Nova obs..." class="input-pdv w-full text-sm p-3"><button type="button" id="btnAddQuickObs" class="bg-green-600 text-white px-4 rounded-lg font-bold"><i class="fas fa-plus"></i></button></div><div id="quickObsListSmall" class="grid grid-cols-2 gap-2"></div></div></div>
+                </form>
+            </div>
+            <div class="border-t border-gray-700 pt-4 mt-auto flex space-x-3 flex-shrink-0 bg-dark-bg"><button type="button" id="btnCancelForm" class="flex-1 py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-bold transition">Cancelar</button><button type="button" id="btnSaveProduct" class="flex-1 py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition shadow-lg flex items-center justify-center"><i class="fas fa-save mr-2"></i> Salvar</button></div>
+        </div>`;
+
+    await fetchIngredients();
+    updateCompListUI();
+
+    const tabBtns = container.querySelectorAll('.form-tab-btn');
+    const tabContents = container.querySelectorAll('.form-tab-content');
+    tabBtns.forEach(btn => {
+        btn.onclick = (e) => {
+            e.preventDefault();
+            tabBtns.forEach(b => { b.classList.remove('bg-indigo-600', 'text-white'); b.classList.add('bg-gray-700', 'text-gray-300'); });
+            btn.classList.remove('bg-gray-700', 'text-gray-300'); btn.classList.add('bg-indigo-600', 'text-white');
+            tabContents.forEach(c => c.classList.add('hidden'));
+            document.getElementById(btn.dataset.target).classList.remove('hidden');
+        };
+    });
+
+    const compCheck = document.getElementById('isComposite');
+    const compContainer = document.getElementById('compositionContainer');
+    compCheck.onchange = () => { if(compCheck.checked) compContainer.classList.remove('hidden'); else compContainer.classList.add('hidden'); };
+
+    const allCats = getCategories();
+    const selects = [document.getElementById('catLvl1'), document.getElementById('catLvl2'), document.getElementById('catLvl3'), document.getElementById('catLvl4')];
+    const finalIdInput = document.getElementById('finalCategoryId');
+    const populateSelect = (levelIndex, parentId) => {
+        const select = selects[levelIndex];
+        select.innerHTML = '<option value="">Selecione...</option>';
+        const children = allCats.filter(c => c.parent == parentId && c.id !== 'all' && c.id !== 'top10');
+        if (children.length === 0) { select.disabled = true; } else { select.disabled = false; children.forEach(c => { const opt = document.createElement('option'); opt.value = c.id; opt.textContent = c.name; select.appendChild(opt); }); }
+        for(let i = levelIndex + 1; i < 4; i++) { selects[i].innerHTML = ''; selects[i].disabled = true; }
+    };
+    selects.forEach((sel, idx) => {
+        sel.onchange = () => {
+            const selectedVal = sel.value;
+            if (selectedVal) { finalIdInput.value = selectedVal; if (idx < 3) populateSelect(idx + 1, selectedVal); } 
+            else { finalIdInput.value = idx > 0 ? selects[idx-1].value : ''; for(let i = idx + 1; i < 4; i++) { selects[i].innerHTML = ''; selects[i].disabled = true; } }
+        };
+    });
+    const getPath = (id) => { let path = []; let curr = allCats.find(c => c.id == id); while(curr) { path.unshift(curr.id); curr = allCats.find(c => c.id == curr.parent); } return path; };
+    const currentPath = product?.categoryId ? getPath(product.categoryId) : [];
+    populateSelect(0, 0);
+    if (currentPath.length > 0) {
+        selects[0].value = currentPath[0]; populateSelect(1, currentPath[0]);
+        if (currentPath[1]) { selects[1].value = currentPath[1]; populateSelect(2, currentPath[1]); }
+        if (currentPath[2]) { selects[2].value = currentPath[2]; populateSelect(3, currentPath[2]); }
+        if (currentPath[3]) { selects[3].value = currentPath[3]; }
+    }
+    
+    const loadMiniObs = async () => {
+        const containerObs = document.getElementById('quickObsListSmall');
+        const snap = await getDocs(query(getQuickObsCollectionRef(), orderBy('text')));
+        containerObs.innerHTML = snap.docs.map(d => `<div class="flex justify-between items-center bg-dark-bg p-2 rounded border border-gray-600"><span class="text-xs text-gray-300">${d.data().text}</span><button type="button" class="text-red-400 hover:text-white text-xs btn-del-mini-obs" data-id="${d.id}">&times;</button></div>`).join('');
+        containerObs.querySelectorAll('.btn-del-mini-obs').forEach(btn => btn.onclick = async () => { if(confirm("Apagar?")) { await deleteDoc(doc(getQuickObsCollectionRef(), btn.dataset.id)); loadMiniObs(); }});
+    };
+    document.getElementById('btnAddQuickObs').onclick = async () => {
+        const val = document.getElementById('newQuickObsInput').value.trim();
+        if(val) { await setDoc(doc(getQuickObsCollectionRef(), val.toLowerCase().replace(/[^a-z0-9]/g, '')), { text: val }); document.getElementById('newQuickObsInput').value = ''; loadMiniObs(); }
+    };
+    loadMiniObs();
+
+    document.getElementById('btnSaveProduct').onclick = async () => {
+        const submitBtn = document.getElementById('btnSaveProduct');
+        toggleLoading(submitBtn, true, 'Salvando...');
+        const selectedCatId = finalIdInput.value; 
+        const isComposite = document.getElementById('isComposite').checked;
+        const validComposition = isComposite ? currentComposition.filter(i => i.id && i.qty > 0) : [];
+        const data = {
+            name: document.getElementById('prodName').value,
+            regular_price: document.getElementById('prodRegPrice').value,
+            price: document.getElementById('prodPrice').value,
+            categories: selectedCatId ? [{ id: parseInt(selectedCatId) }] : [],
+            status: document.getElementById('prodStatus').value,
+            description: document.getElementById('prodDesc').value,
+            images: [{ src: document.getElementById('prodImg').value }],
+            meta_data: [ { key: 'sector', value: document.getElementById('prodSector').value }, { key: 'is_composite', value: isComposite ? 'yes' : 'no' } ],
+            composition: validComposition 
+        };
+        try { 
+            if(isEdit) await updateWooProduct(product.id, data); else await createWooProduct(data); 
+            showToast("Produto salvo!", false); 
+            if(onBack) onBack(); 
+        } catch(e) { showToast(e.message, true); } finally { toggleLoading(submitBtn, false); }
+    };
+    document.getElementById('btnBackToHub').onclick = onBack;
+    document.getElementById('btnCancelForm').onclick = onBack;
+}
+
+// --- CATEGORIAS ---
+async function renderCategoryManagement(container) {
+    container.innerHTML = `<div class="flex justify-between items-center mb-4"><h4 class="font-bold text-white">Categorias</h4><button onclick="window.renderCategoryForm()" class="bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 transition"><i class="fas fa-plus"></i> Nova</button></div><div id="catList" class="space-y-2"></div>`;
+    const list = document.getElementById('catList');
+    const cats = await getCategories(); 
+    const realCats = cats.filter(c => c.id !== 'all' && c.id !== 'top10');
+    list.innerHTML = realCats.map(c => `<div class="flex justify-between items-center bg-dark-input p-3 rounded border border-gray-700"><span class="text-white">${c.name}</span><div class="space-x-2"><button onclick="window.renderCategoryForm('${c.id}')" class="text-blue-400"><i class="fas fa-edit"></i></button><button onclick="if(confirm('Excluir?')) { window.deleteWooCategory(${c.id}).then(() => window.switchHubTab('categories')); }" class="text-red-400"><i class="fas fa-trash"></i></button></div></div>`).join('');
+}
+
+async function renderCategoryForm(catId = null) {
+    const isEdit = !!catId;
+    const cats = getCategories();
+    const cat = isEdit ? cats.find(c => c.id == catId) : null;
+    const contentDiv = document.getElementById('hubContent');
+    const options = cats.filter(c => c.id !== 'all' && c.id !== 'top10' && c.id != catId).map(c => `<option value="${c.id}" ${cat?.parent == c.id ? 'selected' : ''}>${c.name}</option>`).join('');
+    contentDiv.innerHTML = `<div class="max-w-lg mx-auto bg-gray-800 p-6 rounded-lg border border-gray-700 mt-4"><h4 class="text-lg font-bold text-white mb-4">${isEdit ? 'Editar' : 'Nova'} Categoria</h4><div class="mb-4"><label class="block text-sm text-gray-400 mb-1">Nome</label><input type="text" id="catName" class="input-pdv w-full p-2" value="${cat?.name || ''}"></div><div class="mb-6"><label class="block text-sm text-gray-400 mb-1">Pai</label><select id="catParent" class="input-pdv w-full p-2"><option value="0">Nenhuma (Raiz)</option>${options}</select></div><div class="flex justify-end space-x-3"><button onclick="window.switchHubTab('categories')" class="px-4 py-2 bg-gray-600 text-white rounded">Cancelar</button><button id="btnSaveCat" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Salvar</button></div></div>`;
+    document.getElementById('btnSaveCat').onclick = async () => {
+        const btn = document.getElementById('btnSaveCat');
+        const name = document.getElementById('catName').value;
+        const parent = document.getElementById('catParent').value;
+        if(!name) return alert('Nome obrigatório');
+        toggleLoading(btn, true);
+        try {
+            if(isEdit) await updateWooCategory(catId, { name, parent: parseInt(parent) });
+            else await createWooCategory(name, parseInt(parent));
+            showToast('Salvo!');
+            switchHubTab('categories');
+        } catch(e) { console.error(e); showToast('Erro ao salvar category', true); toggleLoading(btn, false); }
+    };
+}
+
+function getFormattedCategoryOptions(categories, selectedId) {
+    return categories.filter(c => c.id !== 'all' && c.id !== 'top10').map(c => `<option value="${c.id}" ${c.id == selectedId ? 'selected' : ''}>${c.name}</option>`).join('');
+}
+
+// --- CONTROLLERS/MANAGERCONTROLLER.JS (PARTE 5/5) ---
+
+// --- CADASTROS AUXILIARES (SETORES, TIPOS, CATEGORIAS) --- 
 async function renderSectorManagementModal() {
     if (!managerModal) return;
     
@@ -709,8 +1119,8 @@ async function renderSectorManagementModal() {
             </div>
             
             <div class="flex space-x-2 mb-4 border-b border-gray-700 pb-2 overflow-x-auto">
-                <button class="aux-tab-btn px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-bold whitespace-nowrap" onclick="window.switchAuxTab('sectors')">Setores (Mesas)</button>
-                <button class="aux-tab-btn px-4 py-2 rounded-lg bg-dark-input text-gray-300 text-sm font-bold hover:bg-gray-700 whitespace-nowrap" onclick="window.switchAuxTab('ingredient_types')">Tipos de Insumo</button>
+                <button class="aux-tab-btn px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-bold whitespace-nowrap" onclick="window.switchAuxTab('sectors')">Setores</button>
+                <button class="aux-tab-btn px-4 py-2 rounded-lg bg-dark-input text-gray-300 text-sm font-bold hover:bg-gray-700 whitespace-nowrap" onclick="window.switchAuxTab('ingredient_types')">Tipos Insumo</button>
                 <button class="aux-tab-btn px-4 py-2 rounded-lg bg-dark-input text-gray-300 text-sm font-bold hover:bg-gray-700 whitespace-nowrap" onclick="window.switchAuxTab('supplier_categories')">Cat. Fornecedor</button>
             </div>
 
@@ -995,1026 +1405,276 @@ async function renderExternalRecruitmentModal(type = 'extra') {
     } catch(e) { console.error(e); modal.querySelector('#candidatesList').innerHTML = '<p class="text-red-400 text-center">Erro ao conectar.</p>'; }
 }
 
-// =================================================================
-//           4. INICIALIZAÇÃO (INIT)
-// =================================================================
-
-export const initManagerController = () => {
-    if (managerControllerInitialized) return;
-    console.log("[ManagerController] Inicializando...");
-    
-    managerModal = document.getElementById('managerModal');
-    if (managerModal) {
-        managerModal.addEventListener('click', (e) => { if (e.target === managerModal) managerModal.style.display = 'none'; });
-    }
-
-    // Vouchers
-    voucherManagementModal = document.getElementById('voucherManagementModal'); 
-    voucherListContainer = document.getElementById('voucherListContainer');     
-    voucherForm = document.getElementById('voucherForm');                       
-    const voucherBtn = document.getElementById('showVoucherFormBtn');
-    
-    if(voucherBtn) {
-        voucherBtn.addEventListener('click', () => { 
-            if(voucherForm) { voucherForm.style.display = 'block'; voucherForm.reset(); }
-        });
-    }
-    if (voucherForm) {
-        voucherForm.addEventListener('submit', handleSaveVoucher);
-    }
-
-    // Relatórios
-    reportDateInput = document.getElementById('reportDateInput');
-    if (reportDateInput) {
-        reportDateInput.valueAsDate = new Date(); 
-        reportDateInput.addEventListener('change', () => {
-            loadReports();
-            if (managerModal && managerModal.style.display === 'flex' && document.getElementById('finContent')) {
-                switchFinTab(currentFinTab);
-            }
-        });
-    }
-    
-    const refreshBtn = document.getElementById('refreshReportBtn');
-    if(refreshBtn) refreshBtn.addEventListener('click', loadReports);
-
-    // Abas de Relatório
-    const tabBtns = document.querySelectorAll('.report-tab-btn');
-    tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            tabBtns.forEach(b => { b.classList.remove('bg-indigo-600', 'text-white'); b.classList.add('bg-dark-input', 'text-gray-300'); });
-            btn.classList.remove('bg-dark-input', 'text-gray-300'); btn.classList.add('bg-indigo-600', 'text-white');
-            document.querySelectorAll('.report-content').forEach(c => c.classList.add('hidden'));
-            const targetContent = document.getElementById(`tab-${btn.dataset.tab}`);
-            if(targetContent) targetContent.classList.remove('hidden');
-            if (btn.dataset.tab === 'sales') fetchMonthlyPerformance();
-            loadReports();
-        });
-    });
-
-    // --- ATRIBUIÇÕES GLOBAIS (SEGURANÇA) ---
-    window.handleSaveVoucher = handleSaveVoucher;
-    window.handleDeleteVoucher = handleDeleteVoucher;
-    window.toggleExpenseForm = toggleExpenseForm;
-    window.saveExpense = saveExpense;
-    window.deleteExpense = deleteExpense;
-    window.handleForceCloseShift = handleForceCloseShift;
-    window.openShiftDetails = openShiftDetails;
-    window.deleteSector = deleteSector;
-    window.setMonthlyGoal = setMonthlyGoal;
-    window.runDateComparison = runDateComparison;
-    window.switchFinTab = switchFinTab;
-    window.openReportPanel = openReportPanel;
-    
-    // Hub / Estoque / Fornecedores
-    window.renderProductHub = renderProductHub; 
-    window.renderCategoryManagement = renderCategoryManagement; 
-    window.renderCategoryForm = renderCategoryForm; 
-    window.switchHubTab = switchHubTab;
-    window.handleDeleteProduct = handleDeleteProduct;
-    window.handleImportXML = handleImportXML;
-    window.toggleCheckItem = toggleCheckItem;
-    window.confirmStockEntry = confirmStockEntry;
-    window.openManualStockEntry = openManualStockEntry;
-    window.saveManualStockEntry = saveManualStockEntry;
-    
-    window.saveSupplier = saveSupplier;
-    window.deleteSupplier = deleteSupplier;
-    
-    window.renderSectorManagementModal = renderSectorManagementModal;
-    window.switchAuxTab = switchAuxTab;
-    window.saveAuxiliary = saveAuxiliary;
-    window.deleteAuxiliary = deleteAuxiliary;
-    
-    window.addCompItem = addCompItem;
-    window.removeCompItem = removeCompItem;
-    window.updateCompItem = updateCompItem;
-    window.saveIngredient = saveIngredient;
-    window.deleteIngredient = deleteIngredient;
-
-    // RH
-    window.renderHRPanel = renderHRPanel;
-    window.switchHRTab = switchHRTab;
-    window.generatePayslip = generatePayslip;
-    window.renderExternalRecruitmentModal = renderExternalRecruitmentModal;
-    
-    // Helpers UI (Injetados)
-    window.editIngredient = (id) => {
-        const ing = ingredientsCache.find(i => i.id === id);
-        if (!ing) return;
-        document.getElementById('ingId').value = ing.id;
-        document.getElementById('ingName').value = ing.name;
-        document.getElementById('ingUnit').value = ing.unit;
-        document.getElementById('ingCost').value = ing.cost;
-        document.getElementById('ingStock').value = ing.stock;
-        document.getElementById('ingMinStock').value = ing.minStock;
-        if(document.getElementById('ingType')) document.getElementById('ingType').value = ing.type || '';
-        document.getElementById('ingModalTitle').textContent = 'Editar Insumo';
-        document.getElementById('ingredientFormModal').style.display = 'flex';
-    };
-
-    window.editSupplier = (id) => {
-        const sup = suppliersCache.find(s => s.id === id);
-        if (!sup) return;
-        document.getElementById('supId').value = sup.id;
-        document.getElementById('supName').value = sup.name;
-        document.getElementById('supPhone').value = sup.phone || '';
-        document.getElementById('supDoc').value = sup.document || '';
-        document.getElementById('supCategory').value = sup.category || '';
-        document.getElementById('supModalTitle').textContent = 'Editar Fornecedor';
-        document.getElementById('supplierFormModal').style.display = 'flex';
-    };
-
-    managerControllerInitialized = true;
-};
-
-// =================================================================
-//           5. ROTEADOR DE AÇÕES (EXPORTADO)
-// =================================================================
-
-export const handleGerencialAction = (action, payload) => {
-    if (managerModal) managerModal.style.display = 'none';
-
-    switch (action) {
-        case 'openWaiterReg': openUserManagementModal(); break;
-        case 'openProductHub': renderProductHub(payload || 'products'); break;
-        case 'openProductManagement': renderProductHub('products'); break;
-        case 'openVoucherManagement': openVoucherManagementModal(); break;
-        case 'openSectorManagement': renderSectorManagementModal(); break;
-        case 'openCustomerCRM': renderCustomerCrmModal(); break;
-        case 'openWooSync': handleSyncAction(); break;
-        case 'openCashManagementReport': openReportPanel('active-shifts'); break;
-        case 'openFinancialModule': renderFinancialModule(); break;
-        case 'closeDay': handleCloseDay(); break;
-        case 'exportCsv': exportSalesToCSV(); break;
-        case 'openHRPanel': renderHRPanel(); break; // RH adicionado
-        default: console.warn(`Ação não mapeada: ${action}`);
-    }
-};
-
-// =================================================================
-//           6. MÓDULOS DE RENDERIZAÇÃO (UI)
-// =================================================================
-
-// --- HUB ---
-async function renderProductHub(activeTab = 'products') {
+// --- MÓDULO FINANCEIRO (DRE & DESPESAS) ---
+async function renderFinancialModule() {
     if (!managerModal) return;
-    await fetchIngredients(); 
     
-    // Buscamos as opções dinâmicas antes de renderizar
-    let typeOptions = '<option value="">Geral</option>';
-    try {
-        const snapTypes = await getDocs(query(getCollectionRef('ingredient_types'), orderBy('name')));
-        snapTypes.forEach(doc => { typeOptions += `<option value="${doc.data().name}">${doc.data().name}</option>`; });
-    } catch(e) { console.error("Erro ao carregar tipos insumo", e); }
-
-    let catOptionsSup = '<option value="">Geral</option>';
-    try {
-        const snapCats = await getDocs(query(getCollectionRef('supplier_categories'), orderBy('name')));
-        snapCats.forEach(doc => { catOptionsSup += `<option value="${doc.data().name}">${doc.data().name}</option>`; });
-    } catch(e) { console.error("Erro ao carregar cat fornecedor", e); }
-
     managerModal.innerHTML = `
-        <div class="bg-dark-card border-0 md:border md:border-dark-border w-full h-full md:h-[90vh] md:max-w-6xl flex flex-col md:rounded-xl shadow-2xl overflow-hidden">
-            <div class="flex justify-between items-center p-4 md:p-6 border-b border-gray-700 bg-gray-800 flex-shrink-0">
-                <div><h3 class="text-xl md:text-2xl font-bold text-white">Gestão de Produtos</h3><p class="text-xs md:text-sm text-gray-400">Cardápio, Estoque e Fornecedores</p></div>
-                <button class="text-gray-400 hover:text-white text-3xl leading-none p-2" onclick="document.getElementById('managerModal').style.display='none'">&times;</button>
+        <div class="bg-dark-card border border-gray-600 w-full max-w-6xl h-[90vh] flex flex-col rounded-xl shadow-2xl overflow-hidden">
+            <div class="flex justify-between items-center p-6 border-b border-gray-700 bg-gray-800">
+                <div><h3 class="text-2xl font-bold text-pink-500"><i class="fas fa-chart-pie mr-2"></i>Gestão Financeira</h3><p class="text-sm text-gray-400">DRE e Controle de Despesas</p></div>
+                <button class="text-gray-400 hover:text-white text-3xl leading-none" onclick="document.getElementById('managerModal').style.display='none'">&times;</button>
             </div>
-            <div class="flex items-center space-x-2 p-3 bg-dark-bg border-b border-gray-700 overflow-x-auto flex-shrink-0 whitespace-nowrap">
-                <button class="hub-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition flex items-center" onclick="window.switchHubTab('products')"><i class="fas fa-hamburger mr-2"></i> Produtos</button>
-                <button class="hub-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition flex items-center" onclick="window.switchHubTab('ingredients')"><i class="fas fa-cubes mr-2"></i> Insumos</button>
-                <button class="hub-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition flex items-center" onclick="window.switchHubTab('suppliers')"><i class="fas fa-truck mr-2"></i> Fornecedores</button>
-                <button class="hub-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition flex items-center" onclick="window.switchHubTab('shoppingList')"><i class="fas fa-shopping-cart mr-2"></i> Compras</button>
-                <button class="hub-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition flex items-center" onclick="window.switchHubTab('categories')"><i class="fas fa-tags mr-2"></i> Categorias</button>
+            <div class="flex p-4 bg-dark-bg border-b border-gray-700 space-x-2 items-center overflow-x-auto">
+                <button class="fin-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition" onclick="window.switchFinTab('dre')"><i class="fas fa-file-invoice-dollar mr-2"></i> DRE Gerencial</button>
+                <button class="fin-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition" onclick="window.switchFinTab('expenses')"><i class="fas fa-money-bill-wave mr-2"></i> Contas a Pagar</button>
             </div>
-            <div id="productActionsToolbar" class="flex flex-col md:flex-row items-stretch md:items-center justify-between p-3 bg-dark-bg border-b border-gray-700 gap-3 flex-shrink-0"></div>
-            <div id="hubContent" class="flex-grow overflow-y-auto p-3 md:p-4 custom-scrollbar bg-dark-bg relative"><div class="flex items-center justify-center h-full text-gray-500"><i class="fas fa-spinner fa-spin text-3xl"></i></div></div>
+            <div id="finContent" class="flex-grow overflow-y-auto p-6 bg-dark-bg custom-scrollbar"><div class="flex justify-center py-10"><i class="fas fa-spinner fa-spin text-pink-500 text-3xl"></i></div></div>
+        </div>`;
+    
+    managerModal.style.display = 'flex';
+    managerModal.classList.remove('p-4'); 
+    managerModal.classList.add('p-0', 'md:p-4');
+    
+    await switchFinTab('dre');
+}
+
+async function renderExpensesList(container) {
+    let supplierOptions = '<option value="">Sem Fornecedor</option>';
+    try {
+        const supSnap = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'suppliers'), orderBy('name')));
+        supSnap.forEach(doc => { supplierOptions += `<option value="${doc.id}">${doc.data().name}</option>`; });
+    } catch(e) { console.error("Erro suppliers", e); }
+
+    container.innerHTML = `
+        <div class="flex justify-between items-center mb-4">
+            <h4 class="text-xl font-bold text-white">Despesas & Custos</h4>
+            <button onclick="window.toggleExpenseForm()" class="bg-pink-600 hover:bg-pink-700 text-white font-bold py-2 px-4 rounded-lg shadow"><i class="fas fa-plus mr-2"></i> Nova Despesa</button>
         </div>
         
-        <div id="ingredientFormModal" class="absolute inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
-            <div class="bg-gray-800 p-6 rounded-lg w-full max-w-md border border-gray-600">
-                <h3 class="text-lg font-bold text-white mb-4" id="ingModalTitle">Novo Insumo</h3>
-                <input type="hidden" id="ingId">
-                <div class="space-y-3">
-                    <div><label class="text-xs text-gray-400">Nome</label><input id="ingName" type="text" class="input-pdv w-full p-2"></div>
-                    <div>
-                        <label class="text-xs text-gray-400">Tipo / Seção</label>
-                        <select id="ingType" class="input-pdv w-full p-2">${typeOptions}</select>
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div><label class="text-xs text-gray-400">Unidade</label><select id="ingUnit" class="input-pdv w-full p-2"><option value="un">Unidade (un)</option><option value="kg">Quilo (kg)</option><option value="l">Litro (l)</option><option value="g">Grama (g)</option><option value="ml">Mililitro (ml)</option></select></div>
-                        <div><label class="text-xs text-gray-400">Custo (R$)</label><input id="ingCost" type="number" step="0.01" class="input-pdv w-full p-2"></div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div><label class="text-xs text-gray-400">Estoque Atual</label><input id="ingStock" type="number" step="0.001" class="input-pdv w-full p-2"></div>
-                        <div><label class="text-xs text-gray-400">Estoque Mínimo</label><input id="ingMinStock" type="number" step="0.001" class="input-pdv w-full p-2"></div>
-                    </div>
+        <div id="expenseForm" class="hidden bg-gray-800 p-4 rounded-xl border border-gray-700 mb-6">
+            <h5 class="text-pink-400 font-bold mb-3">Lançamento de Saída</h5>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                <input type="text" id="expDesc" placeholder="Descrição (Ex: Aluguel, Luz...)" class="input-pdv w-full p-2">
+                <div class="flex space-x-2">
+                    <input type="number" id="expAmount" placeholder="Valor (R$)" class="input-pdv w-full p-2" step="0.01">
+                    <input type="date" id="expDate" class="input-pdv w-full p-2" value="${new Date().toISOString().split('T')[0]}">
                 </div>
-                <div class="flex justify-end space-x-2 mt-6">
-                    <button onclick="document.getElementById('ingredientFormModal').style.display='none'" class="px-4 py-2 bg-gray-600 text-white rounded">Cancelar</button>
-                    <button onclick="window.saveIngredient()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold">Salvar</button>
-                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                <select id="expCat" class="input-pdv w-full p-2">
+                    <option value="Operacional">Operacional</option>
+                    <option value="CMV">CMV (Mercadoria)</option>
+                    <option value="Pessoal">Pessoal / RH</option>
+                    <option value="Ocupação">Ocupação (Aluguel/Luz)</option>
+                    <option value="Marketing">Marketing</option>
+                    <option value="Outros">Outros</option>
+                </select>
+                <select id="expSupplier" class="input-pdv w-full p-2">${supplierOptions}</select>
+                <input type="text" id="expDocNumber" placeholder="Nº Nota/Recibo" class="input-pdv w-full p-2">
+            </div>
+            <div class="mb-3"><input type="text" id="expBarcode" placeholder="Código de Barras (Opcional)" class="input-pdv w-full p-2"></div>
+            <div class="flex justify-end space-x-3">
+                <button onclick="window.toggleExpenseForm()" class="px-4 py-2 bg-gray-600 text-white rounded">Cancelar</button>
+                <button id="btnSaveExpense" onclick="window.saveExpense()" class="px-4 py-2 bg-green-600 text-white rounded font-bold">Salvar Lançamento</button>
             </div>
         </div>
 
-        <div id="supplierFormModal" class="absolute inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
-            <div class="bg-gray-800 p-6 rounded-lg w-full max-w-md border border-gray-600">
-                <h3 class="text-lg font-bold text-white mb-4" id="supModalTitle">Novo Fornecedor</h3>
-                <input type="hidden" id="supId">
-                <div class="space-y-3">
-                    <div><label class="text-xs text-gray-400">Nome / Empresa</label><input id="supName" type="text" class="input-pdv w-full p-2"></div>
-                    <div><label class="text-xs text-gray-400">Telefone</label><input id="supPhone" type="text" class="input-pdv w-full p-2"></div>
-                    <div><label class="text-xs text-gray-400">CNPJ / CPF</label><input id="supDoc" type="text" class="input-pdv w-full p-2"></div>
-                    <div><label class="text-xs text-gray-400">Categoria Principal</label><select id="supCategory" class="input-pdv w-full p-2">${catOptionsSup}</select></div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-gray-300">
+                <thead class="bg-gray-900 text-xs uppercase font-bold text-gray-500"><tr><th class="p-3">Data</th><th class="p-3">Descrição</th><th class="p-3">Categoria</th><th class="p-3 text-right">Valor</th><th class="p-3 text-center">Ações</th></tr></thead>
+                <tbody id="expensesTableBody" class="divide-y divide-gray-700"></tbody>
+            </table>
+        </div>
+    `;
+
+    try {
+        const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'expenses'), orderBy('date', 'desc'), limit(50));
+        const snap = await getDocs(q);
+        const tbody = document.getElementById('expensesTableBody');
+        
+        if (snap.empty) { tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500">Nenhum lançamento.</td></tr>'; return; }
+
+        tbody.innerHTML = snap.docs.map(d => {
+            const i = d.data();
+            let dateStr = '--';
+            if(i.date) {
+               const parts = i.date.split('-');
+               if(parts.length === 3) dateStr = `${parts[2]}/${parts[1]}/${parts[0]}`;
+            }
+            return `
+                <tr class="hover:bg-gray-700/50">
+                    <td class="p-3 text-sm">${dateStr}</td>
+                    <td class="p-3 font-bold text-white">${i.description} <span class="text-xs text-gray-500 block">${i.supplierName || ''}</span></td>
+                    <td class="p-3 text-xs"><span class="bg-gray-700 px-2 py-1 rounded text-gray-300">${i.category || 'Geral'}</span></td>
+                    <td class="p-3 text-right text-red-400 font-bold">- ${formatCurrency(i.amount)}</td>
+                    <td class="p-3 text-center"><button onclick="window.deleteExpense('${d.id}')" class="text-red-500 hover:text-red-300"><i class="fas fa-trash"></i></button></td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch(e) { container.innerHTML += `<p class="text-red-400 mt-4">Erro ao carregar lista: ${e.message}</p>`; }
+}
+
+async function renderDRE(container) {
+    const now = new Date();
+    const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+    container.innerHTML = `
+        <div class="text-center text-gray-400 p-10">
+            <i class="fas fa-chart-line text-5xl mb-4 text-gray-600"></i>
+            <h2 class="text-2xl font-bold text-white mb-2">DRE Gerencial</h2>
+            <p>Competência: <span class="text-pink-400 font-bold">${startMonth.toLocaleDateString('pt-BR', {month:'long', year:'numeric'})}</span></p>
+            <div id="dreReportContainer" class="mt-8 max-w-2xl mx-auto bg-gray-800 p-6 rounded-xl border border-gray-700 text-left">
+                <p class="text-center italic text-gray-500">Calculando resultados...</p>
+            </div>
+        </div>
+    `;
+
+    try {
+const qSales = query(getTablesCollectionRef(), where('status', '==', 'closed'), where('closedAt', '>=', Timestamp.fromDate(startMonth)), where('closedAt', '<=', Timestamp.fromDate(endMonth)));
+        const snapSales = await getDocs(qSales);
+        let grossRevenue = 0;
+        snapSales.forEach(d => { 
+             const t = d.data();
+             (t.payments || []).forEach(p => { 
+                 const v = parseFloat(p.value.toString().replace(/[^\d,.-]/g,'').replace(',','.')); 
+                 if(!isNaN(v)) grossRevenue += v; 
+             });
+        });
+
+        // 2. Despesas
+        const startStr = startMonth.toISOString().split('T')[0];
+        const endStr = endMonth.toISOString().split('T')[0];
+        const qExp = query(collection(db, 'artifacts', appId, 'public', 'data', 'expenses'), where('date', '>=', startStr), where('date', '<=', endStr));
+        const snapExp = await getDocs(qExp);
+        let totalExp = 0;
+        const expByCat = {};
+        
+        snapExp.forEach(d => {
+            const e = d.data();
+            const val = parseFloat(e.amount) || 0;
+            totalExp += val;
+            expByCat[e.category || 'Outros'] = (expByCat[e.category || 'Outros'] || 0) + val;
+        });
+
+        const netResult = grossRevenue - totalExp;
+        const resultColor = netResult >= 0 ? 'text-green-400' : 'text-red-400';
+
+        const dreHTML = `
+            <div class="flex justify-between items-center mb-2 text-lg">
+                <span class="font-bold text-blue-300">(=) Receita Bruta</span>
+                <span class="font-bold text-blue-300">${formatCurrency(grossRevenue)}</span>
+            </div>
+            <div class="border-b border-gray-600 my-2"></div>
+            ${Object.entries(expByCat).map(([cat, val]) => `
+                <div class="flex justify-between items-center mb-1 text-sm text-gray-300">
+                    <span>(-) ${cat}</span>
+                    <span class="text-red-300">- ${formatCurrency(val)}</span>
                 </div>
-                <div class="flex justify-end space-x-2 mt-6">
-                    <button onclick="document.getElementById('supplierFormModal').style.display='none'" class="px-4 py-2 bg-gray-600 text-white rounded">Cancelar</button>
-                    <button onclick="window.saveSupplier()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold">Salvar</button>
+            `).join('')}
+            <div class="flex justify-between items-center mb-1 text-sm font-bold text-gray-400 mt-2">
+                <span>(-) Total Despesas</span>
+                <span class="text-red-400">- ${formatCurrency(totalExp)}</span>
+            </div>
+            <div class="border-t-2 border-gray-500 my-4 pt-2">
+                <div class="flex justify-between items-center text-xl">
+                    <span class="font-bold text-white">(=) Resultado Líquido</span>
+                    <span class="font-bold ${resultColor}">${formatCurrency(netResult)}</span>
                 </div>
+            </div>
+        `;
+        
+        document.getElementById('dreReportContainer').innerHTML = dreHTML;
+
+    } catch(e) {
+        document.getElementById('dreReportContainer').innerHTML = `<p class="text-red-400">Erro cálculo: ${e.message}</p>`;
+    }
+}
+
+// =================================================================
+//           8. CRM DE CLIENTES (UI)
+// =================================================================
+
+async function renderCustomerCrmModal() {
+    if (!managerModal) return;
+
+    managerModal.innerHTML = `
+        <div class="bg-dark-card border border-gray-600 w-full max-w-5xl h-[90vh] flex flex-col rounded-xl shadow-2xl overflow-hidden">
+            <div class="flex justify-between items-center p-6 border-b border-gray-700 bg-gray-800">
+                <div><h3 class="text-2xl font-bold text-blue-400"><i class="fas fa-users mr-2"></i>CRM de Clientes</h3><p class="text-sm text-gray-400">Histórico e Fidelidade</p></div>
+                <button class="text-gray-400 hover:text-white text-3xl leading-none" onclick="document.getElementById('managerModal').style.display='none'">&times;</button>
+            </div>
+            <div class="p-4 bg-dark-bg border-b border-gray-700">
+                <input type="text" id="crmSearch" placeholder="Buscar por Nome, CPF ou Telefone..." class="input-pdv w-full p-3 rounded-lg border border-gray-600 focus:border-blue-500 text-white bg-dark-input">
+            </div>
+            <div id="crmContent" class="flex-grow overflow-y-auto p-6 bg-dark-bg custom-scrollbar">
+                <div class="flex justify-center py-10"><i class="fas fa-spinner fa-spin text-blue-500 text-3xl"></i></div>
             </div>
         </div>`;
     
     managerModal.style.display = 'flex';
-    managerModal.classList.remove('p-4'); managerModal.classList.add('p-0', 'md:p-4');
-    await switchHubTab(activeTab);
-}
+    managerModal.classList.remove('p-4'); 
+    managerModal.classList.add('p-0', 'md:p-4');
 
-async function switchHubTab(tab) {
-    currentHubTab = tab;
-    const contentDiv = document.getElementById('hubContent');
-    const toolbarDiv = document.getElementById('productActionsToolbar');
+    await loadCrmCustomers();
     
-    document.querySelectorAll('.hub-tab-btn').forEach(btn => {
-        const iconClass = tab === 'products' ? 'fa-hamburger' : 
-                          tab === 'ingredients' ? 'fa-cubes' : 
-                          tab === 'shoppingList' ? 'fa-shopping-cart' : 
-                          tab === 'suppliers' ? 'fa-truck' : 'fa-tags';
-        
-        if(btn.innerHTML.includes(iconClass)) {
-            btn.classList.add('bg-indigo-600', 'text-white'); btn.classList.remove('bg-dark-input', 'text-gray-300');
-        } else {
-            btn.classList.remove('bg-indigo-600', 'text-white'); btn.classList.add('bg-dark-input', 'text-gray-300');
-        }
-    });
-
-    contentDiv.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500"><i class="fas fa-spinner fa-spin text-3xl"></i></div>';
-    toolbarDiv.innerHTML = '';
-
-    if (tab === 'products') await renderProductListConfig(contentDiv, toolbarDiv);
-    else if (tab === 'ingredients') await renderIngredientsScreen(contentDiv, toolbarDiv);
-    else if (tab === 'suppliers') await renderSuppliersScreen(contentDiv, toolbarDiv);
-    else if (tab === 'shoppingList') await renderShoppingListScreen(contentDiv, toolbarDiv);
-    else if (tab === 'categories') await renderCategoryManagement(contentDiv);
-}
-
-async function renderIngredientsScreen(container, toolbar) {
-    toolbar.innerHTML = `<div class="flex-grow text-white font-bold text-sm items-center flex gap-2"><i class="fas fa-cubes text-blue-400"></i> Cadastro de Insumos</div><button onclick="document.getElementById('ingredientFormModal').style.display='flex'; document.getElementById('ingId').value=''; document.getElementById('ingName').value=''; document.getElementById('ingModalTitle').textContent='Novo Insumo';" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg flex items-center"><i class="fas fa-plus mr-2"></i> Novo</button>`;
-    const ingredients = await fetchIngredients();
-    if (ingredients.length === 0) { container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-500"><i class="fas fa-box-open text-4xl mb-3"></i><p>Nenhum insumo cadastrado.</p></div>'; return; }
-    
-    container.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">${ingredients.map(ing => `
-        <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex justify-between items-center group hover:border-gray-500 transition">
-            <div>
-                <h4 class="font-bold text-white text-base">${ing.name}</h4>
-                <div class="flex items-center gap-2 mt-1">
-                    <span class="text-[10px] uppercase px-2 py-0.5 bg-gray-700 text-gray-300 rounded">${ing.type || 'Geral'}</span>
-                </div>
-                <p class="text-xs text-gray-400 mt-1">Custo: R$ ${ing.cost.toFixed(2)} / ${ing.unit}</p>
-            </div>
-            <div class="text-right">
-                <div class="font-mono text-xl font-bold ${ing.stock <= ing.minStock ? 'text-red-500' : 'text-green-400'}">${ing.stock} <span class="text-xs text-gray-500">${ing.unit}</span></div>
-                <div class="flex space-x-2 mt-2 justify-end opacity-50 group-hover:opacity-100 transition">
-                    <button onclick="window.editIngredient('${ing.id}')" class="text-blue-400 hover:text-white"><i class="fas fa-edit"></i></button>
-                    <button onclick="window.deleteIngredient('${ing.id}')" class="text-red-400 hover:text-white"><i class="fas fa-trash"></i></button>
-                </div>
-            </div>
-        </div>`).join('')}</div>`;
-}
-
-async function renderSuppliersScreen(container, toolbar) {
-    toolbar.innerHTML = `<div class="flex-grow text-white font-bold text-sm items-center flex gap-2"><i class="fas fa-truck text-orange-400"></i> Base de Fornecedores</div><button onclick="document.getElementById('supplierFormModal').style.display='flex'; document.getElementById('supId').value=''; document.getElementById('supName').value=''; document.getElementById('supModalTitle').textContent='Novo Fornecedor';" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg flex items-center"><i class="fas fa-plus mr-2"></i> Novo</button>`;
-    const suppliers = await fetchSuppliers();
-    if (suppliers.length === 0) { container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-500"><i class="fas fa-users-slash text-4xl mb-3"></i><p>Nenhum fornecedor cadastrado.</p></div>'; return; }
-    
-    container.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">${suppliers.map(sup => `
-        <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex justify-between items-center group hover:border-gray-500 transition">
-            <div>
-                <h4 class="font-bold text-white text-base">${sup.name}</h4>
-                <p class="text-xs text-gray-400 mt-1"><i class="fas fa-phone mr-1"></i> ${sup.phone || 'Sem telefone'}</p>
-                <span class="text-[10px] uppercase px-2 py-0.5 bg-gray-700 text-gray-300 rounded mt-2 inline-block">${sup.category || 'Geral'}</span>
-            </div>
-            <div class="flex flex-col space-y-2 items-end">
-                <button onclick="window.editSupplier('${sup.id}')" class="text-blue-400 hover:text-white p-2"><i class="fas fa-edit"></i></button>
-                <button onclick="window.deleteSupplier('${sup.id}')" class="text-red-400 hover:text-white p-2"><i class="fas fa-trash"></i></button>
-            </div>
-        </div>`).join('')}</div>`;
-}
-
-async function renderShoppingListScreen(container, toolbar) {
-    toolbar.innerHTML = `<div class="flex-grow text-white font-bold text-sm items-center flex gap-2"><i class="fas fa-shopping-cart text-yellow-400"></i> Itens para Reposição</div><button onclick="window.print()" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow flex items-center"><i class="fas fa-print mr-2"></i> Imprimir</button>`;
-    const ingredients = await fetchIngredients();
-    // Agrupa por tipo para facilitar a compra
-    const shoppingList = ingredients.filter(ing => ing.stock <= ing.minStock).sort((a,b) => (a.type || '').localeCompare(b.type || ''));
-    
-    if (shoppingList.length === 0) { container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-green-500"><i class="fas fa-check-circle text-5xl mb-3"></i><p class="text-lg">Tudo certo! Estoque em dia.</p></div>'; return; }
-    
-    container.innerHTML = `<div class="bg-gray-800 rounded-xl overflow-hidden border border-gray-700"><table class="w-full text-left text-gray-300"><thead class="bg-gray-900 text-xs uppercase font-bold text-gray-500"><tr><th class="p-4">Item</th><th class="p-4">Tipo</th><th class="p-4 text-center">Estoque Atual</th><th class="p-4 text-center">Mínimo</th><th class="p-4 text-right">Comprar</th></tr></thead><tbody class="divide-y divide-gray-700">${shoppingList.map(ing => { 
-        const needed = (ing.minStock - ing.stock); 
-        const buyQty = needed > 0 ? needed : ing.minStock; 
-        return `<tr class="hover:bg-gray-700/50">
-            <td class="p-4 font-bold text-white">${ing.name}</td>
-            <td class="p-4 text-xs text-gray-400 uppercase">${ing.type || '-'}</td>
-            <td class="p-4 text-center text-red-400 font-mono">${ing.stock} ${ing.unit}</td>
-            <td class="p-4 text-center text-gray-500 font-mono">${ing.minStock} ${ing.unit}</td>
-            <td class="p-4 text-right font-bold text-yellow-400 text-lg"><i class="fas fa-arrow-right text-xs mr-2"></i> ${buyQty.toFixed(2)} ${ing.unit}</td>
-        </tr>`; 
-    }).join('')}</tbody></table></div>`;
-}
-
-async function renderProductListConfig(contentDiv, toolbarDiv) {
-    const categories = getCategories();
-    let catOptions = '<option value="all">Todas as Categorias</option>';
-    if (categories.length > 0) categories.forEach(c => { if(c.id !== 'all' && c.id !== 'top10') catOptions += `<option value="${c.id}">${c.name}</option>`; });
-    toolbarDiv.innerHTML = `<div class="flex items-center space-x-2 w-full md:w-auto"><select id="hubCategoryFilter" class="bg-gray-700 text-white text-sm py-3 px-3 rounded-lg border border-gray-600 w-full md:w-[200px]">${catOptions}</select></div><div class="flex items-center space-x-2 w-full md:w-auto"><div class="relative w-full md:w-64"><input type="text" id="hubSearchInput" placeholder="Pesquisar..." class="bg-dark-input text-white text-sm py-3 pl-3 pr-8 rounded-lg border border-gray-600 w-full focus:border-indigo-500"><i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i></div><button id="hubNewProductBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition shadow-lg flex items-center justify-center whitespace-nowrap"><i class="fas fa-plus mr-2"></i> <span class="hidden md:inline">Novo</span></button></div>`;
-    document.getElementById('hubNewProductBtn').onclick = () => renderProductForm(null, contentDiv, () => renderProductList(contentDiv, 'all', '', false));
-    const catSelect = document.getElementById('hubCategoryFilter');
-    const searchInput = document.getElementById('hubSearchInput');
-    catSelect.onchange = (e) => { hubCategory = e.target.value; hubPage = 1; renderProductList(contentDiv, hubCategory, hubSearch, false); };
-    searchInput.oninput = (e) => { hubSearch = e.target.value; hubPage = 1; clearTimeout(hubSearchTimeout); hubSearchTimeout = setTimeout(() => { renderProductList(contentDiv, hubCategory, hubSearch, false); }, 600); };
-    await fetchWooCommerceProducts(1, '', 'all', false);
-    await renderProductList(contentDiv, 'all', '', false);
-}
-
-async function renderProductList(container, catFilter, searchTerm, append = false) {
-    if (!append) { container.innerHTML = '<div class="flex justify-center py-10"><i class="fas fa-spinner fa-spin text-3xl text-gray-500"></i></div>'; await fetchWooCommerceProducts(1, searchTerm, catFilter, false); }
-    let products = getProducts();
-    if (products.length === 0 && !append) { container.innerHTML = '<p class="text-center text-gray-500 py-10">Nenhum produto encontrado.</p>'; return; }
-    const listHtml = products.map(p => `<div class="flex justify-between items-center bg-dark-input p-3 rounded-lg mb-2 border border-gray-700 hover:border-gray-500 transition group"><div class="flex items-center space-x-3 overflow-hidden"><div class="w-12 h-12 rounded-lg bg-gray-800 overflow-hidden flex-shrink-0 border border-gray-600"><img src="${p.image || 'https://placehold.co/50'}" class="w-full h-full object-cover"></div><div class="min-w-0"><h4 class="font-bold text-white text-sm truncate">${p.name}</h4><div class="flex items-center text-xs space-x-2 mt-1"><span class="text-green-400 font-mono bg-green-900/30 px-1.5 py-0.5 rounded">${formatCurrency(p.price)}</span>${p.status !== 'publish' ? '<span class="text-yellow-500 bg-yellow-900/30 px-1.5 rounded">Oculto</span>' : ''}</div></div></div><div class="flex space-x-2 flex-shrink-0"><button class="bg-indigo-600 hover:bg-indigo-500 text-white p-2 rounded-lg text-sm btn-edit-prod shadow" data-id="${p.id}"><i class="fas fa-edit"></i></button><button class="bg-red-600 hover:bg-red-500 text-white p-2 rounded-lg text-sm btn-del-prod shadow" data-id="${p.id}"><i class="fas fa-trash"></i></button></div></div>`).join('');
-    const loadMoreHtml = `<div class="pt-4 pb-20 text-center" id="hubLoadMoreContainer"><button id="hubLoadMoreBtn" class="w-full md:w-1/2 py-3 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition font-bold border border-gray-600">Carregar Mais Produtos</button></div>`;
-    if (!append) container.innerHTML = `<div class="pb-4">${listHtml}</div>${loadMoreHtml}`; else { const loadMoreContainer = document.getElementById('hubLoadMoreContainer'); if(loadMoreContainer) loadMoreContainer.remove(); container.insertAdjacentHTML('beforeend', `<div class="pb-4">${listHtml}</div>${loadMoreHtml}`); }
-    container.querySelectorAll('.btn-edit-prod').forEach(btn => btn.onclick = () => { const prod = products.find(p => p.id == btn.dataset.id); renderProductForm(prod, container, () => renderProductList(container, catFilter, searchTerm, false)); });
-    container.querySelectorAll('.btn-del-prod').forEach(btn => btn.onclick = () => handleDeleteProduct(btn.dataset.id, () => renderProductList(container, catFilter, searchTerm, false)));
-    const loadBtn = document.getElementById('hubLoadMoreBtn');
-    if (loadBtn) { loadBtn.onclick = async () => { toggleLoading(loadBtn, true, 'Carregando...'); hubPage++; const newItems = await fetchWooCommerceProducts(hubPage, searchTerm, catFilter, true); if (newItems.length === 0) { showToast("Não há mais produtos.", false); loadBtn.style.display = 'none'; } else { renderProductList(container, catFilter, searchTerm, true); } }; }
-}
-
-async function renderProductForm(product = null, container, onBack) {
-    const isEdit = !!product;
-    const sectorsSnap = await getDocs(query(getSectorsCollectionRef(), where('type', '==', 'production'), orderBy('name')));
-    const sectors = sectorsSnap.docs.map(d => d.data().name);
-    currentComposition = product?.composition || [];
-    
-    container.innerHTML = `
-        <div class="w-full h-full flex flex-col bg-dark-bg">
-            <div class="flex justify-between items-center mb-2 pb-2 border-b border-gray-700 flex-shrink-0"><h4 class="text-lg font-bold text-white flex items-center truncate"><i class="fas ${isEdit ? 'fa-edit text-blue-400' : 'fa-plus-circle text-green-400'} mr-2"></i>${isEdit ? 'Editar' : 'Novo'}</h4><button id="btnBackToHub" class="text-gray-400 hover:text-white flex items-center text-sm py-2 px-3 rounded bg-gray-800"><i class="fas fa-arrow-left mr-1"></i> Voltar</button></div>
-            <div class="flex space-x-2 mb-4 overflow-x-auto pb-2 flex-shrink-0"><button class="form-tab-btn px-4 py-2 rounded-full bg-indigo-600 text-white text-sm font-bold whitespace-nowrap" data-target="tab-general">Geral</button><button class="form-tab-btn px-4 py-2 rounded-full bg-gray-700 text-gray-300 text-sm font-bold whitespace-nowrap" data-target="tab-hierarchy">Hierarquia</button><button class="form-tab-btn px-4 py-2 rounded-full bg-gray-700 text-gray-300 text-sm font-bold whitespace-nowrap" data-target="tab-recipe">Ficha Técnica</button><button class="form-tab-btn px-4 py-2 rounded-full bg-gray-700 text-gray-300 text-sm font-bold whitespace-nowrap" data-target="tab-obs">Obs</button></div>
-            <div class="flex-grow overflow-y-auto custom-scrollbar pr-1 pb-20">
-                <form id="productForm" class="space-y-6">
-                    <div id="tab-general" class="form-tab-content"><div class="space-y-4"><div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Nome</label><input type="text" id="prodName" class="input-pdv w-full text-lg p-3" value="${product?.name || ''}" required></div><div class="grid grid-cols-2 gap-4"><div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Preço</label><input type="number" id="prodPrice" class="input-pdv w-full font-mono text-green-400 font-bold text-lg p-3" step="0.01" value="${product?.price || ''}" required></div><div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Promo</label><input type="number" id="prodRegPrice" class="input-pdv w-full font-mono text-yellow-400 text-lg p-3" step="0.01" value="${product?.regular_price || ''}"></div></div><div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Status</label><select id="prodStatus" class="input-pdv w-full p-3"><option value="publish" ${product?.status === 'publish' ? 'selected' : ''}>Publicado</option><option value="draft" ${product?.status === 'draft' ? 'selected' : ''}>Rascunho</option></select></div><div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">URL Imagem</label><input type="text" id="prodImg" class="input-pdv w-full text-xs p-3" value="${product?.image || ''}"></div><div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Descrição</label><textarea id="prodDesc" class="input-pdv w-full text-sm p-3" rows="3">${product?.description || ''}</textarea></div></div></div>
-                    <div id="tab-hierarchy" class="form-tab-content hidden"><div class="bg-gray-800 p-4 rounded-xl border border-gray-600 space-y-4"><p class="text-sm text-pumpkin font-bold uppercase mb-2">Classificação</p><div><label class="text-xs text-gray-500 block mb-1">1. Grupo</label><select id="catLvl1" class="input-pdv w-full text-sm p-2"></select></div><div><label class="text-xs text-gray-500 block mb-1">2. Subgrupo</label><select id="catLvl2" class="input-pdv w-full text-sm p-2" disabled></select></div><div><label class="text-xs text-gray-500 block mb-1">3. Categoria</label><select id="catLvl3" class="input-pdv w-full text-sm p-2" disabled></select></div><div><label class="text-xs text-gray-500 block mb-1">4. Variação</label><select id="catLvl4" class="input-pdv w-full text-sm p-2" disabled></select></div><input type="hidden" id="finalCategoryId" value="${product?.categoryId || ''}"><div class="pt-4 border-t border-gray-600"><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Setor de Produção (KDS)</label><select id="prodSector" class="input-pdv w-full p-2">${sectors.length > 0 ? sectors.map(s => `<option value="${s}">${s}</option>`).join('') : '<option value="cozinha">Cozinha</option>'}</select></div></div></div>
-                    <div id="tab-recipe" class="form-tab-content hidden space-y-6">
-                         <div class="bg-gray-800 p-4 rounded-xl border border-gray-600"><label class="flex items-center space-x-3 cursor-pointer mb-4"><input type="checkbox" id="isComposite" class="w-6 h-6 rounded bg-dark-input border-gray-500 text-indigo-600" ${product?.composition?.length > 0 ? 'checked' : ''}><span class="text-white font-bold">Este Produto Consome Insumos?</span></label><div id="compositionContainer" class="space-y-2 ${product?.composition?.length > 0 ? '' : 'hidden'}"><h5 class="text-xs font-bold text-gray-500 uppercase mb-2">Ingredientes (Baixa Automática)</h5><div id="compositionList"></div><button type="button" onclick="window.addCompItem()" class="text-xs bg-indigo-600 text-white px-3 py-2 rounded w-full font-bold mt-2 hover:bg-indigo-500"><i class="fas fa-plus mr-2"></i> Adicionar Ingrediente</button></div></div>
-                    </div>
-                    <div id="tab-obs" class="form-tab-content hidden"><div class="bg-gray-800 p-4 rounded-xl border border-gray-600"><p class="text-sm text-gray-300 mb-3">Obs. específicas.</p><div class="flex space-x-2 mb-4"><input type="text" id="newQuickObsInput" placeholder="Nova obs..." class="input-pdv w-full text-sm p-3"><button type="button" id="btnAddQuickObs" class="bg-green-600 text-white px-4 rounded-lg font-bold"><i class="fas fa-plus"></i></button></div><div id="quickObsListSmall" class="grid grid-cols-2 gap-2"></div></div></div>
-                </form>
-            </div>
-            <div class="border-t border-gray-700 pt-4 mt-auto flex space-x-3 flex-shrink-0 bg-dark-bg"><button type="button" id="btnCancelForm" class="flex-1 py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-bold transition">Cancelar</button><button type="button" id="btnSaveProduct" class="flex-1 py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition shadow-lg flex items-center justify-center"><i class="fas fa-save mr-2"></i> Salvar</button></div>
-        </div>`;
-
-    await fetchIngredients();
-    updateCompListUI();
-
-    const tabBtns = container.querySelectorAll('.form-tab-btn');
-    const tabContents = container.querySelectorAll('.form-tab-content');
-    tabBtns.forEach(btn => {
-        btn.onclick = (e) => {
-            e.preventDefault();
-            tabBtns.forEach(b => { b.classList.remove('bg-indigo-600', 'text-white'); b.classList.add('bg-gray-700', 'text-gray-300'); });
-            btn.classList.remove('bg-gray-700', 'text-gray-300'); btn.classList.add('bg-indigo-600', 'text-white');
-            tabContents.forEach(c => c.classList.add('hidden'));
-            document.getElementById(btn.dataset.target).classList.remove('hidden');
-        };
-    });
-
-    const compCheck = document.getElementById('isComposite');
-    const compContainer = document.getElementById('compositionContainer');
-    compCheck.onchange = () => { if(compCheck.checked) compContainer.classList.remove('hidden'); else compContainer.classList.add('hidden'); };
-
-    const allCats = getCategories();
-    const selects = [document.getElementById('catLvl1'), document.getElementById('catLvl2'), document.getElementById('catLvl3'), document.getElementById('catLvl4')];
-    const finalIdInput = document.getElementById('finalCategoryId');
-    const populateSelect = (levelIndex, parentId) => {
-        const select = selects[levelIndex];
-        select.innerHTML = '<option value="">Selecione...</option>';
-        const children = allCats.filter(c => c.parent == parentId && c.id !== 'all' && c.id !== 'top10');
-        if (children.length === 0) { select.disabled = true; } else { select.disabled = false; children.forEach(c => { const opt = document.createElement('option'); opt.value = c.id; opt.textContent = c.name; select.appendChild(opt); }); }
-        for(let i = levelIndex + 1; i < 4; i++) { selects[i].innerHTML = ''; selects[i].disabled = true; }
-    };
-    selects.forEach((sel, idx) => {
-        sel.onchange = () => {
-            const selectedVal = sel.value;
-            if (selectedVal) { finalIdInput.value = selectedVal; if (idx < 3) populateSelect(idx + 1, selectedVal); } 
-            else { finalIdInput.value = idx > 0 ? selects[idx-1].value : ''; for(let i = idx + 1; i < 4; i++) { selects[i].innerHTML = ''; selects[i].disabled = true; } }
-        };
-    });
-    const getPath = (id) => { let path = []; let curr = allCats.find(c => c.id == id); while(curr) { path.unshift(curr.id); curr = allCats.find(c => c.id == curr.parent); } return path; };
-    const currentPath = product?.categoryId ? getPath(product.categoryId) : [];
-    populateSelect(0, 0);
-    if (currentPath.length > 0) {
-        selects[0].value = currentPath[0]; populateSelect(1, currentPath[0]);
-        if (currentPath[1]) { selects[1].value = currentPath[1]; populateSelect(2, currentPath[1]); }
-        if (currentPath[2]) { selects[2].value = currentPath[2]; populateSelect(3, currentPath[2]); }
-        if (currentPath[3]) { selects[3].value = currentPath[3]; }
-    }
-    
-    const loadMiniObs = async () => {
-        const containerObs = document.getElementById('quickObsListSmall');
-        const snap = await getDocs(query(getQuickObsCollectionRef(), orderBy('text')));
-        containerObs.innerHTML = snap.docs.map(d => `<div class="flex justify-between items-center bg-dark-bg p-2 rounded border border-gray-600"><span class="text-xs text-gray-300">${d.data().text}</span><button type="button" class="text-red-400 hover:text-white text-xs btn-del-mini-obs" data-id="${d.id}">&times;</button></div>`).join('');
-        containerObs.querySelectorAll('.btn-del-mini-obs').forEach(btn => btn.onclick = async () => { if(confirm("Apagar?")) { await deleteDoc(doc(getQuickObsCollectionRef(), btn.dataset.id)); loadMiniObs(); }});
-    };
-    document.getElementById('btnAddQuickObs').onclick = async () => {
-        const val = document.getElementById('newQuickObsInput').value.trim();
-        if(val) { await setDoc(doc(getQuickObsCollectionRef(), val.toLowerCase().replace(/[^a-z0-9]/g, '')), { text: val }); document.getElementById('newQuickObsInput').value = ''; loadMiniObs(); }
-    };
-    loadMiniObs();
-
-    document.getElementById('btnSaveProduct').onclick = async () => {
-        const submitBtn = document.getElementById('btnSaveProduct');
-        toggleLoading(submitBtn, true, 'Salvando...');
-        const selectedCatId = finalIdInput.value; 
-        const isComposite = document.getElementById('isComposite').checked;
-        const validComposition = isComposite ? currentComposition.filter(i => i.id && i.qty > 0) : [];
-        const data = {
-            name: document.getElementById('prodName').value,
-            regular_price: document.getElementById('prodRegPrice').value,
-            price: document.getElementById('prodPrice').value,
-            categories: selectedCatId ? [{ id: parseInt(selectedCatId) }] : [],
-            status: document.getElementById('prodStatus').value,
-            description: document.getElementById('prodDesc').value,
-            images: [{ src: document.getElementById('prodImg').value }],
-            meta_data: [ { key: 'sector', value: document.getElementById('prodSector').value }, { key: 'is_composite', value: isComposite ? 'yes' : 'no' } ],
-            composition: validComposition 
-        };
-        try { 
-            if(isEdit) await updateWooProduct(product.id, data); else await createWooProduct(data); 
-            showToast("Produto salvo!", false); 
-            if(onBack) onBack(); 
-        } catch(e) { showToast(e.message, true); } finally { toggleLoading(submitBtn, false); }
-    };
-    document.getElementById('btnBackToHub').onclick = onBack;
-    document.getElementById('btnCancelForm').onclick = onBack;
-}
-
-// --- CATEGORIAS ---
-async function renderCategoryManagement(container) {
-    container.innerHTML = `<div class="flex justify-between items-center mb-4"><h4 class="font-bold text-white">Categorias</h4><button onclick="window.renderCategoryForm()" class="bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 transition"><i class="fas fa-plus"></i> Nova</button></div><div id="catList" class="space-y-2"></div>`;
-    const list = document.getElementById('catList');
-    const cats = await getCategories(); 
-    const realCats = cats.filter(c => c.id !== 'all' && c.id !== 'top10');
-    list.innerHTML = realCats.map(c => `<div class="flex justify-between items-center bg-dark-input p-3 rounded border border-gray-700"><span class="text-white">${c.name}</span><div class="space-x-2"><button onclick="window.renderCategoryForm('${c.id}')" class="text-blue-400"><i class="fas fa-edit"></i></button><button onclick="if(confirm('Excluir?')) { window.deleteWooCategory(${c.id}).then(() => window.switchHubTab('categories')); }" class="text-red-400"><i class="fas fa-trash"></i></button></div></div>`).join('');
-}
-
-async function renderCategoryForm(catId = null) {
-    const isEdit = !!catId;
-    const cats = getCategories();
-    const cat = isEdit ? cats.find(c => c.id == catId) : null;
-    const contentDiv = document.getElementById('hubContent');
-    const options = cats.filter(c => c.id !== 'all' && c.id !== 'top10' && c.id != catId).map(c => `<option value="${c.id}" ${cat?.parent == c.id ? 'selected' : ''}>${c.name}</option>`).join('');
-    contentDiv.innerHTML = `<div class="max-w-lg mx-auto bg-gray-800 p-6 rounded-lg border border-gray-700 mt-4"><h4 class="text-lg font-bold text-white mb-4">${isEdit ? 'Editar' : 'Nova'} Categoria</h4><div class="mb-4"><label class="block text-sm text-gray-400 mb-1">Nome</label><input type="text" id="catName" class="input-pdv w-full p-2" value="${cat?.name || ''}"></div><div class="mb-6"><label class="block text-sm text-gray-400 mb-1">Pai</label><select id="catParent" class="input-pdv w-full p-2"><option value="0">Nenhuma (Raiz)</option>${options}</select></div><div class="flex justify-end space-x-3"><button onclick="window.switchHubTab('categories')" class="px-4 py-2 bg-gray-600 text-white rounded">Cancelar</button><button id="btnSaveCat" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Salvar</button></div></div>`;
-    document.getElementById('btnSaveCat').onclick = async () => {
-        const btn = document.getElementById('btnSaveCat');
-        const name = document.getElementById('catName').value;
-        const parent = document.getElementById('catParent').value;
-        if(!name) return alert('Nome obrigatório');
-        toggleLoading(btn, true);
-        try {
-            if(isEdit) await updateWooCategory(catId, { name, parent: parseInt(parent) });
-            else await createWooCategory(name, parseInt(parent));
-            showToast('Salvo!');
-            switchHubTab('categories');
-        } catch(e) { console.error(e); showToast('Erro ao salvar category', true); toggleLoading(btn, false); }
-    };
-}
-
-function getFormattedCategoryOptions(categories, selectedId) {
-    return categories.filter(c => c.id !== 'all' && c.id !== 'top10').map(c => `<option value="${c.id}" ${c.id == selectedId ? 'selected' : ''}>${c.name}</option>`).join('');
-}
-
-// =================================================================
-//           4. INICIALIZAÇÃO (INIT)
-// =================================================================
-
-export const initManagerController = () => {
-    if (managerControllerInitialized) return;
-    console.log("[ManagerController] Inicializando...");
-    
-    managerModal = document.getElementById('managerModal');
-    if (managerModal) {
-        managerModal.addEventListener('click', (e) => { if (e.target === managerModal) managerModal.style.display = 'none'; });
-    }
-
-    // Vouchers
-    voucherManagementModal = document.getElementById('voucherManagementModal'); 
-    voucherListContainer = document.getElementById('voucherListContainer');     
-    voucherForm = document.getElementById('voucherForm');                       
-    const voucherBtn = document.getElementById('showVoucherFormBtn');
-    
-    if(voucherBtn) {
-        voucherBtn.addEventListener('click', () => { 
-            if(voucherForm) { voucherForm.style.display = 'block'; voucherForm.reset(); }
+    const searchInput = document.getElementById('crmSearch');
+    if(searchInput) {
+        searchInput.addEventListener('keyup', (e) => {
+            loadCrmCustomers(e.target.value);
         });
     }
-    if (voucherForm) {
-        voucherForm.addEventListener('submit', handleSaveVoucher);
-    }
+}
 
-    // Relatórios
-    reportDateInput = document.getElementById('reportDateInput');
-    if (reportDateInput) {
-        reportDateInput.valueAsDate = new Date(); 
-        reportDateInput.addEventListener('change', () => {
-            loadReports();
-            if (managerModal && managerModal.style.display === 'flex' && document.getElementById('finContent')) {
-                switchFinTab(currentFinTab);
-            }
-        });
-    }
-    
-    const refreshBtn = document.getElementById('refreshReportBtn');
-    if(refreshBtn) refreshBtn.addEventListener('click', loadReports);
+async function loadCrmCustomers(searchTerm = '') {
+    const container = document.getElementById('crmContent');
+    if(!container) return;
 
-    // Abas de Relatório
-    const tabBtns = document.querySelectorAll('.report-tab-btn');
-    tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            tabBtns.forEach(b => { b.classList.remove('bg-indigo-600', 'text-white'); b.classList.add('bg-dark-input', 'text-gray-300'); });
-            btn.classList.remove('bg-dark-input', 'text-gray-300'); btn.classList.add('bg-indigo-600', 'text-white');
-            document.querySelectorAll('.report-content').forEach(c => c.classList.add('hidden'));
-            const targetContent = document.getElementById(`tab-${btn.dataset.tab}`);
-            if(targetContent) targetContent.classList.remove('hidden');
-            if (btn.dataset.tab === 'sales') fetchMonthlyPerformance();
-            loadReports();
-        });
-    });
-
-    // --- ATRIBUIÇÕES GLOBAIS (SEGURANÇA) ---
-    window.handleSaveVoucher = handleSaveVoucher;
-    window.handleDeleteVoucher = handleDeleteVoucher;
-    window.toggleExpenseForm = toggleExpenseForm;
-    window.saveExpense = saveExpense;
-    window.deleteExpense = deleteExpense;
-    window.handleForceCloseShift = handleForceCloseShift;
-    window.openShiftDetails = openShiftDetails;
-    window.deleteSector = deleteSector;
-    window.setMonthlyGoal = setMonthlyGoal;
-    window.runDateComparison = runDateComparison;
-    window.switchFinTab = switchFinTab;
-    window.openReportPanel = openReportPanel;
-    
-    // Hub / Estoque / Fornecedores
-    window.renderProductHub = renderProductHub; 
-    window.renderCategoryManagement = renderCategoryManagement; 
-    window.renderCategoryForm = renderCategoryForm; 
-    window.switchHubTab = switchHubTab;
-    window.handleDeleteProduct = handleDeleteProduct;
-    window.handleImportXML = handleImportXML;
-    window.toggleCheckItem = toggleCheckItem;
-    window.confirmStockEntry = confirmStockEntry;
-    window.openManualStockEntry = openManualStockEntry;
-    window.saveManualStockEntry = saveManualStockEntry;
-    
-    window.saveSupplier = saveSupplier;
-    window.deleteSupplier = deleteSupplier;
-    
-    window.renderSectorManagementModal = renderSectorManagementModal;
-    window.switchAuxTab = switchAuxTab;
-    window.handleDeleteProduct = handleDeleteProduct;
-    window.handleImportXML = handleImportXML;
-    window.toggleCheckItem = toggleCheckItem;
-    window.confirmStockEntry = confirmStockEntry;
-    window.openManualStockEntry = openManualStockEntry;
-    window.saveManualStockEntry = saveManualStockEntry;
-    
-    window.saveSupplier = saveSupplier;
-    window.deleteSupplier = deleteSupplier;
-    
-    window.renderSectorManagementModal = renderSectorManagementModal;
-    window.switchAuxTab = switchAuxTab;
-    window.saveAuxiliary = saveAuxiliary;
-    window.deleteAuxiliary = deleteAuxiliary;
-    
-    window.addCompItem = addCompItem;
-    window.removeCompItem = removeCompItem;
-    window.updateCompItem = updateCompItem;
-    window.saveIngredient = saveIngredient;
-    window.deleteIngredient = deleteIngredient;
-
-    // RH
-    window.renderHRPanel = renderHRPanel;
-    window.switchHRTab = switchHRTab;
-    window.generatePayslip = generatePayslip;
-    window.renderExternalRecruitmentModal = renderExternalRecruitmentModal;
-    
-    // Helpers UI (Injetados)
-    window.editIngredient = (id) => {
-        const ing = ingredientsCache.find(i => i.id === id);
-        if (!ing) return;
-        document.getElementById('ingId').value = ing.id;
-        document.getElementById('ingName').value = ing.name;
-        document.getElementById('ingUnit').value = ing.unit;
-        document.getElementById('ingCost').value = ing.cost;
-        document.getElementById('ingStock').value = ing.stock;
-        document.getElementById('ingMinStock').value = ing.minStock;
-        if(document.getElementById('ingType')) document.getElementById('ingType').value = ing.type || '';
-        document.getElementById('ingModalTitle').textContent = 'Editar Insumo';
-        document.getElementById('ingredientFormModal').style.display = 'flex';
-    };
-
-    window.editSupplier = (id) => {
-        const sup = suppliersCache.find(s => s.id === id);
-        if (!sup) return;
-        document.getElementById('supId').value = sup.id;
-        document.getElementById('supName').value = sup.name;
-        document.getElementById('supPhone').value = sup.phone || '';
-        document.getElementById('supDoc').value = sup.document || '';
-        document.getElementById('supCategory').value = sup.category || '';
-        document.getElementById('supModalTitle').textContent = 'Editar Fornecedor';
-        document.getElementById('supplierFormModal').style.display = 'flex';
-    };
-
-    managerControllerInitialized = true;
-};
-
-// =================================================================
-//           5. ROTEADOR DE AÇÕES (EXPORTADO)
-// =================================================================
-
-export const handleGerencialAction = (action, payload) => {
-    if (managerModal) managerModal.style.display = 'none';
-
-    switch (action) {
-        case 'openWaiterReg': openUserManagementModal(); break;
-        case 'openProductHub': renderProductHub(payload || 'products'); break;
-        case 'openProductManagement': renderProductHub('products'); break;
-        case 'openVoucherManagement': openVoucherManagementModal(); break;
-        case 'openSectorManagement': renderSectorManagementModal(); break;
-        case 'openCustomerCRM': renderCustomerCrmModal(); break;
-        case 'openWooSync': handleSyncAction(); break;
-        case 'openCashManagementReport': openReportPanel('active-shifts'); break;
-        case 'openFinancialModule': renderFinancialModule(); break;
-        case 'closeDay': handleCloseDay(); break;
-        case 'exportCsv': exportSalesToCSV(); break;
-        case 'openHRPanel': renderHRPanel(); break; // RH adicionado
-        default: console.warn(`Ação não mapeada: ${action}`);
-    }
-};
-
-// =================================================================
-//           6. MÓDULOS DE RENDERIZAÇÃO (UI)
-// =================================================================
-
-// --- HUB ---
-async function renderProductHub(activeTab = 'products') {
-    if (!managerModal) return;
-    await fetchIngredients(); 
-    
-    // Buscamos as opções dinâmicas antes de renderizar
-    let typeOptions = '<option value="">Geral</option>';
     try {
-        const snapTypes = await getDocs(query(getCollectionRef('ingredient_types'), orderBy('name')));
-        snapTypes.forEach(doc => { typeOptions += `<option value="${doc.data().name}">${doc.data().name}</option>`; });
-    } catch(e) { console.error("Erro ao carregar tipos insumo", e); }
-
-    let catOptionsSup = '<option value="">Geral</option>';
-    try {
-        const snapCats = await getDocs(query(getCollectionRef('supplier_categories'), orderBy('name')));
-        snapCats.forEach(doc => { catOptionsSup += `<option value="${doc.data().name}">${doc.data().name}</option>`; });
-    } catch(e) { console.error("Erro ao carregar cat fornecedor", e); }
-
-    managerModal.innerHTML = `
-        <div class="bg-dark-card border-0 md:border md:border-dark-border w-full h-full md:h-[90vh] md:max-w-6xl flex flex-col md:rounded-xl shadow-2xl overflow-hidden">
-            <div class="flex justify-between items-center p-4 md:p-6 border-b border-gray-700 bg-gray-800 flex-shrink-0">
-                <div><h3 class="text-xl md:text-2xl font-bold text-white">Gestão de Produtos</h3><p class="text-xs md:text-sm text-gray-400">Cardápio, Estoque e Fornecedores</p></div>
-                <button class="text-gray-400 hover:text-white text-3xl leading-none p-2" onclick="document.getElementById('managerModal').style.display='none'">&times;</button>
-            </div>
-            <div class="flex items-center space-x-2 p-3 bg-dark-bg border-b border-gray-700 overflow-x-auto flex-shrink-0 whitespace-nowrap">
-                <button class="hub-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition flex items-center" onclick="window.switchHubTab('products')"><i class="fas fa-hamburger mr-2"></i> Produtos</button>
-                <button class="hub-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition flex items-center" onclick="window.switchHubTab('ingredients')"><i class="fas fa-cubes mr-2"></i> Insumos</button>
-                <button class="hub-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition flex items-center" onclick="window.switchHubTab('suppliers')"><i class="fas fa-truck mr-2"></i> Fornecedores</button>
-                <button class="hub-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition flex items-center" onclick="window.switchHubTab('shoppingList')"><i class="fas fa-shopping-cart mr-2"></i> Compras</button>
-                <button class="hub-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition flex items-center" onclick="window.switchHubTab('categories')"><i class="fas fa-tags mr-2"></i> Categorias</button>
-            </div>
-            <div id="productActionsToolbar" class="flex flex-col md:flex-row items-stretch md:items-center justify-between p-3 bg-dark-bg border-b border-gray-700 gap-3 flex-shrink-0"></div>
-            <div id="hubContent" class="flex-grow overflow-y-auto p-3 md:p-4 custom-scrollbar bg-dark-bg relative"><div class="flex items-center justify-center h-full text-gray-500"><i class="fas fa-spinner fa-spin text-3xl"></i></div></div>
-        </div>
+        const q = query(getCustomersCollectionRef(), orderBy('name'), limit(100));
+        const snapshot = await getDocs(q);
         
-        <div id="ingredientFormModal" class="absolute inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
-            <div class="bg-gray-800 p-6 rounded-lg w-full max-w-md border border-gray-600">
-                <h3 class="text-lg font-bold text-white mb-4" id="ingModalTitle">Novo Insumo</h3>
-                <input type="hidden" id="ingId">
-                <div class="space-y-3">
-                    <div><label class="text-xs text-gray-400">Nome</label><input id="ingName" type="text" class="input-pdv w-full p-2"></div>
-                    <div>
-                        <label class="text-xs text-gray-400">Tipo / Seção</label>
-                        <select id="ingType" class="input-pdv w-full p-2">${typeOptions}</select>
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div><label class="text-xs text-gray-400">Unidade</label><select id="ingUnit" class="input-pdv w-full p-2"><option value="un">Unidade (un)</option><option value="kg">Quilo (kg)</option><option value="l">Litro (l)</option><option value="g">Grama (g)</option><option value="ml">Mililitro (ml)</option></select></div>
-                        <div><label class="text-xs text-gray-400">Custo (R$)</label><input id="ingCost" type="number" step="0.01" class="input-pdv w-full p-2"></div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div><label class="text-xs text-gray-400">Estoque Atual</label><input id="ingStock" type="number" step="0.001" class="input-pdv w-full p-2"></div>
-                        <div><label class="text-xs text-gray-400">Estoque Mínimo</label><input id="ingMinStock" type="number" step="0.001" class="input-pdv w-full p-2"></div>
-                    </div>
-                </div>
-                <div class="flex justify-end space-x-2 mt-6">
-                    <button onclick="document.getElementById('ingredientFormModal').style.display='none'" class="px-4 py-2 bg-gray-600 text-white rounded">Cancelar</button>
-                    <button onclick="window.saveIngredient()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold">Salvar</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="supplierFormModal" class="absolute inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
-            <div class="bg-gray-800 p-6 rounded-lg w-full max-w-md border border-gray-600">
-                <h3 class="text-lg font-bold text-white mb-4" id="supModalTitle">Novo Fornecedor</h3>
-                <input type="hidden" id="supId">
-                <div class="space-y-3">
-                    <div><label class="text-xs text-gray-400">Nome / Empresa</label><input id="supName" type="text" class="input-pdv w-full p-2"></div>
-                    <div><label class="text-xs text-gray-400">Telefone</label><input id="supPhone" type="text" class="input-pdv w-full p-2"></div>
-                    <div><label class="text-xs text-gray-400">CNPJ / CPF</label><input id="supDoc" type="text" class="input-pdv w-full p-2"></div>
-                    <div><label class="text-xs text-gray-400">Categoria Principal</label><select id="supCategory" class="input-pdv w-full p-2">${catOptionsSup}</select></div>
-                </div>
-                <div class="flex justify-end space-x-2 mt-6">
-                    <button onclick="document.getElementById('supplierFormModal').style.display='none'" class="px-4 py-2 bg-gray-600 text-white rounded">Cancelar</button>
-                    <button onclick="window.saveSupplier()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold">Salvar</button>
-                </div>
-            </div>
-        </div>`;
-    
-    managerModal.style.display = 'flex';
-    managerModal.classList.remove('p-4'); managerModal.classList.add('p-0', 'md:p-4');
-    await switchHubTab(activeTab);
-}
-
-async function switchHubTab(tab) {
-    currentHubTab = tab;
-    const contentDiv = document.getElementById('hubContent');
-    const toolbarDiv = document.getElementById('productActionsToolbar');
-    
-    document.querySelectorAll('.hub-tab-btn').forEach(btn => {
-        const iconClass = tab === 'products' ? 'fa-hamburger' : 
-                          tab === 'ingredients' ? 'fa-cubes' : 
-                          tab === 'shoppingList' ? 'fa-shopping-cart' : 
-                          tab === 'suppliers' ? 'fa-truck' : 'fa-tags';
-        
-        if(btn.innerHTML.includes(iconClass)) {
-            btn.classList.add('bg-indigo-600', 'text-white'); btn.classList.remove('bg-dark-input', 'text-gray-300');
-        } else {
-            btn.classList.remove('bg-indigo-600', 'text-white'); btn.classList.add('bg-dark-input', 'text-gray-300');
+        if (snapshot.empty) {
+            container.innerHTML = '<p class="text-gray-500 text-center italic mt-10">Nenhum cliente cadastrado.</p>';
+            return;
         }
-    });
 
-    contentDiv.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500"><i class="fas fa-spinner fa-spin text-3xl"></i></div>';
-    toolbarDiv.innerHTML = '';
+        const customers = [];
+        snapshot.forEach(doc => customers.push({id: doc.id, ...doc.data()}));
 
-    if (tab === 'products') await renderProductListConfig(contentDiv, toolbarDiv);
-    else if (tab === 'ingredients') await renderIngredientsScreen(contentDiv, toolbarDiv);
-    else if (tab === 'suppliers') await renderSuppliersScreen(contentDiv, toolbarDiv);
-    else if (tab === 'shoppingList') await renderShoppingListScreen(contentDiv, toolbarDiv);
-    else if (tab === 'categories') await renderCategoryManagement(contentDiv);
-}
+        const term = searchTerm.toLowerCase();
+        const filtered = searchTerm ? customers.filter(c => 
+            (c.name && c.name.toLowerCase().includes(term)) ||
+            (c.cpf && c.cpf.includes(term)) || 
+            (c.phone && c.phone.includes(term)) ||
+            (c.email && c.email.toLowerCase().includes(term))
+        ) : customers;
 
-async function renderIngredientsScreen(container, toolbar) {
-    toolbar.innerHTML = `<div class="flex-grow text-white font-bold text-sm items-center flex gap-2"><i class="fas fa-cubes text-blue-400"></i> Cadastro de Insumos</div><button onclick="document.getElementById('ingredientFormModal').style.display='flex'; document.getElementById('ingId').value=''; document.getElementById('ingName').value=''; document.getElementById('ingModalTitle').textContent='Novo Insumo';" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg flex items-center"><i class="fas fa-plus mr-2"></i> Novo</button>`;
-    const ingredients = await fetchIngredients();
-    if (ingredients.length === 0) { container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-500"><i class="fas fa-box-open text-4xl mb-3"></i><p>Nenhum insumo cadastrado.</p></div>'; return; }
-    
-    container.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">${ingredients.map(ing => `
-        <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex justify-between items-center group hover:border-gray-500 transition">
-            <div>
-                <h4 class="font-bold text-white text-base">${ing.name}</h4>
-                <div class="flex items-center gap-2 mt-1">
-                    <span class="text-[10px] uppercase px-2 py-0.5 bg-gray-700 text-gray-300 rounded">${ing.type || 'Geral'}</span>
-                </div>
-                <p class="text-xs text-gray-400 mt-1">Custo: R$ ${ing.cost.toFixed(2)} / ${ing.unit}</p>
-            </div>
-            <div class="text-right">
-                <div class="font-mono text-xl font-bold ${ing.stock <= ing.minStock ? 'text-red-500' : 'text-green-400'}">${ing.stock} <span class="text-xs text-gray-500">${ing.unit}</span></div>
-                <div class="flex space-x-2 mt-2 justify-end opacity-50 group-hover:opacity-100 transition">
-                    <button onclick="window.editIngredient('${ing.id}')" class="text-blue-400 hover:text-white"><i class="fas fa-edit"></i></button>
-                    <button onclick="window.deleteIngredient('${ing.id}')" class="text-red-400 hover:text-white"><i class="fas fa-trash"></i></button>
-                </div>
-            </div>
-        </div>`).join('')}</div>`;
-}
+        if(filtered.length === 0) {
+            container.innerHTML = '<p class="text-gray-500 text-center italic mt-10">Nenhum cliente encontrado com esse termo.</p>';
+            return;
+        }
 
-async function renderSuppliersScreen(container, toolbar) {
-    toolbar.innerHTML = `<div class="flex-grow text-white font-bold text-sm items-center flex gap-2"><i class="fas fa-truck text-orange-400"></i> Base de Fornecedores</div><button onclick="document.getElementById('supplierFormModal').style.display='flex'; document.getElementById('supId').value=''; document.getElementById('supName').value=''; document.getElementById('supModalTitle').textContent='Novo Fornecedor';" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg flex items-center"><i class="fas fa-plus mr-2"></i> Novo</button>`;
-    const suppliers = await fetchSuppliers();
-    if (suppliers.length === 0) { container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-500"><i class="fas fa-users-slash text-4xl mb-3"></i><p>Nenhum fornecedor cadastrado.</p></div>'; return; }
-    
-    container.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">${suppliers.map(sup => `
-        <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex justify-between items-center group hover:border-gray-500 transition">
-            <div>
-                <h4 class="font-bold text-white text-base">${sup.name}</h4>
-                <p class="text-xs text-gray-400 mt-1"><i class="fas fa-phone mr-1"></i> ${sup.phone || 'Sem telefone'}</p>
-                <span class="text-[10px] uppercase px-2 py-0.5 bg-gray-700 text-gray-300 rounded mt-2 inline-block">${sup.category || 'Geral'}</span>
-            </div>
-            <div class="flex flex-col space-y-2 items-end">
-                <button onclick="window.editSupplier('${sup.id}')" class="text-blue-400 hover:text-white p-2"><i class="fas fa-edit"></i></button>
-                <button onclick="window.deleteSupplier('${sup.id}')" class="text-red-400 hover:text-white p-2"><i class="fas fa-trash"></i></button>
-            </div>
-        </div>`).join('')}</div>`;
-}
-
-async function renderShoppingListScreen(container, toolbar) {
-    toolbar.innerHTML = `<div class="flex-grow text-white font-bold text-sm items-center flex gap-2"><i class="fas fa-shopping-cart text-yellow-400"></i> Itens para Reposição</div><button onclick="window.print()" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow flex items-center"><i class="fas fa-print mr-2"></i> Imprimir</button>`;
-    const ingredients = await fetchIngredients();
-    // Agrupa por tipo para facilitar a compra
-    const shoppingList = ingredients.filter(ing => ing.stock <= ing.minStock).sort((a,b) => (a.type || '').localeCompare(b.type || ''));
-    
-    if (shoppingList.length === 0) { container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-green-500"><i class="fas fa-check-circle text-5xl mb-3"></i><p class="text-lg">Tudo certo! Estoque em dia.</p></div>'; return; }
-    
-    container.innerHTML = `<div class="bg-gray-800 rounded-xl overflow-hidden border border-gray-700"><table class="w-full text-left text-gray-300"><thead class="bg-gray-900 text-xs uppercase font-bold text-gray-500"><tr><th class="p-4">Item</th><th class="p-4">Tipo</th><th class="p-4 text-center">Estoque Atual</th><th class="p-4 text-center">Mínimo</th><th class="p-4 text-right">Comprar</th></tr></thead><tbody class="divide-y divide-gray-700">${shoppingList.map(ing => { 
-        const needed = (ing.minStock - ing.stock); 
-        const buyQty = needed > 0 ? needed : ing.minStock; 
-        return `<tr class="hover:bg-gray-700/50">
-            <td class="p-4 font-bold text-white">${ing.name}</td>
-            <td class="p-4 text-xs text-gray-400 uppercase">${ing.type || '-'}</td>
-            <td class="p-4 text-center text-red-400 font-mono">${ing.stock} ${ing.unit}</td>
-            <td class="p-4 text-center text-gray-500 font-mono">${ing.minStock} ${ing.unit}</td>
-            <td class="p-4 text-right font-bold text-yellow-400 text-lg"><i class="fas fa-arrow-right text-xs mr-2"></i> ${buyQty.toFixed(2)} ${ing.unit}</td>
-        </tr>`; 
-    }).join('')}</tbody></table></div>`;
-}
-
-async function renderProductListConfig(contentDiv, toolbarDiv) {
-    const categories = getCategories();
-    let catOptions = '<option value="all">Todas as Categorias</option>';
-    if (categories.length > 0) categories.forEach(c => { if(c.id !== 'all' && c.id !== 'top10') catOptions += `<option value="${c.id}">${c.name}</option>`; });
-    toolbarDiv.innerHTML = `<div class="flex items-center space-x-2 w-full md:w-auto"><select id="hubCategoryFilter" class="bg-gray-700 text-white text-sm py-3 px-3 rounded-lg border border-gray-600 w-full md:w-[200px]">${catOptions}</select></div><div class="flex items-center space-x-2 w-full md:w-auto"><div class="relative w-full md:w-64"><input type="text" id="hubSearchInput" placeholder="Pesquisar..." class="bg-dark-input text-white text-sm py-3 pl-3 pr-8 rounded-lg border border-gray-600 w-full focus:border-indigo-500"><i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i></div><button id="hubNewProductBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition shadow-lg flex items-center justify-center whitespace-nowrap"><i class="fas fa-plus mr-2"></i> <span class="hidden md:inline">Novo</span></button></div>`;
-    document.getElementById('hubNewProductBtn').onclick = () => renderProductForm(null, contentDiv, () => renderProductList(contentDiv, 'all', '', false));
-    const catSelect = document.getElementById('hubCategoryFilter');
-    const searchInput = document.getElementById('hubSearchInput');
-    catSelect.onchange = (e) => { hubCategory = e.target.value; hubPage = 1; renderProductList(contentDiv, hubCategory, hubSearch, false); };
-    searchInput.oninput = (e) => { hubSearch = e.target.value; hubPage = 1; clearTimeout(hubSearchTimeout); hubSearchTimeout = setTimeout(() => { renderProductList(contentDiv, hubCategory, hubSearch, false); }, 600); };
-    await fetchWooCommerceProducts(1, '', 'all', false);
-    await renderProductList(contentDiv, 'all', '', false);
-}
-
-async function renderProductList(container, catFilter, searchTerm, append = false) {
-    if (!append) { container.innerHTML = '<div class="flex justify-center py-10"><i class="fas fa-spinner fa-spin text-3xl text-gray-500"></i></div>'; await fetchWooCommerceProducts(1, searchTerm, catFilter, false); }
-    let products = getProducts();
-    if (products.length === 0 && !append) { container.innerHTML = '<p class="text-center text-gray-500 py-10">Nenhum produto encontrado.</p>'; return; }
-    const listHtml = products.map(p => `<div class="flex justify-between items-center bg-dark-input p-3 rounded-lg mb-2 border border-gray-700 hover:border-gray-500 transition group"><div class="flex items-center space-x-3 overflow-hidden"><div class="w-12 h-12 rounded-lg bg-gray-800 overflow-hidden flex-shrink-0 border border-gray-600"><img src="${p.image || 'https://placehold.co/50'}" class="w-full h-full object-cover"></div><div class="min-w-0"><h4 class="font-bold text-white text-sm truncate">${p.name}</h4><div class="flex items-center text-xs space-x-2 mt-1"><span class="text-green-400 font-mono bg-green-900/30 px-1.5 py-0.5 rounded">${formatCurrency(p.price)}</span>${p.status !== 'publish' ? '<span class="text-yellow-500 bg-yellow-900/30 px-1.5 rounded">Oculto</span>' : ''}</div></div></div><div class="flex space-x-2 flex-shrink-0"><button class="bg-indigo-600 hover:bg-indigo-500 text-white p-2 rounded-lg text-sm btn-edit-prod shadow" data-id="${p.id}"><i class="fas fa-edit"></i></button><button class="bg-red-600 hover:bg-red-500 text-white p-2 rounded-lg text-sm btn-del-prod shadow" data-id="${p.id}"><i class="fas fa-trash"></i></button></div></div>`).join('');
-    const loadMoreHtml = `<div class="pt-4 pb-20 text-center" id="hubLoadMoreContainer"><button id="hubLoadMoreBtn" class="w-full md:w-1/2 py-3 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition font-bold border border-gray-600">Carregar Mais Produtos</button></div>`;
-    if (!append) container.innerHTML = `<div class="pb-4">${listHtml}</div>${loadMoreHtml}`; else { const loadMoreContainer = document.getElementById('hubLoadMoreContainer'); if(loadMoreContainer) loadMoreContainer.remove(); container.insertAdjacentHTML('beforeend', `<div class="pb-4">${listHtml}</div>${loadMoreHtml}`); }
-    container.querySelectorAll('.btn-edit-prod').forEach(btn => btn.onclick = () => { const prod = products.find(p => p.id == btn.dataset.id); renderProductForm(prod, container, () => renderProductList(container, catFilter, searchTerm, false)); });
-    container.querySelectorAll('.btn-del-prod').forEach(btn => btn.onclick = () => handleDeleteProduct(btn.dataset.id, () => renderProductList(container, catFilter, searchTerm, false)));
-    const loadBtn = document.getElementById('hubLoadMoreBtn');
-    if (loadBtn) { loadBtn.onclick = async () => { toggleLoading(loadBtn, true, 'Carregando...'); hubPage++; const newItems = await fetchWooCommerceProducts(hubPage, searchTerm, catFilter, true); if (newItems.length === 0) { showToast("Não há mais produtos.", false); loadBtn.style.display = 'none'; } else { renderProductList(container, catFilter, searchTerm, true); } }; }
-}
-
-async function renderProductForm(product = null, container, onBack) {
-    const isEdit = !!product;
-    const sectorsSnap = await getDocs(query(getSectorsCollectionRef(), where('type', '==', 'production'), orderBy('name')));
-    const sectors = sectorsSnap.docs.map(d => d.data().name);
-    currentComposition = product?.composition || [];
-    
-    container.innerHTML = `
-        <div class="w-full h-full flex flex-col bg-dark-bg">
-            <div class="flex justify-between items-center mb-2 pb-2 border-b border-gray-700 flex-shrink-0"><h4 class="text-lg font-bold text-white flex items-center truncate"><i class="fas ${isEdit ? 'fa-edit text-blue-400' : 'fa-plus-circle text-green-400'} mr-2"></i>${isEdit ? 'Editar' : 'Novo'}</h4><button id="btnBackToHub" class="text-gray-400 hover:text-white flex items-center text-sm py-2 px-3 rounded bg-gray-800"><i class="fas fa-arrow-left mr-1"></i> Voltar</button></div>
-            <div class="flex space-x-2 mb-4 overflow-x-auto pb-2 flex-shrink-0"><button class="form-tab-btn px-4 py-2 rounded-full bg-indigo-600 text-white text-sm font-bold whitespace-nowrap" data-target="tab-general">Geral</button><button class="form-tab-btn px-4 py-2 rounded-full bg-gray-700 text-gray-300 text-sm font-bold whitespace-nowrap" data-target="tab-hierarchy">Hierarquia</button><button class="form-tab-btn px-4 py-2 rounded-full bg-gray-700 text-gray-300 text-sm font-bold whitespace-nowrap" data-target="tab-recipe">Ficha Técnica</button><button class="form-tab-btn px-4 py-2 rounded-full bg-gray-700 text-gray-300 text-sm font-bold whitespace-nowrap" data-target="tab-obs">Obs</button></div>
-            <div class="flex-grow overflow-y-auto custom-scrollbar pr-1 pb-20">
-                <form id="productForm" class="space-y-6">
-                    <div id="tab-general" class="form-tab-content"><div class="space-y-4"><div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Nome</label><input type="text" id="prodName" class="input-pdv w-full text-lg p-3" value="${product?.name || ''}" required></div><div class="grid grid-cols-2 gap-4"><div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Preço</label><input type="number" id="prodPrice" class="input-pdv w-full font-mono text-green-400 font-bold text-lg p-3" step="0.01" value="${product?.price || ''}" required></div><div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Promo</label><input type="number" id="prodRegPrice" class="input-pdv w-full font-mono text-yellow-400 text-lg p-3" step="0.01" value="${product?.regular_price || ''}"></div></div><div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Status</label><select id="prodStatus" class="input-pdv w-full p-3"><option value="publish" ${product?.status === 'publish' ? 'selected' : ''}>Publicado</option><option value="draft" ${product?.status === 'draft' ? 'selected' : ''}>Rascunho</option></select></div><div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">URL Imagem</label><input type="text" id="prodImg" class="input-pdv w-full text-xs p-3" value="${product?.image || ''}"></div><div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Descrição</label><textarea id="prodDesc" class="input-pdv w-full text-sm p-3" rows="3">${product?.description || ''}</textarea></div></div></div>
-                    <div id="tab-hierarchy" class="form-tab-content hidden"><div class="bg-gray-800 p-4 rounded-xl border border-gray-600 space-y-4"><p class="text-sm text-pumpkin font-bold uppercase mb-2">Classificação</p><div><label class="text-xs text-gray-500 block mb-1">1. Grupo</label><select id="catLvl1" class="input-pdv w-full text-sm p-2"></select></div><div><label class="text-xs text-gray-500 block mb-1">2. Subgrupo</label><select id="catLvl2" class="input-pdv w-full text-sm p-2" disabled></select></div><div><label class="text-xs text-gray-500 block mb-1">3. Categoria</label><select id="catLvl3" class="input-pdv w-full text-sm p-2" disabled></select></div><div><label class="text-xs text-gray-500 block mb-1">4. Variação</label><select id="catLvl4" class="input-pdv w-full text-sm p-2" disabled></select></div><input type="hidden" id="finalCategoryId" value="${product?.categoryId || ''}"><div class="pt-4 border-t border-gray-600"><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Setor de Produção (KDS)</label><select id="prodSector" class="input-pdv w-full p-2">${sectors.length > 0 ? sectors.map(s => `<option value="${s}">${s}</option>`).join('') : '<option value="cozinha">Cozinha</option>'}</select></div></div></div>
-                    <div id="tab-recipe" class="form-tab-content hidden space-y-6">
-                         <div class="bg-gray-800 p-4 rounded-xl border border-gray-600"><label class="flex items-center space-x-3 cursor-pointer mb-4"><input type="checkbox" id="isComposite" class="w-6 h-6 rounded bg-dark-input border-gray-500 text-indigo-600" ${product?.composition?.length > 0 ? 'checked' : ''}><span class="text-white font-bold">Este Produto Consome Insumos?</span></label><div id="compositionContainer" class="space-y-2 ${product?.composition?.length > 0 ? '' : 'hidden'}"><h5 class="text-xs font-bold text-gray-500 uppercase mb-2">Ingredientes (Baixa Automática)</h5><div id="compositionList"></div><button type="button" onclick="window.addCompItem()" class="text-xs bg-indigo-600 text-white px-3 py-2 rounded w-full font-bold mt-2 hover:bg-indigo-500"><i class="fas fa-plus mr-2"></i> Adicionar Ingrediente</button></div></div>
+        container.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            ${filtered.map(c => `
+                <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 hover:border-blue-500 transition relative group">
+                    <div class="flex items-center space-x-3 mb-3">
+                        <div class="w-12 h-12 rounded-full bg-blue-900/30 text-blue-400 flex items-center justify-center text-xl font-bold border border-blue-500/30">
+                            ${c.name ? c.name.charAt(0).toUpperCase() : '?'}
+                        </div>
+                        <div class="min-w-0">
+                            <h4 class="font-bold text-white truncate text-lg">${c.name || 'Cliente Sem Nome'}</h4>
+                            <p class="text-xs text-gray-400 truncate">${c.email || 'Sem e-mail'}</p>
+                        </div>
                     </div>
-                    <div id="tab-obs" class="form-tab-content hidden"><div class="bg-gray-800 p-4 rounded-xl border border-gray-600"><p class="text-sm text-gray-300 mb-3">Obs. específicas.</p><div class="flex space-x-2 mb-4"><input type="text" id="newQuickObsInput" placeholder="Nova obs..." class="input-pdv w-full text-sm p-3"><button type="button" id="btnAddQuickObs" class="bg-green-600 text-white px-4 rounded-lg font-bold"><i class="fas fa-plus"></i></button></div><div id="quickObsListSmall" class="grid grid-cols-2 gap-2"></div></div></div>
-                </form>
-            </div>
-            <div class="border-t border-gray-700 pt-4 mt-auto flex space-x-3 flex-shrink-0 bg-dark-bg"><button type="button" id="btnCancelForm" class="flex-1 py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-bold transition">Cancelar</button><button type="button" id="btnSaveProduct" class="flex-1 py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition shadow-lg flex items-center justify-center"><i class="fas fa-save mr-2"></i> Salvar</button></div>
+                    <div class="space-y-2 text-sm text-gray-300 bg-gray-900/50 p-3 rounded-lg">
+                        <p class="flex items-center"><i class="fas fa-id-card w-6 text-gray-500 text-center"></i> ${c.cpf || '<span class="italic opacity-50">Não informado</span>'}</p>
+                        <p class="flex items-center"><i class="fas fa-phone w-6 text-gray-500 text-center"></i> ${c.phone || '<span class="italic opacity-50">Não informado</span>'}</p>
+                    </div>
+                    <div class="pt-3 mt-3 border-t border-gray-700 flex justify-between items-center">
+                        <span class="text-xs uppercase font-bold text-gray-500 tracking-wider">Fidelidade</span>
+                        <div class="flex items-center text-pumpkin font-bold text-lg">
+                            <i class="fas fa-star mr-1 text-xs"></i> ${c.points || c.loyaltyPoints || 0} pts
+                        </div>
+                    </div>
+                </div>
+            `).join('')}
         </div>`;
 
-    await fetchIngredients();
-    updateCompListUI();
-
-    const tabBtns = container.querySelectorAll('.form-tab-btn');
-    const tabContents = container.querySelectorAll('.form-tab-content');
-    tabBtns.forEach(btn => {
-        btn.onclick = (e) => {
-            e.preventDefault();
-            tabBtns.forEach(b => { b.classList.remove('bg-indigo-600', 'text-white'); b.classList.add('bg-gray-700', 'text-gray-300'); });
-            btn.classList.remove('bg-gray-700', 'text-gray-300'); btn.classList.add('bg-indigo-600', 'text-white');
-            tabContents.forEach(c => c.classList.add('hidden'));
-            document.getElementById(btn.dataset.target).classList.remove('hidden');
-        };
-    });
-
-    const compCheck = document.getElementById('isComposite');
-    const compContainer = document.getElementById('compositionContainer');
-    compCheck.onchange = () => { if(compCheck.checked) compContainer.classList.remove('hidden'); else compContainer.classList.add('hidden'); };
-
-    const allCats = getCategories();
-    const selects = [document.getElementById('catLvl1'), document.getElementById('catLvl2'), document.getElementById('catLvl3'), document.getElementById('catLvl4')];
-    const finalIdInput = document.getElementById('finalCategoryId');
-    const populateSelect = (levelIndex, parentId) => {
-        const select = selects[levelIndex];
-        select.innerHTML = '<option value="">Selecione...</option>';
-        const children = allCats.filter(c => c.parent == parentId && c.id !== 'all' && c.id !== 'top10');
-        if (children.length === 0) { select.disabled = true; } else { select.disabled = false; children.forEach(c => { const opt = document.createElement('option'); opt.value = c.id; opt.textContent = c.name; select.appendChild(opt); }); }
-        for(let i = levelIndex + 1; i < 4; i++) { selects[i].innerHTML = ''; selects[i].disabled = true; }
-    };
-    selects.forEach((sel, idx) => {
-        sel.onchange = () => {
-            const selectedVal = sel.value;
-            if (selectedVal) { finalIdInput.value = selectedVal; if (idx < 3) populateSelect(idx + 1, selectedVal); } 
-            else { finalIdInput.value = idx > 0 ? selects[idx-1].value : ''; for(let i = idx + 1; i < 4; i++) { selects[i].innerHTML = ''; selects[i].disabled = true; } }
-        };
-    });
-    const getPath = (id) => { let path = []; let curr = allCats.find(c => c.id == id); while(curr) { path.unshift(curr.id); curr = allCats.find(c => c.id == curr.parent); } return path; };
-    const currentPath = product?.categoryId ? getPath(product.categoryId) : [];
-    populateSelect(0, 0);
-    if (currentPath.length > 0) {
-        selects[0].value = currentPath[0]; populateSelect(1, currentPath[0]);
-        if (currentPath[1]) { selects[1].value = currentPath[1]; populateSelect(2, currentPath[1]); }
-        if (currentPath[2]) { selects[2].value = currentPath[2]; populateSelect(3, currentPath[2]); }
-        if (currentPath[3]) { selects[3].value = currentPath[3]; }
+    } catch (e) {
+        console.error(e);
+        container.innerHTML = `<p class="text-red-400 text-center mt-10">Erro ao carregar clientes: ${e.message}</p>`;
     }
-    
-    const loadMiniObs = async () => {
-        const containerObs = document.getElementById('quickObsListSmall');
-        const snap = await getDocs(query(getQuickObsCollectionRef(), orderBy('text')));
-        containerObs.innerHTML = snap.docs.map(d => `<div class="flex justify-between items-center bg-dark-bg p-2 rounded border border-gray-600"><span class="text-xs text-gray-300">${d.data().text}</span><button type="button" class="text-red-400 hover:text-white text-xs btn-del-mini-obs" data-id="${d.id}">&times;</button></div>`).join('');
-        containerObs.querySelectorAll('.btn-del-mini-obs').forEach(btn => btn.onclick = async () => { if(confirm("Apagar?")) { await deleteDoc(doc(getQuickObsCollectionRef(), btn.dataset.id)); loadMiniObs(); }});
-    };
-    document.getElementById('btnAddQuickObs').onclick = async () => {
-        const val = document.getElementById('newQuickObsInput').value.trim();
-        if(val) { await setDoc(doc(getQuickObsCollectionRef(), val.toLowerCase().replace(/[^a-z0-9]/g, '')), { text: val }); document.getElementById('newQuickObsInput').value = ''; loadMiniObs(); }
-    };
-    loadMiniObs();
-
-    document.getElementById('btnSaveProduct').onclick = async () => {
-        const submitBtn = document.getElementById('btnSaveProduct');
-        toggleLoading(submitBtn, true, 'Salvando...');
-        const selectedCatId = finalIdInput.value; 
-        const isComposite = document.getElementById('isComposite').checked;
-        const validComposition = isComposite ? currentComposition.filter(i => i.id && i.qty > 0) : [];
-        const data = {
-            name: document.getElementById('prodName').value,
-            regular_price: document.getElementById('prodRegPrice').value,
-            price: document.getElementById('prodPrice').value,
-            categories: selectedCatId ? [{ id: parseInt(selectedCatId) }] : [],
-            status: document.getElementById('prodStatus').value,
-            description: document.getElementById('prodDesc').value,
-            images: [{ src: document.getElementById('prodImg').value }],
-            meta_data: [ { key: 'sector', value: document.getElementById('prodSector').value }, { key: 'is_composite', value: isComposite ? 'yes' : 'no' } ],
-            composition: validComposition 
-        };
-        try { 
-            if(isEdit) await updateWooProduct(product.id, data); else await createWooProduct(data); 
-            showToast("Produto salvo!", false); 
-            if(onBack) onBack(); 
-        } catch(e) { showToast(e.message, true); } finally { toggleLoading(submitBtn, false); }
-    };
-    document.getElementById('btnBackToHub').onclick = onBack;
-    document.getElementById('btnCancelForm').onclick = onBack;
-}
-
-// --- CATEGORIAS ---
-async function renderCategoryManagement(container) {
-    container.innerHTML = `<div class="flex justify-between items-center mb-4"><h4 class="font-bold text-white">Categorias</h4><button onclick="window.renderCategoryForm()" class="bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 transition"><i class="fas fa-plus"></i> Nova</button></div><div id="catList" class="space-y-2"></div>`;
-    const list = document.getElementById('catList');
-    const cats = await getCategories(); 
-    const realCats = cats.filter(c => c.id !== 'all' && c.id !== 'top10');
-    list.innerHTML = realCats.map(c => `<div class="flex justify-between items-center bg-dark-input p-3 rounded border border-gray-700"><span class="text-white">${c.name}</span><div class="space-x-2"><button onclick="window.renderCategoryForm('${c.id}')" class="text-blue-400"><i class="fas fa-edit"></i></button><button onclick="if(confirm('Excluir?')) { window.deleteWooCategory(${c.id}).then(() => window.switchHubTab('categories')); }" class="text-red-400"><i class="fas fa-trash"></i></button></div></div>`).join('');
-}
-
-async function renderCategoryForm(catId = null) {
-    const isEdit = !!catId;
-    const cats = getCategories();
-    const cat = isEdit ? cats.find(c => c.id == catId) : null;
-    const contentDiv = document.getElementById('hubContent');
-    const options = cats.filter(c => c.id !== 'all' && c.id !== 'top10' && c.id != catId).map(c => `<option value="${c.id}" ${cat?.parent == c.id ? 'selected' : ''}>${c.name}</option>`).join('');
-    contentDiv.innerHTML = `<div class="max-w-lg mx-auto bg-gray-800 p-6 rounded-lg border border-gray-700 mt-4"><h4 class="text-lg font-bold text-white mb-4">${isEdit ? 'Editar' : 'Nova'} Categoria</h4><div class="mb-4"><label class="block text-sm text-gray-400 mb-1">Nome</label><input type="text" id="catName" class="input-pdv w-full p-2" value="${cat?.name || ''}"></div><div class="mb-6"><label class="block text-sm text-gray-400 mb-1">Pai</label><select id="catParent" class="input-pdv w-full p-2"><option value="0">Nenhuma (Raiz)</option>${options}</select></div><div class="flex justify-end space-x-3"><button onclick="window.switchHubTab('categories')" class="px-4 py-2 bg-gray-600 text-white rounded">Cancelar</button><button id="btnSaveCat" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Salvar</button></div></div>`;
-    document.getElementById('btnSaveCat').onclick = async () => {
-        const btn = document.getElementById('btnSaveCat');
-        const name = document.getElementById('catName').value;
-        const parent = document.getElementById('catParent').value;
-        if(!name) return alert('Nome obrigatório');
-        toggleLoading(btn, true);
-        try {
-            if(isEdit) await updateWooCategory(catId, { name, parent: parseInt(parent) });
-            else await createWooCategory(name, parseInt(parent));
-            showToast('Salvo!');
-            switchHubTab('categories');
-        } catch(e) { console.error(e); showToast('Erro ao salvar category', true); toggleLoading(btn, false); }
-    };
-}
-
-function getFormattedCategoryOptions(categories, selectedId) {
-    return categories.filter(c => c.id !== 'all' && c.id !== 'top10').map(c => `<option value="${c.id}" ${c.id == selectedId ? 'selected' : ''}>${c.name}</option>`).join('');
 }
