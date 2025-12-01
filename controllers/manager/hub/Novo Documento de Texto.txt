@@ -1,0 +1,109 @@
+// --- CONTROLLERS/MANAGER/HUB/MANAGERCONTROLLER.JS ---
+
+// 1. IMPORTAÇÃO DOS MÓDULOS
+// Note o "../modules/" para sair da pasta 'hub' e entrar em 'modules'
+import * as DeliveryMgr from '../modules/deliveryManager.js';
+import * as ProductMgr from '../modules/productManager.js'; 
+// import * as FinanceMgr from '../modules/financeManager.js';
+// import * as TeamMgr from '../modules/teamManager.js';
+
+let isInitialized = false;
+let managerModal = null; 
+
+export const initManagerController = () => {
+    if (isInitialized) return;
+    
+    console.log("[ManagerHub] Inicializando Hub de Gestão (Estrutura v2)...");
+    managerModal = document.getElementById('managerModal');
+
+    // Inicializa os módulos
+    try {
+        if(DeliveryMgr?.init) DeliveryMgr.init();
+        if(ProductMgr?.init) ProductMgr.init();
+        // if(FinanceMgr?.init) FinanceMgr.init();
+    } catch (error) {
+        console.error("[ManagerHub] Erro fatal ao inicializar módulos:", error);
+    }
+
+    setupGlobalRoutes();
+    isInitialized = true;
+};
+
+const setupGlobalRoutes = () => {
+    // A. Roteador de Módulos (Cards do Painel)
+    window.openManagerModule = (moduleName) => {
+        console.log(`[ManagerHub] Abrindo: ${moduleName}`);
+        
+        switch(moduleName) {
+            case 'delivery': alert("Configurações de Delivery (Em Breve)"); break;
+
+            case 'products':
+                if(ProductMgr?.open) ProductMgr.open(); 
+                else alert("Erro: Módulo de Produtos não carregado.");
+                break;
+
+            case 'finance':
+                // FinanceMgr.open();
+                alert("Módulo FINANCEIRO: Aguardando 'financeManager.js'");
+                break;
+
+            case 'team':
+                // TeamMgr.open();
+                alert("Módulo RH: Aguardando 'teamManager.js'");
+                break;
+                
+            case 'crm': alert("Módulo CRM: Em desenvolvimento."); break;
+
+            case 'vouchers':
+                const vModal = document.getElementById('voucherManagementModal');
+                if(vModal) vModal.style.display = 'flex';
+                break;
+
+            case 'sync':
+                 if(ProductMgr?.sync) ProductMgr.sync(); // O Sync geralmente fica no ProductMgr
+                 else alert("Erro ao sincronizar.");
+                 break;
+
+            case 'settings':
+                 if(ProductMgr?.openSettings) ProductMgr.openSettings(); // Config de setores fica com produtos ou settings dedicado
+                 else alert("Configurações indisponíveis.");
+                 break;
+
+            default: console.warn(`[ManagerHub] Módulo desconhecido: ${moduleName}`);
+        }
+    };
+
+    // B. Roteador de Modos de Pedido (Modal Cliente)
+    window.switchOrderMode = (mode) => {
+        if (DeliveryMgr?.switchTab) DeliveryMgr.switchTab(mode);
+    };
+
+    // C. Ações Externas
+    window.renderExternalRecruitmentModal = (type) => {
+        if (type === 'motoboy' && DeliveryMgr?.handleCallMotoboy) {
+            DeliveryMgr.handleCallMotoboy();
+        } else {
+            alert("Módulo de Recrutamento (RH) em migração.");
+        }
+    };
+    
+    // D. Autenticação Gerencial
+    window.openManagerAuthModal = (action) => {
+        const password = prompt("Senha de Gerente:");
+        if (password === "1234") { 
+             const map = {
+                 'openProductHub': 'products',
+                 'openProductManagement': 'products',
+                 'openFinancialModule': 'finance',
+                 'openHRPanel': 'team',
+                 'openCustomerCRM': 'crm',
+                 'openVoucherManagement': 'vouchers',
+                 'openWooSync': 'sync',
+                 'openSectorManagement': 'settings'
+             };
+             window.openManagerModule(map[action] || action);
+        } else {
+            alert("Acesso Negado.");
+        }
+    };
+};

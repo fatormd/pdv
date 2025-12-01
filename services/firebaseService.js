@@ -1,4 +1,4 @@
-// --- SERVICES/FIREBASESERVICE.JS ---
+// --- SERVICES/FIREBASESERVICE.JS (CORRIGIDO) ---
 import { collection, doc, updateDoc, arrayUnion, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // Variáveis globais exportadas (inicializadas no app.js)
@@ -22,20 +22,23 @@ export const initializeFirebase = (database, authentication, appIdentifier, appF
 //               REFERÊNCIAS DE COLEÇÕES (Collection Refs)
 // ==================================================================
 
+// 1. Helper Genérico (ESTA É A FUNÇÃO QUE FALTAVA)
+export const getCollectionRef = (name) => collection(db, 'artifacts', appId, 'public', 'data', name);
+
 // Mesas e Pedidos
-export const getTablesCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'tables');
+export const getTablesCollectionRef = () => getCollectionRef('tables');
 export const getTableDocRef = (tableNumber) => doc(db, 'artifacts', appId, 'public', 'data', 'tables', tableNumber.toString());
 
 // KDS (Kitchen Display System)
-export const getKdsCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'kds_orders');
+export const getKdsCollectionRef = () => getCollectionRef('kds_orders');
 
 // CRM e Clientes
-export const getCustomersCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'customers');
+export const getCustomersCollectionRef = () => getCollectionRef('customers');
 
 // Configurações do Sistema (Vouchers, Obs, Setores)
-export const getQuickObsCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'quick_obs');
-export const getVouchersCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'vouchers');
-export const getSectorsCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'sectors');
+export const getQuickObsCollectionRef = () => getCollectionRef('quick_obs');
+export const getVouchersCollectionRef = () => getCollectionRef('vouchers');
+export const getSectorsCollectionRef = () => getCollectionRef('sectors');
 
 
 // ==================================================================
@@ -65,7 +68,7 @@ export const saveSelectedItemsToFirebase = async (tableId, selectedItems) => {
         await updateDoc(tableRef, {
             selectedItems: selectedItems
         });
-        console.log(`[FirebaseService] Itens da mesa ${tableId} salvos com sucesso.`);
+        // console.log(`[FirebaseService] Itens da mesa ${tableId} salvos.`);
     } catch (e) {
         console.error(`[FirebaseService] Erro ao salvar itens da mesa ${tableId}:`, e);
     }

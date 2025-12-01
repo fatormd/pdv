@@ -1,4 +1,4 @@
-// --- APP.JS (VERSÃO FINAL - CORREÇÃO DE DEPENDÊNCIA CIRCULAR) ---
+// --- APP.JS (VERSÃO ATUALIZADA - ESTRUTURA HUB/MODULES) ---
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -17,7 +17,10 @@ export { showToast };
 import { initPanelController, loadOpenTables, renderTableFilters, openTableMergeModal } from '/controllers/panelController.js';
 import { initOrderController, renderOrderScreen, renderMenu } from '/controllers/orderController.js';
 import { initPaymentController, renderPaymentSummary, handleMassActionRequest, openTableTransferModal, handleMassDeleteConfirmed, executeDeletePayment, handleConfirmTableTransfer } from '/controllers/paymentController.js';
-import { initManagerController, handleGerencialAction } from '/controllers/managerController.js';
+
+// --- ALTERAÇÃO AQUI: Novo caminho do ManagerController (Hub) ---
+import { initManagerController } from '/controllers/manager/hub/managerController.js'; 
+
 import { initUserManagementController, openUserManagementModal } from '/controllers/userManagementController.js';
 import { initCashierController } from '/controllers/cashierController.js';
 import { initKdsController } from '/controllers/kdsController.js';
@@ -328,8 +331,10 @@ window.openManagerAuthModal = (action, payload = null) => {
                 case 'openTableMerge': openTableMergeModal(); break; 
                 case 'deletePayment': executeDeletePayment(payload); break;
                 case 'goToManagerPanel': await goToScreen('managerScreen'); break;
-                case 'exportCsv': handleGerencialAction(action); break;
-                default: handleGerencialAction(action, payload); break;
+                
+                // --- ALTERAÇÃO AQUI: Uso explícito de window.handleGerencialAction ---
+                case 'exportCsv': window.handleGerencialAction(action); break;
+                default: window.handleGerencialAction(action, payload); break;
             }
         } else {
             showToast("Senha incorreta.", true);

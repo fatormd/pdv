@@ -274,25 +274,25 @@
                 
                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-2">
                     
-                    <div class="manager-card content-card p-6 text-center cursor-pointer border border-indigo-500/30 hover:border-indigo-500 hover:bg-dark-card/80 transition duration-200" onclick="window.openManagerAuthModal('openProductHub')"> 
+                    <div class="manager-card content-card p-6 text-center cursor-pointer border border-indigo-500/30 hover:border-indigo-500 hover:bg-dark-card/80 transition duration-200" onclick="window.openManagerModule('products')"> 
                         <i class="fas fa-box-open text-4xl mb-3 text-indigo-400"></i> 
                         <h4 class="font-bold text-xl text-white">Gestão de Produtos</h4> 
                         <p class="text-xs text-gray-400 mt-1">Catálogo, Hierarquia e Estoque</p> 
                     </div>
 
-                    <div class="manager-card content-card p-6 text-center cursor-pointer border border-green-500/30 hover:border-green-500 hover:bg-dark-card/80 transition duration-200" onclick="window.openManagerAuthModal('openCashManagementReport')"> 
+                    <div class="manager-card content-card p-6 text-center cursor-pointer border border-green-500/30 hover:border-green-500 hover:bg-dark-card/80 transition duration-200" onclick="window.openManagerModule('finance')"> 
                         <i class="fas fa-cash-register text-4xl mb-3 text-green-400"></i> 
                         <h4 class="font-bold text-xl text-white">Vendas</h4> 
                         <p class="text-xs text-gray-400 mt-1">Relatórios, Metas e Caixa</p> 
                     </div>
 
-                    <div class="manager-card content-card p-6 text-center cursor-pointer border border-pink-500/30 hover:border-pink-500 hover:bg-dark-card/80 transition duration-200" onclick="window.openManagerAuthModal('openHRPanel')"> 
+                    <div class="manager-card content-card p-6 text-center cursor-pointer border border-pink-500/30 hover:border-pink-500 hover:bg-dark-card/80 transition duration-200" onclick="window.openManagerModule('team')"> 
                         <i class="fas fa-id-card-alt text-4xl mb-3 text-pink-400"></i> 
                         <h4 class="font-bold text-xl text-white">RH & Equipe</h4> 
                         <p class="text-xs text-gray-400 mt-1">Ponto, Comissões e Acessos</p> 
                     </div>
 
-                    <div class="manager-card content-card p-6 text-center cursor-pointer hover:bg-dark-card/80 transition" onclick="window.openManagerAuthModal('openCustomerCRM')"> 
+                    <div class="manager-card content-card p-6 text-center cursor-pointer hover:bg-dark-card/80 transition" onclick="window.openManagerModule('crm')"> 
                         <i class="fas fa-users text-4xl mb-3 text-blue-400"></i> 
                         <h4 class="font-bold text-lg text-gray-200">Clientes (CRM)</h4> 
                         <p class="text-xs text-gray-500 mt-1">Fidelidade e Histórico</p> 
@@ -304,25 +304,25 @@
                         <p class="text-xs text-gray-500 mt-1">Agenda e Mesas</p> 
                     </div>
 
-                    <div class="manager-card content-card p-6 text-center cursor-pointer hover:bg-dark-card/80 transition opacity-70" onclick="window.openManagerAuthModal('openFinancialModule')"> 
+                    <div class="manager-card content-card p-6 text-center cursor-pointer hover:bg-dark-card/80 transition opacity-70" onclick="window.openManagerModule('finance')"> 
                         <i class="fas fa-chart-pie text-4xl mb-3 text-pink-500"></i> 
                         <h4 class="font-bold text-lg text-gray-200">Financeiro</h4> 
                         <p class="text-xs text-gray-500 mt-1">DRE e Contas a Pagar</p> 
                     </div>
                     
-                    <div class="manager-card content-card p-6 text-center cursor-pointer hover:bg-dark-card/80 transition" onclick="window.openManagerAuthModal('openSectorManagement')"> 
+                    <div class="manager-card content-card p-6 text-center cursor-pointer hover:bg-dark-card/80 transition" onclick="window.openManagerModule('settings')"> 
                         <i class="fas fa-map-signs text-4xl mb-3 text-gray-400"></i> 
                         <h4 class="font-bold text-lg text-gray-200">Configurações</h4> 
                         <p class="text-xs text-gray-500 mt-1">Setores e Cadastros Aux.</p> 
                     </div>
                     
-                    <div class="manager-card content-card p-6 text-center cursor-pointer hover:bg-dark-card/80 transition" onclick="window.openManagerAuthModal('openVoucherManagement')"> 
+                    <div class="manager-card content-card p-6 text-center cursor-pointer hover:bg-dark-card/80 transition" onclick="window.openManagerModule('vouchers')"> 
                         <i class="fas fa-ticket-alt text-4xl mb-3 text-gray-400"></i> 
                         <h4 class="font-bold text-lg text-gray-200">Vouchers</h4> 
                         <p class="text-xs text-gray-500 mt-1">Campanhas</p> 
                     </div>
                     
-                    <div class="manager-card content-card p-6 text-center cursor-pointer hover:bg-dark-card/80 transition" onclick="window.openManagerAuthModal('openWooSync')"> 
+                    <div class="manager-card content-card p-6 text-center cursor-pointer hover:bg-dark-card/80 transition" onclick="window.openManagerModule('sync')"> 
                         <i class="fas fa-sync text-4xl mb-3 text-gray-500"></i> 
                         <h4 class="font-bold text-lg text-gray-200">Sincronizar</h4> 
                         <p class="text-xs text-gray-500 mt-1">Forçar Atualização</p> 
@@ -451,16 +451,109 @@
     <div id="nfeModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"><div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md"><h3 class="text-xl font-bold mb-4 text-indigo-400">Emissão de Nota Fiscal</h3><div id="nfeError" class="hidden p-3 rounded-lg bg-red-900 border border-red-700 text-red-200 mb-4"><p id="nfeErrorMessage" class="font-semibold">Erro aqui</p></div><div id="nfeDetails"><div class="mb-4"><label class="block text-sm font-medium text-dark-placeholder mb-1">Cliente</label><p id="nfeCustomerName" class="text-lg font-semibold text-dark-text">Carregando...</p></div><div class="mb-4"><label class="block text-sm font-medium text-dark-placeholder mb-1">Documento</label><p id="nfeCustomerDoc" class="text-lg font-semibold text-dark-text">Carregando...</p></div><div class="mb-4"><label class="block text-sm font-medium text-dark-placeholder mb-1">Valor Total</label><p id="nfeTotalValue" class="text-2xl font-bold text-pumpkin">R$ 0,00</p></div></div><div class="flex justify-end space-x-3 mt-6"><button class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('nfeModal').style.display='none'">Cancelar</button><button id="nfeConfirmBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"><i class="fas fa-check-circle"></i> Emitir</button></div></div></div>
     <div id="voucherManagementModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"><div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col"><div class="flex justify-between items-center mb-4 flex-shrink-0"><h3 class="text-xl font-bold text-pumpkin">Gerenciar Vouchers</h3><button class="px-4 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('voucherManagementModal').style.display='none'; document.getElementById('voucherForm').reset(); document.getElementById('voucherForm').style.display='none';">Fechar</button></div><div class="flex-grow overflow-y-auto mb-4 custom-scrollbar"><div id="voucherListContainer" class="mb-4 border border-gray-600 p-3 rounded-lg bg-dark-bg min-h-[100px]"><p class="text-dark-placeholder italic">Carregando vouchers...</p></div><form id="voucherForm" class="p-4 border border-gray-600 rounded-lg bg-dark-input space-y-3" style="display: none;"><h4 id="voucherFormTitle" class="text-lg font-semibold text-indigo-400 mb-2">Novo Voucher</h4><input type="hidden" id="voucherIdInput"><div><label class="block text-sm font-medium text-dark-placeholder mb-1">Nome*</label><input type="text" id="voucherNameInput" placeholder="Ex: R$10 desconto" class="input-pdv w-full" required></div><div class="grid grid-cols-2 gap-4"><div><label class="block text-sm font-medium text-dark-placeholder mb-1">Pontos*</label><input type="number" id="voucherPointsInput" placeholder="Ex: 100" class="input-pdv w-full" required min="1"></div><div><label class="block text-sm font-medium text-dark-placeholder mb-1">Desconto (R$)*</label><input type="number" id="voucherValueInput" placeholder="Ex: 10.00" class="input-pdv w-full" required min="0.01" step="0.01"></div></div><div class="flex justify-end space-x-3 pt-3"><button type="button" id="cancelVoucherFormBtn" class="px-4 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('voucherForm').reset(); document.getElementById('voucherForm').style.display='none';">Cancelar</button><button type="submit" id="saveVoucherBtn" class="px-4 py-2 bg-pumpkin text-white rounded-lg hover:bg-pumpkin-dark transition">Salvar Voucher</button></div><p id="voucherFormError" class="text-red-400 text-sm mt-2" style="display: none;"></p></form><button id="showVoucherFormBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition mt-4"><i class="fas fa-plus"></i> Adicionar Novo Voucher</button></div></div></div>
     
-    <div id="customerRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"><div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-lg"><h3 class="text-xl font-bold mb-4 text-indigo-400">Buscar / Cadastrar Cliente</h3><div class="mb-4"><label for="customerSearchCpf" class="block text-sm font-medium text-dark-placeholder mb-1">Buscar por CPF / CNPJ</label><div class="flex space-x-2"><input type="text" id="customerSearchCpf" placeholder="Digite o CPF ou CNPJ" class="input-pdv w-full"><button id="searchCustomerByCpfBtn" class="p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition w-14"><i class="fas fa-search"></i></button></div></div><div id="customerSearchResults" class="mb-4 p-3 rounded-lg bg-dark-bg border border-dark-border min-h-[50px]"></div><hr class="border-gray-600 my-4"><h4 class="text-lg font-semibold mb-3 text-dark-text">Dados do Cliente</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div><label for="customerName" class="block text-sm font-medium text-dark-placeholder mb-1">Nome Completo / Razão Social*</label><input type="text" id="customerName" class="input-pdv w-full"></div><div><label for="customerCpf" class="block text-sm font-medium text-dark-placeholder mb-1">CPF / CNPJ*</label><input type="text" id="customerCpf" placeholder="Documento (só números)" class="input-pdv w-full"></div><div><label for="customerPhone" class="block text-sm font-medium text-dark-placeholder mb-1">Telefone</label><input type="tel" id="customerPhone" placeholder="(__) _____-____" class="input-pdv w-full"></div><div><label for="customerEmail" class="block text-sm font-medium text-dark-placeholder mb-1">E-mail</label><input type="email" id="customerEmail" class="input-pdv w-full"></div></div><p class="text-xs text-dark-placeholder mt-1">* Campos obrigatórios</p>
+    <div id="customerRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
+        <div class="bg-dark-card border border-dark-border p-0 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+            
+            <div class="bg-gray-800 border-b border-gray-700 flex text-center select-none">
+                <button class="flex-1 py-4 text-sm font-bold text-gray-400 hover:text-white hover:bg-gray-700 transition border-r border-gray-700 tab-btn group" data-tab="tab-mesa" onclick="window.switchOrderMode('mesa')">
+                    <i class="fas fa-chair mb-1 block text-lg group-hover:scale-110 transition-transform"></i> MESA
+                </button>
+                <button class="flex-1 py-4 text-sm font-bold text-gray-400 hover:text-white hover:bg-gray-700 transition border-r border-gray-700 tab-btn group" data-tab="tab-retirada" onclick="window.switchOrderMode('retirada')">
+                    <i class="fas fa-walking mb-1 block text-lg group-hover:scale-110 transition-transform"></i> RETIRADA
+                </button>
+                <button class="flex-1 py-4 text-sm font-bold text-gray-400 hover:text-white hover:bg-gray-700 transition tab-btn group" data-tab="tab-entrega" onclick="window.switchOrderMode('entrega')">
+                    <i class="fas fa-motorcycle mb-1 block text-lg group-hover:scale-110 transition-transform"></i> ENTREGA
+                </button>
+            </div>
     
-    <div class="flex justify-end space-x-3 mt-6">
-        <button id="closeCustomerRegModalBtn" class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('customerRegModal').style.display='none'">Fechar</button>
-        <button id="callMotoboyBtn" class="px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition shadow-lg flex items-center" onclick="if(window.renderExternalRecruitmentModal) window.renderExternalRecruitmentModal('motoboy'); else alert('Módulo RH não carregado.');">
-            <i class="fas fa-motorcycle mr-2"></i> Chamar Motoca
-        </button>
-        <button id="saveCustomerBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50" disabled>Salvar Cliente</button>
-        <button id="linkCustomerToTableBtn" class="px-4 py-3 bg-pumpkin text-white rounded-lg hover:bg-pumpkin-dark transition disabled:opacity-50" disabled>Associar à Mesa</button>
-    </div></div></div>
+            <div class="p-6 overflow-y-auto custom-scrollbar flex-grow">
+                
+                <div class="mb-6 bg-dark-bg p-4 rounded-lg border border-gray-700">
+                    <label class="block text-xs uppercase font-bold text-dark-placeholder mb-2">1. Identificar Cliente</label>
+                    
+                    <button id="googleAuthBtn" class="w-full mb-3 bg-white text-gray-800 font-bold py-3 rounded flex items-center justify-center shadow hover:bg-gray-100 transition">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5 h-5 mr-3">
+                        Entrar com Google
+                    </button>
+    
+                    <div class="relative flex py-2 items-center">
+                        <div class="flex-grow border-t border-gray-600"></div>
+                        <span class="flex-shrink-0 mx-4 text-gray-500 text-xs">OU MANUALMENTE</span>
+                        <div class="flex-grow border-t border-gray-600"></div>
+                    </div>
+    
+                    <div class="flex space-x-2 mt-2">
+                        <input type="text" id="customerSearchCpf" placeholder="CPF, Telefone ou E-mail" class="input-pdv w-full">
+                        <button id="searchCustomerByCpfBtn" class="p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition w-14 shadow-lg">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="customerSearchResults" class="mb-4 hidden p-3 bg-green-900/20 border border-green-500/50 rounded-lg text-green-400 text-sm flex items-center justify-center animate-pulse">
+                    <i class="fas fa-check-circle mr-2"></i> Cliente identificado com sucesso!
+                </div>
+    
+                <hr class="border-gray-700 mb-6">
+    
+                <div class="relative min-h-[150px]">
+                    
+                    <div id="tab-mesa" class="order-mode-content absolute inset-0 transition-opacity duration-300">
+                        <label class="block text-xs uppercase font-bold text-dark-placeholder mb-2">2. Destino do Pedido</label>
+                        <div class="bg-gray-800 p-6 rounded-xl text-center border border-gray-600">
+                            <span class="text-gray-400 text-sm block mb-1">Mesa Selecionada</span>
+                            <h2 class="text-4xl font-extrabold text-white" id="modalCurrentTableDisplay">--</h2>
+                            <p class="text-xs text-gray-500 mt-2">O cliente será vinculado a esta mesa.</p>
+                        </div>
+                    </div>
+    
+                    <div id="tab-retirada" class="order-mode-content hidden absolute inset-0 transition-opacity duration-300">
+                        <label class="block text-xs uppercase font-bold text-dark-placeholder mb-2">2. Dados de Retirada</label>
+                        <div class="flex flex-col items-center justify-center h-full">
+                            <p class="text-sm text-gray-400 mb-3">Informe este PIN ao cliente:</p>
+                            <div class="bg-gray-800 px-8 py-4 rounded-xl border-2 border-dashed border-pumpkin shadow-[0_0_15px_rgba(255,117,24,0.2)]">
+                                <span class="block text-[10px] text-gray-500 uppercase text-center tracking-widest mb-1">PIN DO PEDIDO</span>
+                                <span id="generatedPinDisplay" class="text-5xl font-mono font-bold text-white tracking-wider">----</span>
+                            </div>
+                        </div>
+                    </div>
+    
+                    <div id="tab-entrega" class="order-mode-content hidden absolute inset-0 transition-opacity duration-300 space-y-3">
+                        <div class="flex justify-between items-end mb-1">
+                            <label class="block text-xs uppercase font-bold text-dark-placeholder">2. Endereço de Entrega</label>
+                            <button id="callMotoboyBtn" class="px-3 py-1 bg-orange-600 text-white text-[10px] uppercase tracking-wide rounded hover:bg-orange-700 transition font-bold flex items-center shadow-md transform hover:scale-105" onclick="if(window.renderExternalRecruitmentModal) window.renderExternalRecruitmentModal('motoboy');">
+                                <i class="fas fa-bullhorn mr-1"></i> Chamar Motoca
+                            </button>
+                        </div>
+                        
+                        <div class="grid grid-cols-3 gap-3">
+                            <input type="text" id="deliveryZip" placeholder="CEP" class="input-pdv col-span-1 text-sm">
+                            <input type="text" id="deliveryCity" placeholder="Cidade" class="input-pdv col-span-2 text-sm bg-gray-700 text-gray-400" readonly value="São Paulo">
+                        </div>
+                        <div class="grid grid-cols-4 gap-3">
+                            <input type="text" id="deliveryStreet" placeholder="Rua / Avenida" class="input-pdv col-span-3">
+                            <input type="text" id="deliveryNumber" placeholder="Nº" class="input-pdv col-span-1 text-center">
+                        </div>
+                        <input type="text" id="deliveryComplement" placeholder="Complemento / Ponto de Referência" class="input-pdv w-full text-sm">
+                    </div>
+                </div>
+    
+                <div class="mt-48 md:mt-40 pt-4 border-t border-gray-700"> <label class="block text-xs text-gray-500 mb-1">Nome do Cliente (Confirmar)</label>
+                     <input type="text" id="customerNameInput" class="input-pdv w-full" placeholder="Nome do Cliente">
+                </div>
+    
+            </div>
+    
+            <div class="p-4 border-t border-gray-700 bg-gray-800 flex justify-end space-x-3 z-10 relative">
+                <button class="px-5 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition font-bold" onclick="document.getElementById('customerRegModal').style.display='none'">
+                    Cancelar
+                </button>
+                <button id="confirmOrderModeBtn" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-bold shadow-lg flex items-center disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-check-circle mr-2"></i> INICIAR PEDIDO
+                </button>
+            </div>
+        </div>
+    </div>
 
     <div id="customAlertModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"><div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm text-center"><h3 class="text-xl font-bold mb-4 text-red-400" id="customAlertTitle">Aviso</h3><p class="text-base mb-6 text-dark-text" id="customAlertMessage">Msg.</p><button id="customAlertOkBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg transition">OK</button></div></div>
     <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"></div>
