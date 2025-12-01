@@ -1,11 +1,14 @@
-// --- CONTROLLERS/MANAGER/HUB/MANAGERCONTROLLER.JS (VERSÃO FINAL COMPLETA) ---
+// --- CONTROLLERS/MANAGER/HUB/MANAGERCONTROLLER.JS (ATUALIZADO COM RESERVAS) ---
 
-// 1. IMPORTAÇÃO DOS MÓDULOS (CAMINHOS ABSOLUTOS)
+// 1. IMPORTAÇÃO DOS MÓDULOS
 import * as DeliveryMgr from '/controllers/manager/modules/deliveryManager.js';
 import * as ProductMgr from '/controllers/manager/modules/productManager.js'; 
 import * as FinanceMgr from '/controllers/manager/modules/financeManager.js';
 import * as TeamMgr from '/controllers/manager/modules/teamManager.js';
-import * as SalesMgr from '/controllers/manager/modules/salesManager.js'; // <--- NOVO IMPORT
+import * as SalesMgr from '/controllers/manager/modules/salesManager.js'; 
+import * as CrmMgr from '/controllers/manager/modules/crmManager.js'; 
+import * as VoucherMgr from '/controllers/manager/modules/voucherManager.js';
+import * as ReservationMgr from '/controllers/manager/modules/reservationManager.js'; // <--- IMPORTAÇÃO RESERVAS
 
 let isInitialized = false;
 let managerModal = null; 
@@ -22,7 +25,10 @@ export const initManagerController = () => {
         if(ProductMgr?.init) ProductMgr.init();
         if(FinanceMgr?.init) FinanceMgr.init();
         if(TeamMgr?.init) TeamMgr.init();
-        if(SalesMgr?.init) SalesMgr.init(); // <--- INICIALIZAÇÃO VENDAS
+        if(SalesMgr?.init) SalesMgr.init();
+        if(CrmMgr?.init) CrmMgr.init();
+        if(VoucherMgr?.init) VoucherMgr.init();
+        if(ReservationMgr?.init) ReservationMgr.init(); // <--- INIT RESERVAS
     } catch (error) {
         console.error("[ManagerHub] Erro ao inicializar módulos:", error);
     }
@@ -32,7 +38,6 @@ export const initManagerController = () => {
 };
 
 const setupGlobalRoutes = () => {
-    // A. Roteador de Módulos (Cards do Painel)
     window.openManagerModule = (moduleName) => {
         console.log(`[ManagerHub] Abrindo: ${moduleName}`);
         
@@ -52,7 +57,7 @@ const setupGlobalRoutes = () => {
                     else throw new Error("Módulo Financeiro não encontrado.");
                     break;
 
-                case 'sales': // <--- NOVO CASE PARA VENDAS
+                case 'sales': 
                     if(SalesMgr?.open) SalesMgr.open();
                     else throw new Error("Módulo de Vendas não encontrado.");
                     break;
@@ -63,14 +68,18 @@ const setupGlobalRoutes = () => {
                     break;
                     
                 case 'crm':
-                    // Redireciona para o CRM (ainda dentro de ProductMgr ou SalesMgr dependendo da sua escolha, ou mantenha alerta)
-                    if(ProductMgr?.openCRM) ProductMgr.openCRM(); 
-                    else alert("Módulo CRM: Em desenvolvimento.");
+                    if(CrmMgr?.open) CrmMgr.open(); 
+                    else throw new Error("Módulo CRM não encontrado.");
                     break;
 
                 case 'vouchers':
-                    const vModal = document.getElementById('voucherManagementModal');
-                    if(vModal) vModal.style.display = 'flex';
+                    if(VoucherMgr?.open) VoucherMgr.open();
+                    else throw new Error("Módulo de Vouchers não encontrado.");
+                    break;
+                
+                case 'reservations': // <--- ROTA RESERVAS
+                    if(ReservationMgr?.open) ReservationMgr.open();
+                    else throw new Error("Módulo de Reservas não encontrado.");
                     break;
 
                 case 'sync':
@@ -92,14 +101,13 @@ const setupGlobalRoutes = () => {
         }
     };
 
-    // B. Alias de Compatibilidade (CONECTA O APP.JS AO HUB)
+    // Alias de Compatibilidade
     window.handleGerencialAction = (action, payload) => {
-        // Mapeia nomes de ações antigas para os novos módulos
         const actionMap = {
             'openProductHub': 'products',
             'openProductManagement': 'products',
-            'openFinancialModule': 'finance', // Mantém financeiro para DRE
-            'openCashManagementReport': 'sales', // <--- CORREÇÃO: Aponta para Vendas
+            'openFinancialModule': 'finance', 
+            'openCashManagementReport': 'sales',
             'openHRPanel': 'team',
             'openCustomerCRM': 'crm',
             'openVoucherManagement': 'vouchers',
@@ -111,17 +119,14 @@ const setupGlobalRoutes = () => {
         window.openManagerModule(moduleName);
     };
 
-    // C. Roteador de Modos de Pedido (Modal Cliente)
     window.switchOrderMode = (mode) => {
         if (DeliveryMgr?.switchTab) DeliveryMgr.switchTab(mode);
     };
 
-    // D. Ações Externas
     window.renderExternalRecruitmentModal = (type) => {
         if (type === 'motoboy') {
             if(DeliveryMgr?.handleCallMotoboy) DeliveryMgr.handleCallMotoboy();
         } else {
-            // RH (Chamar Extra)
             if(TeamMgr?.open) {
                 TeamMgr.open();
                 setTimeout(() => window.switchHRTab('team'), 100); 

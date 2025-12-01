@@ -67,7 +67,7 @@ service cloud.firestore {
       // 6. USUÁRIOS (STAFF)
       match /users/{userId} {
         allow read: if isStaff();
-        allow write: if false; // Apenas via Admin SDK ou console por segurança, ou ajuste para isGerente() se tiver cadastro no app
+        allow write: if false; 
       }
 
       // 7. MESAS (CORE)
@@ -118,26 +118,26 @@ service cloud.firestore {
 
       // 12. INSUMOS (COMPOSIÇÃO)
       match /ingredients/{ingredientId} {
-        allow read: if isAuthenticated(); // Staff precisa ler para montar fichas
+        allow read: if isAuthenticated();
         allow write: if isGerente();
       }
 
       // 13. FORNECEDORES
       match /suppliers/{supplierId} {
-        allow read: if isAuthenticated(); // Necessário para vincular despesas
+        allow read: if isAuthenticated();
         allow write: if isGerente();
       }
 
       // 14. BANCO DE TALENTOS (EXTRAS / MOTOBOYS)
       match /external_candidates/{candidateId} {
-        allow read: if isAuthenticated(); // Staff pode ler para "Chamar Motoca"
-        allow write: if isGerente();      // Apenas Gerente cadastra/avalia
+        allow read: if isAuthenticated();
+        allow write: if isGerente();
       }
 
       // 15. ESTOQUE E MOVIMENTAÇÕES
       match /stock/{itemId} {
         allow read: if isAuthenticated();
-        allow write: if isStaff(); // Baixa de estoque na venda
+        allow write: if isStaff();
       }
       
       match /inventory_movements/{movementId} {
@@ -156,14 +156,20 @@ service cloud.firestore {
         allow read: if isAuthenticated();
         allow write: if isGerente();
       }
+
+      // 18. RESERVAS (NOVA REGRA ADICIONADA)
+      match /reservations/{reservationId} {
+        allow read: if isStaff();
+        allow write: if isStaff();
+      }
       
-      // Bloqueio padrão
+      // Bloqueio padrão (Final dos matches internos)
       match /{document=**} {
         allow read, write: if false;
       }
-    }
+    } 
 
-    // Configurações Públicas
+    // Configurações Públicas (Fora do bloco /data)
     match /artifacts/{appId}/public/product_config {
       allow read: if isAuthenticated();
       allow write: if isGerente();
