@@ -403,3 +403,56 @@ input:checked + .slider-obs:before { transform: translateX(22px); }
     transform: translateY(-2px);
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
 }
+
+/* --- Refinamento Visual dos Modais (Geral + Cliente) --- */
+
+/* Lista de TODOS os modais do sistema */
+#managerModal, 
+#res_formModal, 
+#res_mapModal, 
+#crm_formModal, 
+#vouch_formModal,
+/* Modais do Cliente Adicionados Abaixo */
+#associationModal,
+#customerRegistrationModal,
+#clientObsModal,
+#productInfoModal,
+#customAlertModal {
+    background-color: rgba(0, 0, 0, 0.75) !important;
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    transition: all 0.3s ease-in-out;
+}
+
+/* Animação do "Cartão" dentro do modal */
+#managerModal > div,
+#res_formModal > div,
+#crm_formModal > div,
+#vouch_formModal > div,
+#associationModal > div,
+#customerRegistrationModal > div,
+#clientObsModal > div,
+#productInfoModal > div,
+#customAlertModal > div {
+    animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes modalSlideUp {
+    from { opacity: 0; transform: translateY(20px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* --- Efeito Skeleton (Carregamento Elegante) --- */
+.skeleton {
+    background: #1f2937;
+    background: linear-gradient(90deg, #1f2937 25%, #374151 50%, #1f2937 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s infinite;
+    border-radius: 0.5rem;
+}
+@keyframes skeleton-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}

@@ -1,4 +1,4 @@
-// --- CONTROLLERS/MANAGER/MODULES/FINANCEMANAGER.JS ---
+// --- CONTROLLERS/MANAGER/MODULES/FINANCEMANAGER.JS (CORRIGIDO) ---
 
 import { db, appId, getTablesCollectionRef } from "/services/firebaseService.js"; 
 import { 
@@ -6,10 +6,9 @@ import {
     doc, deleteDoc, addDoc, serverTimestamp, Timestamp 
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-import { formatCurrency, toggleLoading } from "/utils.js";
-import { showToast } from "/app.js"; 
+// CORREÇÃO: Importação centralizada do utils.js
+import { formatCurrency, toggleLoading, showToast } from "/utils.js";
 
-// Helpers Locais
 const getColRef = (name) => collection(db, 'artifacts', appId, 'public', 'data', name);
 let managerModal = null;
 let currentTab = 'dre';
@@ -22,7 +21,6 @@ export const init = () => {
     console.log("[FinanceModule] Inicializado.");
     managerModal = document.getElementById('managerModal');
     
-    // Expõe funções globais para os botões do HTML injetado
     window.switchFinTab = switchFinTab;
     window.toggleExpenseForm = toggleExpenseForm;
     window.saveExpense = saveExpense;
@@ -76,7 +74,6 @@ async function switchFinTab(tab) {
     const content = document.getElementById('finContent');
     if(!content) return;
 
-    // Atualiza Visual das Abas
     document.querySelectorAll('.fin-tab-btn').forEach(btn => {
         if(btn.id === `tab-${tab}`) {
             btn.classList.remove('bg-dark-input', 'text-gray-300');
@@ -98,7 +95,6 @@ async function switchFinTab(tab) {
 // ==================================================================
 
 async function renderExpensesList(container) {
-    // Carrega fornecedores para o select
     let supplierOptions = '<option value="">Sem Fornecedor</option>';
     try {
         const supSnap = await getDocs(query(getColRef('suppliers'), orderBy('name')));
@@ -250,9 +246,8 @@ async function saveExpense() {
         
         showToast("Despesa salva com sucesso!", false); 
         toggleExpenseForm();
-        loadExpensesTable(); // Recarrega tabela
+        loadExpensesTable(); 
         
-        // Limpa campos básicos
         document.getElementById('expDesc').value = '';
         document.getElementById('expAmount').value = '';
         
@@ -283,7 +278,6 @@ async function deleteExpense(id) {
 
 async function renderDRE(container) {
     const now = new Date();
-    // Default: Mês atual
     const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
@@ -302,7 +296,6 @@ async function renderDRE(container) {
     `;
 
     try {
-        // 1. Receita (Vendas Fechadas do Mês)
         const qSales = query(
             getTablesCollectionRef(), 
             where('status', '==', 'closed'), 
@@ -315,14 +308,12 @@ async function renderDRE(container) {
         
         snapSales.forEach(d => { 
              const t = d.data();
-             // Soma pagamentos válidos
              (t.payments || []).forEach(p => { 
                  const v = parseFloat(p.value.toString().replace(/[^\d,.-]/g,'').replace(',','.')); 
                  if(!isNaN(v)) grossRevenue += v; 
              });
         });
 
-        // 2. Despesas (Lançadas no módulo de despesas)
         const startStr = startMonth.toISOString().split('T')[0];
         const endStr = endMonth.toISOString().split('T')[0];
         
@@ -344,7 +335,6 @@ async function renderDRE(container) {
             expByCat[cat] = (expByCat[cat] || 0) + val;
         });
 
-        // 3. Resultado
         const netResult = grossRevenue - totalExp;
         const resultColor = netResult >= 0 ? 'text-green-400' : 'text-red-400';
         const margin = grossRevenue > 0 ? ((netResult / grossRevenue) * 100).toFixed(1) : 0;

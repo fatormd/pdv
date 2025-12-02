@@ -82,10 +82,17 @@
             <div id="clientOrderScreen" class="w-screen flex-shrink-0 flex flex-col">
                 <div class="flex items-center justify-between mb-4 md:mb-6 flex-shrink-0">
                     <div class="flex items-center text-green-400">
-                        <span class="text-xl md:text-2xl font-semibold mr-3" id="client-table-number">Cardápio Digital</span>
+                        <span class="text-xl md:text-2xl font-semibold mr-3" id="client-table-number">Cardápio</span>
+                        
+                        <div id="kdsTrackingIconContainer" class="hidden ml-2 bg-gray-800 rounded-full px-3 py-1 flex items-center space-x-2 transition hover:bg-gray-700">
+                             <i id="kdsTrackingIcon" class="fas fa-clock text-yellow-400"></i>
+                             <span class="text-xs text-white font-bold" id="kdsTrackingStatus">Na Fila</span>
+                        </div>
+
                     </div>
-                    <button id="goToPaymentBtnClient" class="rounded-full bg-green-600 p-2 md:p-3 text-white shadow-lg hover:bg-green-700 transition w-10 h-10 md:w-12 md:h-12 flex items-center justify-center" title="Ver Conta" onclick="window.goToScreen('clientPaymentScreen')">
-                        <i class="fas fa-receipt text-lg md:text-xl"></i>
+                    
+                    <button id="goToPaymentBtnClient" class="rounded-full bg-gray-700 p-2 md:p-3 text-white shadow-lg hover:bg-gray-600 transition w-10 h-10 md:w-12 md:h-12 flex items-center justify-center" title="Entrar">
+                        <i class="fas fa-user"></i> 
                     </button>
                 </div>
 
@@ -93,8 +100,8 @@
                     <div class="p-3 md:p-4 content-card rounded-lg bg-dark-card border border-dark-border">
                         <div class="flex justify-between items-center mb-3 md:mb-4">
                             <h2 class="text-lg md:text-xl font-semibold text-dark-text mr-2">Seu Pedido (<span id="client-cart-count">0</span>)</h2>
-                            <button id="sendOrderBtn" class="bg-green-600 text-white p-2 md:p-3 rounded-full shadow-lg hover:bg-green-700 transition w-10 h-10 md:w-12 md:h-12 flex items-center justify-center text-lg md:text-xl disabled:opacity-50" title="Enviar Pedido para Confirmação">
-                                <i class="fas fa-check-circle"></i>
+                            <button id="sendOrderBtn" class="bg-green-600 text-white px-5 py-2 rounded-lg shadow-lg hover:bg-green-700 transition font-bold uppercase text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed">
+                                ENVIAR
                             </button>
                         </div>
                         
@@ -112,7 +119,8 @@
                             <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-dark-placeholder"></i>
                         </div>
                     </div>
-                    <div id="client-category-filters" class="flex space-x-2 overflow-x-auto pb-3 mb-4 px-1 flex-shrink-0"></div>
+                    
+                    <div id="client-category-filters" class="flex space-x-2 overflow-x-auto mb-4 px-1 flex-shrink-0 sticky top-0 z-30 bg-dark-bg/95 backdrop-blur-sm py-2"></div>
 
                     <div id="client-menu-container" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1 pb-4"> 
                         <div class="col-span-full text-center p-6 text-dark-placeholder italic">Carregando cardápio...</div>
@@ -126,19 +134,19 @@
                         <button id="backToOrderFromPaymentBtn" class="mr-2 text-2xl md:text-3xl p-2 hover:text-indigo-300 transition" title="Voltar para o Pedido" onclick="window.goToScreen('clientOrderScreen')">
                             <i class="fas fa-arrow-left"></i>
                         </button>
-                        <span class="text-xl md:text-2xl font-semibold mr-3" id="payment-table-number">Mesa Selecionada</span>
+                        <span class="text-xl md:text-2xl font-semibold mr-3" id="payment-table-number">Minha Conta</span>
                     </div>
-                    <button id="printSummaryBtnClient" class="p-2 text-indigo-400 hover:text-indigo-300 transition" title="Imprimir Resumo" onclick="window.printSummaryClient()">
-                        <i class="fas fa-print text-lg md:text-xl"></i>
+                    <button id="logoutBtnClient" class="p-2 text-red-400 hover:text-red-300 transition" title="Sair da Conta">
+                        <i class="fas fa-sign-out-alt text-lg md:text-xl"></i>
                     </button>
                 </div>
                  <div class="flex items-center justify-between mb-4 md:mb-6 flex-shrink-0 hidden print:flex">
-                     <span class="text-xl md:text-2xl font-semibold mr-3" id="payment-table-number-print">Conta da Mesa Selecionada</span>
+                     <span class="text-xl md:text-2xl font-semibold mr-3" id="payment-table-number-print">Conta</span>
                  </div>
 
                 <div class="flex-grow pb-4 pr-1 overflow-y-auto custom-scrollbar"> 
                     <div class="content-card p-3 md:p-4 mb-6 rounded-lg bg-dark-card border border-dark-border">
-                        <h2 class="text-lg md:text-xl font-semibold text-green-400 mb-3 md:mb-4">Itens Confirmados (Conferência)</h2>
+                        <h2 class="text-lg md:text-xl font-semibold text-green-400 mb-3 md:mb-4">Itens Confirmados</h2>
                         <div id="reviewItemsList" class="space-y-2 md:space-y-3 pt-2 mb-4 max-h-72 overflow-y-auto pr-2 custom-scrollbar">
                              <div class="text-sm md:text-base text-dark-placeholder italic p-2">Carregando itens confirmados pelo garçom...</div>
                         </div>
@@ -177,7 +185,9 @@
                     </div>
 
                     <div id="crmClientSection" class="content-card mt-6 rounded-lg bg-dark-card border border-dark-border print-hide" style="display: none;"> 
-                        <div class="p-3 md:p-4"><h2 class="text-lg md:text-xl font-semibold text-pumpkin mb-3"><i class="fas fa-star mr-2"></i> Cliente da Casa</h2></div>
+                        <div class="p-3 md:p-4 flex justify-between items-center">
+                            <h2 class="text-lg md:text-xl font-semibold text-pumpkin"><i class="fas fa-star mr-2"></i> Cliente da Casa</h2>
+                        </div>
                         <div class="border-b border-dark-border flex overflow-x-auto crm-tabs-container">
                             <button class="crm-tab-btn active whitespace-nowrap" data-tab="crm-pontos"><i class="fas fa-coins mr-1"></i> Pontos</button>
                             <button class="crm-tab-btn whitespace-nowrap" data-tab="crm-vouchers"><i class="fas fa-ticket-alt mr-1"></i> Vouchers</button>
@@ -212,65 +222,53 @@
         </div> 
     </main>
 
-    <div id="associationModal" class="fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center z-50 p-4" style="display: none;">
-        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm relative">
-            
-            <h3 class="text-xl font-bold mb-4 text-white text-center">Como deseja pedir?</h3>
+    <div id="logoutConfirmationModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-[60] hidden p-4">
+        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-xs text-center">
+            <h3 class="text-xl font-bold mb-3 text-white">Sair da Conta</h3>
+            <p class="text-gray-400 text-sm mb-6">Deseja realmente desconectar?</p>
+            <div class="flex space-x-3 mb-4">
+                <button onclick="document.getElementById('logoutConfirmationModal').style.display='none'" class="flex-1 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition font-semibold">Cancelar</button>
+                <button id="confirmLogoutBtn" class="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition font-semibold">Sair</button>
+            </div>
+            <div class="pt-3 border-t border-gray-700">
+                <p class="text-xs text-gray-500">Logado como:</p>
+                <p class="text-xs font-bold text-pumpkin" id="logoutModalUserName">Usuário</p>
+            </div>
+        </div>
+    </div>
 
-            <div class="flex mb-6 border-b border-gray-600">
-                <div class="assoc-tab-btn active" data-tab="mesa">
-                    <i class="fas fa-utensils mr-2"></i> Mesa
-                </div>
-                <div class="assoc-tab-btn" data-tab="retirada">
-                    <i class="fas fa-shopping-bag mr-2"></i> Retirada
-                </div>
-                <div class="assoc-tab-btn" data-tab="entrega">
-                    <i class="fas fa-motorcycle mr-2"></i> Entrega
+    <div id="deliveryFeedbackModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-[60] hidden p-4">
+        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm text-center">
+            <div class="mb-4">
+                <i class="fas fa-motorcycle text-4xl text-pumpkin mb-2"></i>
+                <h3 class="text-xl font-bold text-white">Pedido Entregue!</h3>
+            </div>
+            <p class="text-gray-300 text-sm mb-6">Tudo certo com a entrega? O que acha de dar uma força para o entregador?</p>
+            <div class="bg-gray-800 p-4 rounded-lg mb-6 border border-gray-700">
+                <p class="text-xs text-gray-400 uppercase font-bold mb-2">Caixinha (Pix)</p>
+                <div class="flex justify-center space-x-2">
+                    <button class="tip-btn px-3 py-1 bg-gray-700 text-white rounded hover:bg-green-600 transition text-sm">R$ 2</button>
+                    <button class="tip-btn px-3 py-1 bg-gray-700 text-white rounded hover:bg-green-600 transition text-sm">R$ 5</button>
+                    <button class="tip-btn px-3 py-1 bg-gray-700 text-white rounded hover:bg-green-600 transition text-sm">R$ 10</button>
                 </div>
             </div>
+            <button onclick="document.getElementById('deliveryFeedbackModal').style.display='none'" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold transition">Concluir</button>
+        </div>
+    </div>
 
+    <div id="associationModal" class="fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center z-50 p-4" style="display: none;">
+        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm relative">
+            <h3 class="text-xl font-bold mb-4 text-white text-center">Como deseja pedir?</h3>
+            <div class="flex mb-6 border-b border-gray-600">
+                <div class="assoc-tab-btn active" data-tab="mesa"><i class="fas fa-utensils mr-2"></i> Mesa</div>
+                <div class="assoc-tab-btn" data-tab="retirada"><i class="fas fa-shopping-bag mr-2"></i> Retirada</div>
+                <div class="assoc-tab-btn" data-tab="entrega"><i class="fas fa-motorcycle mr-2"></i> Entrega</div>
+            </div>
             <form id="activationForm" class="space-y-4">
-                
-                <div id="content-mesa" class="assoc-tab-content active">
-                    <label class="text-sm text-gray-400 mb-1 block">Número da Mesa</label>
-                    <input type="number" id="activateTableNumber" class="input-pdv w-full p-3 text-center text-xl font-bold" placeholder="00">
-                </div>
-
-                <div id="content-retirada" class="assoc-tab-content" style="display: none;">
-                    <label class="text-sm text-gray-400 mb-1 block">Crie ou Insira seu PIN (4 dígitos)</label>
-                    <input type="number" id="activatePickupPin" class="input-pdv w-full p-3 text-center text-xl font-bold" placeholder="Ex: 1234">
-                    <p class="text-xs text-gray-500 mt-2 text-center">Use este PIN para retirar seu pedido no balcão.</p>
-                </div>
-
-                <div id="content-entrega" class="assoc-tab-content" style="display: none;">
-                    <div class="text-center space-y-4 py-2">
-                        <i class="fas fa-motorcycle text-4xl text-pumpkin mb-2"></i>
-                        <p class="text-gray-300 text-sm">Solicite um entregador para levar seu pedido até você.</p>
-                        <button type="button" id="btnCallMotoboy" class="w-full py-3 px-4 bg-pumpkin text-white rounded-lg font-bold hover:bg-pumpkin-dark transition flex items-center justify-center shadow-lg">
-                            <i class="fas fa-shipping-fast mr-2"></i> CHAMAR MOTOCA
-                        </button>
-                        <p class="text-xs text-gray-500">Você será redirecionado.</p>
-                    </div>
-                </div>
-                
-                <div class="pt-4 border-t border-gray-700 mt-4">
-                    <button type="button" id="googleLoginBtn" class="w-full py-3 px-4 bg-white text-gray-700 rounded-lg font-semibold flex items-center justify-center border border-gray-300 hover:bg-gray-50 mb-3">
-                        <i class="fab fa-google mr-3 text-red-500 text-lg"></i>
-                        Entrar com Google
-                    </button>
-                    
-                    <div id="loggedInStep" class="p-3 bg-dark-input rounded-lg text-center mb-3" style="display: none;">
-                        <span class="text-xs text-gray-400">Logado como:</span>
-                        <p id="loggedInUserName" class="font-semibold text-white text-sm"></p>
-                    </div>
-                    
-                    <p id="assocErrorMsg" class="text-red-400 text-sm text-center mb-3" style="display: none;"></p>
-
-                    <div class="flex space-x-3" id="defaultActionButtons">
-                        <button type="button" id="cancelActivationBtn" class="flex-1 py-3 bg-gray-600 text-gray-200 rounded-lg font-bold hover:bg-gray-500 transition">Cancelar</button>
-                        <button type="submit" id="activateAndSendBtn" class="flex-1 py-3 bg-brand-primary text-white rounded-lg font-bold hover:bg-brand-primary-dark transition">Confirmar</button>
-                    </div>
-                </div>
+                <div id="content-mesa" class="assoc-tab-content active"><label class="text-sm text-gray-400 mb-1 block">Número da Mesa</label><input type="number" id="activateTableNumber" class="input-pdv w-full p-3 text-center text-xl font-bold" placeholder="00"></div>
+                <div id="content-retirada" class="assoc-tab-content" style="display: none;"><label class="text-sm text-gray-400 mb-1 block">Crie ou Insira seu PIN (4 dígitos)</label><input type="number" id="activatePickupPin" class="input-pdv w-full p-3 text-center text-xl font-bold" placeholder="Ex: 1234"><p class="text-xs text-gray-500 mt-2 text-center">Use este PIN para retirar seu pedido no balcão.</p></div>
+                <div id="content-entrega" class="assoc-tab-content" style="display: none;"><div class="text-center space-y-4 py-2"><i class="fas fa-motorcycle text-4xl text-pumpkin mb-2"></i><p class="text-gray-300 text-sm">Solicite um entregador para levar seu pedido até você.</p><button type="button" id="btnCallMotoboy" class="w-full py-3 px-4 bg-pumpkin text-white rounded-lg font-bold hover:bg-pumpkin-dark transition flex items-center justify-center shadow-lg"><i class="fas fa-shipping-fast mr-2"></i> CHAMAR MOTOCA</button><p class="text-xs text-gray-500">Você será redirecionado.</p></div></div>
+                <div class="pt-4 border-t border-gray-700 mt-4"><button type="button" id="googleLoginBtn" class="w-full py-3 px-4 bg-white text-gray-700 rounded-lg font-semibold flex items-center justify-center border border-gray-300 hover:bg-gray-50 mb-3"><i class="fab fa-google mr-3 text-red-500 text-lg"></i> Entrar com Google</button><div id="loggedInStep" class="p-3 bg-dark-input rounded-lg text-center mb-3" style="display: none;"><span class="text-xs text-gray-400">Logado como:</span><p id="loggedInUserName" class="font-semibold text-white text-sm"></p></div><p id="assocErrorMsg" class="text-red-400 text-sm text-center mb-3" style="display: none;"></p><div class="flex space-x-3" id="defaultActionButtons"><button type="button" id="cancelActivationBtn" class="flex-1 py-3 bg-gray-600 text-gray-200 rounded-lg font-bold hover:bg-gray-500 transition">Cancelar</button><button type="submit" id="activateAndSendBtn" class="flex-1 py-3 bg-brand-primary text-white rounded-lg font-bold hover:bg-brand-primary-dark transition">Confirmar</button></div></div>
             </form>
         </div>
     </div>
@@ -279,7 +277,6 @@
     <div id="clientObsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"><div class="bg-dark-card border border-dark-border p-4 md:p-6 rounded-xl shadow-2xl w-full max-w-sm"><h3 id="obsItemName" class="text-lg md:text-xl font-bold mb-4 text-indigo-400">Observação</h3><div id="clientQuickObsButtons" class="flex flex-wrap gap-2 mb-4"></div><textarea id="clientObsText" rows="2" class="input-pdv w-full p-3 text-sm" placeholder="Ex: Sem cebola..."></textarea><div class="flex items-center justify-between mt-3 mb-4"><span class="text-gray-300 text-sm">Em Espera?</span><label class="switch-obs"><input type="checkbox" id="esperaSwitch"><span class="slider-obs"></span></label></div><div class="flex justify-end space-x-2"><button id="clientCancelObsBtn" class="px-3 py-2 bg-red-600 text-white rounded-lg">Cancelar</button><button id="clientConfirmObsBtn" class="px-3 py-2 bg-green-600 text-white rounded-lg">Salvar</button></div></div></div>
     <div id="customAlertModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"></div>
     <div id="productInfoModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4"><div class="bg-dark-card border border-dark-border p-5 rounded-xl shadow-2xl w-full max-w-md relative"><button onclick="document.getElementById('productInfoModal').style.display='none'" class="absolute top-2 right-2 text-gray-400 text-2xl">&times;</button><div class="w-full h-48 mb-4 rounded-lg overflow-hidden"><img id="infoProductImage" src="" class="w-full h-full object-cover"></div><h3 id="infoProductName" class="text-xl font-bold text-pumpkin mb-1"></h3><p id="infoProductPrice" class="text-lg font-bold text-white mb-3"></p><div id="infoProductDescription" class="text-sm text-gray-400 mb-4"></div><button id="infoProductAddBtn" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg">Adicionar</button></div></div>
-
 
     <div id="calculatorModal" class="hidden"></div>
     <div id="tableTransferModal" class="hidden"></div>
@@ -301,7 +298,6 @@
         // Placeholders
         window.openManagerAuthModal = () => {};
         
-        // O app.js agora define a função window.goToScreen, então este é apenas um fallback
         if (!window.goToScreen) {
             window.goToScreen = (screenId) => {
                  const appContainer = document.getElementById('appContainer');
@@ -309,12 +305,9 @@
                  const index = clientScreens[screenId];
                  
                  if (appContainer && index !== undefined) {
-                      console.log(`[NAV CLIENT] Going to ${screenId} (index ${index})`);
                       appContainer.style.transform = `translateX(-${index * 100}vw)`;
                       const event = new CustomEvent('screenChanged', { detail: { screenId: screenId } });
                       window.dispatchEvent(event);
-                 } else { 
-                      console.error(`[NAV CLIENT] Invalid screen ID: ${screenId}`); 
                  }
             };
         }
@@ -322,7 +315,6 @@
         window.openKdsStatusModal = () => {};
         window.handleTableTransferConfirmed = () => {};
 
-        // IDs do Firebase
         window.__app_id = "1:1097659747429:web:8ec0a7c3978c311dbe0a8c";
         window.__firebase_config = JSON.stringify({
             apiKey: "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY",

@@ -1,14 +1,14 @@
-// --- CONTROLLERS/MANAGER/MODULES/TEAMMANAGER.JS ---
+// --- CONTROLLERS/MANAGER/MODULES/TEAMMANAGER.JS (CORRIGIDO) ---
 
 import { db, appId, getTablesCollectionRef } from "/services/firebaseService.js"; 
 import { 
     collection, query, where, getDocs, orderBy, Timestamp 
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-import { formatCurrency, toggleLoading } from "/utils.js";
+// CORREÇÃO: Importação centralizada do utils.js
+import { formatCurrency, toggleLoading, showToast } from "/utils.js";
 import { openUserManagementModal } from "/controllers/userManagementController.js"; 
 
-// Helpers Locais
 const getColRef = (name) => collection(db, 'artifacts', appId, 'public', 'data', name);
 let managerModal = null;
 let currentTab = 'team';
@@ -21,10 +21,9 @@ export const init = () => {
     console.log("[TeamModule] Inicializado.");
     managerModal = document.getElementById('managerModal');
     
-    // Expõe funções globais para o HTML
     window.switchHRTab = switchHRTab;
     window.generatePayslip = generatePayslip;
-    window.openUserManagementModal = openUserManagementModal; // Re-exporta para garantir acesso
+    window.openUserManagementModal = openUserManagementModal;
 };
 
 export const open = async () => {
@@ -248,10 +247,9 @@ async function generatePayslip() {
         const q = query(getTablesCollectionRef(), where('status', '==', 'closed'), where('closedAt', '>=', startDate), where('closedAt', '<=', endDate));
         const snap = await getDocs(q);
         
-        // Filtra localmente por garçom (nome ou ID)
+        // Filtra localmente por garçom
         snap.forEach(doc => { 
             const t = doc.data(); 
-            // Lógica simples de matching: ID exato ou primeiro nome
             if ((t.waiterId && t.waiterId === userId) || (t.closedBy && userName.includes(t.closedBy.split(' ')[0]))) {
                 totalSales += (t.total || 0); 
             }
@@ -260,15 +258,13 @@ async function generatePayslip() {
         console.error("Erro ao buscar vendas para comissão:", e);
     }
 
-    // Cálculos
     const commissionVal = totalSales * (commPct / 100);
-    const hourlyRate = salaryBase / 220; // Divisor padrão mensal
-    const nightShiftVal = (hourlyRate * 0.20) * nightHours; // 20% adicional
+    const hourlyRate = salaryBase / 220; 
+    const nightShiftVal = (hourlyRate * 0.20) * nightHours; 
     const thirteenthVal = pay13th ? (salaryBase / 12) : 0;
     
     const grossSalary = salaryBase + commissionVal + nightShiftVal + thirteenthVal;
     
-    // Descontos
     const vtVal = deductVT ? Math.min(grossSalary * 0.06, salaryBase * 0.06) : 0; 
     const inssVal = calculateINSS(grossSalary);
     const irrfVal = calculateIRRF(grossSalary - inssVal, dependents);
@@ -279,7 +275,6 @@ async function generatePayslip() {
     
     const fmt = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-    // Renderiza Holerite
     const preview = document.getElementById('payslipPreview');
     preview.innerHTML = `
         <div class="font-mono text-sm leading-snug">
