@@ -1,4 +1,4 @@
-// --- CONTROLLERS/MANAGER/MODULES/PRODUCTMANAGER.JS (VERSÃO FINAL: UPLOAD & SAVE CORRIGIDOS) ---
+// --- CONTROLLERS/MANAGER/MODULES/PRODUCTMANAGER.JS (VERSÃO FINAL: VALIDADA & SEGURA) ---
 
 import { 
     db, appId, storage, ref, uploadBytes, getDownloadURL, 
@@ -51,7 +51,7 @@ export const init = () => {
     console.log("[ProductModule] Inicializado.");
     managerModal = document.getElementById('managerModal');
     
-    // --- LÓGICA DE UPLOAD BLINDADA ---
+    // --- LÓGICA DE UPLOAD BLINDADA (COM VALIDAÇÃO) ---
     window.handleImageUpload = async (input) => {
         if (input.files && input.files[0]) {
             const file = input.files[0];
@@ -59,6 +59,25 @@ export const init = () => {
             const icon = document.getElementById('imgPlaceholderIcon');
             const urlInput = document.getElementById('prodImgUrl');
             const btnSave = document.getElementById('btnSaveProduct');
+
+            // --- VALIDAÇÃO DE SEGURANÇA (NOVO) ---
+            
+            // 1. Validar Tipo de Arquivo
+            const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+            if (!validTypes.includes(file.type)) {
+                showToast("Formato inválido! Use apenas JPG, PNG ou WEBP.", true);
+                input.value = ''; // Limpa o input para permitir nova seleção
+                return;
+            }
+
+            // 2. Validar Tamanho (Máximo 2MB)
+            const maxSize = 2 * 1024 * 1024; // 2MB em bytes
+            if (file.size > maxSize) {
+                showToast("Imagem muito grande! O limite é 2MB.", true);
+                input.value = ''; 
+                return;
+            }
+            // -------------------------------------
 
             // 1. Preview imediato
             const reader = new FileReader();
@@ -890,3 +909,4 @@ function injectSupplierModal() {
 }
 
 async function renderLowestCostScreen(container, toolbar) { toolbar.innerHTML = `<div class="text-xs text-gray-400 italic w-full text-right">* Baseado nas últimas cotações recebidas.</div>`; container.innerHTML = '<div class="flex justify-center py-10"><i class="fas fa-spinner fa-spin text-3xl text-green-500"></i></div>'; try { const q = query(getColRef('quotations'), where('status', '==', 'received'), orderBy('createdAt', 'desc')); const snap = await getDocs(q); if(snap.empty) { container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-500"><i class="fas fa-search-dollar text-4xl mb-2"></i><p>Nenhuma cotação recente encontrada. Vá em "Lista de Compras" e solicite um orçamento.</p></div>'; return; } const comparisonMap = {}; snap.forEach(doc => { const quote = doc.data(); quote.items.forEach(item => { if (!comparisonMap[item.itemId]) { comparisonMap[item.itemId] = { name: item.name, prices: [] }; } comparisonMap[item.itemId].prices.push({ supplier: quote.supplierName, price: item.price, date: quote.createdAt }); }); }); let html = `<div class="grid grid-cols-1 gap-4 pb-20">`; Object.values(comparisonMap).forEach(itemData => { const sortedPrices = itemData.prices.sort((a, b) => a.price - b.price); const bestPrice = sortedPrices[0]; html += `<div class="bg-gray-800 border border-gray-700 rounded-xl p-4 shadow-lg"><div class="flex justify-between items-center mb-3 border-b border-gray-600 pb-2"><h3 class="text-lg font-bold text-white">${itemData.name}</h3><span class="bg-green-900 text-green-300 text-xs px-2 py-1 rounded border border-green-700">Melhor: ${bestPrice.supplier}</span></div><div class="space-y-2">${sortedPrices.map((p, index) => { const isBest = index === 0; return `<div class="flex justify-between items-center p-2 rounded ${isBest ? 'bg-green-900/20 border border-green-500/50' : 'bg-dark-input'}"><span class="text-sm text-gray-300">${p.supplier}</span><span class="font-mono font-bold ${isBest ? 'text-green-400 text-base' : 'text-gray-400 text-sm'}">${formatCurrency(p.price)}${isBest ? '<i class="fas fa-trophy ml-2 text-yellow-400"></i>' : ''}</span></div>`; }).join('')}</div></div>`; }); html += `</div>`; container.innerHTML = html; } catch(e) { console.error("Erro comparação:", e); container.innerHTML = `<p class="text-red-400 text-center">Erro ao carregar comparações.</p>`; } }
+}

@@ -1,91 +1,97 @@
-// --- utils.js (VERSÃO DEFINITIVA) ---
+// --- UTILS.JS (CENTRALIZADO & SEGURO) ---
 
-// Formata um valor numérico para BRL
 export const formatCurrency = (value) => {
-    if (typeof value !== 'number') value = parseFloat(value) || 0;
-    return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+    }).format(value);
 };
 
-// Formata um timestamp para tempo decorrido (ex: "5 min")
-export const formatElapsedTime = (timestamp) => {
+export const formatElapsedTime = (startTime) => {
+    if (!startTime) return '00:00';
     const now = Date.now();
-    const seconds = Math.floor((now - timestamp) / 1000);
-    const minutes = Math.floor(seconds / 60);
-    return `${minutes} min`;
+    const diff = now - startTime;
+    const minutes = Math.floor(diff / 60000);
+    const seconds = Math.floor((diff % 60000) / 1000);
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 };
 
+// Remove caracteres não numéricos de telefone
+export const maskPhoneNumber = (phone) => {
+    if (!phone) return '';
+    return phone.replace(/\D/g, '').replace(/^(\d{2})(\d{5})(\d{4}).*/, '($1) $2-$3');
+};
+
+// Helper para converter string "R$ 10,00" em float 10.00
 export const getNumericValueFromCurrency = (currencyString) => {
     if (!currencyString) return 0;
-    const cleanedValue = String(currencyString)
-        .replace(/[^0-9,-]/g, '')
-        .replace(',', '.');
-    return parseFloat(cleanedValue) || 0;
+    if (typeof currencyString === 'number') return currencyString;
+    return parseFloat(currencyString.replace(/[^\d,]/g, '').replace(',', '.')) || 0;
 };
 
-export const maskPhoneNumber = (phone) => {
-    if (!phone) return null;
-    const cleaned = String(phone).replace(/\D/g, '');
-    if (cleaned.length === 11) {
-        const ddd = cleaned.substring(0, 2);
-        const lastFour = cleaned.substring(7);
-        return `(${ddd}) *****-${lastFour}`;
-    }
-    if (cleaned.length === 10) {
-        const ddd = cleaned.substring(0, 2);
-        const lastFour = cleaned.substring(6);
-        return `(${ddd}) ****-${lastFour}`;
-    }
-    if (cleaned.length > 4) {
-        const lastFour = cleaned.slice(-4);
-        return `*****-${lastFour}`;
-    }
-    return phone;
+export const calculateItemsValue = (items) => {
+    if (!items || !Array.isArray(items)) return 0;
+    return items.reduce((sum, item) => sum + (item.price || 0), 0);
 };
 
-export const calculateItemsValue = (itemsArray) => {
-    if (!itemsArray || !Array.isArray(itemsArray)) return 0;
-    return itemsArray.reduce((total, item) => {
-        const price = parseFloat(item.price) || 0;
-        return total + price;
-    }, 0);
+// --- SHOW TOAST (NOTIFICAÇÃO FLUTUANTE) ---
+export const showToast = (message, isError = false) => {
+    const existing = document.getElementById('toast-notification');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'toast-notification';
+    toast.className = `fixed top-5 right-5 px-6 py-4 rounded-lg shadow-2xl z-[100] transform transition-all duration-300 translate-y-[-100%] opacity-0 flex items-center ${
+        isError ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
+    }`;
+    
+    toast.innerHTML = `
+        <i class="fas ${isError ? 'fa-exclamation-triangle' : 'fa-check-circle'} mr-3 text-xl"></i>
+        <span class="font-bold text-sm">${message}</span>
+    `;
+
+    document.body.appendChild(toast);
+
+    // Animação de entrada
+    requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-[-100%]', 'opacity-0');
+    });
+
+    // Auto-remove
+    setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-[-100%]');
+        setTimeout(() => toast.remove(), 300);
+    }, 3500);
 };
 
-// --- UI HELPERS ---
-
-export const toggleLoading = (btnElement, isLoading, loadingText = 'Aguarde...') => {
+// --- TOGGLE LOADING (PROTEÇÃO CONTRA DUPLO CLIQUE) ---
+export const toggleLoading = (btnElement, isLoading, loadingText = 'Processando...') => {
     if (!btnElement) return;
+
     if (isLoading) {
+        // Proteção: Só salva o texto original se ele ainda não foi salvo
+        // (Isso evita que salve o ícone de spinner como texto original em cliques rápidos)
         if (!btnElement.dataset.originalText) {
             btnElement.dataset.originalText = btnElement.innerHTML;
         }
+        
+        // Define largura fixa para evitar "pulo" no layout
+        btnElement.style.width = `${btnElement.offsetWidth}px`;
+        
         btnElement.disabled = true;
-        btnElement.style.minWidth = btnElement.offsetWidth + 'px';
-        btnElement.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${loadingText}`;
+        btnElement.innerHTML = `<i class="fas fa-spinner fa-spin animate-spin"></i> ${loadingText}`;
         btnElement.classList.add('opacity-75', 'cursor-not-allowed');
     } else {
         btnElement.disabled = false;
-        btnElement.style.minWidth = '';
-        btnElement.innerHTML = btnElement.dataset.originalText || 'Confirmar';
+        
+        // Restaura texto original
+        if (btnElement.dataset.originalText) {
+            btnElement.innerHTML = btnElement.dataset.originalText;
+        } else {
+            btnElement.innerHTML = 'Confirmar'; // Fallback
+        }
+        
+        btnElement.style.width = ''; // Reseta largura
         btnElement.classList.remove('opacity-75', 'cursor-not-allowed');
     }
-};
-
-export const showToast = (message, isError = false) => {
-    try {
-        const toast = document.createElement('div');
-        toast.textContent = message;
-        toast.className = 'fixed bottom-5 right-5 p-4 rounded-lg shadow-lg text-white z-[9999] transition-opacity duration-300 ease-out font-bold flex items-center';
-        toast.style.backgroundColor = isError ? '#ef4444' : '#22c55e'; // Red-500 ou Green-500
-        toast.innerHTML = `<i class="fas ${isError ? 'fa-exclamation-circle' : 'fa-check-circle'} mr-2"></i> ${message}`;
-        
-        toast.style.opacity = '0'; 
-        document.body.appendChild(toast);
-        
-        requestAnimationFrame(() => { toast.style.opacity = '1'; });
-        
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 300); 
-        }, 3000); 
-    } catch (e) { console.error("Falha ao mostrar toast:", e); alert(message); }
 };

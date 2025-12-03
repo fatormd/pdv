@@ -43,6 +43,10 @@
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #1f2937; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #4b5563; border-radius: 10px; }
+        
+        /* Animação suave para os modais */
+        .animate-fade-in { animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
     </style>
 </head>
 <body class="bg-dark-bg min-h-screen text-dark-text"> 
@@ -388,7 +392,8 @@
     <div id="waiterRegModal" class="hidden"></div>
     <div id="selectiveTransferModal" class="hidden"></div>
     <div id="productManagementModal" class="hidden"></div>
-    
+    <div id="customerRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"><div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col"><div class="flex justify-between items-center mb-4 flex-shrink-0"><h3 class="text-xl font-bold text-indigo-400">Associar/Cadastrar Cliente</h3><button id="closeCustomerRegModalBtn" class="text-gray-400 hover:text-white text-2xl">&times;</button></div><div class="flex space-x-2 mb-4"><input type="text" id="customerSearchCpf" placeholder="Buscar por CPF/CNPJ" class="input-pdv w-full"><button id="searchCustomerByCpfBtn" class="p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"><i class="fas fa-search"></i></button></div><div id="customerSearchResults" class="mb-4"></div><div class="space-y-3 flex-grow overflow-y-auto custom-scrollbar p-1"><input type="text" id="customerName" placeholder="Nome Completo *" class="input-pdv w-full"><input type="text" id="customerCpf" placeholder="CPF/CNPJ *" class="input-pdv w-full"><input type="text" id="customerPhone" placeholder="Telefone/WhatsApp" class="input-pdv w-full"><input type="email" id="customerEmail" placeholder="E-mail" class="input-pdv w-full"></div><div class="flex justify-end space-x-3 mt-4 pt-2 border-t border-gray-700 flex-shrink-0"><button id="saveCustomerBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg disabled:opacity-50">Salvar Novo</button><button id="linkCustomerToTableBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg disabled:opacity-50" disabled>Associar à Mesa</button></div></div></div>
+
     <div id="obsModal" class="fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center z-[80] hidden p-4 print-hide">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
             <h3 class="text-xl font-bold text-pumpkin mb-2" id="obsItemName">Item</h3>
@@ -456,6 +461,31 @@
 
     <div id="sangriaModal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[60] hidden p-4 print-hide"><div class="bg-dark-card border border-red-500/50 p-5 rounded-lg shadow-xl w-full max-w-xs"><h4 class="text-lg font-bold text-red-400 mb-3">Nova Sangria</h4><p class="text-xs text-gray-400 mb-3">Registre o valor entregue ao gerente.</p><input type="number" id="sangriaValueInput" class="input-pdv w-full mb-2" placeholder="Valor (R$)" step="0.01"><input type="text" id="sangriaReasonInput" class="input-pdv w-full mb-4" placeholder="Motivo (Ex: Recolhimento)"><div class="flex space-x-2"><button class="flex-1 bg-gray-600 text-white py-2 rounded hover:bg-gray-500" onclick="document.getElementById('sangriaModal').style.display='none'">Cancelar</button><button id="confirmSangriaBtn" class="flex-1 bg-red-600 text-white py-2 rounded hover:bg-red-700 font-bold">Salvar</button></div></div></div>
 
+    <div id="customConfirmModal" class="fixed inset-0 bg-black/90 flex items-center justify-center z-[100] hidden p-4 animate-fade-in">
+        <div class="bg-dark-card border border-gray-600 p-6 rounded-xl shadow-2xl w-full max-w-sm text-center">
+            <div class="mb-4">
+                <i class="fas fa-question-circle text-5xl text-pumpkin mb-3"></i>
+                <h3 class="text-xl font-bold text-white mb-2" id="confirmTitle">Confirmação</h3>
+                <p class="text-gray-300 text-sm" id="confirmMessage">Tem certeza?</p>
+            </div>
+            <div class="flex space-x-3 justify-center">
+                <button id="btnConfirmNo" class="px-5 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg font-bold transition">Não</button>
+                <button id="btnConfirmYes" class="px-5 py-2 bg-pumpkin hover:bg-pumpkin-dark text-white rounded-lg font-bold transition shadow-lg">Sim</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="customAlertModal" class="fixed inset-0 bg-black/90 flex items-center justify-center z-[100] hidden p-4 animate-fade-in">
+        <div class="bg-dark-card border border-gray-600 p-6 rounded-xl shadow-2xl w-full max-w-sm text-center">
+            <div class="mb-4">
+                <i class="fas fa-exclamation-circle text-5xl text-blue-500 mb-3"></i>
+                <h3 class="text-xl font-bold text-white mb-2">Atenção</h3>
+                <p class="text-gray-300 text-sm" id="alertMessage">Mensagem...</p>
+            </div>
+            <button id="btnAlertOk" class="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition shadow-lg">OK</button>
+        </div>
+    </div>
+
     <audio id="notificationSound" src="ding.mp3" preload="auto"></audio>
 
     <p class="mt-8 text-center text-xs text-dark-placeholder print-hide" id="user-id-display">Usuário ID: Carregando...</p>
@@ -467,17 +497,6 @@
         window.openSplitTransferModal = (splitId, mode) => { alert(`Funcionalidade desativada`); };
     </script>
 
-    <script>
-        window.__app_id = "1:1097659747429:web:8ec0a7c3978c311dbe0a8c";
-        window.__firebase_config = JSON.stringify({
-            apiKey: "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY",
-            authDomain: "fator-pdv.firebaseapp.com",
-            projectId: "fator-pdv",
-            storageBucket: "fator-pdv.firebasestorage.app",
-            messagingSenderId: "1097659747429",
-            appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c"
-        });
-    </script>
     <script type="module" src="app.js?v=4"></script>
 </body>
 </html>

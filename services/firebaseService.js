@@ -1,7 +1,7 @@
-// --- SERVICES/FIREBASESERVICE.JS (COM STORAGE ATIVADO) ---
+// --- SERVICES/FIREBASESERVICE.JS (COM STORAGE & MODO OFFLINE ATIVOS) ---
 
-import { collection, doc, updateDoc, arrayUnion, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-// 1. IMPORTAÇÃO DO STORAGE
+// 1. Adicionamos 'enableIndexedDbPersistence' na importação
+import { collection, doc, updateDoc, arrayUnion, serverTimestamp, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
 // Variáveis globais exportadas
@@ -9,9 +9,9 @@ export let db = null;
 export let auth = null;
 export let appId = null;
 export let functions = null;
-export let storage = null; // 2. VARIÁVEL DO STORAGE
+export let storage = null;
 
-// 3. EXPORTA AS FERRAMENTAS PARA OS OUTROS ARQUIVOS USAREM
+// Exporta as ferramentas para os outros arquivos usarem
 export { arrayUnion, serverTimestamp, ref, uploadBytes, getDownloadURL };
 
 // Função de inicialização
@@ -21,7 +21,23 @@ export const initializeFirebase = (database, authentication, appIdentifier, appF
     appId = appIdentifier;
     functions = appFunctions;
 
-    // 4. INICIALIZAÇÃO AUTOMÁTICA DO STORAGE
+    // 2. ATIVAÇÃO DA PERSISTÊNCIA OFFLINE (NOVO)
+    // Isso permite que o sistema funcione mesmo se a internet cair
+    enableIndexedDbPersistence(db)
+        .then(() => {
+            console.log("[FirebaseService] Modo Offline ativado com sucesso.");
+        })
+        .catch((err) => {
+            if (err.code == 'failed-precondition') {
+                // Provavelmente múltiplas abas abertas ao mesmo tempo
+                console.warn('[FirebaseService] Persistência offline falhou: Múltiplas abas abertas.');
+            } else if (err.code == 'unimplemented') {
+                // Navegador não suporta (ex: modo anônimo de alguns browsers)
+                console.warn('[FirebaseService] Persistência offline não suportada neste navegador.');
+            }
+        });
+
+    // 3. INICIALIZAÇÃO AUTOMÁTICA DO STORAGE
     if (db && db.app) {
         try {
             storage = getStorage(db.app);

@@ -1,4 +1,4 @@
-// --- CONTROLLERS/PANELCONTROLLER.JS (ATUALIZADO COM DESAGRUPAR) ---
+// --- CONTROLLERS/PANELCONTROLLER.JS (OTIMIZADO: EVENT DELEGATION) ---
 import { 
     getTablesCollectionRef, 
     getTableDocRef, 
@@ -125,7 +125,8 @@ const renderTables = (docs) => {
             } 
             else if (isBillRequested) {
                  cardColorClasses = 'bg-green-900 border-green-700 text-white hover:bg-green-800 ring-2 ring-green-400 animate-pulse';
-                 attentionIconHtml = `<button class="attention-icon-btn bill-request-icon" data-table-id="${tId}" title="Imprimir Conta">
+                 // AQUI: Substituído onclick por data-action
+                 attentionIconHtml = `<button class="attention-icon-btn bill-request-icon" data-action="confirm-bill" data-id="${tId}" title="Imprimir Conta">
                                         <i class="fas fa-print text-xl text-green-400 animate-pulse"></i>
                                      </button>`;
             }
@@ -158,16 +159,18 @@ const renderTables = (docs) => {
 
                  if (t.kdsAlert === 'ready') {
                      kdsIconClass = "text-green-400 animate-bounce font-bold drop-shadow-md";
-                     kdsIcon = "fa-concierge-bell"; // Sino de pronto
+                     kdsIcon = "fa-concierge-bell"; 
                      kdsTitle = "PEDIDO PRONTO!";
                  }
 
-                 kdsStatusButtonHtml = `<button class="kds-status-icon-btn ${kdsIconClass}" title="${kdsTitle}" onclick="window.openKdsStatusModal('${tId}')">
+                 // AQUI: Substituído onclick por data-action
+                 kdsStatusButtonHtml = `<button class="kds-status-icon-btn ${kdsIconClass}" title="${kdsTitle}" data-action="open-kds" data-id="${tId}">
                                             <i class="fas ${kdsIcon}"></i>
                                         </button>`;
             }
             
-            const mergeIconHtml = isMerged ? '' : `<button class="merge-icon-btn" title="Agrupar Mesas" onclick="window.openTableMergeModal()"><i class="fas fa-people-arrows"></i></button>`;
+            // AQUI: Substituído onclick por data-action
+            const mergeIconHtml = isMerged ? '' : `<button class="merge-icon-btn" title="Agrupar Mesas" data-action="open-merge"><i class="fas fa-people-arrows"></i></button>`;
             
             const clientInfo = t.clientName ? `<p class="text-xs font-semibold">${t.clientName}</p>` : '';
             const statusText = isMerged ? `Agrupada (Mestra: ${t.masterTable})` : `Pessoas: ${t.diners}`;
@@ -190,23 +193,39 @@ const renderTables = (docs) => {
 
     openTablesCount.textContent = count;
     if (count === 0) openTablesList.innerHTML = `<div class="col-span-full text-sm text-dark-placeholder italic p-4 content-card bg-dark-card border border-gray-700">Nenhuma mesa aberta/agrupada no setor "${currentSectorFilter}".</div>`;
+};
 
-    document.querySelectorAll('.table-card-panel').forEach(card => {
-        card.addEventListener('click', (e) => {
-            if (e.target.closest('.kds-status-icon-btn') || e.target.closest('.attention-icon') || e.target.closest('.merge-icon-btn') || e.target.closest('.bill-request-icon')) return; 
+// --- FUNÇÃO CENTRAL DE EVENTOS (DELEGAÇÃO) ---
+const setupPanelEventListeners = () => {
+    const list = document.getElementById('openTablesList');
+    
+    // Remove listeners antigos se houver (para evitar duplicidade em hot reload, se aplicável)
+    const newClone = list.cloneNode(false);
+    // Mas no caso de SPA simples, apenas garantimos que rodamos uma vez no init.
+    
+    list.addEventListener('click', (e) => {
+        // 1. Verifica se clicou em um botão de ação (KDS, Merge, Conta)
+        const actionBtn = e.target.closest('[data-action]');
+        if (actionBtn) {
+            e.stopPropagation(); // Impede abrir a mesa
+            const action = actionBtn.dataset.action;
+            const id = actionBtn.dataset.id;
 
+            if (action === 'open-kds') openKdsStatusModal(id);
+            else if (action === 'open-merge') openTableMergeModal();
+            else if (action === 'confirm-bill') handleBillRequestConfirmation(id);
+            return;
+        }
+
+        // 2. Verifica se clicou no Card da Mesa (para abrir pedido)
+        const card = e.target.closest('.table-card-panel');
+        if (card) {
+            // Ignora se clicou em ícones de atenção que não são botões
+            if (e.target.closest('.attention-icon')) return;
+            
             const tableId = card.dataset.tableId;
-            if (tableId) {
-                selectTableAndStartListener(tableId);
-            }
-        });
-    });
-
-    document.querySelectorAll('.bill-request-icon').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            window.handleBillRequestConfirmation(btn.dataset.tableId);
-        });
+            if (tableId) selectTableAndStartListener(tableId);
+        }
     });
 };
 
@@ -234,7 +253,7 @@ export const loadOpenTables = () => {
 };
 
 // --- STATUS KDS ---
-window.openKdsStatusModal = async (tableId) => {
+const openKdsStatusModal = async (tableId) => {
     const modal = document.getElementById('tableKdsModal');
     const content = document.getElementById('tableKdsContent');
     document.getElementById('tableKdsTitle').textContent = `Cozinha - Mesa ${tableId}`;
@@ -376,7 +395,6 @@ async function handleBillRequestConfirmation(tableId) {
         goToScreen('paymentScreen');
     } catch (e) { console.error(e); showToast("Erro ao processar.", true); }
 }
-window.handleBillRequestConfirmation = handleBillRequestConfirmation;
 
 // --- AGRUPAMENTO E DESAGRUPAMENTO DE MESAS (ATUALIZADO) ---
 export const openTableMergeModal = () => {
@@ -403,7 +421,7 @@ export const openTableMergeModal = () => {
             <label for="cb_merge_${t.id}" class="ml-3 text-white font-bold">Mesa ${t.tableNumber} <span class="text-xs font-normal text-gray-400">(${formatCurrency(t.total)})</span></label>
         </div>`).join('');
 
-    // HTML para a aba "Separar"
+    // HTML para a aba "Separar" - AQUI TAMBÉM USAMOS DATA-ACTION
     const ungroupList = mergedTables.length > 0 
         ? mergedTables.map(t => `
             <div class="flex justify-between items-center bg-dark-input p-3 rounded border border-gray-700 mb-2">
@@ -412,7 +430,7 @@ export const openTableMergeModal = () => {
                     <span class="text-xs text-gray-400 block">Mestra: Mesa ${t.masterTable}</span>
                 </div>
                 <button class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-bold" 
-                        onclick="window.handleConfirmUngroup('${t.id}', '${t.masterTable}')">
+                        data-action="ungroup" data-id="${t.id}" data-master="${t.masterTable}">
                     Separar
                 </button>
             </div>`).join('')
@@ -445,7 +463,7 @@ export const openTableMergeModal = () => {
             </div>
 
             <div id="ungroupTabContent" class="hidden">
-                <div class="max-h-80 overflow-y-auto custom-scrollbar">
+                <div class="max-h-80 overflow-y-auto custom-scrollbar" id="ungroupListContainer">
                     ${ungroupList}
                 </div>
                 <div class="flex justify-end mt-4 pt-2 border-t border-gray-700">
@@ -456,7 +474,7 @@ export const openTableMergeModal = () => {
     `;
     modal.style.display = 'flex';
     
-    // Lógica de Abas Internas
+    // Configura listeners do Modal (Abas e Desagrupar)
     document.getElementById('tabMerge').onclick = () => {
         document.getElementById('mergeTabContent').style.display = 'block';
         document.getElementById('ungroupTabContent').style.display = 'none';
@@ -477,11 +495,16 @@ export const openTableMergeModal = () => {
 
     document.getElementById('confirmMergeBtn').onclick = handleConfirmTableMerge;
     
-    // Expondo a função de desagrupar para o onclick do HTML injetado
-    window.handleConfirmUngroup = handleConfirmUngroup;
+    // Listener de Delegação para Desagrupar (Dentro do Modal)
+    document.getElementById('ungroupListContainer').addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-action="ungroup"]');
+        if (btn) {
+            handleConfirmUngroup(btn.dataset.id, btn.dataset.master);
+        }
+    });
 };
 
-// Lógica de Agrupar (Mantida)
+// Lógica de Agrupar
 export const handleConfirmTableMerge = async () => {
     const masterId = document.getElementById('masterTableSelect').value.trim();
     const container = document.getElementById('sourceTablesContainer');
@@ -552,43 +575,23 @@ export const handleConfirmTableMerge = async () => {
     }
 };
 
-// Lógica de Desagrupar (NOVA)
-export const handleConfirmUngroup = async (mergedTableId, masterTableNum) => {
+// Lógica de Desagrupar
+const handleConfirmUngroup = async (mergedTableId, masterTableNum) => {
     if (!confirm(`Deseja separar a Mesa ${mergedTableId}? Ela ficará LIVRE (fechada).`)) return;
 
     try {
         const batch = writeBatch(db);
         const tablesCol = getTablesCollectionRef();
-        
-        // Referência da Mesa Agrupada
         const mergedRef = doc(tablesCol, mergedTableId);
-        
-        // Precisamos encontrar o ID da Mesa Mestra baseada no seu número (masterTableNum)
-        // Como o ID do documento é geralmente o número da mesa em string, tentamos direto
-        // Se a lógica de ID for diferente, precisaria de uma query. Assumindo ID = Numero.
         const masterRef = doc(tablesCol, masterTableNum.toString());
 
-        // 1. Atualiza Mesa Mestra (Remove da lista de merged)
-        batch.update(masterRef, {
-            mergedTables: arrayRemove(mergedTableId)
-        });
-
-        // 2. Atualiza Mesa Agrupada (Volta para Closed/Livre)
-        batch.update(mergedRef, {
-            status: 'closed',
-            masterTable: null,
-            total: 0,
-            diners: 0,
-            mergedTables: []
-        });
+        batch.update(masterRef, { mergedTables: arrayRemove(mergedTableId) });
+        batch.update(mergedRef, { status: 'closed', masterTable: null, total: 0, diners: 0, mergedTables: [] });
 
         await batch.commit();
         
-        // Atualiza a lista visualmente sem fechar o modal
         openTableMergeModal(); 
-        // Simula clique na aba 'Separar' para manter contexto
         setTimeout(() => document.getElementById('tabUngroup').click(), 100);
-        
         showToast(`Mesa ${mergedTableId} separada com sucesso!`, false);
 
     } catch (e) {
@@ -603,6 +606,9 @@ export const initPanelController = async () => {
     console.log("[PanelController] Inicializando...");
     await fetchServiceSectors();
     
+    // Novo: Listener centralizado para ações na lista de mesas
+    setupPanelEventListeners();
+
     const abrirBtn = document.getElementById('abrirMesaBtn');
     if (abrirBtn) abrirBtn.addEventListener('click', handleAbrirMesa);
     const searchBtn = document.getElementById('searchTableBtn');

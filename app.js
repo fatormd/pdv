@@ -573,3 +573,56 @@ export const playNotificationSound = () => {
         audio.play().catch(e => console.warn("Som bloqueado."));
     }
 };
+
+// --- UTILITÁRIOS GLOBAIS DE UI (CONFIRM & ALERT) ---
+window.showConfirm = (message, title = "Confirmação") => {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('customConfirmModal');
+        if(!modal) {
+            // Fallback se o modal não existir no HTML ainda
+            resolve(confirm(message));
+            return;
+        }
+        document.getElementById('confirmTitle').textContent = title;
+        document.getElementById('confirmMessage').textContent = message;
+        
+        const btnYes = document.getElementById('btnConfirmYes');
+        const btnNo = document.getElementById('btnConfirmNo');
+        
+        const handleYes = () => { close(); resolve(true); };
+        const handleNo = () => { close(); resolve(false); };
+        
+        const close = () => {
+            modal.classList.add('hidden');
+            btnYes.removeEventListener('click', handleYes);
+            btnNo.removeEventListener('click', handleNo);
+        };
+
+        btnYes.addEventListener('click', handleYes);
+        btnNo.addEventListener('click', handleNo);
+        
+        modal.classList.remove('hidden');
+    });
+};
+
+window.showAlert = (message) => {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('customAlertModal');
+        if(!modal) {
+            alert(message);
+            resolve();
+            return;
+        }
+        document.getElementById('alertMessage').textContent = message;
+        const btnOk = document.getElementById('btnAlertOk');
+        
+        const handleOk = () => {
+            modal.classList.add('hidden');
+            btnOk.removeEventListener('click', handleOk);
+            resolve();
+        };
+        
+        btnOk.addEventListener('click', handleOk);
+        modal.classList.remove('hidden');
+    });
+};

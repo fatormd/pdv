@@ -1,6 +1,7 @@
-// --- CONTROLLERS/PAYMENTCONTROLLER.JS (VERSÃO FINAL - ATUALIZADA COM CHAMADA DE MOTOBOY) ---
+// --- CONTROLLERS/PAYMENTCONTROLLER.JS (VERSÃO OTIMIZADA & CENTRALIZADA) ---
 import { currentTableId, currentOrderSnapshot, userId, goToScreen, showToast } from "/app.js"; 
-import { formatCurrency, calculateItemsValue, getNumericValueFromCurrency } from "/utils.js"; 
+// AQUI: Importamos toggleLoading do utils.js
+import { formatCurrency, calculateItemsValue, getNumericValueFromCurrency, toggleLoading } from "/utils.js"; 
 import { getTableDocRef, getCustomersCollectionRef, db, getTablesCollectionRef } from "/services/firebaseService.js"; 
 import {
     updateDoc, arrayUnion, arrayRemove, writeBatch, getDoc, serverTimestamp,
@@ -19,32 +20,18 @@ let tableTransferModal, targetTableInput, confirmTransferBtn;
 let printSummaryBtn;
 let customerRegModal, customerSearchCpfInput, searchCustomerByCpfBtn, customerSearchResultsDiv;
 let customerNameInput, customerCpfInput, customerPhoneInput, customerEmailInput;
-let closeCustomerRegModalBtn, saveCustomerBtn, linkCustomerToTableBtn, callMotoboyBtn; // Adicionado callMotoboyBtn
+let closeCustomerRegModalBtn, saveCustomerBtn, linkCustomerToTableBtn, callMotoboyBtn;
 let currentFoundCustomer = null;
 let decreaseDinersBtn, increaseDinersBtn;
 
 // Estado local
 let isMassSelectionActive = false;
 let paymentInitialized = false;
+let itemsToTransfer = []; 
 
-// Constante de métodos de pagamento
 const PAYMENT_METHODS = ['Dinheiro', 'Pix', 'Crédito', 'Débito', 'Ticket', 'Voucher'];
 
-// --- HELPER DE UI: LOADING STATE ---
-const toggleLoading = (btnElement, isLoading, loadingText = 'Processando...') => {
-    if (!btnElement) return;
-    if (isLoading) {
-        btnElement.dataset.originalText = btnElement.innerHTML;
-        btnElement.disabled = true;
-        btnElement.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${loadingText}`;
-        btnElement.classList.add('opacity-75', 'cursor-not-allowed');
-    } else {
-        btnElement.disabled = false;
-        btnElement.innerHTML = btnElement.dataset.originalText || 'Confirmar';
-        btnElement.classList.remove('opacity-75', 'cursor-not-allowed');
-    }
-};
-
+// --- HELPERS (Calculadora e Updates Simples) ---
 const updateText = (id, value) => {
     const el = document.getElementById(id);
     if (el) el.textContent = value;
@@ -53,12 +40,7 @@ const updateText = (id, value) => {
 // ==========================================================
 // --- MOTOR DA CALCULADORA ---
 // ==========================================================
-let calculatorState = { 
-    displayValue: '0', 
-    firstOperand: null, 
-    waitingForSecondOperand: false, 
-    operator: null 
-};
+let calculatorState = { displayValue: '0', firstOperand: null, waitingForSecondOperand: false, operator: null };
 
 function updateDisplay() {
     if(calcDisplay) {
@@ -123,12 +105,7 @@ const performCalculation = {
 };
 
 function resetCalculator() {
-    calculatorState = { 
-        displayValue: '0', 
-        firstOperand: null, 
-        waitingForSecondOperand: false, 
-        operator: null 
-    };
+    calculatorState = { displayValue: '0', firstOperand: null, waitingForSecondOperand: false, operator: null };
 }
 
 function backspace() {
@@ -136,38 +113,43 @@ function backspace() {
      calculatorState.displayValue = displayValue.length > 1 ? displayValue.slice(0, -1) : '0';
 }
 
-// --- FUNÇÕES DE AÇÃO (PAGAMENTO) ---
+// --- FUNÇÕES DE AÇÃO ---
 
-export const executeDeletePayment = async (timestamp) => {
+const executeDeletePayment = async (timestamp, btnElement) => {
     if (!currentTableId || !timestamp) return;
-    const tableRef = getTableDocRef(currentTableId);
     
+    if (!(await window.showConfirm("Tem certeza que deseja excluir este pagamento?", "Confirmar Exclusão"))) return;
+
+    // Proteção Visual no Botão de Lixeira
+    if (btnElement) {
+        btnElement.classList.add('text-gray-500', 'cursor-not-allowed');
+        btnElement.disabled = true;
+    }
+
+    const tableRef = getTableDocRef(currentTableId);
     const paymentToDelete = currentOrderSnapshot?.payments.find(p => p.timestamp == timestamp); 
     
     try {
         if (paymentToDelete) {
             await updateDoc(tableRef, { payments: arrayRemove(paymentToDelete) });
         } else {
-            const paymentsArray = currentOrderSnapshot?.payments || [];
-            const idx = paymentsArray.findIndex(p => p.timestamp == timestamp);
-            if (idx > -1) {
-                const freshSnap = await getDoc(tableRef);
-                const freshPayments = freshSnap.data()?.payments || [];
-                const freshPaymentToDelete = freshPayments.find(p => p.timestamp == timestamp);
-                if (freshPaymentToDelete) {
-                    await updateDoc(tableRef, { payments: arrayRemove(freshPaymentToDelete) });
-                }
+            const freshSnap = await getDoc(tableRef);
+            const freshPayments = freshSnap.data()?.payments || [];
+            const freshPaymentToDelete = freshPayments.find(p => p.timestamp == timestamp);
+            if (freshPaymentToDelete) {
+                await updateDoc(tableRef, { payments: arrayRemove(freshPaymentToDelete) });
             }
         }
         showToast("Pagamento removido com sucesso.", false);
     } catch (e) {
         console.error("Erro ao remover pagamento:", e);
         showToast("Falha ao remover pagamento.", true);
+        // Restaura botão em caso de erro
+        if (btnElement) {
+            btnElement.classList.remove('text-gray-500', 'cursor-not-allowed');
+            btnElement.disabled = false;
+        }
     }
-};
-
-window.deletePayment = (timestamp) => {
-    window.openManagerAuthModal('deletePayment', timestamp); 
 };
 
 const _validatePaymentInputs = () => {
@@ -180,7 +162,7 @@ const _validatePaymentInputs = () => {
     addPaymentBtn.classList.toggle('cursor-not-allowed', !isValid); 
 };
 
-// --- FUNÇÕES DE RENDERIZAÇÃO ---
+// --- RENDERIZAÇÃO ---
 
 const renderRegisteredPayments = (payments) => {
     if (!paymentSummaryList) return;
@@ -197,10 +179,10 @@ const renderRegisteredPayments = (payments) => {
             </div>
             <div class="flex items-center space-x-3">
                 <span class="font-bold text-lg text-dark-text">${p.value}</span>
-                <button class="p-2 text-red-500 hover:text-red-400 transition print-hide" 
+                <button class="p-2 text-red-500 hover:text-red-400 transition print-hide btn-delete-payment" 
                         title="Excluir Pagamento"
-                        onclick="window.deletePayment(${p.timestamp})">
-                    <i class="fas fa-trash-alt"></i>
+                        data-timestamp="${p.timestamp}">
+                    <i class="fas fa-trash-alt pointer-events-none"></i>
                 </button>
             </div>
         </div>
@@ -273,9 +255,7 @@ export const renderPaymentSummary = (tableId, orderSnapshot) => {
 const renderReviewItemsList = (orderSnapshot) => { 
     if (!reviewItemsList) return;
     const items = orderSnapshot?.sentItems || [];
-    const oldActionBar = document.getElementById('reviewActionBar');
-    if (oldActionBar) oldActionBar.remove();
-
+    
     if (items.length === 0) {
         reviewItemsList.innerHTML = `<div class="text-sm text-dark-placeholder italic p-2">Nenhum item na conta principal.</div>`;
         return;
@@ -298,8 +278,8 @@ const renderReviewItemsList = (orderSnapshot) => {
             <div class="flex items-center flex-grow min-w-0 mr-2 print-hide"> 
                 <input type="checkbox"
                        class="item-select-checkbox mr-3 h-5 w-5 bg-dark-input border-gray-600 rounded text-pumpkin focus:ring-pumpkin"
-                       data-items='${itemData}'
-                       onchange="window.activateItemSelection()">
+                       data-action="toggle-select"
+                       data-items='${itemData}'>
                 <div class="flex flex-col min-w-0">
                     <span class="font-semibold text-dark-text truncate">${group.name} (${group.count}x)</span>
                     <span class="text-xs text-dark-placeholder">${group.note || 'Sem observações'}</span>
@@ -315,9 +295,8 @@ const renderReviewItemsList = (orderSnapshot) => {
     const actionBarHtml = `
         <div id="reviewActionBar" class="flex justify-between items-center p-2 mt-4 bg-dark-input rounded-lg sticky bottom-0 print-hide">
             <div class="flex items-center">
-                <input type="checkbox" id="selectAllItems" class="mr-2 h-4 w-4"
-                       onchange="window.activateItemSelection('toggleAll')">
-                <label for="selectAllItems" class="text-sm font-semibold">Todos</label>
+                <input type="checkbox" id="selectAllItems" class="mr-2 h-4 w-4" data-action="toggle-all">
+                <label for="selectAllItems" class="text-sm font-semibold cursor-pointer">Todos</label>
             </div>
             <div class="flex space-x-2">
                 <button id="massDeleteBtn" class="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm font-bold opacity-50 cursor-not-allowed" disabled>
@@ -330,12 +309,10 @@ const renderReviewItemsList = (orderSnapshot) => {
         </div>`;
         
     reviewItemsList.innerHTML = itemsHtml + actionBarHtml;
-    attachReviewListListeners();
 };
 
-
-// --- AÇÕES EM MASSA E TRANSFERÊNCIA ---
-window.activateItemSelection = (mode = null) => { 
+// --- AÇÕES EM MASSA ---
+const activateItemSelection = (mode = null) => { 
     const allCheckboxes = document.querySelectorAll('#reviewItemsList input[type="checkbox"].item-select-checkbox');
     const selectAllBox = document.getElementById('selectAllItems');
     const deleteBtn = document.getElementById('massDeleteBtn');
@@ -366,16 +343,22 @@ window.activateItemSelection = (mode = null) => {
         selectAllBox.checked = false;
     }
 
-    window.itemsToTransfer = []; 
+    itemsToTransfer = []; 
     selectedCheckboxes.forEach(box => {
         try {
-            window.itemsToTransfer.push(...JSON.parse(box.dataset.items.replace(/&#39;/g, "'")));
+            itemsToTransfer.push(...JSON.parse(box.dataset.items.replace(/&#39;/g, "'")));
         } catch(e) { console.error("Erro ao ler dados de item para seleção:", e); }
     });
+    
+    window.itemsToTransfer = itemsToTransfer; 
 };
 
+// Listener global de ações em massa para Managers
+window.executeMassDelete = handleMassDeleteConfirmed; 
+window.executeMassTransfer = openTableTransferModal;
+
 export const handleMassActionRequest = (action) => {
-    if (!window.itemsToTransfer || window.itemsToTransfer.length === 0) { 
+    if (!itemsToTransfer || itemsToTransfer.length === 0) { 
         showToast("Nenhum item selecionado.", true);
         return;
     }
@@ -386,8 +369,8 @@ export const handleMassActionRequest = (action) => {
     }
 };
 
-export const handleMassDeleteConfirmed = async () => {
-    if (!currentTableId || !window.itemsToTransfer || window.itemsToTransfer.length === 0) {
+async function handleMassDeleteConfirmed() {
+    if (!currentTableId || !itemsToTransfer || itemsToTransfer.length === 0) {
         showToast("Nenhum item selecionado para exclusão.", true);
         return;
     }
@@ -406,20 +389,20 @@ export const handleMassDeleteConfirmed = async () => {
             return;
         }
 
-        const itemsToDelete = window.itemsToTransfer;
-        const valueToDecrease = itemsToDelete.reduce((sum, item) => sum + (item.price || 0), 0);
+        const valueToDecrease = itemsToTransfer.reduce((sum, item) => sum + (item.price || 0), 0);
         const currentTotal = currentOrderSnapshot?.total || 0;
         const newTotal = Math.max(0, currentTotal - valueToDecrease); 
 
-        itemsToDelete.forEach(item => {
+        itemsToTransfer.forEach(item => {
             batch.update(tableRef, { sentItems: arrayRemove(item) });
         });
 
         batch.update(tableRef, { total: newTotal });
 
         await batch.commit();
-        showToast(`${itemsToDelete.length} item(ns) removidos.`, false);
-        window.itemsToTransfer = []; 
+        showToast(`${itemsToTransfer.length} item(ns) removidos.`, false);
+        itemsToTransfer = []; 
+        window.itemsToTransfer = [];
 
     } catch (e) {
         console.error("Erro mass delete:", e);
@@ -427,9 +410,9 @@ export const handleMassDeleteConfirmed = async () => {
     } finally {
         toggleLoading(deleteBtn, false);
     }
-};
+}
 
-export function openTableTransferModal() {
+function openTableTransferModal() {
     if (!tableTransferModal) {
         showToast("Erro: Modal de transferência não inicializado.", true);
         return;
@@ -449,15 +432,15 @@ export function openTableTransferModal() {
 
     tableTransferModal.style.display = 'flex';
     if (targetTableInput) targetTableInput.focus(); 
-};
+}
 
-export function handleConfirmTableTransfer() {
+function handleConfirmTableTransfer() {
     const targetTableId = targetTableInput?.value;
     const newDinersInput = document.getElementById('newTableDiners');
     const newSectorInput = document.getElementById('newTableSector');
     const newTableDinersDiv = document.getElementById('newTableDinersInput');
 
-    if (!targetTableId || !window.itemsToTransfer || window.itemsToTransfer.length === 0) {
+    if (!targetTableId || !itemsToTransfer || itemsToTransfer.length === 0) {
         showToast("Destino ou itens inválidos.", true);
         return;
     }
@@ -476,21 +459,26 @@ export function handleConfirmTableTransfer() {
 
     toggleLoading(confirmTransferBtn, true, 'Transferindo...');
 
-    window.handleTableTransferConfirmed(currentTableId, targetTableId, window.itemsToTransfer, newDiners, newSector)
-        .then(() => {
-            if (tableTransferModal) tableTransferModal.style.display = 'none';
-            showToast("Transferência realizada!", false);
-        })
-        .catch((e) => {
-            showToast("Erro na transferência.", true);
-        })
-        .finally(() => {
-            toggleLoading(confirmTransferBtn, false);
-        });
-};
+    if(window.handleTableTransferConfirmed) {
+        window.handleTableTransferConfirmed(currentTableId, targetTableId, itemsToTransfer, newDiners, newSector)
+            .then(() => {
+                if (tableTransferModal) tableTransferModal.style.display = 'none';
+                showToast("Transferência realizada!", false);
+            })
+            .catch((e) => {
+                showToast("Erro na transferência.", true);
+            })
+            .finally(() => {
+                toggleLoading(confirmTransferBtn, false);
+            });
+    } else {
+        console.error("Função handleTableTransferConfirmed não encontrada.");
+        toggleLoading(confirmTransferBtn, false);
+    }
+}
 
 // ==================================================================
-//           FUNÇÃO DE FECHAMENTO COM LIMPEZA DE AGRUPADAS
+//           FUNÇÃO DE FECHAMENTO
 // ==================================================================
 export const handleFinalizeOrder = async () => {
     if (!currentTableId || !currentOrderSnapshot) return;
@@ -501,15 +489,13 @@ export const handleFinalizeOrder = async () => {
     const remainingBalance = totalDaConta - totalPago;
     const sentItems = currentOrderSnapshot.sentItems || [];
 
-    // --- LÓGICA DE MESA VAZIA/ORFÃ ---
     if (sentItems.length === 0) {
-        if (!confirm(`Esta mesa não tem itens registrados. Deseja forçar o fechamento e limpar a mesa?`)) return;
+        if (!(await window.showConfirm(`Esta mesa não tem itens registrados. Deseja forçar o fechamento e limpar a mesa?`, "Mesa Vazia"))) return;
         
         toggleLoading(finalizeOrderBtn, true, 'Limpando...');
         
         try {
             const batch = writeBatch(db);
-            // Cria histórico de fechamento forçado
             const historyRef = doc(getTablesCollectionRef(), `${currentTableId}_forced_close_${Date.now()}`);
             batch.set(historyRef, { 
                 ...currentOrderSnapshot, 
@@ -518,15 +504,11 @@ export const handleFinalizeOrder = async () => {
                 closedBy: userId || 'Staff',
                 note: 'Fechamento manual de mesa vazia/orfã'
             });
-            
-            // Deleta a mesa
             batch.delete(getTableDocRef(currentTableId));
-            
             await batch.commit();
-            
             showToast("Mesa limpa com sucesso.", false);
             goToScreen('panelScreen');
-            return; // Sai da função
+            return;
 
         } catch (e) {
             console.error("Erro ao limpar mesa:", e);
@@ -537,25 +519,21 @@ export const handleFinalizeOrder = async () => {
     }
 
     if (remainingBalance > 0.01) {
-         showToast(`Ainda resta ${formatCurrency(remainingBalance)} a pagar.`, true);
+         window.showAlert(`Ainda resta ${formatCurrency(remainingBalance)} a pagar.`);
          return;
     }
 
-    if (!confirm(`Tem certeza que deseja fechar a Mesa ${currentTableId}?`)) return;
+    if (!(await window.showConfirm(`Tem certeza que deseja fechar a Mesa ${currentTableId}?`, "Fechar Conta"))) return;
 
     toggleLoading(finalizeOrderBtn, true, 'Fechando...');
 
     try {
-        // 1. Envia para WooCommerce
         const wooOrder = await createWooCommerceOrder(currentOrderSnapshot);
-        
         const tableRef = getTableDocRef(currentTableId);
         const clientId = currentOrderSnapshot.clientId; 
         const pointsEarned = Math.floor(totalDaConta); 
         
         const batch = writeBatch(db);
-
-        // 2. CRIA BACKUP (Histórico)
         const historyId = `${currentTableId}_closed_${Date.now()}`;
         const historyRef = doc(getTablesCollectionRef(), historyId);
 
@@ -569,42 +547,26 @@ export const handleFinalizeOrder = async () => {
         };
 
         batch.set(historyRef, closingData);
-
-        // 3. DELETA A MESA ORIGINAL
         batch.delete(tableRef); 
 
-        // 4. LIMPEZA DE MESAS FILHAS (AGRUPADAS)
-        // Busca todas as mesas que apontam para esta mesa como 'masterTable'
         const mergedTablesQuery = query(
             getTablesCollectionRef(), 
             where('masterTable', '==', parseInt(currentTableId)), 
             where('status', '==', 'merged')
         );
-        
         const mergedSnap = await getDocs(mergedTablesQuery);
+        mergedSnap.forEach(doc => { batch.delete(doc.ref); });
         
-        // Adiciona a deleção de cada mesa filha ao batch
-        mergedSnap.forEach(doc => {
-            batch.delete(doc.ref);
-        });
-        
-        // 5. ATUALIZA CRM (Pontos)
         if (clientId) {
             const customerRef = doc(getCustomersCollectionRef(), clientId);
             batch.update(customerRef, {
                 points: increment(pointsEarned), 
                 lastVisit: serverTimestamp(),
-                orderHistory: arrayUnion({ 
-                    orderId: wooOrder.id,
-                    total: totalDaConta,
-                    points: pointsEarned,
-                    date: Date.now()
-                })
+                orderHistory: arrayUnion({ orderId: wooOrder.id, total: totalDaConta, points: pointsEarned, date: Date.now() })
             });
         }
         
         await batch.commit();
-
         const successMessage = clientId 
             ? `Sucesso! Pedido Woo: #${wooOrder.id}. +${pointsEarned} pontos.`
             : `Sucesso! Pedido Woo: #${wooOrder.id}. Mesa arquivada.`;
@@ -741,27 +703,50 @@ const handlePrintSummary = () => {
     window.print();
 };
 
-// --- INICIALIZAÇÃO DO CONTROLLER ---
-const attachReviewListListeners = () => {
-    const massDeleteBtn = document.getElementById('massDeleteBtn');
-    const massTransferBtn = document.getElementById('massTransferBtn');
+// --- CONFIGURAÇÃO DE EVENTOS DE LISTA ---
+const setupPaymentEventListeners = () => {
+    // 1. Delegação de Eventos na Lista de Pagamentos (Excluir)
+    if (paymentSummaryList) {
+        paymentSummaryList.addEventListener('click', (e) => {
+            const deleteBtn = e.target.closest('.btn-delete-payment');
+            if (deleteBtn) {
+                // Passamos o botão como argumento para desabilitá-lo durante o processo
+                executeDeletePayment(deleteBtn.dataset.timestamp, deleteBtn);
+            }
+        });
+    }
 
-    if (massDeleteBtn) {
-         const newDeleteBtn = massDeleteBtn.cloneNode(true);
-         massDeleteBtn.parentNode.replaceChild(newDeleteBtn, massDeleteBtn);
-         newDeleteBtn.addEventListener('click', () => handleMassActionRequest('delete')); 
+    // 2. Delegação de Eventos na Lista de Itens (Checkboxes)
+    if (reviewItemsList) {
+        reviewItemsList.addEventListener('click', (e) => {
+            const target = e.target;
+            
+            // Checkbox individual
+            if (target.matches('input[data-action="toggle-select"]')) {
+                activateItemSelection();
+            }
+            
+            // Checkbox "Selecionar Todos"
+            if (target.matches('input[data-action="toggle-all"]')) {
+                activateItemSelection('toggleAll');
+            }
+
+            // Botão Excluir em Massa
+            const deleteBtn = target.closest('#massDeleteBtn');
+            if (deleteBtn) {
+                handleMassActionRequest('delete');
+            }
+
+            // Botão Transferir em Massa
+            const transferBtn = target.closest('#massTransferBtn');
+            if (transferBtn) {
+                handleMassActionRequest('transfer');
+            }
+        });
     }
-     if (massTransferBtn) {
-         const newTransferBtn = massTransferBtn.cloneNode(true);
-         massTransferBtn.parentNode.replaceChild(newTransferBtn, massTransferBtn);
-         newTransferBtn.addEventListener('click', () => handleMassActionRequest('transfer')); 
-    }
-    document.querySelectorAll('#reviewItemsList input[type="checkbox"].item-select-checkbox').forEach(box => {
-         box.removeEventListener('change', window.activateItemSelection);
-         box.addEventListener('change', window.activateItemSelection);
-    });
 };
 
+// --- INICIALIZAÇÃO DO CONTROLLER ---
 export const initPaymentController = () => {
     if(paymentInitialized) return;
     console.log("[PaymentController] Inicializando...");
@@ -814,13 +799,12 @@ export const initPaymentController = () => {
     closeCustomerRegModalBtn = document.getElementById('closeCustomerRegModalBtn');
     saveCustomerBtn = document.getElementById('saveCustomerBtn');
     linkCustomerToTableBtn = document.getElementById('linkCustomerToTableBtn');
-    
-    // Seleção do botão Motoboy
     callMotoboyBtn = document.getElementById('callMotoboyBtn');
 
     if (!reviewItemsList || !calculatorModal) return;
 
     renderPaymentMethodButtons();
+    setupPaymentEventListeners(); // <--- Inicia a delegação de eventos
 
     if(toggleServiceTaxBtn) toggleServiceTaxBtn.addEventListener('click', async () => { 
         if (!currentTableId) return;
@@ -968,10 +952,8 @@ export const initPaymentController = () => {
     if (saveCustomerBtn) saveCustomerBtn.addEventListener('click', saveCustomer); 
     if (linkCustomerToTableBtn) linkCustomerToTableBtn.addEventListener('click', linkCustomerToTable); 
     
-    // --- LISTENER DO BOTÃO CHAMAR MOTOBOY ---
     if (callMotoboyBtn) {
         callMotoboyBtn.addEventListener('click', () => {
-            // Verifica se a função global do managerController está disponível
             if (window.renderExternalRecruitmentModal) {
                 window.renderExternalRecruitmentModal('motoboy');
             } else {
