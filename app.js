@@ -34,7 +34,7 @@ const FIREBASE_CONFIG = {
     apiKey: "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY",
     authDomain: "fator-pdv.firebaseapp.com",
     projectId: "fator-pdv",
-    storageBucket: "fator-pdv.appspot.com",
+    storageBucket: "fator-pdv.firebasestorage.app",
     messagingSenderId: "1097659747429",
     appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c"
 };
