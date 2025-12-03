@@ -1,4 +1,5 @@
-// --- CONTROLLERS/PAYMENTCONTROLLER.JS (CORRIGIDO: EXPORTS REPOSTOS) ---
+// --- CONTROLLERS/PAYMENTCONTROLLER.JS (COMPLETO: COM FIDELIDADE E HISTÓRICO) ---
+
 import { currentTableId, currentOrderSnapshot, userId, goToScreen, showToast } from "/app.js"; 
 import { formatCurrency, calculateItemsValue, getNumericValueFromCurrency, toggleLoading } from "/utils.js"; 
 import { getTableDocRef, getCustomersCollectionRef, db, getTablesCollectionRef } from "/services/firebaseService.js"; 
@@ -112,7 +113,7 @@ function backspace() {
      calculatorState.displayValue = displayValue.length > 1 ? displayValue.slice(0, -1) : '0';
 }
 
-// --- FUNÇÕES DE AÇÃO (Agora Exportadas para uso no App.js) ---
+// --- FUNÇÕES DE AÇÃO (Exportadas para uso no App.js) ---
 
 export const executeDeletePayment = async (timestamp, btnElement) => {
     if (!currentTableId || !timestamp) return;
@@ -131,6 +132,7 @@ export const executeDeletePayment = async (timestamp, btnElement) => {
         if (paymentToDelete) {
             await updateDoc(tableRef, { payments: arrayRemove(paymentToDelete) });
         } else {
+            // Fallback se o snapshot estiver desatualizado
             const freshSnap = await getDoc(tableRef);
             const freshPayments = freshSnap.data()?.payments || [];
             const freshPaymentToDelete = freshPayments.find(p => p.timestamp == timestamp);
@@ -366,7 +368,7 @@ export const handleMassActionRequest = (action) => {
     }
 };
 
-export async function handleMassDeleteConfirmed() { // Exportado
+export async function handleMassDeleteConfirmed() { 
     if (!currentTableId || !itemsToTransfer || itemsToTransfer.length === 0) {
         showToast("Nenhum item selecionado para exclusão.", true);
         return;
@@ -409,7 +411,7 @@ export async function handleMassDeleteConfirmed() { // Exportado
     }
 }
 
-export function openTableTransferModal() { // Exportado
+export function openTableTransferModal() { 
     if (!tableTransferModal) {
         showToast("Erro: Modal de transferência não inicializado.", true);
         return;
@@ -431,7 +433,7 @@ export function openTableTransferModal() { // Exportado
     if (targetTableInput) targetTableInput.focus(); 
 }
 
-export function handleConfirmTableTransfer() { // Exportado
+export function handleConfirmTableTransfer() { 
     const targetTableId = targetTableInput?.value;
     const newDinersInput = document.getElementById('newTableDiners');
     const newSectorInput = document.getElementById('newTableSector');
@@ -475,7 +477,7 @@ export function handleConfirmTableTransfer() { // Exportado
 }
 
 // ==================================================================
-//           FUNÇÃO DE FECHAMENTO
+//           FUNÇÃO DE FECHAMENTO COM FIDELIDADE
 // ==================================================================
 export const handleFinalizeOrder = async () => {
     if (!currentTableId || !currentOrderSnapshot) return;
@@ -529,7 +531,7 @@ export const handleFinalizeOrder = async () => {
         const wooOrder = await createWooCommerceOrder(currentOrderSnapshot);
         const tableRef = getTableDocRef(currentTableId);
         const clientId = currentOrderSnapshot.clientId; 
-        const pointsEarned = Math.floor(totalDaConta); 
+        const pointsEarned = Math.floor(totalDaConta); // Regra: 1 Ponto por 1 Real
         
         const batch = writeBatch(db);
         const historyId = `${currentTableId}_closed_${Date.now()}`;
@@ -540,13 +542,16 @@ export const handleFinalizeOrder = async () => {
             status: 'closed',          
             closedAt: serverTimestamp(), 
             finalTotal: totalDaConta,
+            pointsGenerated: pointsEarned,
             wooOrderId: wooOrder.id,
             closedBy: userId || 'Staff'
         };
 
+        // 1. Arquiva a mesa e remove a ativa
         batch.set(historyRef, closingData);
         batch.delete(tableRef); 
 
+        // 2. Limpa mesas "filhas" se for agrupada
         const mergedTablesQuery = query(
             getTablesCollectionRef(), 
             where('masterTable', '==', parseInt(currentTableId)), 
@@ -555,12 +560,21 @@ export const handleFinalizeOrder = async () => {
         const mergedSnap = await getDocs(mergedTablesQuery);
         mergedSnap.forEach(doc => { batch.delete(doc.ref); });
         
+        // 3. ATUALIZA CLIENTE (FIDELIDADE)
         if (clientId) {
             const customerRef = doc(getCustomersCollectionRef(), clientId);
+            
+            const historyEntry = {
+                orderId: wooOrder.id || `PDV-${historyId}`,
+                total: totalDaConta,
+                points: pointsEarned,
+                date: Date.now()
+            };
+
             batch.update(customerRef, {
                 points: increment(pointsEarned), 
                 lastVisit: serverTimestamp(),
-                orderHistory: arrayUnion({ orderId: wooOrder.id, total: totalDaConta, points: pointsEarned, date: Date.now() })
+                orderHistory: arrayUnion(historyEntry) // Grava no histórico do cliente
             });
         }
         

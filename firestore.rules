@@ -29,6 +29,12 @@ service cloud.firestore {
           allow write: if isGerente();
         }
         
+        // CORREÇÃO: Adicionada regra para 'settings' (Info do Estabelecimento)
+        match /settings/{docId} {
+          allow read: if isAuthenticated(); // Clientes precisam ler o nome/logo
+          allow write: if isGerente();      // Apenas gerente altera
+        }
+        
         match /financial_goals/{docId} {
           allow read: if isStaff();
           allow write: if isGerente();
@@ -88,6 +94,7 @@ service cloud.firestore {
             request.resource.data.keys().hasOnly([
               'tableNumber', 'status', 'diners', 'sector', 'createdAt', 'total', 
               'clientId', 'clientName', 'clientPhone', 'anonymousUid', 'clientDocType',
+            
               'selectedItems', 'requestedOrders', 'sentItems', 
               'clientOrderPending', 'waiterNotification', 'billRequested', 
               'payments', 'serviceTaxApplied', 
@@ -172,7 +179,8 @@ service cloud.firestore {
         
         // 19. FILA DE PEDIDOS (NOVO)
         match /orders_queue/{orderId} {
-          allow read, write: if isStaff(); // Garçom/Caixa cria o pedido na fila
+          allow read, write: if isStaff();
+          // Garçom/Caixa cria o pedido na fila
         }
 
         // Bloqueio padrão para qualquer outra coleção dentro de /data

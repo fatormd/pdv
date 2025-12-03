@@ -1,14 +1,10 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (CORRIGIDO: ZERO DEPENDÊNCIA DE APP.JS) ---
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (CORRIGIDO: NOME DO RESTAURANTE) ---
 
 import { db, auth, getQuickObsCollectionRef, appId, getTablesCollectionRef, getTableDocRef, getCustomersCollectionRef, getKdsCollectionRef } from "/services/firebaseService.js";
-// 1. IMPORTANTE: Importamos showToast e toggleLoading de utils.js, NÃO de app.js
 import { formatCurrency, toggleLoading, showToast } from "/utils.js"; 
 import { getProducts, getCategories, fetchWooCommerceCategories, fetchWooCommerceProducts } from "/services/wooCommerceService.js";
 import { onSnapshot, doc, updateDoc, arrayUnion, setDoc, getDoc, getDocs, query, serverTimestamp, orderBy, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-
-// 2. REMOVIDO: import { ... } from "/app.js"; <--- ISSO CAUSAVA O ERRO
-// Agora usamos window.currentTableId, window.setCurrentTable, etc.
 
 // --- ESTADO GLOBAL ---
 let selectedItems = []; 
@@ -21,6 +17,7 @@ let localCurrentClientUser = null;
 let tempUserData = null;
 let unsubscribeClientKds = null; 
 let currentAssociationTab = 'mesa';
+let restaurantNameCache = "Fator PDV"; // Cache do nome
 
 // --- MODO DEMO ---
 let currentBusinessType = 'food'; 
@@ -86,7 +83,6 @@ let businessTypeSelector;
 // ==================================================================
 
 async function handleSendOrderClick() {
-    // 3. Correção: Usa window.currentTableId em vez da importação
     const tableId = localCurrentTableId || window.currentTableId;
     if (!selectedItems || selectedItems.length === 0) {
         showToast("Seu carrinho está vazio.", true);
@@ -101,10 +97,12 @@ async function handleSendOrderClick() {
 
 function handleAuthActionClick() {
     if (localCurrentClientUser) {
-        signOut(auth).then(() => {
-            showToast("Você saiu da sua conta.");
-            window.location.reload();
-        });
+        if(confirm("Deseja realmente sair da sua conta?")) {
+            signOut(auth).then(() => {
+                showToast("Você saiu da sua conta.");
+                window.location.reload();
+            });
+        }
     } else {
         openAssociationModal();
     }
@@ -117,7 +115,7 @@ async function signInWithGoogle(e) {
         await signInWithPopup(auth, provider);
     } catch (error) {
         console.error("Erro Login:", error);
-        showAssocError("Erro ao tentar logar.");
+        showAssocError("Erro ao tentar logar. Tente novamente.");
     }
 }
 
@@ -150,8 +148,6 @@ async function handleActivationAndSend(e) {
         const tableSnap = await getDoc(tableRef);
         
         localCurrentTableId = tableDocId;
-        
-        // 4. Correção: Usa window.setCurrentTable
         if (window.setCurrentTable) window.setCurrentTable(tableDocId, true, false); 
         
         const clientData = {
@@ -162,9 +158,12 @@ async function handleActivationAndSend(e) {
 
         if (tableSnap.exists()) {
             const tData = tableSnap.data();
+            
+            // Regra: Se a mesa está aberta e tem um dono diferente, bloqueia
             if (tData.status !== 'closed' && tData.clientId && tData.clientId !== clientData.uid) {
-                throw new Error("Esta mesa/PIN está em uso por outro cliente.");
+                throw new Error(`Mesa em uso por ${tData.clientName || 'outro cliente'}.`);
             }
+
             if (tData.status === 'closed') {
                 const historyRef = doc(getTablesCollectionRef(), `${tableDocId}_closed_${Date.now()}`);
                 await setDoc(historyRef, tData);
@@ -183,8 +182,8 @@ async function handleActivationAndSend(e) {
                 }
             }
         } else {
-            // Confirmação usando window.confirm pois showConfirm pode não estar carregado
-            if (!isPickup && !confirm(`Mesa ${identifier} não existe. Abrir nova?`)) {
+            // Mesa não existe -> Criar nova
+            if (!isPickup && !confirm(`Mesa ${identifier} não existe. Abrir nova conta?`)) {
                 throw new Error("Ação cancelada.");
             }
             await setDoc(tableRef, {
@@ -198,7 +197,6 @@ async function handleActivationAndSend(e) {
             });
         }
 
-        // 5. Correção: Usa window.setTableListener
         if (window.setTableListener) window.setTableListener(tableDocId, true);
         startClientKdsListener(tableDocId);
         
@@ -208,6 +206,8 @@ async function handleActivationAndSend(e) {
         
         closeAssociationModal();
         showToast(isPickup ? `Retirada #${identifier} iniciada!` : `Mesa ${identifier} vinculada!`, false);
+
+        if(clientTableNumber) clientTableNumber.textContent = isPickup ? `PIN: ${identifier}` : `Mesa ${identifier}`;
 
     } catch (error) {
         console.error(error);
@@ -484,7 +484,6 @@ export const initClientOrderController = () => {
     fetchQuickObservations(); 
     fetchRestaurantInfo(); 
     
-    // 6. Correção: Usa window.currentTableId
     if (localCurrentTableId || window.currentTableId) {
         startClientKdsListener(localCurrentTableId || window.currentTableId);
     }
@@ -494,25 +493,130 @@ export const initClientOrderController = () => {
 };
 
 // ==================================================================
-//               3. FUNÇÕES AUXILIARES
+//               3. FUNÇÕES PRINCIPAIS E LISTENERS
 // ==================================================================
 
+/**
+ * Renderiza a tela do cliente (atualiza carrinho, contadores, etc.)
+ */
+export const renderClientOrderScreen = (orderSnapshot = null) => {
+    if (clientCartCount) {
+        const totalItems = selectedItems.length;
+        clientCartCount.textContent = totalItems;
+        if (totalItems > 0) {
+            clientCartCount.style.display = 'flex';
+            clientCartCount.classList.remove('hidden');
+        } else {
+            clientCartCount.style.display = 'none';
+            clientCartCount.classList.add('hidden');
+        }
+    }
+    _renderClientCart();
+};
+
+/**
+ * Carrega o menu inicial
+ */
+async function loadMenu() {
+    showMenuSkeleton();
+    currentPage = 1;
+    if (currentBusinessType === 'food') {
+        try {
+            await fetchWooCommerceProducts(1, '', currentCategoryFilter, false);
+        } catch (error) {
+            console.error("Erro ao carregar menu:", error);
+            showToast("Erro ao carregar cardápio.", true);
+        }
+    }
+    renderMenu(false);
+}
+
+/**
+ * Inicia listener para status do pedido (KDS) E DETECTA FECHAMENTO DE MESA
+ */
+function startClientKdsListener(tableId) {
+    if (unsubscribeClientKds) unsubscribeClientKds();
+    const tableRef = getTableDocRef(tableId);
+    
+    unsubscribeClientKds = onSnapshot(tableRef, (docSnap) => {
+        // --- LÓGICA DE RESET AUTOMÁTICO ---
+        if (!docSnap.exists() || docSnap.data().status === 'closed') {
+            console.log("[ClientKDS] Mesa fechada ou removida. Resetando estado...");
+            showToast("Conta encerrada! Pode abrir uma nova mesa.", false);
+            
+            // Limpa o vínculo local
+            localCurrentTableId = null;
+            window.currentTableId = null;
+            
+            // CORREÇÃO: Reseta o título para o Nome do Restaurante (cached)
+            if (clientTableNumber) clientTableNumber.textContent = restaurantNameCache;
+            
+            selectedItems = [];
+            renderClientOrderScreen();
+            openAssociationModal();
+            
+            if(unsubscribeClientKds) unsubscribeClientKds();
+            return;
+        }
+        // ----------------------------------
+
+        if (kdsTrackingStatusEl) {
+            const data = docSnap.data();
+            const hasPending = data.clientOrderPending; 
+            const hasItems = data.sentItems && data.sentItems.length > 0;
+            if (hasPending) {
+                kdsTrackingStatusEl.textContent = "Enviado à cozinha";
+                kdsTrackingStatusEl.className = "text-yellow-400 text-xs font-bold";
+            } else if (hasItems) {
+                kdsTrackingStatusEl.textContent = "Em preparação";
+                kdsTrackingStatusEl.className = "text-green-400 text-xs font-bold";
+            } else {
+                kdsTrackingStatusEl.textContent = "Faça seu pedido";
+                kdsTrackingStatusEl.className = "text-gray-400 text-xs";
+            }
+        }
+    }, (error) => {
+        console.warn("Aviso KDS:", error);
+        if (error.code === 'permission-denied' || error.message.includes('No document')) {
+             localCurrentTableId = null;
+             window.currentTableId = null;
+             // CORREÇÃO: Reseta o título
+             if (clientTableNumber) clientTableNumber.textContent = restaurantNameCache;
+             openAssociationModal();
+        }
+    });
+}
+
+// ==================================================================
+//               4. FUNÇÕES AUXILIARES
+// ==================================================================
+
+// CORREÇÃO: Função atualizada para ler do local correto 'settings/store_info'
 async function fetchRestaurantInfo() {
     if (currentBusinessType !== 'food') {
         updateRestaurantTitle();
         return;
     }
     const titleEl = document.getElementById('restaurantTitle');
-    if (!titleEl) return;
+    const headerTitleEl = document.getElementById('client-table-number'); 
 
     try {
-        const configRef = doc(db, 'artifacts', appId, 'public', 'data', 'system_status', 'business_day'); 
+        // CORREÇÃO: Caminho apontando para 'settings/store_info' (onde o manager salva)
+        const configRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'store_info'); 
         const docSnap = await getDoc(configRef);
-        if (docSnap.exists() && docSnap.data().restaurantName) {
-            titleEl.textContent = docSnap.data().restaurantName;
-        } else {
-            titleEl.textContent = "Cardápio Digital";
+        
+        // Verifica se existe e tem nome, senão usa padrão
+        const name = (docSnap.exists() && docSnap.data().name) ? docSnap.data().name : "Fator PDV";
+        restaurantNameCache = name; 
+
+        // Atualiza o título do cardápio (h2)
+        if (titleEl) titleEl.textContent = name;
+        
+        // Atualiza o título do topo se não houver mesa ativa
+        if (headerTitleEl && !localCurrentTableId) {
+            headerTitleEl.textContent = name;
         }
+
     } catch (e) {
         console.warn("Erro ao buscar nome:", e);
     }
@@ -520,12 +624,13 @@ async function fetchRestaurantInfo() {
 
 function updateRestaurantTitle() {
     const titleEl = document.getElementById('restaurantTitle');
-    if (!titleEl) return;
-
-    if (currentBusinessType === 'food') {
-        fetchRestaurantInfo(); 
-    } else {
-        titleEl.textContent = DEMO_DATA[currentBusinessType].title;
+    const headerTitleEl = document.getElementById('client-table-number');
+    
+    if (currentBusinessType !== 'food') {
+        const name = DEMO_DATA[currentBusinessType].title;
+        restaurantNameCache = name;
+        if(titleEl) titleEl.textContent = name;
+        if(headerTitleEl && !localCurrentTableId) headerTitleEl.textContent = name;
     }
 }
 
@@ -542,12 +647,14 @@ async function restoreActiveSession(user) {
             const tableId = tableDoc.id;
             localCurrentTableId = tableId;
             
-            if(window.setCurrentTable) window.setCurrentTable(tableId, true); 
+            if(window.setCurrentTable) window.setCurrentTable(tableId, true, false); 
             if(window.setTableListener) window.setTableListener(tableId, true);
             
             startClientKdsListener(tableId);
             closeAssociationModal();
-            showToast("Pedido anterior recuperado.", false);
+            showToast("Sessão ativa recuperada.", false);
+            
+            if(clientTableNumber) clientTableNumber.textContent = `Mesa ${tableId}`;
         }
     } catch (e) {
         console.error("[ClientOrder] Erro restore:", e);
@@ -667,19 +774,39 @@ async function sendOrderToFirebase() {
     const tableId = localCurrentTableId || window.currentTableId;
     if (!tableId || selectedItems.length === 0) { showToast("Carrinho vazio.", true); return; }
     toggleLoading(sendOrderBtn, true, 'Enviando...');
+    
+    // Sanitiza os itens
+    const sanitizedItems = selectedItems.map(item => JSON.parse(JSON.stringify(item)));
+
     const orderId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    
     const newOrderRequest = {
         orderId: orderId,
         requestedAt: new Date().toISOString(),
         clientInfo: {
-            uid: localCurrentClientUser?.uid,
-            name: localCurrentClientUser?.displayName,
-            phone: localCurrentClientUser?.phone
+            uid: localCurrentClientUser?.uid || null,
+            name: localCurrentClientUser?.displayName || "Cliente",
+            phone: localCurrentClientUser?.phone || null 
         },
-        items: selectedItems.map(item => ({ ...item }))
+        items: sanitizedItems
     };
+
     try {
         const tableRef = getTableDocRef(tableId);
+        
+        // Verifica se a mesa ainda existe antes de atualizar
+        const docSnap = await getDoc(tableRef);
+        
+        if (!docSnap.exists()) {
+            showToast("Esta mesa foi fechada. Por favor, vincule-se novamente.", true);
+            localCurrentTableId = null;
+            window.currentTableId = null;
+            // Reseta título
+            if (clientTableNumber) clientTableNumber.textContent = restaurantNameCache;
+            openAssociationModal(); 
+            return; 
+        }
+
         await updateDoc(tableRef, {
             requestedOrders: arrayUnion(newOrderRequest),
             clientOrderPending: true,
