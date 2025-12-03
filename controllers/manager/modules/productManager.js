@@ -1,4 +1,4 @@
-// --- CONTROLLERS/MANAGER/MODULES/PRODUCTMANAGER.JS (VERSÃO FINAL COMPLETA) ---
+// --- CONTROLLERS/MANAGER/MODULES/PRODUCTMANAGER.JS (VERSÃO FINAL: UPLOAD & SAVE CORRIGIDOS) ---
 
 import { 
     db, appId, storage, ref, uploadBytes, getDownloadURL, 
@@ -12,7 +12,7 @@ import {
 
 import { formatCurrency, toggleLoading, showToast } from "/utils.js";
 
-// Import com ?v=2 para forçar atualização do cache do navegador
+// Import com ?v=2 para limpar cache do navegador
 import { 
     syncWithWooCommerce, getProducts, getCategories, fetchSalesHistory,
     createWooProduct, updateWooProduct, deleteWooProduct, fetchWooCommerceProducts 
@@ -51,15 +51,16 @@ export const init = () => {
     console.log("[ProductModule] Inicializado.");
     managerModal = document.getElementById('managerModal');
     
-    // --- LÓGICA DE UPLOAD CORRIGIDA E SANITIZADA ---
+    // --- LÓGICA DE UPLOAD BLINDADA ---
     window.handleImageUpload = async (input) => {
         if (input.files && input.files[0]) {
             const file = input.files[0];
             const preview = document.getElementById('imgPreview');
             const icon = document.getElementById('imgPlaceholderIcon');
             const urlInput = document.getElementById('prodImgUrl');
+            const btnSave = document.getElementById('btnSaveProduct');
 
-            // 1. Mostra o preview imediatamente
+            // 1. Preview imediato
             const reader = new FileReader();
             reader.onload = (e) => {
                 if(preview) { preview.src = e.target.result; preview.classList.remove('hidden'); }
@@ -72,37 +73,50 @@ export const init = () => {
                 return;
             }
 
-            showToast("Otimizando e enviando imagem...", false);
+            // 2. Bloqueia botão para evitar erro "No URL"
+            if(btnSave) {
+                btnSave.disabled = true;
+                btnSave.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Subindo foto...';
+            }
+
+            showToast("Enviando para a nuvem...", false);
             
             try {
-                // 2. SANITIZAÇÃO DO NOME DO ARQUIVO
-                // Remove acentos, espaços e caracteres especiais para não quebrar no WooCommerce
-                const cleanName = file.name
+                // 3. Sanitização do nome (Remove acentos e espaços)
+                const ext = file.name.split('.').pop().toLowerCase();
+                const cleanName = file.name.split('.')[0]
                     .normalize('NFD').replace(/[\u0300-\u036f]/g, "") // Tira acentos
-                    .replace(/\s+/g, '_') // Troca espaços por _
-                    .replace(/[^a-zA-Z0-9._-]/g, '') // Remove caracteres estranhos
+                    .replace(/[^a-zA-Z0-9]/g, '_') // Mantém só letras/numeros e _
                     .toLowerCase();
 
-                const fileName = `products/${Date.now()}_${cleanName}`;
+                const fileName = `products/${Date.now()}_${cleanName}.${ext}`;
                 const storageRef = ref(storage, fileName);
                 
-                // 3. Upload
+                // 4. Upload
                 await uploadBytes(storageRef, file);
                 
-                // 4. Pega o link público
+                // 5. Pega o link público
                 const publicUrl = await getDownloadURL(storageRef);
                 
-                // 5. Cola o link no campo e garante que não tem espaços extras
+                // 6. Cola o link no campo
                 if(urlInput) {
-                    urlInput.value = publicUrl.trim();
-                    console.log("Link Gerado (Clean):", publicUrl);
+                    urlInput.value = publicUrl;
+                    // Força atualização visual
+                    urlInput.dispatchEvent(new Event('input')); 
+                    console.log("LINK GERADO:", publicUrl);
                 }
                 
-                showToast("Upload concluído! Link pronto.", false);
+                showToast("Upload concluído! Pode salvar.", false);
 
             } catch (error) {
                 console.error("Erro no upload:", error);
                 showToast("Erro ao subir imagem: " + error.message, true);
+            } finally {
+                // 7. Libera o botão
+                if(btnSave) {
+                    btnSave.disabled = false;
+                    btnSave.innerHTML = '<i class="fas fa-save mr-2"></i> Salvar Ficha';
+                }
             }
         }
     };
@@ -197,7 +211,8 @@ async function renderProductHub(activeTab = 'products') {
             <div id="hubContent" class="flex-grow overflow-y-auto p-3 md:p-4 custom-scrollbar bg-dark-bg relative">
                 <div class="flex items-center justify-center h-full text-gray-500"><i class="fas fa-spinner fa-spin text-3xl"></i></div>
             </div>
-        </div>`;
+        </div>
+        <div id="subModalContainer"></div>`;
 
     managerModal.style.display = 'flex';
     managerModal.classList.remove('p-4'); managerModal.classList.add('p-0', 'md:p-4');
@@ -232,7 +247,7 @@ async function switchHubTab(tab) {
 }
 
 // ==================================================================
-//           3. GESTÃO DE PRODUTOS (LISTA E FORM)
+//           3. GESTÃO DE PRODUTOS
 // ==================================================================
 
 async function renderProductListConfig(contentDiv, toolbarDiv) {
@@ -264,7 +279,7 @@ async function renderProductListConfig(contentDiv, toolbarDiv) {
     const renderList = async (page = 1) => {
         contentDiv.innerHTML = '<div class="flex justify-center py-10"><i class="fas fa-spinner fa-spin text-3xl text-gray-500"></i></div>';
         await fetchWooCommerceProducts(page, hubSearch, hubCategory, false);
-        await fetchProductExtensions(); 
+        await fetchProductExtensions(); // Atualiza cache local
         
         const products = getProducts();
         
@@ -357,7 +372,6 @@ async function renderProductForm(product = null, container) {
     const salePrice = product?.sale_price || '';
     const onSale = !!salePrice; 
     
-    // Tenta pegar imagem local (backup), senão usa a do Woo
     const prodImage = extendedData.localImage || (product?.image && !product.image.includes('placehold') ? product.image : '');
 
     container.innerHTML = `
