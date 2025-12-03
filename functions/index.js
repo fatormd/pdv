@@ -37,7 +37,7 @@ const wooClient = axios.create({
 const WOOCOMMERCE_URL = "https://nossotempero.fatormd.com";
 
 // =======================================================
-// 1. PROXY WOOCOMMERCE (LEGADO / SÍNCRONO)
+// 1. PROXY WOOCOMMERCE (COM DIAGNÓSTICO DETALHADO)
 // =======================================================
 exports.proxyWooCommerce = onCall({ timeoutSeconds: 300, memory: "512MiB" }, async (request) => {
   const { method, endpoint, payload } = request.data;
@@ -50,7 +50,6 @@ exports.proxyWooCommerce = onCall({ timeoutSeconds: 300, memory: "512MiB" }, asy
   }
 
   const authParams = `consumer_key=${consumerKey}&consumer_secret=${consumerSecret}&_t=${Date.now()}`;
-  // Verifica se o endpoint já tem query params
   const querySeparator = endpoint.includes("?") ? "&" : "?";
   const url = `${WOOCOMMERCE_URL}/wp-json/wc/v3/${endpoint}${querySeparator}${authParams}`;
 
@@ -72,13 +71,24 @@ exports.proxyWooCommerce = onCall({ timeoutSeconds: 300, memory: "512MiB" }, asy
 
   } catch (error) {
     console.error("Erro Proxy Woo:", error.message);
+    
+    // --- MELHORIA AQUI: Retorna o detalhe do erro para o App ---
+    if (error.response && error.response.data) {
+        console.error("Detalhes do erro Woo:", JSON.stringify(error.response.data));
+        // Formata a mensagem de erro para ser legível no Toast
+        const wooError = error.response.data;
+        const msg = wooError.message || wooError.code || "Erro desconhecido no Woo";
+        
+        // Lança um erro que o front-end consegue ler
+        throw new HttpsError("invalid-argument", `WooCommerce Recusou: ${msg}`);
+    }
+    // -----------------------------------------------------------
+
     if (error.code === 'ECONNABORTED') {
        throw new HttpsError("deadline-exceeded", "O servidor WooCommerce demorou muito para responder.");
     }
-    if (error.response) {
-        console.error("Resposta do Woo:", error.response.status, error.response.data);
-    }
-    throw new HttpsError("internal", `Erro WooCommerce: ${error.message}`);
+    
+    throw new HttpsError("internal", `Erro de Conexão: ${error.message}`);
   }
 });
 

@@ -1,4 +1,4 @@
-// --- CONTROLLERS/MANAGER/HUB/MANAGERCONTROLLER.JS (ATUALIZADO COM RESERVAS) ---
+// --- CONTROLLERS/MANAGER/HUB/MANAGERCONTROLLER.JS (COMPLETO & ATUALIZADO) ---
 
 // 1. IMPORTAÇÃO DOS MÓDULOS
 import * as DeliveryMgr from '/controllers/manager/modules/deliveryManager.js';
@@ -8,7 +8,8 @@ import * as TeamMgr from '/controllers/manager/modules/teamManager.js';
 import * as SalesMgr from '/controllers/manager/modules/salesManager.js'; 
 import * as CrmMgr from '/controllers/manager/modules/crmManager.js'; 
 import * as VoucherMgr from '/controllers/manager/modules/voucherManager.js';
-import * as ReservationMgr from '/controllers/manager/modules/reservationManager.js'; // <--- IMPORTAÇÃO RESERVAS
+import * as ReservationMgr from '/controllers/manager/modules/reservationManager.js';
+import * as SettingsMgr from '/controllers/manager/modules/settingsManager.js'; // <--- NOVO IMPORT
 
 let isInitialized = false;
 let managerModal = null; 
@@ -28,7 +29,8 @@ export const initManagerController = () => {
         if(SalesMgr?.init) SalesMgr.init();
         if(CrmMgr?.init) CrmMgr.init();
         if(VoucherMgr?.init) VoucherMgr.init();
-        if(ReservationMgr?.init) ReservationMgr.init(); // <--- INIT RESERVAS
+        if(ReservationMgr?.init) ReservationMgr.init();
+        if(SettingsMgr?.init) SettingsMgr.init(); // <--- INICIALIZAÇÃO CONFIGURAÇÕES
     } catch (error) {
         console.error("[ManagerHub] Erro ao inicializar módulos:", error);
     }
@@ -77,7 +79,7 @@ const setupGlobalRoutes = () => {
                     else throw new Error("Módulo de Vouchers não encontrado.");
                     break;
                 
-                case 'reservations': // <--- ROTA RESERVAS
+                case 'reservations':
                     if(ReservationMgr?.open) ReservationMgr.open();
                     else throw new Error("Módulo de Reservas não encontrado.");
                     break;
@@ -87,9 +89,9 @@ const setupGlobalRoutes = () => {
                      else alert("Erro ao sincronizar: Módulo não carregado.");
                      break;
 
-                case 'settings':
-                     if(ProductMgr?.openSettings) ProductMgr.openSettings();
-                     else alert("Configurações indisponíveis.");
+                case 'settings': // <--- ROTA ATUALIZADA PARA O NOVO MÓDULO
+                     if(SettingsMgr?.open) SettingsMgr.open();
+                     else throw new Error("Módulo de Configurações não encontrado.");
                      break;
 
                 default:
@@ -101,7 +103,7 @@ const setupGlobalRoutes = () => {
         }
     };
 
-    // Alias de Compatibilidade
+    // Alias de Compatibilidade (Mantém o funcionamento dos botões antigos)
     window.handleGerencialAction = (action, payload) => {
         const actionMap = {
             'openProductHub': 'products',
@@ -112,7 +114,7 @@ const setupGlobalRoutes = () => {
             'openCustomerCRM': 'crm',
             'openVoucherManagement': 'vouchers',
             'openWooSync': 'sync',
-            'openSectorManagement': 'settings'
+            'openSectorManagement': 'settings' // Agora aponta para o novo SettingsMgr
         };
 
         const moduleName = actionMap[action] || action;

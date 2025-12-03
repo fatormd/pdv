@@ -1,28 +1,41 @@
-// --- SERVICES/FIREBASESERVICE.JS (CORRIGIDO) ---
-import { collection, doc, updateDoc, arrayUnion, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+// --- SERVICES/FIREBASESERVICE.JS (COM STORAGE ATIVADO) ---
 
-// Variáveis globais exportadas (inicializadas no app.js)
+import { collection, doc, updateDoc, arrayUnion, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+// 1. IMPORTAÇÃO DO STORAGE
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+
+// Variáveis globais exportadas
 export let db = null;
 export let auth = null;
 export let appId = null;
 export let functions = null;
+export let storage = null; // 2. VARIÁVEL DO STORAGE
 
-// Exporta funções úteis do Firestore para uso nos controllers
-export { arrayUnion, serverTimestamp };
+// 3. EXPORTA AS FERRAMENTAS PARA OS OUTROS ARQUIVOS USAREM
+export { arrayUnion, serverTimestamp, ref, uploadBytes, getDownloadURL };
 
-// Função de inicialização (Chamada única no app.js)
+// Função de inicialização
 export const initializeFirebase = (database, authentication, appIdentifier, appFunctions) => {
     db = database;
     auth = authentication;
     appId = appIdentifier;
     functions = appFunctions;
+
+    // 4. INICIALIZAÇÃO AUTOMÁTICA DO STORAGE
+    if (db && db.app) {
+        try {
+            storage = getStorage(db.app);
+            console.log("[FirebaseService] Storage inicializado.");
+        } catch (e) {
+            console.error("[FirebaseService] Erro ao iniciar Storage:", e);
+        }
+    }
 };
 
 // ==================================================================
 //               REFERÊNCIAS DE COLEÇÕES (Collection Refs)
 // ==================================================================
 
-// 1. Helper Genérico (ESTA É A FUNÇÃO QUE FALTAVA)
 export const getCollectionRef = (name) => collection(db, 'artifacts', appId, 'public', 'data', name);
 
 // Mesas e Pedidos
@@ -35,40 +48,27 @@ export const getKdsCollectionRef = () => getCollectionRef('kds_orders');
 // CRM e Clientes
 export const getCustomersCollectionRef = () => getCollectionRef('customers');
 
-// Configurações do Sistema (Vouchers, Obs, Setores)
+// Configurações do Sistema
 export const getQuickObsCollectionRef = () => getCollectionRef('quick_obs');
 export const getVouchersCollectionRef = () => getCollectionRef('vouchers');
 export const getSectorsCollectionRef = () => getCollectionRef('sectors');
 
-
 // ==================================================================
-//               REFERÊNCIAS DE DOCUMENTOS ÚNICOS (Doc Refs)
+//               REFERÊNCIAS DE DOCUMENTOS ÚNICOS
 // ==================================================================
 
-// Status do Sistema (Abertura/Fechamento de Casa/Turno)
 export const getSystemStatusDocRef = () => doc(db, 'artifacts', appId, 'public', 'data', 'system_status', 'business_day');
-
-// Metas Financeiras e KPIs
 export const getFinancialGoalsDocRef = () => doc(db, 'artifacts', appId, 'public', 'data', 'system_status', 'financial_goals');
 
-
 // ==================================================================
-//               FUNÇÕES AUXILIARES (Helpers)
+//               FUNÇÕES AUXILIARES
 // ==================================================================
 
-/**
- * Salva os itens selecionados na mesa (Carrinho local -> Firebase)
- */
 export const saveSelectedItemsToFirebase = async (tableId, selectedItems) => {
     if (!tableId || !db) return;
-
     const tableRef = getTableDocRef(tableId);
-
     try {
-        await updateDoc(tableRef, {
-            selectedItems: selectedItems
-        });
-        // console.log(`[FirebaseService] Itens da mesa ${tableId} salvos.`);
+        await updateDoc(tableRef, { selectedItems: selectedItems });
     } catch (e) {
         console.error(`[FirebaseService] Erro ao salvar itens da mesa ${tableId}:`, e);
     }

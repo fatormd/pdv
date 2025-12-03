@@ -1,17 +1,31 @@
-// --- CONTROLLERS/MANAGER/MODULES/TEAMMANAGER.JS (CORRIGIDO) ---
+// --- CONTROLLERS/MANAGER/MODULES/TEAMMANAGER.JS (COM AJUSTE DE FONTE) ---
 
 import { db, appId, getTablesCollectionRef } from "/services/firebaseService.js"; 
 import { 
     collection, query, where, getDocs, orderBy, Timestamp 
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-// CORREÇÃO: Importação centralizada do utils.js
 import { formatCurrency, toggleLoading, showToast } from "/utils.js";
 import { openUserManagementModal } from "/controllers/userManagementController.js"; 
 
 const getColRef = (name) => collection(db, 'artifacts', appId, 'public', 'data', name);
 let managerModal = null;
 let currentTab = 'team';
+let currentPrintFontSize = 12; // Tamanho padrão da fonte
+
+// --- Helper para Modal Seguro ---
+function getSubModalContainer() {
+    let container = document.getElementById('subModalContainer');
+    if (!container || container.parentElement.id === 'managerModal') {
+        if(container) container.remove();
+        container = document.createElement('div');
+        container.id = 'subModalContainer';
+        container.style.zIndex = '9999';
+        container.style.position = 'relative';
+        document.body.appendChild(container);
+    }
+    return container;
+}
 
 // ==================================================================
 //           1. API PÚBLICA
@@ -24,6 +38,8 @@ export const init = () => {
     window.switchHRTab = switchHRTab;
     window.generatePayslip = generatePayslip;
     window.openUserManagementModal = openUserManagementModal;
+    window.openPayrollModal = openPayrollModal;
+    window.changePayrollFontSize = changePayrollFontSize; // Nova função exposta
 };
 
 export const open = async () => {
@@ -74,7 +90,6 @@ async function renderHRPanel(activeTab = 'team') {
             
             <div class="flex p-4 bg-dark-bg border-b border-gray-700 space-x-2 items-center overflow-x-auto flex-shrink-0">
                 <button id="tab-team" class="hr-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition" onclick="window.switchHRTab('team')"><i class="fas fa-user-cog mr-2"></i> Equipe</button>
-                <button id="tab-payroll" class="hr-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition" onclick="window.switchHRTab('payroll')"><i class="fas fa-file-invoice-dollar mr-2"></i> Folha & Encargos</button>
                 <button class="hr-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition bg-orange-700 text-white hover:bg-orange-600" onclick="window.renderExternalRecruitmentModal('extra')"><i class="fas fa-bullhorn mr-2"></i> Chamar Extra</button>
             </div>
             
@@ -86,7 +101,7 @@ async function renderHRPanel(activeTab = 'team') {
     managerModal.style.display = 'flex';
     managerModal.classList.remove('p-4'); managerModal.classList.add('p-0', 'md:p-4');
     
-    await switchHRTab(activeTab);
+    await switchHRTab('team');
 }
 
 async function switchHRTab(tab) {
@@ -113,23 +128,34 @@ async function switchHRTab(tab) {
             return;
         }
 
-        let html = `<div class="grid grid-cols-1 md:grid-cols-3 gap-4">`;
+        let html = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">`;
         usersSnap.forEach(u => {
             const data = u.data();
             html += `
-                <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 relative group hover:border-pink-500 transition">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-12 h-12 rounded-full bg-pink-900/50 flex items-center justify-center text-pink-400 font-bold text-xl border border-pink-500/30">
-                            ${data.name ? data.name.charAt(0).toUpperCase() : '?'}
+                <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 relative group hover:border-pink-500 transition shadow-lg flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center space-x-4 mb-4">
+                            <div class="w-14 h-14 rounded-full bg-pink-900/30 flex items-center justify-center text-pink-400 font-bold text-2xl border border-pink-500/30 shadow-inner">
+                                ${data.name ? data.name.charAt(0).toUpperCase() : '?'}
+                            </div>
+                            <div class="min-w-0">
+                                <h4 class="font-bold text-white text-lg truncate">${data.name}</h4>
+                                <p class="text-xs text-gray-400 uppercase tracking-wider font-semibold bg-gray-900/50 inline-block px-2 py-0.5 rounded mt-1">${data.role || 'Sem Cargo'}</p>
+                            </div>
                         </div>
-                        <div>
-                            <h4 class="font-bold text-white text-lg">${data.name}</h4>
-                            <p class="text-xs text-gray-400 uppercase tracking-wider">${data.role}</p>
+                        <div class="space-y-1 text-sm text-gray-400 mb-4 bg-gray-900/30 p-3 rounded">
+                            <p class="truncate"><i class="fas fa-envelope mr-2 w-4"></i> ${data.email}</p>
+                            <p><i class="fas fa-circle mr-2 w-4 ${data.isActive ? 'text-green-500' : 'text-red-500'}"></i> ${data.isActive ? 'Ativo' : 'Inativo'}</p>
                         </div>
                     </div>
-                    <div class="mt-4 pt-3 border-t border-gray-700 flex justify-between text-xs text-gray-400">
-                        <span>${data.email}</span>
-                        <span class="${data.isActive ? 'text-green-400' : 'text-red-400'} font-bold px-2 py-0.5 rounded bg-gray-900">${data.isActive ? 'ATIVO' : 'INATIVO'}</span>
+                    
+                    <div class="grid grid-cols-2 gap-2 mt-auto">
+                         <button onclick="window.openPayrollModal('${u.id}', '${data.name}')" class="bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white py-2 px-3 rounded-lg font-bold transition text-xs flex items-center justify-center border border-purple-600/30">
+                            <i class="fas fa-file-invoice-dollar mr-2"></i> Folha
+                         </button>
+                         <button onclick="alert('Editar usuário via Gerenciar Cadastros')" class="bg-gray-700 hover:bg-gray-600 text-gray-300 py-2 px-3 rounded-lg font-bold transition text-xs flex items-center justify-center">
+                            <i class="fas fa-edit mr-2"></i> Editar
+                         </button>
                     </div>
                 </div>`;
         });
@@ -140,92 +166,178 @@ async function switchHRTab(tab) {
             </button>
         </div>`;
         content.innerHTML = html;
-        
-    } else if (tab === 'payroll') {
-        await renderPayrollGenerator(content);
-    }
+    } 
 }
 
 // ==================================================================
-//           4. FOLHA DE PAGAMENTO (PAYROLL)
+//           4. MODAL DE FOLHA DE PAGAMENTO (LAYOUT TÉRMICO + FONTE)
 // ==================================================================
 
-async function renderPayrollGenerator(container) {
-    const usersSnap = await getDocs(getColRef('users'));
-    const usersOptions = usersSnap.docs.map(d => `<option value="${d.id}" data-name="${d.data().name}">${d.data().name || d.id}</option>`).join('');
-    
+// Função para ajustar fonte
+function changePayrollFontSize(delta) {
+    currentPrintFontSize += delta;
+    if (currentPrintFontSize < 8) currentPrintFontSize = 8;
+    if (currentPrintFontSize > 20) currentPrintFontSize = 20;
+
+    const preview = document.getElementById('payslipPreview');
+    if (preview) {
+        preview.style.fontSize = `${currentPrintFontSize}px`;
+    }
+}
+
+async function openPayrollModal(userId, userName) {
     const today = new Date();
     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
     const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+    
+    currentPrintFontSize = 12; // Reset ao abrir
 
-    container.innerHTML = `
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-            <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 h-fit overflow-y-auto max-h-full custom-scrollbar shadow-lg">
-                <h4 class="text-white font-bold mb-4 border-b border-gray-600 pb-2 flex items-center"><i class="fas fa-cog mr-2 text-gray-400"></i> Parâmetros</h4>
+    const modalHtml = `
+        <div id="payrollModal" class="fixed inset-0 bg-black/90 flex items-center justify-center z-[90] animate-fade-in p-4">
+            <div class="bg-dark-card border border-gray-600 w-full max-w-6xl max-h-[95vh] rounded-xl shadow-2xl overflow-hidden flex flex-col">
                 
-                <div class="space-y-4">
-                    <div>
-                        <label class="text-xs text-gray-400 font-bold uppercase block mb-1">Colaborador</label>
-                        <select id="payUser" class="input-pdv w-full p-2 bg-dark-input border-gray-600 rounded">${usersOptions}</select>
-                    </div>
-                    
-                    <div class="grid grid-cols-2 gap-2">
-                        <div><label class="text-xs text-gray-400 block mb-1">Início</label><input type="date" id="payStart" class="input-pdv w-full p-2" value="${firstDay}"></div>
-                        <div><label class="text-xs text-gray-400 block mb-1">Fim</label><input type="date" id="payEnd" class="input-pdv w-full p-2" value="${lastDay}"></div>
-                    </div>
-                    
-                    <div class="bg-gray-900/50 p-3 rounded border border-gray-600">
-                        <p class="text-xs text-green-400 font-bold mb-2 uppercase border-b border-gray-700 pb-1">Proventos</p>
-                        <div class="grid grid-cols-2 gap-2 mb-2">
-                            <div><label class="text-[10px] text-gray-400">Salário Base</label><input type="number" id="payBase" class="input-pdv w-full p-1 text-sm" value="1412.00"></div>
-                            <div><label class="text-[10px] text-gray-400">Comissão (%)</label><input type="number" id="payCommPct" class="input-pdv w-full p-1 text-sm" value="10"></div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-gray-900/50 p-3 rounded border border-gray-600">
-                        <p class="text-xs text-yellow-400 font-bold mb-2 uppercase border-b border-gray-700 pb-1">Extras</p>
-                        <div class="mb-2">
-                            <label class="text-[10px] text-gray-400">Horas Noturnas</label>
-                            <input type="number" id="payNightHours" class="input-pdv w-full p-1 text-sm" placeholder="Qtd Horas">
-                        </div>
-                        <div class="flex items-center justify-between mb-1">
-                            <label class="text-xs text-gray-300 flex items-center"><input type="checkbox" id="pay13th" class="mr-2 h-4 w-4 rounded bg-dark-bg border-gray-500"> 13º (Parcela)</label>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-gray-900/50 p-3 rounded border border-gray-600">
-                        <p class="text-xs text-red-400 font-bold mb-2 uppercase border-b border-gray-700 pb-1">Descontos</p>
-                        <div class="grid grid-cols-2 gap-2 mb-2">
-                            <div><label class="text-[10px] text-gray-400">Adiantamentos</label><input type="number" id="payAdvance" class="input-pdv w-full p-1 text-sm" value="0.00"></div>
-                            <div><label class="text-[10px] text-gray-400">Dependentes</label><input type="number" id="payDependents" class="input-pdv w-full p-1 text-sm" value="0"></div>
-                        </div>
-                        <label class="flex items-center text-xs text-gray-300"><input type="checkbox" id="payVT" class="mr-2 h-4 w-4 rounded bg-dark-bg border-gray-500" checked> Descontar VT (6%)</label>
-                    </div>
-                    
-                    <button onclick="window.generatePayslip()" class="w-full bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-bold py-3 rounded-lg mt-2 shadow-lg transition transform hover:scale-[1.02]">
-                        <i class="fas fa-calculator mr-2"></i> Calcular Folha
-                    </button>
+                <div class="flex justify-between items-center p-4 border-b border-gray-700 bg-gray-800 flex-shrink-0">
+                    <h3 class="text-xl font-bold text-white flex items-center">
+                        <i class="fas fa-file-invoice-dollar mr-2 text-purple-400"></i> Folha: <span class="text-pink-400 ml-2">${userName}</span>
+                    </h3>
+                    <button onclick="document.getElementById('payrollModal').remove()" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
                 </div>
-            </div>
-            
-            <div class="lg:col-span-2 bg-white text-black p-0 rounded-xl shadow-2xl overflow-hidden flex flex-col">
-                <div class="bg-gray-200 p-2 border-b border-gray-300 text-right">
-                    <button onclick="window.print()" class="text-xs font-bold text-gray-600 hover:text-black uppercase"><i class="fas fa-print mr-1"></i> Imprimir</button>
-                </div>
-                <div id="payslipPreview" class="p-8 overflow-y-auto custom-scrollbar flex-grow">
-                    <div class="text-center text-gray-400 py-20 italic">
-                        <i class="fas fa-file-invoice-dollar text-6xl mb-4 opacity-20"></i><br>
-                        Selecione o colaborador e clique em calcular.
+
+                <div class="flex-grow overflow-y-auto custom-scrollbar min-h-0">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
+                        
+                        <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 h-fit lg:sticky lg:top-0">
+                            <h4 class="text-white font-bold mb-4 border-b border-gray-600 pb-2 flex items-center"><i class="fas fa-sliders-h mr-2 text-gray-400"></i> Parâmetros</h4>
+                            
+                            <div class="space-y-4">
+                                <input type="hidden" id="payUserId" value="${userId}">
+                                <input type="hidden" id="payUserName" value="${userName}">
+
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div><label class="text-xs text-gray-400 block mb-1">Início</label><input type="date" id="payStart" class="input-pdv w-full p-2" value="${firstDay}"></div>
+                                    <div><label class="text-xs text-gray-400 block mb-1">Fim</label><input type="date" id="payEnd" class="input-pdv w-full p-2" value="${lastDay}"></div>
+                                </div>
+                                
+                                <div class="bg-gray-900/50 p-3 rounded border border-gray-600">
+                                    <p class="text-xs text-green-400 font-bold mb-2 uppercase border-b border-gray-700 pb-1">Proventos</p>
+                                    <div class="grid grid-cols-2 gap-2 mb-2">
+                                        <div><label class="text-[10px] text-gray-400">Salário Base</label><input type="number" id="payBase" class="input-pdv w-full p-1 text-sm" value="1412.00"></div>
+                                        <div><label class="text-[10px] text-gray-400">Comissão (%)</label><input type="number" id="payCommPct" class="input-pdv w-full p-1 text-sm" value="10"></div>
+                                    </div>
+                                </div>
+                                
+                                <div class="bg-gray-900/50 p-3 rounded border border-gray-600">
+                                    <p class="text-xs text-yellow-400 font-bold mb-2 uppercase border-b border-gray-700 pb-1">Extras</p>
+                                    <div class="mb-2">
+                                        <label class="text-[10px] text-gray-400">Horas Noturnas</label>
+                                        <input type="number" id="payNightHours" class="input-pdv w-full p-1 text-sm" placeholder="Qtd Horas">
+                                    </div>
+                                    <div class="flex items-center justify-between mb-1">
+                                        <label class="text-xs text-gray-300 flex items-center"><input type="checkbox" id="pay13th" class="mr-2 h-4 w-4 rounded bg-dark-bg border-gray-500"> 13º (Parcela)</label>
+                                    </div>
+                                </div>
+                                
+                                <div class="bg-gray-900/50 p-3 rounded border border-gray-600">
+                                    <p class="text-xs text-red-400 font-bold mb-2 uppercase border-b border-gray-700 pb-1">Descontos</p>
+                                    <div class="grid grid-cols-2 gap-2 mb-2">
+                                        <div><label class="text-[10px] text-gray-400">Adiantamentos</label><input type="number" id="payAdvance" class="input-pdv w-full p-1 text-sm" value="0.00"></div>
+                                        <div><label class="text-[10px] text-gray-400">Dependentes</label><input type="number" id="payDependents" class="input-pdv w-full p-1 text-sm" value="0"></div>
+                                    </div>
+                                    <label class="flex items-center text-xs text-gray-300"><input type="checkbox" id="payVT" class="mr-2 h-4 w-4 rounded bg-dark-bg border-gray-500" checked> Descontar VT (6%)</label>
+                                </div>
+                                
+                                <button onclick="window.generatePayslip()" class="w-full bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-bold py-3 rounded-lg mt-2 shadow-lg transition transform hover:scale-[1.02]">
+                                    <i class="fas fa-calculator mr-2"></i> Calcular Folha
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="lg:col-span-2 bg-gray-200 p-0 rounded-xl shadow-2xl flex flex-col min-h-[500px]">
+                            <div class="bg-gray-300 p-2 border-b border-gray-400 flex justify-between items-center rounded-t-xl">
+                                <span class="text-xs font-bold text-gray-600 ml-2 uppercase">Pré-visualização (Estilo Cupom)</span>
+                                <div class="flex items-center space-x-2">
+                                    <button onclick="window.changePayrollFontSize(-1)" class="w-8 h-8 bg-gray-500 text-white rounded hover:bg-gray-600 font-bold text-xs" title="Diminuir Fonte">A-</button>
+                                    <button onclick="window.changePayrollFontSize(1)" class="w-8 h-8 bg-gray-500 text-white rounded hover:bg-gray-600 font-bold text-xs" title="Aumentar Fonte">A+</button>
+                                    <div class="w-px h-6 bg-gray-400 mx-2"></div>
+                                    <button onclick="window.printPayrollArea()" class="text-xs font-bold text-white hover:text-gray-200 uppercase px-4 py-2 bg-blue-600 hover:bg-blue-700 border-0 rounded shadow flex items-center">
+                                        <i class="fas fa-print mr-2"></i> Imprimir
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="flex-grow p-4 md:p-8 flex justify-center bg-gray-500/10 overflow-y-auto">
+                                <div id="payslipPreview" class="bg-white shadow-lg w-full max-w-[320px] p-2 self-start" style="font-family: 'Courier New', monospace; color: black; font-size: 12px;">
+                                    <div class="text-center text-gray-400 py-20 italic font-sans">
+                                        <i class="fas fa-receipt text-6xl mb-4 opacity-30"></i><br>
+                                        Configure os parâmetros e clique em calcular.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>`;
+
+    getSubModalContainer().innerHTML = modalHtml;
+    
+    // Função de Impressão Otimizada para Térmicas
+    window.printPayrollArea = () => {
+        const content = document.getElementById('payslipPreview').innerHTML;
+        
+        // CSS Específico para Impressoras Térmicas injetado na hora
+        const styles = `
+            <style>
+                @page { margin: 0; size: auto; }
+                body { margin: 0; padding: 0; background-color: #fff; }
+                .ticket-container {
+                    width: 100%;
+                    max-width: 80mm; /* Largura padrão térmica 80mm (adaptável a 58mm) */
+                    margin: 0 auto;
+                    padding: 5px 0;
+                    font-family: 'Courier New', Courier, monospace;
+                    font-size: ${currentPrintFontSize}px; /* Usa o tamanho definido pelo usuário */
+                    color: #000;
+                    background: #fff;
+                }
+                .ticket-header { text-align: center; margin-bottom: 10px; }
+                .ticket-title { font-size: 1.2em; font-weight: bold; text-transform: uppercase; }
+                .dashed-line { border-bottom: 1px dashed #000; margin: 8px 0; display: block; width: 100%; }
+                .row { display: flex; justify-content: space-between; margin-bottom: 3px; }
+                .row-col { display: flex; flex-direction: column; }
+                .item-name { font-weight: bold; }
+                .item-sub { font-size: 0.9em; margin-left: 10px; }
+                .section-title { font-weight: bold; text-transform: uppercase; margin-top: 5px; margin-bottom: 2px; }
+                .total-box { margin-top: 10px; border-top: 2px solid #000; padding-top: 5px; }
+                .big-total { font-size: 1.3em; font-weight: bold; }
+                .signature-box { margin-top: 30px; text-align: center; font-size: 0.9em; }
+                .signature-line { border-top: 1px solid #000; width: 80%; margin: 0 auto 5px auto; }
+                /* Ocultar elementos desnecessários na impressão */
+                button, .no-print { display: none !important; }
+            </style>
+        `;
+
+        // Cria um iframe invisível para imprimir sem perder o contexto do app
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+        
+        const doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(`<html><head>${styles}</head><body><div class="ticket-container">${content}</div></body></html>`);
+        doc.close();
+        
+        iframe.contentWindow.focus();
+        setTimeout(() => {
+            iframe.contentWindow.print();
+            document.body.removeChild(iframe);
+        }, 500);
+    };
 }
 
 async function generatePayslip() {
-    const userSelect = document.getElementById('payUser');
-    const userName = userSelect.options[userSelect.selectedIndex].text;
-    const userId = userSelect.value;
+    const userId = document.getElementById('payUserId').value;
+    const userName = document.getElementById('payUserName').value;
     
     // Inputs
     const start = document.getElementById('payStart').value;
@@ -238,7 +350,7 @@ async function generatePayslip() {
     const pay13th = document.getElementById('pay13th').checked;
     const deductVT = document.getElementById('payVT').checked;
 
-    // Busca Vendas do Período para Comissão
+    // Busca Vendas para Comissão
     const startDate = Timestamp.fromDate(new Date(start + 'T00:00:00'));
     const endDate = Timestamp.fromDate(new Date(end + 'T23:59:59'));
     
@@ -246,17 +358,13 @@ async function generatePayslip() {
     try {
         const q = query(getTablesCollectionRef(), where('status', '==', 'closed'), where('closedAt', '>=', startDate), where('closedAt', '<=', endDate));
         const snap = await getDocs(q);
-        
-        // Filtra localmente por garçom
         snap.forEach(doc => { 
             const t = doc.data(); 
             if ((t.waiterId && t.waiterId === userId) || (t.closedBy && userName.includes(t.closedBy.split(' ')[0]))) {
                 totalSales += (t.total || 0); 
             }
         });
-    } catch(e) {
-        console.error("Erro ao buscar vendas para comissão:", e);
-    }
+    } catch(e) { console.error(e); }
 
     const commissionVal = totalSales * (commPct / 100);
     const hourlyRate = salaryBase / 220; 
@@ -275,71 +383,116 @@ async function generatePayslip() {
     
     const fmt = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+    // --- MONTAGEM DO HTML ESTILO CUPOM (VERTICAL) ---
     const preview = document.getElementById('payslipPreview');
     preview.innerHTML = `
-        <div class="font-mono text-sm leading-snug">
-            <div class="text-center border-b-2 border-black pb-4 mb-6">
-                <h2 class="text-xl font-bold uppercase tracking-widest">Recibo de Pagamento</h2>
-                <p class="text-xs mt-1">Fator MD - CNPJ: 00.000.000/0001-00</p>
+        <div class="ticket-header">
+            <div class="ticket-title">FATOR MD</div>
+            <div style="font-size:0.9em;">CNPJ: 00.000.000/0001-00</div>
+            <div style="font-size:0.9em;">RECIBO DE PAGAMENTO</div>
+        </div>
+        
+        <div class="dashed-line"></div>
+        
+        <div class="row">
+            <span>COLABORADOR:</span>
+            <span style="font-weight:bold;">${userName.split(' ')[0]}</span>
+        </div>
+        <div class="row">
+            <span>REF:</span>
+            <span>${new Date(start).toLocaleDateString('pt-BR', {month:'short', year:'2-digit'}).toUpperCase()}</span>
+        </div>
+        <div class="row">
+            <span>DATA:</span>
+            <span>${new Date().toLocaleDateString('pt-BR')}</span>
+        </div>
+
+        <div class="dashed-line"></div>
+
+        <div class="section-title">PROVENTOS (+)</div>
+        
+        <div class="row">
+            <span class="item-name">Salário Base</span>
+            <span>${fmt(salaryBase)}</span>
+        </div>
+        
+        ${commissionVal > 0 ? `
+        <div class="row">
+            <span class="item-name">Comissões</span>
+            <span>${fmt(commissionVal)}</span>
+        </div>
+        <div class="row"><span class="item-sub text-xs text-gray-500">(Vendas: ${fmt(totalSales)} | ${commPct}%)</span></div>
+        ` : ''}
+
+        ${nightShiftVal > 0 ? `
+        <div class="row">
+            <span class="item-name">Adc. Noturno</span>
+            <span>${fmt(nightShiftVal)}</span>
+        </div>
+        <div class="row"><span class="item-sub">(${nightHours}h)</span></div>
+        ` : ''}
+
+        ${thirteenthVal > 0 ? `
+        <div class="row">
+            <span class="item-name">13º (Adiant.)</span>
+            <span>${fmt(thirteenthVal)}</span>
+        </div>
+        ` : ''}
+
+        <div class="dashed-line"></div>
+        
+        <div class="section-title">DESCONTOS (-)</div>
+
+        <div class="row">
+            <span class="item-name">INSS</span>
+            <span>${fmt(inssVal)}</span>
+        </div>
+
+        ${irrfVal > 0 ? `
+        <div class="row">
+            <span class="item-name">IRRF</span>
+            <span>${fmt(irrfVal)}</span>
+        </div>` : ''}
+
+        ${vtVal > 0 ? `
+        <div class="row">
+            <span class="item-name">Vale Transp.</span>
+            <span>${fmt(vtVal)}</span>
+        </div>` : ''}
+
+        ${advances > 0 ? `
+        <div class="row">
+            <span class="item-name">Adiantamentos</span>
+            <span>${fmt(advances)}</span>
+        </div>` : ''}
+
+        <div class="dashed-line"></div>
+
+        <div class="total-box">
+            <div class="row">
+                <span>Bruto:</span>
+                <span>${fmt(grossSalary)}</span>
             </div>
-            
-            <div class="flex justify-between mb-6 bg-gray-100 p-4 rounded border border-gray-300">
-                <div>
-                    <p><strong>Funcionário:</strong> ${userName}</p>
-                    <p><strong>Cargo:</strong> Operacional</p>
-                </div>
-                <div class="text-right">
-                    <p><strong>Referência:</strong> ${new Date(start).toLocaleDateString('pt-BR', {month:'long', year:'numeric'}).toUpperCase()}</p>
-                    <p><strong>Data:</strong> ${new Date().toLocaleDateString('pt-BR')}</p>
-                </div>
+            <div class="row">
+                <span>Descontos:</span>
+                <span>- ${fmt(totalDiscounts)}</span>
             </div>
-            
-            <table class="w-full mb-6 border-collapse">
-                <thead>
-                    <tr class="border-b-2 border-black text-xs uppercase">
-                        <th class="text-left py-2 pl-2">Descrição</th>
-                        <th class="text-center py-2">Ref.</th>
-                        <th class="text-right py-2">Vencimentos</th>
-                        <th class="text-right py-2 pr-2">Descontos</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr><td class="pl-2 py-1">Salário Base</td><td class="text-center">30d</td><td class="text-right">${fmt(salaryBase)}</td><td class="text-right pr-2">-</td></tr>
-                    ${commissionVal > 0 ? `<tr><td class="pl-2 py-1">Comissões (Vendas: ${fmt(totalSales)})</td><td class="text-center">${commPct}%</td><td class="text-right">${fmt(commissionVal)}</td><td class="text-right pr-2">-</td></tr>` : ''}
-                    ${nightShiftVal > 0 ? `<tr><td class="pl-2 py-1">Adicional Noturno</td><td class="text-center">${nightHours}h</td><td class="text-right">${fmt(nightShiftVal)}</td><td class="text-right pr-2">-</td></tr>` : ''}
-                    ${thirteenthVal > 0 ? `<tr><td class="pl-2 py-1">13º Salário (Adiant.)</td><td class="text-center">1/12</td><td class="text-right">${fmt(thirteenthVal)}</td><td class="text-right pr-2">-</td></tr>` : ''}
-                    
-                    <tr><td class="pl-2 py-1 text-gray-600">INSS</td><td class="text-center text-gray-500">Tab.</td><td class="text-right">-</td><td class="text-right pr-2">${fmt(inssVal)}</td></tr>
-                    ${irrfVal > 0 ? `<tr><td class="pl-2 py-1 text-gray-600">IRRF</td><td class="text-center text-gray-500">Tab.</td><td class="text-right">-</td><td class="text-right pr-2">${fmt(irrfVal)}</td></tr>` : ''}
-                    ${vtVal > 0 ? `<tr><td class="pl-2 py-1 text-gray-600">Vale Transporte</td><td class="text-center text-gray-500">6%</td><td class="text-right">-</td><td class="text-right pr-2">${fmt(vtVal)}</td></tr>` : ''}
-                    ${advances > 0 ? `<tr><td class="pl-2 py-1 text-gray-600">Adiantamentos</td><td class="text-center text-gray-500">-</td><td class="text-right">-</td><td class="text-right pr-2">${fmt(advances)}</td></tr>` : ''}
-                </tbody>
-                <tfoot class="border-t-2 border-black font-bold bg-gray-100">
-                    <tr>
-                        <td class="pl-2 py-3">TOTAIS</td>
-                        <td></td>
-                        <td class="text-right py-3 text-green-700">${fmt(grossSalary)}</td>
-                        <td class="text-right py-3 pr-2 text-red-700">${fmt(totalDiscounts)}</td>
-                    </tr>
-                </tfoot>
-            </table>
-            
-            <div class="flex justify-between items-center mb-8 gap-6">
-                <div class="bg-blue-50 p-3 rounded border border-blue-200 w-1/2 text-xs text-blue-800">
-                    <p><strong>FGTS do Mês (8%):</strong> ${fmt(fgtsVal)}</p>
-                    <p><strong>Base de Cálculo:</strong> ${fmt(grossSalary)}</p>
-                </div>
-                <div class="bg-gray-900 text-white p-4 rounded-lg w-1/2 flex justify-between items-center shadow-md">
-                    <span class="text-sm uppercase tracking-wider">Líquido a Receber</span>
-                    <span class="text-2xl font-bold text-green-400">${fmt(netSalary)}</span>
-                </div>
+            <div class="row" style="margin-top:5px;">
+                <span class="big-total">LÍQUIDO:</span>
+                <span class="big-total">${fmt(netSalary)}</span>
             </div>
-            
-            <div class="mt-12 pt-4 border-t-2 border-dashed border-gray-400 text-center">
-                <p class="mb-8 text-xs">Declaro ter recebido a importância líquida discriminada neste recibo.</p>
-                <div class="w-64 mx-auto border-t border-black pt-1 font-bold text-sm">
-                    Assinatura do Funcionário
-                </div>
-            </div>
-        </div>`;
+        </div>
+
+        <div class="row" style="margin-top:5px; font-size:0.9em;">
+            <span>FGTS do Mês:</span>
+            <span>${fmt(fgtsVal)}</span>
+        </div>
+
+        <div class="signature-box">
+            <div class="signature-line"></div>
+            ASSINATURA DO COLABORADOR
+        </div>
+        
+        <div style="text-align:center; margin-top:20px;">.</div>
+    `;
 }

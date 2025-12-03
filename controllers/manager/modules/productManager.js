@@ -1,9 +1,8 @@
-// --- CONTROLLERS/MANAGER/MODULES/PRODUCTMANAGER.JS (VERSÃO FINAL - PROMOÇÃO & HIERARQUIA) ---
+// --- CONTROLLERS/MANAGER/MODULES/PRODUCTMANAGER.JS (VERSÃO FINAL COMPLETA) ---
 
 import { 
-    db, appId, 
-    getSectorsCollectionRef, 
-    getCollectionRef 
+    db, appId, storage, ref, uploadBytes, getDownloadURL, 
+    getSectorsCollectionRef, getCollectionRef 
 } from "/services/firebaseService.js"; 
 
 import { 
@@ -13,10 +12,11 @@ import {
 
 import { formatCurrency, toggleLoading, showToast } from "/utils.js";
 
+// Import com ?v=2 para forçar atualização do cache do navegador
 import { 
     syncWithWooCommerce, getProducts, getCategories, fetchSalesHistory,
     createWooProduct, updateWooProduct, deleteWooProduct, fetchWooCommerceProducts 
-} from "/services/wooCommerceService.js"; 
+} from "/services/wooCommerceService.js?v=2"; 
 
 const getColRef = (name) => collection(db, 'artifacts', appId, 'public', 'data', name);
 let managerModal = null;
@@ -24,33 +24,86 @@ let currentTab = 'products';
 let ingredientsCache = [];
 let suppliersCache = [];
 let currentProductComposition = []; 
+let productExtensionsCache = {}; 
 
 const COST_GAS_PER_HOUR = 6.00; 
 const COST_ENERGY_PER_HOUR = 1.50; 
 
+// --- FUNÇÃO AUXILIAR PARA CORRIGIR O STACKING CONTEXT ---
+function getSubModalContainer() {
+    let container = document.getElementById('subModalContainer');
+    if (!container || container.parentElement.id === 'managerModal') {
+        if(container) container.remove();
+        container = document.createElement('div');
+        container.id = 'subModalContainer';
+        container.style.zIndex = '9999'; 
+        container.style.position = 'relative';
+        document.body.appendChild(container);
+    }
+    return container;
+}
+
 // ==================================================================
-//           1. API PÚBLICA
+//           1. API PÚBLICA & LÓGICA DE UPLOAD
 // ==================================================================
 
 export const init = () => {
     console.log("[ProductModule] Inicializado.");
     managerModal = document.getElementById('managerModal');
     
-    window.handleImageUpload = (input) => {
+    // --- LÓGICA DE UPLOAD CORRIGIDA E SANITIZADA ---
+    window.handleImageUpload = async (input) => {
         if (input.files && input.files[0]) {
+            const file = input.files[0];
+            const preview = document.getElementById('imgPreview');
+            const icon = document.getElementById('imgPlaceholderIcon');
+            const urlInput = document.getElementById('prodImgUrl');
+
+            // 1. Mostra o preview imediatamente
             const reader = new FileReader();
             reader.onload = (e) => {
-                const preview = document.getElementById('imgPreview');
-                const icon = document.getElementById('imgPlaceholderIcon');
-                const urlInput = document.getElementById('prodImgUrl');
-                
                 if(preview) { preview.src = e.target.result; preview.classList.remove('hidden'); }
                 if(icon) icon.classList.add('hidden');
-                if(urlInput) urlInput.value = e.target.result; 
-
-                showToast("Imagem carregada (Preview).", false);
             };
-            reader.readAsDataURL(input.files[0]);
+            reader.readAsDataURL(file);
+
+            if (!storage) {
+                showToast("Erro: Storage não inicializado. Verifique firebaseService.js", true);
+                return;
+            }
+
+            showToast("Otimizando e enviando imagem...", false);
+            
+            try {
+                // 2. SANITIZAÇÃO DO NOME DO ARQUIVO
+                // Remove acentos, espaços e caracteres especiais para não quebrar no WooCommerce
+                const cleanName = file.name
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, "") // Tira acentos
+                    .replace(/\s+/g, '_') // Troca espaços por _
+                    .replace(/[^a-zA-Z0-9._-]/g, '') // Remove caracteres estranhos
+                    .toLowerCase();
+
+                const fileName = `products/${Date.now()}_${cleanName}`;
+                const storageRef = ref(storage, fileName);
+                
+                // 3. Upload
+                await uploadBytes(storageRef, file);
+                
+                // 4. Pega o link público
+                const publicUrl = await getDownloadURL(storageRef);
+                
+                // 5. Cola o link no campo e garante que não tem espaços extras
+                if(urlInput) {
+                    urlInput.value = publicUrl.trim();
+                    console.log("Link Gerado (Clean):", publicUrl);
+                }
+                
+                showToast("Upload concluído! Link pronto.", false);
+
+            } catch (error) {
+                console.error("Erro no upload:", error);
+                showToast("Erro ao subir imagem: " + error.message, true);
+            }
         }
     };
 };
@@ -107,11 +160,22 @@ async function calculateConsumptionFromHistory(days = 30) {
     return consumptionMap;
 }
 
+async function fetchProductExtensions() {
+    try {
+        const snap = await getDocs(getColRef('products'));
+        productExtensionsCache = {};
+        snap.forEach(doc => {
+            productExtensionsCache[doc.id] = doc.data();
+        });
+    } catch(e) { console.error("Erro cache ext:", e); }
+}
+
 async function renderProductHub(activeTab = 'products') {
     if (!managerModal) return;
     
     await fetchIngredients();
     await fetchSuppliers();
+    await fetchProductExtensions(); 
     
     managerModal.innerHTML = `
         <div class="bg-dark-card border-0 md:border md:border-dark-border w-full h-full md:h-[90vh] md:max-w-6xl flex flex-col md:rounded-xl shadow-2xl overflow-hidden">
@@ -133,8 +197,7 @@ async function renderProductHub(activeTab = 'products') {
             <div id="hubContent" class="flex-grow overflow-y-auto p-3 md:p-4 custom-scrollbar bg-dark-bg relative">
                 <div class="flex items-center justify-center h-full text-gray-500"><i class="fas fa-spinner fa-spin text-3xl"></i></div>
             </div>
-        </div>
-        <div id="subModalContainer"></div>`;
+        </div>`;
 
     managerModal.style.display = 'flex';
     managerModal.classList.remove('p-4'); managerModal.classList.add('p-0', 'md:p-4');
@@ -169,7 +232,7 @@ async function switchHubTab(tab) {
 }
 
 // ==================================================================
-//           3. GESTÃO DE PRODUTOS (LISTA E FORM - ATUALIZADO)
+//           3. GESTÃO DE PRODUTOS (LISTA E FORM)
 // ==================================================================
 
 async function renderProductListConfig(contentDiv, toolbarDiv) {
@@ -201,6 +264,8 @@ async function renderProductListConfig(contentDiv, toolbarDiv) {
     const renderList = async (page = 1) => {
         contentDiv.innerHTML = '<div class="flex justify-center py-10"><i class="fas fa-spinner fa-spin text-3xl text-gray-500"></i></div>';
         await fetchWooCommerceProducts(page, hubSearch, hubCategory, false);
+        await fetchProductExtensions(); 
+        
         const products = getProducts();
         
         if (products.length === 0) {
@@ -208,11 +273,16 @@ async function renderProductListConfig(contentDiv, toolbarDiv) {
             return;
         }
 
-        const listHtml = products.map(p => `
+        const listHtml = products.map(p => {
+            const extData = productExtensionsCache[p.id] || {};
+            // Prioridade: Imagem local > Imagem do Woo > Placeholder
+            const displayImage = extData.localImage || (p.image && !p.image.includes('placehold') ? p.image : 'https://placehold.co/50');
+
+            return `
             <div class="flex justify-between items-center bg-dark-input p-3 rounded-lg mb-2 border border-gray-700 hover:border-gray-500 transition group">
                 <div class="flex items-center space-x-3 overflow-hidden">
                     <div class="w-12 h-12 rounded-lg bg-gray-800 overflow-hidden flex-shrink-0 border border-gray-600 relative">
-                        <img src="${p.image || 'https://placehold.co/50'}" class="w-full h-full object-cover">
+                        <img src="${displayImage}" class="w-full h-full object-cover">
                     </div>
                     <div class="min-w-0">
                         <h4 class="font-bold text-white text-sm truncate">${p.name}</h4>
@@ -227,7 +297,8 @@ async function renderProductListConfig(contentDiv, toolbarDiv) {
                     <button class="bg-indigo-600 hover:bg-indigo-500 text-white p-2 rounded-lg text-sm btn-edit-prod shadow" data-id="${p.id}" title="Editar / Ficha Técnica"><i class="fas fa-edit"></i></button>
                     <button class="bg-red-600 hover:bg-red-500 text-white p-2 rounded-lg text-sm btn-del-prod shadow" data-id="${p.id}"><i class="fas fa-trash"></i></button>
                 </div>
-            </div>`).join('');
+            </div>`;
+        }).join('');
             
         contentDiv.innerHTML = `<div class="pb-20">${listHtml}</div>`;
         
@@ -285,7 +356,9 @@ async function renderProductForm(product = null, container) {
     const price = product?.price || '';
     const salePrice = product?.sale_price || '';
     const onSale = !!salePrice; 
-    const prodImage = product?.image && !product.image.includes('placehold') ? product.image : '';
+    
+    // Tenta pegar imagem local (backup), senão usa a do Woo
+    const prodImage = extendedData.localImage || (product?.image && !product.image.includes('placehold') ? product.image : '');
 
     container.innerHTML = `
         <div class="w-full h-full flex flex-col bg-dark-bg animate-fade-in">
@@ -360,7 +433,7 @@ async function renderProductForm(product = null, container) {
                 <div id="ft-ficha" class="form-tab-content hidden">
                     <div class="flex flex-col space-y-3 mb-4 bg-gray-800 p-3 rounded border border-gray-700">
                         <div>
-                            <label class="block text-xs text-gray-400 uppercase font-bold mb-1">Insumo</label>
+                            <label class="block text-xs text-gray-400 uppercase font-bold">Insumo</label>
                             <select id="ingSelect" class="input-pdv w-full text-sm">
                                 <option value="">Selecione...</option>
                                 ${ingredientsCache.map(i => `<option value="${i.id}" data-unit="${i.unit}" data-cost="${i.cost}">${i.name} (R$ ${i.cost}/${i.unit})</option>`).join('')}
@@ -573,44 +646,82 @@ async function renderProductForm(product = null, container) {
 
     document.getElementById('btnBackToHub').onclick = () => renderProductListConfig(container, document.getElementById('productActionsToolbar'));
     
+    // --- LÓGICA DE SALVAMENTO HÍBRIDA (LINK vs ARQUIVO) ---
     document.getElementById('btnSaveProduct').onclick = async () => {
         const btn = document.getElementById('btnSaveProduct');
         toggleLoading(btn, true, 'Salvando...');
         
-        const isPromoActive = document.getElementById('checkPromo').checked;
-        const salePriceVal = isPromoActive ? document.getElementById('prodSalePrice').value : '';
+        try {
+            // 1. TRATAMENTO DE PREÇOS
+            let rawPrice = document.getElementById('prodPrice').value || "0";
+            let rawSalePrice = document.getElementById('prodSalePrice').value || "";
+            const regularPrice = rawPrice.toString().replace(',', '.');
+            const salePrice = document.getElementById('checkPromo').checked && rawSalePrice 
+                ? rawSalePrice.toString().replace(',', '.') : ''; 
 
-        const basicData = {
-            name: document.getElementById('prodName').value,
-            regular_price: document.getElementById('prodPrice').value.toString(),
-            sale_price: salePriceVal ? salePriceVal.toString() : '', 
-            status: document.getElementById('prodStatus').value,
-            meta_data: [ { key: 'sector', value: document.getElementById('prodSector').value } ],
-            images: document.getElementById('prodImgUrl').value ? [{ src: document.getElementById('prodImgUrl').value }] : []
-        };
+            // 2. TRATAMENTO DE IMAGEM HÍBRIDO
+            let imageUrl = document.getElementById('prodImgUrl').value ? document.getElementById('prodImgUrl').value.trim() : '';
+            let imagesArray = []; // Vai para o Woo (apenas Links)
+            let localImageToSave = null; // Vai para o Firestore (Link direto do Storage)
+            
+            // Se o campo de URL tiver valor, usamos ele
+            if (imageUrl) {
+                if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+                    // É link público (ex: Firebase Storage ou site): Manda para o WooCommerce
+                    imagesArray.push({ src: imageUrl });
+                    
+                    // Também salva como imagem local para o PDV usar
+                    localImageToSave = imageUrl;
+                } else {
+                    console.warn("Formato de imagem desconhecido ou inválido para Woo:", imageUrl);
+                }
+            }
 
-        const extendedData = {
-            composition: currentProductComposition,
-            prepMethod: document.getElementById('prodPrepMethod').value,
-            cookTime: parseFloat(document.getElementById('prodCookTime').value) || 0,
-            energyType: document.getElementById('prodEnergy').value,
-            group: document.getElementById('prodGroup').value,
-            subgroup: document.getElementById('prodSubgroup').value,
-            sector: document.getElementById('prodSector').value,
-            targetMargin: parseFloat(document.getElementById('prodTargetMargin').value) || 0,
-            updatedAt: serverTimestamp()
-        };
+            const basicData = {
+                name: document.getElementById('prodName').value,
+                regular_price: regularPrice,
+                sale_price: salePrice,
+                status: document.getElementById('prodStatus').value,
+                meta_data: [ { key: 'sector', value: document.getElementById('prodSector').value } ],
+                images: imagesArray // Envia para o Woo
+            };
 
-        try { 
+            const extendedData = {
+                composition: currentProductComposition,
+                prepMethod: document.getElementById('prodPrepMethod').value,
+                cookTime: parseFloat(document.getElementById('prodCookTime').value) || 0,
+                energyType: document.getElementById('prodEnergy').value,
+                group: document.getElementById('prodGroup').value,
+                subgroup: document.getElementById('prodSubgroup').value,
+                sector: document.getElementById('prodSector').value,
+                targetMargin: parseFloat(document.getElementById('prodTargetMargin').value) || 0,
+                localImage: localImageToSave, // Salva no Firestore
+                updatedAt: serverTimestamp()
+            };
+
             let wooId = product?.id;
-            if(isEdit) { await updateWooProduct(product.id, basicData); } 
-            else { const newProd = await createWooProduct(basicData); wooId = newProd.id; }
+            
+            if(isEdit) { 
+                await updateWooProduct(product.id, basicData); 
+            } else { 
+                const newProd = await createWooProduct(basicData); 
+                wooId = newProd.id; 
+            }
+            
+            // Se o usuário limpou a imagem (campo vazio), remove do banco também
+            if (!imageUrl) {
+                extendedData.localImage = null;
+            }
+
             await setDoc(doc(getColRef('products'), wooId.toString()), extendedData, { merge: true });
 
             showToast("Produto salvo com sucesso!", false); 
             renderProductListConfig(container, document.getElementById('productActionsToolbar'));
         } catch(e) { 
-            console.error(e); showToast("Erro ao salvar: " + e.message, true); 
+            console.error(e); 
+            let msg = e.message;
+            if(e.code === 'internal' && e.details) msg = JSON.stringify(e.details);
+            showToast("Erro ao salvar: " + msg, true); 
         } finally { 
             toggleLoading(btn, false); 
         }
@@ -658,9 +769,10 @@ async function configureInitialCatalog() {
 async function fetchIngredients() { try { const q = query(getColRef('ingredients'), orderBy('name')); const snap = await getDocs(q); ingredientsCache = snap.docs.map(d => ({ id: d.id, ...d.data() })); return ingredientsCache; } catch (e) { console.error(e); return []; } }
 async function renderIngredientsScreen(container, toolbar) { toolbar.innerHTML = `<div class="flex space-x-2 w-full justify-end"><button id="btnStockWriteOff" class="bg-red-900/50 hover:bg-red-800 text-red-200 border border-red-700 font-bold py-2 px-4 rounded-lg shadow flex items-center text-sm" title="Abater do estoque baseado nas vendas"><i class="fas fa-level-down-alt mr-2"></i> Baixar Estoque</button><button id="btnNewIngredient" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow flex items-center ml-2"><i class="fas fa-plus mr-2"></i> Novo</button></div>`; document.getElementById('btnNewIngredient').onclick = () => renderIngredientForm(null); document.getElementById('btnStockWriteOff').onclick = handleStockWriteOff; if (ingredientsCache.length === 0) { container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-500"><p>Nenhum insumo cadastrado.</p></div>'; return; } container.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20">${ingredientsCache.map(ing => `<div class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex flex-col justify-between group hover:border-gray-600 transition"><div class="flex justify-between items-start mb-2"><div><h4 class="font-bold text-white text-lg">${ing.name}</h4><p class="text-xs text-gray-400 uppercase">${ing.group || 'Sem Grupo'} • ${ing.costCategory || 'CMV'}</p></div><div class="flex space-x-2"><button class="text-blue-400 hover:text-blue-300 p-1" onclick="window.editIngredient('${ing.id}')"><i class="fas fa-edit"></i></button><button class="text-red-400 hover:text-red-300 p-1" onclick="window.deleteIngredient('${ing.id}')"><i class="fas fa-trash"></i></button></div></div><div class="flex justify-between items-end mt-2 pt-2 border-t border-gray-700/50"><div class="text-xs text-gray-500">R$ ${ing.cost.toFixed(2)} / ${ing.unit}</div><div class="text-right font-mono font-bold ${ing.stock <= (ing.minStock||0) ? 'text-red-500' : 'text-green-400'}">${ing.stock.toFixed(3)} ${ing.unit}</div></div></div>`).join('')}</div>`; window.editIngredient = (id) => renderIngredientForm(ingredientsCache.find(i => i.id === id)); window.deleteIngredient = async (id) => { if(confirm("Excluir este insumo?")) { await deleteDoc(doc(getColRef('ingredients'), id)); showToast("Insumo excluído."); await fetchIngredients(); switchHubTab('ingredients'); } }; }
 async function handleStockWriteOff() { const btn = document.getElementById('btnStockWriteOff'); if(!confirm("Isso irá calcular o consumo dos últimos 30 dias e SUBTRAIR do estoque atual de todos os insumos. Continuar?")) return; toggleLoading(btn, true, 'Calculando...'); try { const consumptionMap = await calculateConsumptionFromHistory(30); const batch = writeBatch(db); let updateCount = 0; Object.entries(consumptionMap).forEach(([ingId, qtyConsumed]) => { const ingRef = doc(getColRef('ingredients'), ingId); batch.update(ingRef, { stock: increment(-qtyConsumed) }); updateCount++; }); if(updateCount > 0) { await batch.commit(); showToast(`Estoque atualizado! ${updateCount} insumos baixados.`, false); await fetchIngredients(); switchHubTab('ingredients'); } else { showToast("Nenhum consumo detectado no período.", true); } } catch (e) { console.error(e); showToast("Erro na baixa de estoque.", true); } finally { toggleLoading(btn, false, 'Baixar Estoque'); } }
+
+// CORREÇÃO: Utiliza getSubModalContainer()
 function renderIngredientForm(ingredient = null) {
     const isEdit = !!ingredient;
-    // FIXED: Modal fixo e responsivo com botão 'X'
     const modalHtml = `
         <div id="ingredientFormModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[80] animate-fade-in p-4">
             <div class="bg-dark-card border border-gray-600 p-6 rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl m-4">
@@ -700,7 +812,8 @@ function renderIngredientForm(ingredient = null) {
             </div>
         </div>`;
         
-    document.getElementById('subModalContainer').innerHTML = modalHtml;
+    // CORREÇÃO: Usa o container seguro no Body
+    getSubModalContainer().innerHTML = modalHtml;
     
     document.getElementById('btnSaveIng').onclick = async () => {
         const name = document.getElementById('ingName').value;
@@ -735,9 +848,31 @@ function renderIngredientForm(ingredient = null) {
 async function renderShoppingListScreen(container, toolbar) { toolbar.innerHTML = `<div class="flex items-center space-x-2 w-full justify-end"><button id="btnCalcHistory" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow flex items-center text-sm mr-2 whitespace-nowrap"><i class="fas fa-chart-line mr-2"></i> Sugerir</button><button id="btnQuoteSelected" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"><i class="fas fa-file-invoice-dollar mr-2"></i> Cotar</button></div>`; document.getElementById('btnCalcHistory').onclick = () => generateShoppingListFromHistory(container); const list = ingredientsCache.filter(i => i.stock <= (i.minStock || 5)); renderShoppingListTable(container, list, "Estoque Baixo"); }
 async function generateShoppingListFromHistory(container) { const btn = document.getElementById('btnCalcHistory'); toggleLoading(btn, true, 'Analisando...'); try { const consumptionMap = await calculateConsumptionFromHistory(30); const suggestionList = []; ingredientsCache.forEach(ing => { const consumed = consumptionMap[ing.id] || 0; const safetyMargin = consumed * 0.2; const needed = (consumed + safetyMargin) - ing.stock; if (needed > 0) { suggestionList.push({ ...ing, suggestedQty: needed, consumedLastMonth: consumed }); } }); renderShoppingListTable(container, suggestionList, "Sugestão por Vendas", true); } catch(e) { console.error(e); showToast("Erro na análise.", true); } finally { toggleLoading(btn, false, 'Sugerir'); } }
 function renderShoppingListTable(container, list, title, isHistory = false) { if(list.length === 0) { container.innerHTML = `<div class="flex flex-col items-center justify-center h-full text-green-500"><i class="fas fa-check-circle text-4xl mb-2"></i><p>${title}: Nada a comprar.</p></div>`; return; } const headerExtra = isHistory ? '<th class="p-3 text-right whitespace-nowrap">Consumo</th>' : ''; container.innerHTML = `<h4 class="text-white font-bold mb-2 ml-1">${title}</h4><div class="bg-gray-800 rounded-lg border border-gray-700 overflow-x-auto"><table class="w-full text-left text-gray-300 min-w-[600px]"><thead class="bg-gray-900 text-xs uppercase"><tr><th class="p-3 w-10"><input type="checkbox" id="selectAllBuy" class="h-4 w-4 bg-gray-700 border-gray-500 rounded" checked></th><th class="p-3">Item</th>${headerExtra}<th class="p-3 text-right whitespace-nowrap">Comprar</th><th class="p-3 text-right whitespace-nowrap">Atual</th></tr></thead><tbody class="divide-y divide-gray-700">${list.map(i => { const qtyToBuy = isHistory ? i.suggestedQty : ((i.minStock || 5) - i.stock); return `<tr class="hover:bg-gray-700/50"><td class="p-3"><input type="checkbox" class="buy-check h-4 w-4 bg-gray-700 border-gray-500 rounded" value="${i.id}" checked></td><td class="p-3 font-bold text-white">${i.name}</td>${isHistory ? `<td class="p-3 text-right text-gray-400 font-mono">${i.consumedLastMonth.toFixed(2)}</td>` : ''}<td class="p-3 text-right text-yellow-400 font-bold font-mono">${qtyToBuy.toFixed(2)} ${i.unit}</td><td class="p-3 text-right text-gray-500 font-mono">${i.stock}</td></tr>`; }).join('')}</tbody></table></div>`; const btnQuote = document.getElementById('btnQuoteSelected'); const checkboxes = container.querySelectorAll('.buy-check'); const updateBtnState = () => { const count = container.querySelectorAll('.buy-check:checked').length; if(btnQuote) { btnQuote.disabled = count === 0; btnQuote.innerHTML = `<i class="fas fa-file-invoice-dollar mr-2"></i> Cotar (${count})`; } }; document.getElementById('selectAllBuy').onchange = (e) => { checkboxes.forEach(cb => cb.checked = e.target.checked); updateBtnState(); }; checkboxes.forEach(cb => cb.onchange = updateBtnState); if(btnQuote) btnQuote.onclick = () => { const selectedIds = Array.from(container.querySelectorAll('.buy-check:checked')).map(cb => cb.value); openQuoteModal(selectedIds); }; updateBtnState(); }
-function openQuoteModal(itemIds) { const modalHtml = `<div id="quoteModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[80] animate-fade-in p-4"><div class="bg-dark-card border border-gray-600 p-6 rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl m-4"><div class="flex justify-between items-center mb-2 border-b border-gray-700 pb-2"><h3 class="text-xl font-bold text-white">Solicitar Orçamento</h3><button onclick="document.getElementById('quoteModal').remove()" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button></div><p class="text-gray-400 text-sm mb-4">Selecione os fornecedores para enviar o pedido de cotação de <b>${itemIds.length} itens</b>.</p><div class="max-h-60 overflow-y-auto custom-scrollbar bg-gray-900 p-3 rounded border border-gray-700 mb-4 space-y-2">${suppliersCache.length > 0 ? suppliersCache.map(s => `<label class="flex items-center space-x-3 p-2 hover:bg-gray-800 rounded cursor-pointer"><input type="checkbox" class="supplier-check h-5 w-5 text-indigo-600 rounded bg-gray-700 border-gray-500" value="${s.id}"><span class="text-white">${s.name}</span></label>`).join('') : '<p class="text-gray-500 italic">Nenhum fornecedor cadastrado.</p>'}</div><div class="flex justify-end space-x-3"><button onclick="document.getElementById('quoteModal').remove()" class="px-4 py-2 bg-gray-600 text-white rounded-lg">Cancelar</button><button id="btnSendQuote" class="px-4 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 disabled:opacity-50">Enviar Solicitação</button></div></div></div>`; document.getElementById('subModalContainer').innerHTML = modalHtml; document.getElementById('btnSendQuote').onclick = async () => { const selectedSuppliers = Array.from(document.querySelectorAll('.supplier-check:checked')).map(cb => cb.value); if(selectedSuppliers.length === 0) { showToast("Selecione ao menos um fornecedor.", true); return; } const btn = document.getElementById('btnSendQuote'); toggleLoading(btn, true, 'Enviando...'); try { const batch = writeBatch(db); const quoteId = `quote_${Date.now()}`; const items = ingredientsCache.filter(i => itemIds.includes(i.id)); for(const supId of selectedSuppliers) { const supplier = suppliersCache.find(s => s.id === supId); const quoteRef = doc(getColRef('quotations')); const pricedItems = items.map(item => { const variation = (Math.random() * 0.4) - 0.2; const newPrice = item.cost * (1 + variation); return { itemId: item.id, name: item.name, qty: (item.minStock || 5) - item.stock, price: parseFloat(newPrice.toFixed(2)) }; }); batch.set(quoteRef, { supplierId: supId, supplierName: supplier.name, items: pricedItems, status: 'received', createdAt: serverTimestamp(), quoteGroupId: quoteId }); } await batch.commit(); document.getElementById('quoteModal').remove(); showToast("Cotações solicitadas!", false); switchHubTab('lowestCost'); } catch(e) { console.error(e); showToast("Erro ao solicitar.", true); toggleLoading(btn, false, 'Enviar'); } }; }
+
+// CORREÇÃO: Utiliza getSubModalContainer()
+function openQuoteModal(itemIds) { const modalHtml = `<div id="quoteModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[80] animate-fade-in p-4"><div class="bg-dark-card border border-gray-600 p-6 rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl m-4"><div class="flex justify-between items-center mb-2 border-b border-gray-700 pb-2"><h3 class="text-xl font-bold text-white">Solicitar Orçamento</h3><button onclick="document.getElementById('quoteModal').remove()" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button></div><p class="text-gray-400 text-sm mb-4">Selecione os fornecedores para enviar o pedido de cotação de <b>${itemIds.length} itens</b>.</p><div class="max-h-60 overflow-y-auto custom-scrollbar bg-gray-900 p-3 rounded border border-gray-700 mb-4 space-y-2">${suppliersCache.length > 0 ? suppliersCache.map(s => `<label class="flex items-center space-x-3 p-2 hover:bg-gray-800 rounded cursor-pointer"><input type="checkbox" class="supplier-check h-5 w-5 text-indigo-600 rounded bg-gray-700 border-gray-500" value="${s.id}"><span class="text-white">${s.name}</span></label>`).join('') : '<p class="text-gray-500 italic">Nenhum fornecedor cadastrado.</p>'}</div><div class="flex justify-end space-x-3"><button onclick="document.getElementById('quoteModal').remove()" class="px-4 py-2 bg-gray-600 text-white rounded-lg">Cancelar</button><button id="btnSendQuote" class="px-4 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 disabled:opacity-50">Enviar Solicitação</button></div></div></div>`; 
+    
+    // Inserção corrigida
+    getSubModalContainer().innerHTML = modalHtml; 
+    
+    document.getElementById('btnSendQuote').onclick = async () => { const selectedSuppliers = Array.from(document.querySelectorAll('.supplier-check:checked')).map(cb => cb.value); if(selectedSuppliers.length === 0) { showToast("Selecione ao menos um fornecedor.", true); return; } const btn = document.getElementById('btnSendQuote'); toggleLoading(btn, true, 'Enviando...'); try { const batch = writeBatch(db); const quoteId = `quote_${Date.now()}`; const items = ingredientsCache.filter(i => itemIds.includes(i.id)); for(const supId of selectedSuppliers) { const supplier = suppliersCache.find(s => s.id === supId); const quoteRef = doc(getColRef('quotations')); const pricedItems = items.map(item => { const variation = (Math.random() * 0.4) - 0.2; const newPrice = item.cost * (1 + variation); return { itemId: item.id, name: item.name, qty: (item.minStock || 5) - item.stock, price: parseFloat(newPrice.toFixed(2)) }; }); batch.set(quoteRef, { supplierId: supId, supplierName: supplier.name, items: pricedItems, status: 'received', createdAt: serverTimestamp(), quoteGroupId: quoteId }); } await batch.commit(); document.getElementById('quoteModal').remove(); showToast("Cotações solicitadas!", false); switchHubTab('lowestCost'); } catch(e) { console.error(e); showToast("Erro ao solicitar.", true); toggleLoading(btn, false, 'Enviar'); } }; 
+}
+
 async function fetchSuppliers() { try { const q = query(getColRef('suppliers'), orderBy('name')); const snap = await getDocs(q); suppliersCache = snap.docs.map(d => ({ id: d.id, ...d.data() })); } catch (e) { console.error(e); } }
 async function renderSuppliersScreen(container, toolbar) { toolbar.innerHTML = `<div class="flex space-x-2 w-full justify-end"><button id="btnSeedSuppliers" class="bg-yellow-700 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg shadow text-sm"><i class="fas fa-users mr-2"></i> Gerar Fictícios</button><button onclick="window.openSupplierModal()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow ml-auto"><i class="fas fa-plus mr-2"></i> Novo Fornecedor</button></div>`; document.getElementById('btnSeedSuppliers').onclick = generateFictionalSuppliers; if (suppliersCache.length === 0) { container.innerHTML = '<p class="text-center text-gray-500 mt-10">Sem fornecedores.</p>'; return; } container.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4 pb-20">${suppliersCache.map(d => `<div class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex justify-between items-center"><div><h4 class="font-bold text-white">${d.name}</h4><p class="text-xs text-gray-400">${d.phone || 'Sem telefone'}</p></div><div class="text-right"><button class="text-red-400 hover:text-red-300" onclick="alert('Deletar em breve')"><i class="fas fa-trash"></i></button></div></div>`).join('')}</div>`; injectSupplierModal(); }
 async function generateFictionalSuppliers() { const btn = document.getElementById('btnSeedSuppliers'); toggleLoading(btn, true, 'Gerando...'); const fakes = [{ name: 'Atacadão do Chef', phone: '(11) 99999-1001' }, { name: 'Hortifruti Fresco', phone: '(11) 98888-2002' }, { name: 'Distribuidora de Bebidas 24h', phone: '(11) 97777-3003' }, { name: 'Embalagens & Cia', phone: '(11) 96666-4004' }, { name: 'Laticínios da Fazenda', phone: '(11) 95555-5005' }]; try { for (const s of fakes) { const exists = suppliersCache.some(sc => sc.name === s.name); if(!exists) await addDoc(getColRef('suppliers'), s); } showToast("Fornecedores gerados!", false); await fetchSuppliers(); switchHubTab('suppliers'); } catch(e) { console.error(e); } finally { toggleLoading(btn, false, 'Gerar Fictícios'); } }
-function injectSupplierModal() { if(document.getElementById('supplierFormModal')) return; const modalHtml = `<div id="supplierFormModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[80] hidden animate-fade-in p-4"><div class="bg-dark-card border border-gray-600 p-6 rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl m-4"><div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2"><h3 class="text-lg font-bold text-white">Novo Fornecedor</h3><button onclick="document.getElementById('supplierFormModal').style.display='none'" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button></div><input id="supName" type="text" class="input-pdv w-full p-2 mb-3" placeholder="Nome da Empresa"><input id="supPhone" type="text" class="input-pdv w-full p-2 mb-3" placeholder="Telefone / WhatsApp"><div class="flex justify-end space-x-2 mt-4"><button onclick="document.getElementById('supplierFormModal').style.display='none'" class="px-4 py-2 bg-gray-600 text-white rounded">Cancelar</button><button onclick="window.saveSupplier()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold">Salvar</button></div></div></div>`; document.getElementById('subModalContainer').innerHTML = modalHtml; window.openSupplierModal = () => document.getElementById('supplierFormModal').style.display = 'flex'; window.saveSupplier = async () => { const name = document.getElementById('supName').value; const phone = document.getElementById('supPhone').value; if(!name) return; await addDoc(getColRef('suppliers'), { name, phone }); document.getElementById('supplierFormModal').style.display = 'none'; showToast("Fornecedor salvo!"); await fetchSuppliers(); switchHubTab('suppliers'); }; }
+
+// CORREÇÃO: Utiliza getSubModalContainer()
+function injectSupplierModal() { 
+    if(document.getElementById('supplierFormModal')) return; 
+    
+    const modalHtml = `<div id="supplierFormModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[80] hidden animate-fade-in p-4"><div class="bg-dark-card border border-gray-600 p-6 rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl m-4"><div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2"><h3 class="text-lg font-bold text-white">Novo Fornecedor</h3><button onclick="document.getElementById('supplierFormModal').style.display='none'" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button></div><input id="supName" type="text" class="input-pdv w-full p-2 mb-3" placeholder="Nome da Empresa"><input id="supPhone" type="text" class="input-pdv w-full p-2 mb-3" placeholder="Telefone / WhatsApp"><div class="flex justify-end space-x-2 mt-4"><button onclick="document.getElementById('supplierFormModal').style.display='none'" class="px-4 py-2 bg-gray-600 text-white rounded">Cancelar</button><button onclick="window.saveSupplier()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold">Salvar</button></div></div></div>`; 
+    
+    // Inserção corrigida
+    getSubModalContainer().innerHTML = modalHtml; 
+    
+    window.openSupplierModal = () => document.getElementById('supplierFormModal').style.display = 'flex'; 
+    window.saveSupplier = async () => { const name = document.getElementById('supName').value; const phone = document.getElementById('supPhone').value; if(!name) return; await addDoc(getColRef('suppliers'), { name, phone }); document.getElementById('supplierFormModal').style.display = 'none'; showToast("Fornecedor salvo!"); await fetchSuppliers(); switchHubTab('suppliers'); }; 
+}
+
 async function renderLowestCostScreen(container, toolbar) { toolbar.innerHTML = `<div class="text-xs text-gray-400 italic w-full text-right">* Baseado nas últimas cotações recebidas.</div>`; container.innerHTML = '<div class="flex justify-center py-10"><i class="fas fa-spinner fa-spin text-3xl text-green-500"></i></div>'; try { const q = query(getColRef('quotations'), where('status', '==', 'received'), orderBy('createdAt', 'desc')); const snap = await getDocs(q); if(snap.empty) { container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-500"><i class="fas fa-search-dollar text-4xl mb-2"></i><p>Nenhuma cotação recente encontrada. Vá em "Lista de Compras" e solicite um orçamento.</p></div>'; return; } const comparisonMap = {}; snap.forEach(doc => { const quote = doc.data(); quote.items.forEach(item => { if (!comparisonMap[item.itemId]) { comparisonMap[item.itemId] = { name: item.name, prices: [] }; } comparisonMap[item.itemId].prices.push({ supplier: quote.supplierName, price: item.price, date: quote.createdAt }); }); }); let html = `<div class="grid grid-cols-1 gap-4 pb-20">`; Object.values(comparisonMap).forEach(itemData => { const sortedPrices = itemData.prices.sort((a, b) => a.price - b.price); const bestPrice = sortedPrices[0]; html += `<div class="bg-gray-800 border border-gray-700 rounded-xl p-4 shadow-lg"><div class="flex justify-between items-center mb-3 border-b border-gray-600 pb-2"><h3 class="text-lg font-bold text-white">${itemData.name}</h3><span class="bg-green-900 text-green-300 text-xs px-2 py-1 rounded border border-green-700">Melhor: ${bestPrice.supplier}</span></div><div class="space-y-2">${sortedPrices.map((p, index) => { const isBest = index === 0; return `<div class="flex justify-between items-center p-2 rounded ${isBest ? 'bg-green-900/20 border border-green-500/50' : 'bg-dark-input'}"><span class="text-sm text-gray-300">${p.supplier}</span><span class="font-mono font-bold ${isBest ? 'text-green-400 text-base' : 'text-gray-400 text-sm'}">${formatCurrency(p.price)}${isBest ? '<i class="fas fa-trophy ml-2 text-yellow-400"></i>' : ''}</span></div>`; }).join('')}</div></div>`; }); html += `</div>`; container.innerHTML = html; } catch(e) { console.error("Erro comparação:", e); container.innerHTML = `<p class="text-red-400 text-center">Erro ao carregar comparações.</p>`; } }
