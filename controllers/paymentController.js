@@ -1,6 +1,5 @@
-// --- CONTROLLERS/PAYMENTCONTROLLER.JS (VERSÃO OTIMIZADA & CENTRALIZADA) ---
+// --- CONTROLLERS/PAYMENTCONTROLLER.JS (CORRIGIDO: EXPORTS REPOSTOS) ---
 import { currentTableId, currentOrderSnapshot, userId, goToScreen, showToast } from "/app.js"; 
-// AQUI: Importamos toggleLoading do utils.js
 import { formatCurrency, calculateItemsValue, getNumericValueFromCurrency, toggleLoading } from "/utils.js"; 
 import { getTableDocRef, getCustomersCollectionRef, db, getTablesCollectionRef } from "/services/firebaseService.js"; 
 import {
@@ -113,14 +112,13 @@ function backspace() {
      calculatorState.displayValue = displayValue.length > 1 ? displayValue.slice(0, -1) : '0';
 }
 
-// --- FUNÇÕES DE AÇÃO ---
+// --- FUNÇÕES DE AÇÃO (Agora Exportadas para uso no App.js) ---
 
-const executeDeletePayment = async (timestamp, btnElement) => {
+export const executeDeletePayment = async (timestamp, btnElement) => {
     if (!currentTableId || !timestamp) return;
     
     if (!(await window.showConfirm("Tem certeza que deseja excluir este pagamento?", "Confirmar Exclusão"))) return;
 
-    // Proteção Visual no Botão de Lixeira
     if (btnElement) {
         btnElement.classList.add('text-gray-500', 'cursor-not-allowed');
         btnElement.disabled = true;
@@ -144,7 +142,6 @@ const executeDeletePayment = async (timestamp, btnElement) => {
     } catch (e) {
         console.error("Erro ao remover pagamento:", e);
         showToast("Falha ao remover pagamento.", true);
-        // Restaura botão em caso de erro
         if (btnElement) {
             btnElement.classList.remove('text-gray-500', 'cursor-not-allowed');
             btnElement.disabled = false;
@@ -369,7 +366,7 @@ export const handleMassActionRequest = (action) => {
     }
 };
 
-async function handleMassDeleteConfirmed() {
+export async function handleMassDeleteConfirmed() { // Exportado
     if (!currentTableId || !itemsToTransfer || itemsToTransfer.length === 0) {
         showToast("Nenhum item selecionado para exclusão.", true);
         return;
@@ -412,7 +409,7 @@ async function handleMassDeleteConfirmed() {
     }
 }
 
-function openTableTransferModal() {
+export function openTableTransferModal() { // Exportado
     if (!tableTransferModal) {
         showToast("Erro: Modal de transferência não inicializado.", true);
         return;
@@ -434,7 +431,7 @@ function openTableTransferModal() {
     if (targetTableInput) targetTableInput.focus(); 
 }
 
-function handleConfirmTableTransfer() {
+export function handleConfirmTableTransfer() { // Exportado
     const targetTableId = targetTableInput?.value;
     const newDinersInput = document.getElementById('newTableDiners');
     const newSectorInput = document.getElementById('newTableSector');
@@ -489,6 +486,7 @@ export const handleFinalizeOrder = async () => {
     const remainingBalance = totalDaConta - totalPago;
     const sentItems = currentOrderSnapshot.sentItems || [];
 
+    // --- LÓGICA DE MESA VAZIA/ORFÃ ---
     if (sentItems.length === 0) {
         if (!(await window.showConfirm(`Esta mesa não tem itens registrados. Deseja forçar o fechamento e limpar a mesa?`, "Mesa Vazia"))) return;
         

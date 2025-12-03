@@ -1,12 +1,16 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (CORREÇÃO DE LÓGICA + RESTAURAÇÃO DE SESSÃO) ---
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (CORRIGIDO: ZERO DEPENDÊNCIA DE APP.JS) ---
 
 import { db, auth, getQuickObsCollectionRef, appId, getTablesCollectionRef, getTableDocRef, getCustomersCollectionRef, getKdsCollectionRef } from "/services/firebaseService.js";
-import { formatCurrency, toggleLoading } from "/utils.js"; 
+// 1. IMPORTANTE: Importamos showToast e toggleLoading de utils.js, NÃO de app.js
+import { formatCurrency, toggleLoading, showToast } from "/utils.js"; 
 import { getProducts, getCategories, fetchWooCommerceCategories, fetchWooCommerceProducts } from "/services/wooCommerceService.js";
 import { onSnapshot, doc, updateDoc, arrayUnion, setDoc, getDoc, getDocs, query, serverTimestamp, orderBy, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { showToast, currentTableId, setCurrentTable, setTableListener } from "/app.js"; 
 
+// 2. REMOVIDO: import { ... } from "/app.js"; <--- ISSO CAUSAVA O ERRO
+// Agora usamos window.currentTableId, window.setCurrentTable, etc.
+
+// --- ESTADO GLOBAL ---
 let selectedItems = []; 
 let quickObsCache = []; 
 let currentCategoryFilter = 'all';
@@ -18,11 +22,50 @@ let tempUserData = null;
 let unsubscribeClientKds = null; 
 let currentAssociationTab = 'mesa';
 
+// --- MODO DEMO ---
+let currentBusinessType = 'food'; 
+
+const DEMO_DATA = {
+    retail: {
+        title: "Fator Shop",
+        categories: [
+            { id: 'roupas', name: 'Roupas', slug: 'roupas' },
+            { id: 'acessorios', name: 'Acessórios', slug: 'acessorios' },
+            { id: 'eletronicos', name: 'Eletrônicos', slug: 'eletronicos' },
+            { id: 'brinquedos', name: 'Brinquedos', slug: 'brinquedos' }
+        ],
+        products: [
+            { id: 'r1', name: 'Camiseta Básica Preta', price: 49.90, image: 'https://placehold.co/600x400/222/fff?text=Camiseta', category: 'roupas' },
+            { id: 'r2', name: 'Calça Jeans Skinny', price: 129.90, image: 'https://placehold.co/600x400/333/fff?text=Jeans', category: 'roupas' },
+            { id: 'r3', name: 'Boné Trucker', price: 59.90, image: 'https://placehold.co/600x400/444/fff?text=Bone', category: 'acessorios' },
+            { id: 'r4', name: 'Fone Bluetooth', price: 199.90, image: 'https://placehold.co/600x400/555/fff?text=Fone', category: 'eletronicos' },
+            { id: 'r5', name: 'Bola de Futebol', price: 89.90, image: 'https://placehold.co/600x400/666/fff?text=Bola', category: 'brinquedos' },
+            { id: 'r6', name: 'Tênis Esportivo', price: 299.90, image: 'https://placehold.co/600x400/777/fff?text=Tenis', category: 'roupas' }
+        ]
+    },
+    services: {
+        title: "Fator Serviços",
+        categories: [
+            { id: 'beleza', name: 'Beleza & Estética', slug: 'beleza' },
+            { id: 'manutencao', name: 'Manutenção', slug: 'manutencao' },
+            { id: 'eventos', name: 'Festas & Eventos', slug: 'eventos' }
+        ],
+        products: [
+            { id: 's1', name: 'Corte de Cabelo', price: 45.00, image: 'https://placehold.co/600x400/333/fff?text=Corte', category: 'beleza' },
+            { id: 's2', name: 'Instalação Elétrica (Hora)', price: 150.00, image: 'https://placehold.co/600x400/555/fff?text=Eletrica', category: 'manutencao' },
+            { id: 's3', name: 'Buffet Infantil (por pessoa)', price: 85.00, image: 'https://placehold.co/600x400/888/fff?text=Buffet', category: 'eventos' },
+            { id: 's4', name: 'Troca de Óleo e Filtro', price: 120.00, image: 'https://placehold.co/600x400/444/fff?text=Oficina', category: 'manutencao' },
+            { id: 's5', name: 'Massagem Relaxante', price: 100.00, image: 'https://placehold.co/600x400/666/fff?text=Massagem', category: 'beleza' }
+        ]
+    }
+};
+
 let currentPage = 1;
 let currentSearch = '';
 let searchTimeout = null;
 let loadMoreBtn;
 
+// Elementos do DOM
 let clientMenuContainer, clientCategoryFilters, sendOrderBtn, clientCartCount;
 let associationModal, activateAndSendBtn, googleLoginBtn, activationForm;
 let activateTableNumber, activatePickupPin, btnCallMotoboy;
@@ -35,11 +78,234 @@ let customerRegistrationModal, customerRegistrationForm, saveRegistrationBtn;
 let regCustomerName, regCustomerEmail, regCustomerWhatsapp, regCustomerBirthday, regErrorMsg;
 let goToPaymentBtnClient; 
 let kdsTrackingIconContainer, kdsTrackingIcon, kdsTrackingStatusEl;
+let headerClientNameDisplay;
+let businessTypeSelector;
+
+// ==================================================================
+//               1. FUNÇÕES DE AÇÃO (HANDLERS)
+// ==================================================================
+
+async function handleSendOrderClick() {
+    // 3. Correção: Usa window.currentTableId em vez da importação
+    const tableId = localCurrentTableId || window.currentTableId;
+    if (!selectedItems || selectedItems.length === 0) {
+        showToast("Seu carrinho está vazio.", true);
+        return;
+    }
+    if (!tableId) {
+        openAssociationModal();
+    } else {
+        await sendOrderToFirebase();
+    }
+}
+
+function handleAuthActionClick() {
+    if (localCurrentClientUser) {
+        signOut(auth).then(() => {
+            showToast("Você saiu da sua conta.");
+            window.location.reload();
+        });
+    } else {
+        openAssociationModal();
+    }
+}
+
+async function signInWithGoogle(e) {
+    if(e) e.preventDefault();
+    const provider = new GoogleAuthProvider();
+    try {
+        await signInWithPopup(auth, provider);
+    } catch (error) {
+        console.error("Erro Login:", error);
+        showAssocError("Erro ao tentar logar.");
+    }
+}
+
+async function handleActivationAndSend(e) {
+    if (e) e.preventDefault();
+    
+    let identifier = '';
+    let isPickup = false;
+
+    if (currentAssociationTab === 'mesa') {
+        identifier = activateTableNumber.value.trim();
+        if (!identifier) { showAssocError("Informe o número da mesa."); return; }
+    } else if (currentAssociationTab === 'retirada') {
+        identifier = activatePickupPin.value.trim();
+        if (!identifier || identifier.length < 4) { showAssocError("PIN inválido (min 4 dígitos)."); return; }
+        isPickup = true;
+    }
+
+    if (!localCurrentClientUser) {
+        showAssocError("Faça login para continuar.");
+        return;
+    }
+
+    toggleLoading(activateAndSendBtn, true);
+    assocErrorMsg.style.display = 'none';
+
+    try {
+        const tableDocId = isPickup ? `pickup_${identifier}` : identifier;
+        const tableRef = getTableDocRef(tableDocId);
+        const tableSnap = await getDoc(tableRef);
+        
+        localCurrentTableId = tableDocId;
+        
+        // 4. Correção: Usa window.setCurrentTable
+        if (window.setCurrentTable) window.setCurrentTable(tableDocId, true, false); 
+        
+        const clientData = {
+            uid: localCurrentClientUser.uid,
+            name: localCurrentClientUser.displayName,
+            phone: localCurrentClientUser.phone || null
+        };
+
+        if (tableSnap.exists()) {
+            const tData = tableSnap.data();
+            if (tData.status !== 'closed' && tData.clientId && tData.clientId !== clientData.uid) {
+                throw new Error("Esta mesa/PIN está em uso por outro cliente.");
+            }
+            if (tData.status === 'closed') {
+                const historyRef = doc(getTablesCollectionRef(), `${tableDocId}_closed_${Date.now()}`);
+                await setDoc(historyRef, tData);
+                await setDoc(tableRef, {
+                    tableNumber: isPickup ? identifier : parseInt(identifier),
+                    status: 'open',
+                    sector: isPickup ? 'Retirada' : (tData.sector || 'Salão'),
+                    isPickup: isPickup,
+                    createdAt: serverTimestamp(),
+                    total: 0, sentItems: [], payments: [], serviceTaxApplied: true, selectedItems: [], requestedOrders: [],
+                    clientId: clientData.uid, clientName: clientData.name, clientPhone: clientData.phone, anonymousUid: null
+                });
+            } else {
+                if (!tData.clientId) {
+                    await updateDoc(tableRef, { clientId: clientData.uid, clientName: clientData.name, clientPhone: clientData.phone });
+                }
+            }
+        } else {
+            // Confirmação usando window.confirm pois showConfirm pode não estar carregado
+            if (!isPickup && !confirm(`Mesa ${identifier} não existe. Abrir nova?`)) {
+                throw new Error("Ação cancelada.");
+            }
+            await setDoc(tableRef, {
+                tableNumber: isPickup ? identifier : parseInt(identifier),
+                status: 'open',
+                sector: isPickup ? 'Retirada' : 'Cliente',
+                isPickup: isPickup,
+                createdAt: serverTimestamp(),
+                total: 0, sentItems: [], payments: [], serviceTaxApplied: true, selectedItems: [], requestedOrders: [],
+                clientId: clientData.uid, clientName: clientData.name, clientPhone: clientData.phone, anonymousUid: null
+            });
+        }
+
+        // 5. Correção: Usa window.setTableListener
+        if (window.setTableListener) window.setTableListener(tableDocId, true);
+        startClientKdsListener(tableDocId);
+        
+        if (selectedItems.length > 0) {
+            await sendOrderToFirebase();
+        }
+        
+        closeAssociationModal();
+        showToast(isPickup ? `Retirada #${identifier} iniciada!` : `Mesa ${identifier} vinculada!`, false);
+
+    } catch (error) {
+        console.error(error);
+        showAssocError(error.message);
+    } finally {
+        toggleLoading(activateAndSendBtn, false, 'Confirmar');
+    }
+}
+
+const handleCallMotoboy = () => {
+    if (!localCurrentClientUser) {
+        showAssocError("Faça login para chamar o entregador.");
+        return;
+    }
+    alert("Redirecionando para o sistema de entregas... (Em Breve)");
+};
+
+async function handleNewCustomerRegistration(e) {
+    e.preventDefault();
+    if (!tempUserData) { showAssocError("Erro: Dados perdidos. Logue novamente."); return; }
+    const whatsapp = regCustomerWhatsapp.value;
+    const birthday = regCustomerBirthday.value;
+    if (!whatsapp || !birthday) {
+        regErrorMsg.textContent = "Preencha todos os campos.";
+        regErrorMsg.style.display = 'block';
+        return;
+    }
+    regErrorMsg.style.display = 'none';
+    const completeUserData = { ...tempUserData, whatsapp: whatsapp, nascimento: birthday };
+    saveRegistrationBtn.disabled = true;
+    saveRegistrationBtn.textContent = "Salvando...";
+    try {
+        await saveCustomerData(completeUserData);
+        if(localCurrentClientUser) localCurrentClientUser.phone = whatsapp;
+        showToast("Cadastro concluído!", false);
+        closeCustomerRegistrationModal();
+        openAssociationModal();
+        updateCustomerInfo(localCurrentClientUser, false);
+    } catch (error) {
+        console.error("Erro salvar:", error);
+        regErrorMsg.textContent = "Falha ao salvar.";
+        regErrorMsg.style.display = 'block';
+    } finally {
+        saveRegistrationBtn.disabled = false;
+        saveRegistrationBtn.textContent = "Salvar e Continuar";
+    }
+}
+
+const handleSearch = (e) => {
+    currentSearch = e.target.value; 
+    currentPage = 1; 
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(async () => { 
+        showMenuSkeleton(); 
+        if (currentBusinessType === 'food') {
+            await fetchWooCommerceProducts(1, currentSearch, currentCategoryFilter, false); 
+        }
+        renderMenu(false); 
+    }, 600);
+};
+
+const handleCategoryClick = async (e) => {
+    const btn = e.target.closest('.category-btn'); if (!btn) return;
+    currentCategoryFilter = btn.dataset.category; 
+    currentPage = 1; 
+    showMenuSkeleton();
+    if (currentBusinessType === 'food') {
+        await fetchWooCommerceProducts(1, currentSearch, currentCategoryFilter, false); 
+    }
+    renderMenu(false);
+};
+
+const handleLoadMore = async () => {
+    currentPage++; 
+    toggleLoading(loadMoreBtn, true, 'Carregando...');
+    if (currentBusinessType === 'food') {
+        const newItems = await fetchWooCommerceProducts(currentPage, currentSearch, currentCategoryFilter, true);
+        if (newItems.length === 0) { 
+            showToast("Fim da lista.", false); 
+            loadMoreBtn.style.display = 'none'; 
+        } else { 
+            renderMenu(true); 
+        }
+    } else {
+        loadMoreBtn.style.display = 'none';
+        showToast("Fim da lista.", false);
+    }
+};
+
+// ==================================================================
+//               2. FUNÇÃO DE INICIALIZAÇÃO (INIT)
+// ==================================================================
 
 export const initClientOrderController = () => {
     if (orderControllerInitialized) return;
     console.log("[ClientOrder] Inicializando...");
 
+    // Binding de Elementos
     clientMenuContainer = document.getElementById('client-menu-container');
     clientCategoryFilters = document.getElementById('client-category-filters');
     sendOrderBtn = document.getElementById('sendOrderBtn');
@@ -55,6 +321,8 @@ export const initClientOrderController = () => {
     kdsTrackingIconContainer = document.getElementById('kdsTrackingIconContainer');
     kdsTrackingIcon = document.getElementById('kdsTrackingIcon');
     kdsTrackingStatusEl = document.getElementById('kdsTrackingStatus');
+    headerClientNameDisplay = document.getElementById('headerClientNameDisplay');
+    businessTypeSelector = document.getElementById('businessTypeSelector');
 
     associationModal = document.getElementById('associationModal');
     activationForm = document.getElementById('activationForm'); 
@@ -67,6 +335,7 @@ export const initClientOrderController = () => {
     activatePickupPin = document.getElementById('activatePickupPin');
     btnCallMotoboy = document.getElementById('btnCallMotoboy');
 
+    // Configuração de Abas do Modal
     tabButtons = document.querySelectorAll('.assoc-tab-btn');
     tabContents = document.querySelectorAll('.assoc-tab-content');
     const defaultActionButtons = document.getElementById('defaultActionButtons');
@@ -91,6 +360,17 @@ export const initClientOrderController = () => {
 
     if (btnCallMotoboy) btnCallMotoboy.addEventListener('click', handleCallMotoboy);
 
+    // Listener para o Modo Demo
+    if (businessTypeSelector) {
+        businessTypeSelector.addEventListener('change', (e) => {
+            currentBusinessType = e.target.value;
+            currentCategoryFilter = 'all'; 
+            updateRestaurantTitle(); 
+            renderMenu(false); 
+        });
+    }
+
+    // Cadastro Manual (Fallback)
     customerRegistrationModal = document.getElementById('customerRegistrationModal');
     customerRegistrationForm = document.getElementById('customerRegistrationForm');
     saveRegistrationBtn = document.getElementById('saveRegistrationBtn');
@@ -104,6 +384,7 @@ export const initClientOrderController = () => {
         customerRegistrationForm.addEventListener('submit', handleNewCustomerRegistration);
     }
     
+    // Observações
     clientObsModal = document.getElementById('clientObsModal'); 
     clientObsText = document.getElementById('clientObsText'); 
     clientQuickObsButtons = document.getElementById('clientQuickObsButtons'); 
@@ -149,6 +430,7 @@ export const initClientOrderController = () => {
         }
     }
 
+    // Event Listeners Principais
     if (sendOrderBtn) sendOrderBtn.onclick = handleSendOrderClick;
     if (authActionBtn) authActionBtn.onclick = handleAuthActionClick;
     if (googleLoginBtn) googleLoginBtn.onclick = signInWithGoogle;
@@ -163,7 +445,15 @@ export const initClientOrderController = () => {
         clientMenuContainer.addEventListener('click', (e) => {
             const card = e.target.closest('.product-card');
             if (!card) return;
-            const product = getProducts().find(p => p.id == card.dataset.productId);
+            const pid = card.dataset.productId;
+            
+            let product;
+            if (currentBusinessType === 'food') {
+                product = getProducts().find(p => p.id == pid);
+            } else {
+                product = DEMO_DATA[currentBusinessType].products.find(p => p.id == pid);
+            }
+
             if (!product) return;
             if (e.target.closest('.info-item-btn')) openProductInfoModal(product);
             else addItemToCart(product);
@@ -188,19 +478,57 @@ export const initClientOrderController = () => {
     if (clientCategoryFilters) clientCategoryFilters.addEventListener('click', handleCategoryClick);
     if (searchProductInputClient) searchProductInputClient.addEventListener('input', handleSearch);
 
+    // Boot
     setupAuthStateObserver();
     loadMenu(); 
     fetchQuickObservations(); 
+    fetchRestaurantInfo(); 
     
-    if (localCurrentTableId || currentTableId) {
-        startClientKdsListener(localCurrentTableId || currentTableId);
+    // 6. Correção: Usa window.currentTableId
+    if (localCurrentTableId || window.currentTableId) {
+        startClientKdsListener(localCurrentTableId || window.currentTableId);
     }
 
     orderControllerInitialized = true;
     console.log("[ClientOrder] Inicializado.");
 };
 
-// --- RESTAURAÇÃO DE SESSÃO (CORREÇÃO DO ERRO LÓGICO) ---
+// ==================================================================
+//               3. FUNÇÕES AUXILIARES
+// ==================================================================
+
+async function fetchRestaurantInfo() {
+    if (currentBusinessType !== 'food') {
+        updateRestaurantTitle();
+        return;
+    }
+    const titleEl = document.getElementById('restaurantTitle');
+    if (!titleEl) return;
+
+    try {
+        const configRef = doc(db, 'artifacts', appId, 'public', 'data', 'system_status', 'business_day'); 
+        const docSnap = await getDoc(configRef);
+        if (docSnap.exists() && docSnap.data().restaurantName) {
+            titleEl.textContent = docSnap.data().restaurantName;
+        } else {
+            titleEl.textContent = "Cardápio Digital";
+        }
+    } catch (e) {
+        console.warn("Erro ao buscar nome:", e);
+    }
+}
+
+function updateRestaurantTitle() {
+    const titleEl = document.getElementById('restaurantTitle');
+    if (!titleEl) return;
+
+    if (currentBusinessType === 'food') {
+        fetchRestaurantInfo(); 
+    } else {
+        titleEl.textContent = DEMO_DATA[currentBusinessType].title;
+    }
+}
+
 async function restoreActiveSession(user) {
     try {
         const q = query(
@@ -208,28 +536,24 @@ async function restoreActiveSession(user) {
             where('clientId', '==', user.uid),
             where('status', '==', 'open')
         );
-        
         const snapshot = await getDocs(q);
-        
         if (!snapshot.empty) {
             const tableDoc = snapshot.docs[0];
             const tableId = tableDoc.id;
-            
-            console.log(`[ClientOrder] Sessão restaurada: ${tableId}`);
-            
             localCurrentTableId = tableId;
-            setCurrentTable(tableId, true); // Restaura estado global no app.js
-            startClientKdsListener(tableId);
             
+            if(window.setCurrentTable) window.setCurrentTable(tableId, true); 
+            if(window.setTableListener) window.setTableListener(tableId, true);
+            
+            startClientKdsListener(tableId);
             closeAssociationModal();
             showToast("Pedido anterior recuperado.", false);
         }
     } catch (e) {
-        console.error("[ClientOrder] Erro ao restaurar sessão:", e);
+        console.error("[ClientOrder] Erro restore:", e);
     }
 }
 
-// --- AUTH & USER ---
 function setupAuthStateObserver() {
     onAuthStateChanged(auth, (user) => {
         if (user && !user.isAnonymous) {
@@ -237,10 +561,7 @@ function setupAuthStateObserver() {
             tempUserData = { uid: user.uid, name: user.displayName, email: user.email, photoURL: user.photoURL };
             updateAuthUI(user);
             checkCustomerRegistration(user); 
-            
-            // CHAMADA DE RESTAURAÇÃO: Verifica se já tem pedido aberto
             restoreActiveSession(user);
-
         } else if (user && user.isAnonymous) {
              closeAssociationModal();
              closeCustomerRegistrationModal();
@@ -250,15 +571,19 @@ function setupAuthStateObserver() {
             tempUserData = null;
             updateAuthUI(null);
             updateCustomerInfo(null, false);
-            if (!currentTableId) openAssociationModal();
+            if (!window.currentTableId) openAssociationModal();
         }
     });
 }
 
 function updateAuthUI(user) {
     if (!goToPaymentBtnClient) return;
-
     if (user && !user.isAnonymous) {
+        if (headerClientNameDisplay) {
+            const firstName = user.displayName ? user.displayName.split(' ')[0] : 'Cliente';
+            headerClientNameDisplay.textContent = `Olá, ${firstName}`;
+            headerClientNameDisplay.classList.remove('hidden');
+        }
         goToPaymentBtnClient.innerHTML = '<i class="fas fa-receipt text-lg md:text-xl"></i>';
         goToPaymentBtnClient.classList.replace('bg-gray-700', 'bg-green-600');
         goToPaymentBtnClient.classList.replace('hover:bg-gray-600', 'hover:bg-green-700');
@@ -270,6 +595,10 @@ function updateAuthUI(user) {
         
         goToPaymentBtnClient.onclick = () => window.goToScreen('clientPaymentScreen');
     } else {
+        if (headerClientNameDisplay) {
+            headerClientNameDisplay.classList.add('hidden');
+            headerClientNameDisplay.textContent = '';
+        }
         goToPaymentBtnClient.innerHTML = '<i class="fas fa-user text-lg md:text-xl"></i>'; 
         goToPaymentBtnClient.classList.replace('bg-green-600', 'bg-gray-700');
         goToPaymentBtnClient.classList.replace('hover:bg-green-700', 'hover:bg-gray-600');
@@ -278,186 +607,207 @@ function updateAuthUI(user) {
         const newBtn = goToPaymentBtnClient.cloneNode(true);
         goToPaymentBtnClient.parentNode.replaceChild(newBtn, goToPaymentBtnClient);
         goToPaymentBtnClient = newBtn;
-        
         goToPaymentBtnClient.onclick = signInWithGoogle;
     }
 }
 
-// --- RENDER ORDER SCREEN ---
-export function renderClientOrderScreen(tableData) {
-    if (clientCartCount) clientCartCount.textContent = selectedItems.length;
-    
-    // Atualiza Título da Mesa
-    const tableId = localCurrentTableId || currentTableId;
-    if (clientTableNumber && tableId) {
-        if (parseInt(tableId) >= 9000) clientTableNumber.textContent = `Pedido #${tableId}`; // Retirada
-        else if (parseInt(tableId) >= 8000) clientTableNumber.textContent = `Delivery #${tableId}`; // Delivery
-        else clientTableNumber.textContent = `Mesa ${tableId}`; // Mesa
+function updateCustomerInfo(user, isNew = false) {
+    if (!loggedInStep || !loggedInUserName || !googleLoginBtn) return;
+    if (user && !isNew) {
+        loggedInStep.style.display = 'block';
+        loggedInUserName.textContent = user.displayName || user.email;
+        googleLoginBtn.style.display = 'none';
+    } else {
+        loggedInStep.style.display = 'none';
+        loggedInUserName.textContent = '';
+        googleLoginBtn.style.display = 'flex';
     }
-
-    if (sendOrderBtn) {
-        const billRequested = tableData?.waiterNotification?.includes('fechamento') || tableData?.billRequested === true;
-        if (billRequested) {
-            sendOrderBtn.disabled = true;
-            sendOrderBtn.innerHTML = 'AGUARDE...';
-            sendOrderBtn.classList.add('opacity-50');
-        } else {
-            sendOrderBtn.disabled = selectedItems.length === 0;
-            sendOrderBtn.innerHTML = 'ENVIAR';
-            sendOrderBtn.classList.remove('opacity-50');
-        }
-    }
-    _renderClientCart();
 }
 
-// ... FUNÇÕES AUXILIARES ...
+async function checkCustomerRegistration(user) {
+    const customerRef = doc(getCustomersCollectionRef(), user.uid);
+    try {
+        const docSnap = await getDoc(customerRef);
+        if (!docSnap.exists()) {
+            await setDoc(customerRef, {
+                uid: user.uid,
+                name: user.displayName || 'Cliente',
+                email: user.email || '',
+                photoURL: user.photoURL || null,
+                createdAt: serverTimestamp(),
+                points: 0,
+                phone: null 
+            });
+        } else {
+             const data = docSnap.data();
+             if (data.phone) localCurrentClientUser.phone = data.phone;
+        }
+        updateCustomerInfo(user, false);
+    } catch (error) {
+        console.error("Erro check customer:", error);
+        updateCustomerInfo(user, false);
+    }
+}
 
-const showMenuSkeleton = () => {
-    if (!clientMenuContainer) return;
-    clientMenuContainer.innerHTML = Array(6).fill(0).map(() => `<div class="bg-dark-card border border-dark-border rounded-xl shadow-md flex flex-col overflow-hidden h-64"><div class="w-full h-32 skeleton"></div><div class="p-4 flex flex-col flex-grow space-y-3"><div class="h-4 w-3/4 skeleton"></div><div class="h-4 w-1/2 skeleton"></div><div class="mt-auto h-8 w-full skeleton rounded-lg"></div></div></div>`).join('');
-};
-const handleSearch = (e) => {
-    currentSearch = e.target.value; currentPage = 1; clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(async () => { showMenuSkeleton(); await fetchWooCommerceProducts(1, currentSearch, currentCategoryFilter, false); renderMenu(false); }, 600);
-};
-const handleCategoryClick = async (e) => {
-    const btn = e.target.closest('.category-btn'); if (!btn) return;
-    currentCategoryFilter = btn.dataset.category; currentPage = 1; showMenuSkeleton();
-    await fetchWooCommerceProducts(1, currentSearch, currentCategoryFilter, false); renderMenu(false);
-};
-const handleLoadMore = async () => {
-    currentPage++; toggleLoading(loadMoreBtn, true, 'Carregando...');
-    const newItems = await fetchWooCommerceProducts(currentPage, currentSearch, currentCategoryFilter, true);
-    if (newItems.length === 0) { showToast("Fim da lista.", false); loadMoreBtn.style.display = 'none'; } else { renderMenu(true); }
-};
-const renderLoadMoreButton = () => {
+async function saveCustomerData(userData) {
+    const customerRef = doc(getCustomersCollectionRef(), userData.uid);
+    await setDoc(customerRef, {
+        uid: userData.uid,
+        name: userData.name,
+        email: userData.email,
+        phone: userData.whatsapp,
+        birthday: userData.nascimento,
+        photoURL: userData.photoURL || null,
+        points: 0,
+        createdAt: serverTimestamp()
+    }, { merge: true });
+}
+
+async function sendOrderToFirebase() {
+    const tableId = localCurrentTableId || window.currentTableId;
+    if (!tableId || selectedItems.length === 0) { showToast("Carrinho vazio.", true); return; }
+    toggleLoading(sendOrderBtn, true, 'Enviando...');
+    const orderId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    const newOrderRequest = {
+        orderId: orderId,
+        requestedAt: new Date().toISOString(),
+        clientInfo: {
+            uid: localCurrentClientUser?.uid,
+            name: localCurrentClientUser?.displayName,
+            phone: localCurrentClientUser?.phone
+        },
+        items: selectedItems.map(item => ({ ...item }))
+    };
+    try {
+        const tableRef = getTableDocRef(tableId);
+        await updateDoc(tableRef, {
+            requestedOrders: arrayUnion(newOrderRequest),
+            clientOrderPending: true,
+            waiterNotification: "Novo Pedido"
+        });
+        selectedItems.length = 0;
+        renderClientOrderScreen();
+        showToast("Pedido enviado! Aguarde confirmação.", false);
+    } catch (e) {
+        console.error("Erro envio:", e);
+        showToast("Falha ao enviar pedido.", true);
+    } finally {
+        toggleLoading(sendOrderBtn, false, 'ENVIAR');
+    }
+}
+
+// Helper Functions
+function showAssocError(message) { if (assocErrorMsg) { assocErrorMsg.textContent = message; assocErrorMsg.style.display = 'block'; } }
+function renderClientQuickObsButtons(observations) { if (!clientQuickObsButtons) return; if (observations.length === 0) { clientQuickObsButtons.innerHTML = '<p class="text-xs italic">Nenhuma obs.</p>'; return; } clientQuickObsButtons.innerHTML = observations.map(obs => `<button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input rounded-full hover:bg-gray-600" data-obs="${obs.text}">${obs.text}</button>`).join(''); }
+export const fetchQuickObservations = async () => { try { if (quickObsCache.length > 0) { renderClientQuickObsButtons(quickObsCache); return quickObsCache; } const q = query(getQuickObsCollectionRef(), orderBy('text', 'asc')); const snap = await getDocs(q); quickObsCache = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })); renderClientQuickObsButtons(quickObsCache); } catch (e) { console.error(e); } };
+
+// Skeleton & Render Helpers
+function showMenuSkeleton() { if (!clientMenuContainer) return; clientMenuContainer.innerHTML = Array(6).fill(0).map(() => `<div class="bg-dark-card border border-dark-border rounded-xl shadow-md flex flex-col overflow-hidden h-64"><div class="w-full h-32 skeleton"></div><div class="p-4 flex flex-col flex-grow space-y-3"><div class="h-4 w-3/4 skeleton"></div><div class="h-4 w-1/2 skeleton"></div><div class="mt-auto h-8 w-full skeleton rounded-lg"></div></div></div>`).join(''); }
+
+function renderMenu(append = false) { 
+    if (!clientMenuContainer) return; 
+    
+    let categories, products;
+    if (currentBusinessType === 'food') {
+        categories = getCategories();
+        products = getProducts();
+    } else {
+        categories = DEMO_DATA[currentBusinessType].categories;
+        products = DEMO_DATA[currentBusinessType].products;
+    }
+
+    if (clientCategoryFilters && (clientCategoryFilters.innerHTML.trim() === '' || !append || currentBusinessType !== 'food')) { 
+        clientCategoryFilters.innerHTML = `
+            <button class="category-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap ${currentCategoryFilter === 'all' ? 'bg-brand-primary text-white' : 'bg-dark-input text-dark-text border border-gray-600'}" data-category="all">Todos</button>
+            ${categories.map(cat => { 
+                const isActive = cat.slug === currentCategoryFilter ? 'bg-brand-primary text-white' : 'bg-dark-input text-dark-text border border-gray-600'; 
+                return `<button class="category-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap ${isActive}" data-category="${cat.slug || cat.id}">${cat.name}</button>`; 
+            }).join('')}`; 
+    } 
+    
+    let filteredProducts = products; 
+    if (currentCategoryFilter !== 'all') {
+        filteredProducts = products.filter(p => {
+            const hasCatArray = p.categories && Array.isArray(p.categories) && p.categories.some(c => c.slug === currentCategoryFilter);
+            const hasCatString = p.category && p.category === currentCategoryFilter;
+            return hasCatArray || hasCatString;
+        });
+    }
+
+    if (currentSearch && currentBusinessType !== 'food') {
+        filteredProducts = filteredProducts.filter(p => p.name.toLowerCase().includes(currentSearch.toLowerCase()));
+    }
+
+    if (!append) clientMenuContainer.innerHTML = ''; 
+    
+    if (filteredProducts.length === 0) { 
+        clientMenuContainer.innerHTML = `<div class="col-span-full text-center p-6 text-yellow-400 italic">Nenhum produto encontrado.</div>`; 
+    } else { 
+        const html = filteredProducts.map((product, index) => { 
+            let badge = ''; 
+            if (currentBusinessType === 'food' && currentCategoryFilter === 'top10' && index < 3) { 
+                const colors = ['text-yellow-400', 'text-gray-300', 'text-orange-400']; 
+                badge = `<i class="fas fa-medal ${colors[index]} absolute top-2 right-2 text-xl drop-shadow-md"></i>`; 
+            } 
+            return `<div class="product-card bg-dark-card border border-dark-border rounded-xl shadow-md flex flex-col overflow-hidden relative" data-product-id="${product.id}">${badge}<img src="${product.image}" alt="${product.name}" class="w-full h-32 object-cover"><div class="p-4 flex flex-col flex-grow"><h4 class="font-semibold text-base text-white mb-2 min-h-[2.5rem]">${product.name}</h4><div class="flex justify-between items-center mb-3"><span class="font-bold text-lg text-brand-primary">${formatCurrency(product.price)}</span><button class="add-item-btn bg-brand-primary text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-brand-primary-dark transition pointer-events-none"><i class="fas fa-plus"></i></button></div><div class="flex-grow"></div><button class="info-item-btn w-full bg-dark-input text-dark-text font-semibold py-2 rounded-lg hover:bg-gray-600 transition text-sm">Descrição</button></div></div>`; 
+        }).join(''); 
+        
+        if (append) { 
+            if (loadMoreBtn) loadMoreBtn.remove(); 
+            clientMenuContainer.insertAdjacentHTML('beforeend', html); 
+        } else { 
+            clientMenuContainer.innerHTML = html; 
+        } 
+    } 
+    renderLoadMoreButton(); 
+}
+
+function renderLoadMoreButton() {
+    if (currentBusinessType !== 'food') return;
     if (loadMoreBtn) loadMoreBtn.remove(); loadMoreBtn = document.createElement('button');
     loadMoreBtn.className = 'col-span-full py-3 mt-4 bg-gray-800 text-gray-400 rounded-lg font-bold text-sm';
     loadMoreBtn.innerText = 'Ver mais produtos'; loadMoreBtn.onclick = handleLoadMore; clientMenuContainer.appendChild(loadMoreBtn);
-};
-const handleCallMotoboy = () => { if (!localCurrentClientUser) { showAssocError("Faça login para chamar o entregador."); return; } alert("Redirecionando para o sistema de entregas... (Em Breve)"); };
+}
 
-// --- STATUS KDS ---
-const startClientKdsListener = (tableId) => {
-    if (unsubscribeClientKds) unsubscribeClientKds();
-    if (!tableId) return;
+function addItemToCart(product) { 
+    if (!product || !product.id) return; 
+    const newItem = { 
+        id: product.id, 
+        name: product.name, 
+        price: product.price, 
+        sector: product.sector || (currentBusinessType === 'food' ? 'cozinha' : 'balcao'), 
+        category: product.category || 'uncategorized', 
+        note: '' 
+    }; 
+    selectedItems.push(newItem); 
+    renderClientOrderScreen(); 
+    showToast("Item adicionado!", false); 
+    openClientObsModal(product.id, ''); 
+}
 
-    let queryVal = tableId;
-    if (!isNaN(tableId) && !tableId.toString().startsWith('pickup_')) {
-        queryVal = parseInt(tableId);
-    }
-
-    const q = query(
-        getKdsCollectionRef(), 
-        where('tableNumber', '==', queryVal),
-        where('status', 'in', ['pending', 'preparing', 'ready'])
-    );
-
-    unsubscribeClientKds = onSnapshot(q, (snapshot) => {
-        const orders = snapshot.docs.map(d => d.data());
-        updateClientStatusUI(orders, tableId);
-    });
-};
-
-const updateClientStatusUI = (orders, tableId) => {
-    if (!kdsTrackingIconContainer || !kdsTrackingIcon || !kdsTrackingStatusEl) return;
-
-    if (orders.length === 0) {
-        kdsTrackingIconContainer.classList.add('hidden');
-        return;
-    }
-
-    const hasReady = orders.some(o => o.status === 'ready');
-    const hasPreparing = orders.some(o => o.status === 'preparing');
-    const isDelivery = tableId.toString().startsWith('pickup_') || parseInt(tableId) >= 8000;
-    
-    let statusText = '';
-    let iconClass = '';
-    let containerClass = 'hidden ml-2 bg-gray-800 rounded-full px-3 py-1 flex items-center space-x-2 transition hover:bg-gray-700'; 
-    let isClickable = false;
-    
-    if (hasReady) {
-        statusText = isDelivery ? 'Saiu para Entrega' : 'Pronto!';
-        iconClass = isDelivery ? 'fas fa-motorcycle text-green-400' : 'fas fa-check-circle text-green-400';
-        containerClass += ' animate-bounce';
-        isClickable = isDelivery; 
-    } else if (hasPreparing) {
-        statusText = 'Preparando';
-        iconClass = 'fas fa-fire text-orange-500 animate-pulse';
-    } else {
-        statusText = 'Na Fila';
-        iconClass = 'fas fa-clock text-yellow-400';
-    }
-
-    kdsTrackingIconContainer.className = containerClass; 
-    kdsTrackingIconContainer.classList.remove('hidden'); 
-    kdsTrackingIcon.className = iconClass;
-    kdsTrackingStatusEl.textContent = statusText;
-
-    if (isClickable) {
-        kdsTrackingIconContainer.onclick = () => {
-             const modal = document.getElementById('deliveryFeedbackModal');
-             if(modal) modal.style.display = 'flex';
-        };
-         kdsTrackingIconContainer.style.cursor = 'pointer';
-    } else {
-        kdsTrackingIconContainer.onclick = null;
-        kdsTrackingIconContainer.style.cursor = 'default';
-    }
-};
-
-function handleAuthActionClick() { if (localCurrentClientUser) { signOut(auth).then(() => { showToast("Você saiu da sua conta."); window.location.reload(); }); } else { openAssociationModal(); } }
-async function loadMenu() { try { await fetchWooCommerceCategories(null); await fetchWooCommerceProducts(1, '', 'all', false); renderMenu(); if (statusScreen) statusScreen.style.display = 'none'; if (mainContent) mainContent.style.display = 'flex'; } catch (error) { console.error("Erro menu:", error); if (statusScreen) statusScreen.innerHTML = '<p class="text-red-400 p-4 text-center">Erro ao carregar cardápio.</p>'; } }
-function renderMenu(append = false) { if (!clientMenuContainer) return; if (clientCategoryFilters && (clientCategoryFilters.innerHTML.trim() === '' || !append)) { const categories = getCategories(); clientCategoryFilters.innerHTML = categories.map(cat => { const isActive = cat.slug === currentCategoryFilter ? 'bg-brand-primary text-white' : 'bg-dark-input text-dark-text border border-gray-600'; return `<button class="category-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap ${isActive}" data-category="${cat.slug || cat.id}">${cat.name}</button>`; }).join(''); } const products = getProducts(); let filteredProducts = products; if (currentCategoryFilter === 'top10') { const top10Ids = JSON.parse(localStorage.getItem('top10_products') || '[]'); filteredProducts = products.filter(p => top10Ids.includes(p.id.toString())); filteredProducts.sort((a, b) => top10Ids.indexOf(a.id.toString()) - top10Ids.indexOf(b.id.toString())); } if (!append) clientMenuContainer.innerHTML = ''; if (filteredProducts.length === 0) { clientMenuContainer.innerHTML = `<div class="col-span-full text-center p-6 text-yellow-400 italic">Nenhum produto encontrado.</div>`; } else { const html = filteredProducts.map((product, index) => { let badge = ''; if (currentCategoryFilter === 'top10' && index < 3) { const colors = ['text-yellow-400', 'text-gray-300', 'text-orange-400']; badge = `<i class="fas fa-medal ${colors[index]} absolute top-2 right-2 text-xl drop-shadow-md"></i>`; } return `<div class="product-card bg-dark-card border border-dark-border rounded-xl shadow-md flex flex-col overflow-hidden relative" data-product-id="${product.id}">${badge}<img src="${product.image}" alt="${product.name}" class="w-full h-32 object-cover"><div class="p-4 flex flex-col flex-grow"><h4 class="font-semibold text-base text-white mb-2 min-h-[2.5rem]">${product.name}</h4><div class="flex justify-between items-center mb-3"><span class="font-bold text-lg text-brand-primary">${formatCurrency(product.price)}</span><button class="add-item-btn bg-brand-primary text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-brand-primary-dark transition pointer-events-none"><i class="fas fa-plus"></i></button></div><div class="flex-grow"></div><button class="info-item-btn w-full bg-dark-input text-dark-text font-semibold py-2 rounded-lg hover:bg-gray-600 transition text-sm">Descrição</button></div></div>`; }).join(''); if (append) { if (loadMoreBtn) loadMoreBtn.remove(); clientMenuContainer.insertAdjacentHTML('beforeend', html); } else { clientMenuContainer.innerHTML = html; } } if (currentCategoryFilter !== 'top10') { renderLoadMoreButton(); } }
-function addItemToCart(product) { if (!product || !product.id) return; const newItem = { id: product.id, name: product.name, price: product.price, sector: product.sector || 'cozinha', category: product.category || 'uncategorized', note: '' }; selectedItems.push(newItem); renderClientOrderScreen(); showToast("Item adicionado!", false); openClientObsModal(product.id, ''); }
 function increaseCartItemQuantity(itemId, noteKey) { const itemToCopy = selectedItems.findLast(item => item.id == itemId && (item.note || '') === noteKey); if (itemToCopy) { selectedItems.push({ ...itemToCopy }); renderClientOrderScreen(); } }
 function decreaseCartItemQuantity(itemId, noteKey) { let indexToRemove = -1; for (let i = selectedItems.length - 1; i >= 0; i--) { if (selectedItems[i].id == itemId && (selectedItems[i].note || '') === noteKey) { indexToRemove = i; break; } } if (indexToRemove > -1) { selectedItems.splice(indexToRemove, 1); renderClientOrderScreen(); } }
 function openProductInfoModal(product) { if (!product) return; const modal = document.getElementById('productInfoModal'); const img = document.getElementById('infoProductImage'); const nameEl = document.getElementById('infoProductName'); const priceEl = document.getElementById('infoProductPrice'); const descEl = document.getElementById('infoProductDescription'); const addBtn = document.getElementById('infoProductAddBtn'); if (!modal) return; img.src = product.image || 'https://placehold.co/600x400/1f2937/d1d5db?text=Produto'; nameEl.textContent = product.name; priceEl.textContent = formatCurrency(product.price); descEl.innerHTML = product.description || 'Sem descrição.'; const newAddBtn = addBtn.cloneNode(true); addBtn.parentNode.replaceChild(newAddBtn, addBtn); newAddBtn.onclick = () => { addItemToCart(product); modal.style.display = 'none'; }; modal.style.display = 'flex'; }
-function openClientObsModal(itemId, noteKey) { const products = getProducts(); const product = products.find(p => p.id == itemId); const esperaSwitch = document.getElementById('esperaSwitch'); if (!clientObsModal || !product || !esperaSwitch) return; const regexEspera = new RegExp(ESPERA_KEY.replace('(', '\\(').replace(')', '\\)'), 'ig'); const isEspera = regexEspera.test(noteKey); let cleanNote = noteKey.replace(regexEspera, '').trim(); if (cleanNote.startsWith(',')) cleanNote = cleanNote.substring(1).trim(); clientObsModal.querySelector('h3').textContent = product.name; clientObsText.value = cleanNote; esperaSwitch.checked = isEspera; clientObsModal.dataset.itemId = itemId; clientObsModal.dataset.originalNoteKey = noteKey; clientObsModal.style.display = 'flex'; }
+function openClientObsModal(itemId, noteKey) { 
+    let products = currentBusinessType === 'food' ? getProducts() : DEMO_DATA[currentBusinessType].products;
+    const product = products.find(p => p.id == itemId); 
+    const esperaSwitch = document.getElementById('esperaSwitch'); 
+    if (!clientObsModal || !product || !esperaSwitch) return; 
+    const regexEspera = new RegExp(ESPERA_KEY.replace('(', '\\(').replace(')', '\\)'), 'ig'); 
+    const isEspera = regexEspera.test(noteKey); 
+    let cleanNote = noteKey.replace(regexEspera, '').trim(); 
+    if (cleanNote.startsWith(',')) cleanNote = cleanNote.substring(1).trim(); 
+    clientObsModal.querySelector('h3').textContent = product.name; 
+    clientObsText.value = cleanNote; 
+    esperaSwitch.checked = isEspera; 
+    clientObsModal.dataset.itemId = itemId; 
+    clientObsModal.dataset.originalNoteKey = noteKey; 
+    clientObsModal.style.display = 'flex'; 
+}
+
 function _renderClientCart() { const cartItemsList = document.getElementById('client-cart-items-list'); if (!cartItemsList) return; if (selectedItems.length === 0) { cartItemsList.innerHTML = `<div class="text-sm md:text-base text-dark-placeholder italic p-2">Nenhum item selecionado.</div>`; } else { const groupedItems = selectedItems.reduce((acc, item) => { const key = `${item.id}-${item.note || ''}`; if (!acc[key]) acc[key] = { ...item, count: 0 }; acc[key].count++; return acc; }, {}); cartItemsList.innerHTML = Object.values(groupedItems).map(group => { const note = group.note || ''; const regexEspera = new RegExp(ESPERA_KEY.replace('(', '\\(').replace(')', '\\)'), 'ig'); const isEspera = regexEspera.test(note); let displayNote = note.replace(regexEspera, '').trim(); if (displayNote.startsWith(',')) displayNote = displayNote.substring(1).trim(); let noteHtml = ''; if (isEspera) noteHtml = `<span class="text-yellow-400 font-semibold">${ESPERA_KEY}</span>`; if (displayNote) noteHtml += ` <span class="text-brand-primary">(${displayNote})</span>`; if (!noteHtml) noteHtml = `(Adicionar Obs.)`; return `<div class="flex justify-between items-center bg-dark-input p-3 rounded-lg shadow-sm"><div class="flex flex-col flex-grow min-w-0 mr-2"><span class="font-semibold text-white">${group.name} (${group.count}x)</span><span class="text-sm cursor-pointer text-gray-400 hover:text-white obs-span" data-item-id="${group.id}" data-item-note-key="${note}">${noteHtml}</span></div><div class="flex items-center space-x-2 flex-shrink-0"><button class="qty-btn bg-red-600 text-white rounded-full h-8 w-8 flex items-center justify-center" data-item-id="${group.id}" data-item-note-key="${note}" data-action="decrease"><i class="fas fa-minus"></i></button><button class="qty-btn bg-green-600 text-white rounded-full h-8 w-8 flex items-center justify-center" data-item-id="${group.id}" data-item-note-key="${note}" data-action="increase"><i class="fas fa-plus"></i></button></div></div>`; }).join(''); } }
-function handleSendOrderClick() { if (selectedItems.length === 0) { showToast("Seu carrinho está vazio.", true); return; } if (!localCurrentTableId && !currentTableId) { openAssociationModal(); } else { sendOrderToFirebase(); } }
-function showTab(tabName) { if(!tabContents || !tabButtons) return; tabContents.forEach(content => { content.style.display = 'none'; content.classList.remove('active'); }); tabButtons.forEach(button => { button.classList.remove('active'); }); const activeContent = document.getElementById(`tab-content-${tabName}`); const activeButton = document.querySelector(`.client-tab-btn[data-tab="${tabName}"]`); if (activeContent) { activeContent.style.display = 'block'; activeContent.classList.add('active'); } if (activeButton) { activeButton.classList.add('active'); } }
+
 function openAssociationModal() { if (associationModal) { if(assocErrorMsg) assocErrorMsg.style.display = 'none'; associationModal.style.display = 'flex'; document.querySelectorAll('.assoc-tab-btn').forEach(b => b.classList.remove('active')); document.querySelectorAll('.assoc-tab-content').forEach(c => c.style.display = 'none'); const mesaTab = document.querySelector('.assoc-tab-btn[data-tab="mesa"]'); const mesaContent = document.getElementById('content-mesa'); if(mesaTab) mesaTab.classList.add('active'); if(mesaContent) mesaContent.style.display = 'block'; currentAssociationTab = 'mesa'; if (activateTableNumber) activateTableNumber.focus(); const defaultActionButtons = document.getElementById('defaultActionButtons'); if (defaultActionButtons) defaultActionButtons.style.display = 'flex'; } }
 function closeAssociationModal() { if (associationModal) associationModal.style.display = 'none'; }
 function openCustomerRegistrationModal() { if (customerRegistrationModal && tempUserData) { regCustomerName.textContent = tempUserData.name || 'Nome não encontrado'; regCustomerEmail.textContent = tempUserData.email || 'Email não encontrado'; regCustomerWhatsapp.value = ''; regCustomerBirthday.value = ''; if(regErrorMsg) regErrorMsg.style.display = 'none'; customerRegistrationModal.style.display = 'flex'; associationModal.style.display = 'none'; } }
 function closeCustomerRegistrationModal() { if (customerRegistrationModal) customerRegistrationModal.style.display = 'none'; }
-async function signInWithGoogle(e) { if(e) e.preventDefault(); const provider = new GoogleAuthProvider(); try { await signInWithPopup(auth, provider); } catch (error) { console.error("Erro Login:", error); showAssocError("Erro ao tentar logar."); } }
-async function checkCustomerRegistration(user) { const customerRef = doc(getCustomersCollectionRef(), user.uid); try { const docSnap = await getDoc(customerRef); if (docSnap.exists() && docSnap.data().phone) { localCurrentClientUser.phone = docSnap.data().phone; updateCustomerInfo(user, false); } else { openCustomerRegistrationModal(); } } catch (error) { console.error("Erro check customer:", error); showAssocError("Erro ao verificar cadastro."); } }
-async function handleNewCustomerRegistration(e) { e.preventDefault(); if (!tempUserData) { showAssocError("Erro: Dados perdidos. Logue novamente."); return; } const whatsapp = regCustomerWhatsapp.value; const birthday = regCustomerBirthday.value; if (!whatsapp || !birthday) { regErrorMsg.textContent = "Preencha todos os campos."; regErrorMsg.style.display = 'block'; return; } regErrorMsg.style.display = 'none'; const completeUserData = { ...tempUserData, whatsapp: whatsapp, nascimento: birthday }; saveRegistrationBtn.disabled = true; saveRegistrationBtn.textContent = "Salvando..."; try { await saveCustomerData(completeUserData); if(localCurrentClientUser) localCurrentClientUser.phone = whatsapp; showToast("Cadastro concluído!", false); closeCustomerRegistrationModal(); openAssociationModal(); updateCustomerInfo(localCurrentClientUser, false); } catch (error) { console.error("Erro salvar:", error); regErrorMsg.textContent = "Falha ao salvar."; regErrorMsg.style.display = 'block'; } finally { saveRegistrationBtn.disabled = false; saveRegistrationBtn.textContent = "Salvar e Continuar"; } }
-async function saveCustomerData(userData) { const customerRef = doc(getCustomersCollectionRef(), userData.uid); await setDoc(customerRef, { uid: userData.uid, name: userData.name, email: userData.email, phone: userData.whatsapp, birthday: userData.nascimento, photoURL: userData.photoURL || null, points: 0, createdAt: serverTimestamp() }, { merge: true }); }
-function updateCustomerInfo(user, isNew = false) { if (!loggedInStep || !loggedInUserName || !googleLoginBtn) return; if (user && !isNew) { loggedInStep.style.display = 'block'; loggedInUserName.textContent = user.displayName || user.email; googleLoginBtn.style.display = 'none'; } else { loggedInStep.style.display = 'none'; loggedInUserName.textContent = ''; googleLoginBtn.style.display = 'flex'; } }
-async function handleActivationAndSend(e) {
-    if (e) e.preventDefault(); let identifier = ''; let isPickup = false;
-    if (currentAssociationTab === 'mesa') { identifier = activateTableNumber.value.trim(); if (!identifier) { showAssocError("Informe o número da mesa."); return; } } else if (currentAssociationTab === 'retirada') { identifier = activatePickupPin.value.trim(); if (!identifier || identifier.length < 4) { showAssocError("PIN inválido (min 4 dígitos)."); return; } isPickup = true; }
-    if (!localCurrentClientUser) { showAssocError("Faça login para continuar."); return; }
-    toggleLoading(activateAndSendBtn, true); assocErrorMsg.style.display = 'none';
-    try {
-        const tableDocId = isPickup ? `pickup_${identifier}` : identifier; const tableRef = getTableDocRef(tableDocId); const tableSnap = await getDoc(tableRef);
-        localCurrentTableId = tableDocId; setCurrentTable(tableDocId, true, false);
-        const clientData = { uid: localCurrentClientUser.uid, name: localCurrentClientUser.displayName, phone: localCurrentClientUser.phone || null };
-        if (tableSnap.exists()) {
-            const tData = tableSnap.data();
-            if (tData.status !== 'closed' && tData.clientId && tData.clientId !== clientData.uid) { throw new Error("Esta mesa/PIN está em uso por outro cliente."); }
-            if (tData.status === 'closed') {
-                const historyRef = doc(getTablesCollectionRef(), `${tableDocId}_closed_${Date.now()}`); await setDoc(historyRef, tData);
-                await setDoc(tableRef, { tableNumber: isPickup ? identifier : parseInt(identifier), status: 'open', sector: isPickup ? 'Retirada' : (tData.sector || 'Salão'), isPickup: isPickup, createdAt: serverTimestamp(), total: 0, sentItems: [], payments: [], serviceTaxApplied: true, selectedItems: [], requestedOrders: [], clientId: clientData.uid, clientName: clientData.name, clientPhone: clientData.phone, anonymousUid: null });
-            } else { if (!tData.clientId) { await updateDoc(tableRef, { clientId: clientData.uid, clientName: clientData.name, clientPhone: clientData.phone }); } }
-        } else {
-            if (!isPickup && !confirm(`Mesa ${identifier} não existe. Abrir nova?`)) throw new Error("Ação cancelada.");
-            await setDoc(tableRef, { tableNumber: isPickup ? identifier : parseInt(identifier), status: 'open', sector: isPickup ? 'Retirada' : 'Cliente', isPickup: isPickup, createdAt: serverTimestamp(), total: 0, sentItems: [], payments: [], serviceTaxApplied: true, selectedItems: [], requestedOrders: [], clientId: clientData.uid, clientName: clientData.name, clientPhone: clientData.phone, anonymousUid: null });
-        }
-        setTableListener(tableDocId, true); startClientKdsListener(tableDocId);
-        if (selectedItems.length > 0) await sendOrderToFirebase();
-        closeAssociationModal(); showToast(isPickup ? `Retirada #${identifier} iniciada!` : `Mesa ${identifier} vinculada!`, false);
-    } catch (error) { console.error(error); showAssocError(error.message); } finally { toggleLoading(activateAndSendBtn, false, 'Confirmar'); }
-}
-function showAssocError(message) { if (assocErrorMsg) { assocErrorMsg.textContent = message; assocErrorMsg.style.display = 'block'; } }
-function renderClientQuickObsButtons(observations) { if (!clientQuickObsButtons) return; if (observations.length === 0) { clientQuickObsButtons.innerHTML = '<p class="text-xs italic">Nenhuma obs.</p>'; return; } clientQuickObsButtons.innerHTML = observations.map(obs => `<button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input rounded-full hover:bg-gray-600" data-obs="${obs.text}">${obs.text}</button>`).join(''); }
-export const fetchQuickObservations = async () => { try { if (quickObsCache.length > 0) { renderClientQuickObsButtons(quickObsCache); return quickObsCache; } const q = query(getQuickObsCollectionRef(), orderBy('text', 'asc')); const snap = await getDocs(q); quickObsCache = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })); renderClientQuickObsButtons(quickObsCache); } catch (e) { console.error(e); } };
-async function sendOrderToFirebase() {
-    const tableId = localCurrentTableId || currentTableId; if (!tableId || selectedItems.length === 0) { showToast("Carrinho vazio.", true); return; }
-    toggleLoading(sendOrderBtn, true, 'Enviando...');
-    const orderId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-    const newOrderRequest = { orderId: orderId, requestedAt: new Date().toISOString(), clientInfo: { uid: localCurrentClientUser?.uid, name: localCurrentClientUser?.displayName, phone: localCurrentClientUser?.phone }, items: selectedItems.map(item => ({ ...item })) };
-    try { const tableRef = getTableDocRef(tableId); await updateDoc(tableRef, { requestedOrders: arrayUnion(newOrderRequest), clientOrderPending: true, waiterNotification: "Novo Pedido" }); selectedItems.length = 0; renderClientOrderScreen(); showToast("Pedido enviado! Aguarde confirmação.", false); } catch (e) { console.error("Erro envio:", e); showToast("Falha ao enviar pedido.", true); } finally { toggleLoading(sendOrderBtn, false, 'ENVIAR'); } // Texto restaurado para ENVIAR
-}

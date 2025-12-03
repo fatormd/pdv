@@ -1,4 +1,4 @@
-// --- CONTROLLERS/MANAGER/MODULES/PRODUCTMANAGER.JS (VERSÃO FINAL: VALIDADA & SEGURA) ---
+// --- CONTROLLERS/MANAGER/MODULES/PRODUCTMANAGER.JS (VERSÃO FINAL: FORMATADA & CORRIGIDA) ---
 
 import { 
     db, appId, storage, ref, uploadBytes, getDownloadURL, 
@@ -60,26 +60,23 @@ export const init = () => {
             const urlInput = document.getElementById('prodImgUrl');
             const btnSave = document.getElementById('btnSaveProduct');
 
-            // --- VALIDAÇÃO DE SEGURANÇA (NOVO) ---
-            
             // 1. Validar Tipo de Arquivo
             const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
             if (!validTypes.includes(file.type)) {
                 showToast("Formato inválido! Use apenas JPG, PNG ou WEBP.", true);
-                input.value = ''; // Limpa o input para permitir nova seleção
+                input.value = ''; 
                 return;
             }
 
             // 2. Validar Tamanho (Máximo 2MB)
-            const maxSize = 2 * 1024 * 1024; // 2MB em bytes
+            const maxSize = 2 * 1024 * 1024; // 2MB
             if (file.size > maxSize) {
                 showToast("Imagem muito grande! O limite é 2MB.", true);
                 input.value = ''; 
                 return;
             }
-            // -------------------------------------
 
-            // 1. Preview imediato
+            // Preview imediato
             const reader = new FileReader();
             reader.onload = (e) => {
                 if(preview) { preview.src = e.target.result; preview.classList.remove('hidden'); }
@@ -88,11 +85,10 @@ export const init = () => {
             reader.readAsDataURL(file);
 
             if (!storage) {
-                showToast("Erro: Storage não inicializado. Verifique firebaseService.js", true);
+                showToast("Erro: Storage não inicializado.", true);
                 return;
             }
 
-            // 2. Bloqueia botão para evitar erro "No URL"
             if(btnSave) {
                 btnSave.disabled = true;
                 btnSave.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Subindo foto...';
@@ -101,26 +97,21 @@ export const init = () => {
             showToast("Enviando para a nuvem...", false);
             
             try {
-                // 3. Sanitização do nome (Remove acentos e espaços)
+                // Sanitização do nome
                 const ext = file.name.split('.').pop().toLowerCase();
                 const cleanName = file.name.split('.')[0]
-                    .normalize('NFD').replace(/[\u0300-\u036f]/g, "") // Tira acentos
-                    .replace(/[^a-zA-Z0-9]/g, '_') // Mantém só letras/numeros e _
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, "")
+                    .replace(/[^a-zA-Z0-9]/g, '_')
                     .toLowerCase();
 
                 const fileName = `products/${Date.now()}_${cleanName}.${ext}`;
                 const storageRef = ref(storage, fileName);
                 
-                // 4. Upload
                 await uploadBytes(storageRef, file);
-                
-                // 5. Pega o link público
                 const publicUrl = await getDownloadURL(storageRef);
                 
-                // 6. Cola o link no campo
                 if(urlInput) {
                     urlInput.value = publicUrl;
-                    // Força atualização visual
                     urlInput.dispatchEvent(new Event('input')); 
                     console.log("LINK GERADO:", publicUrl);
                 }
@@ -131,7 +122,6 @@ export const init = () => {
                 console.error("Erro no upload:", error);
                 showToast("Erro ao subir imagem: " + error.message, true);
             } finally {
-                // 7. Libera o botão
                 if(btnSave) {
                     btnSave.disabled = false;
                     btnSave.innerHTML = '<i class="fas fa-save mr-2"></i> Salvar Ficha';
@@ -309,7 +299,6 @@ async function renderProductListConfig(contentDiv, toolbarDiv) {
 
         const listHtml = products.map(p => {
             const extData = productExtensionsCache[p.id] || {};
-            // Prioridade: Imagem local > Imagem do Woo > Placeholder
             const displayImage = extData.localImage || (p.image && !p.image.includes('placehold') ? p.image : 'https://placehold.co/50');
 
             return `
@@ -550,7 +539,6 @@ async function renderProductForm(product = null, container) {
             </div>
         </div>`;
 
-    // Listeners para Preview de Imagem
     const urlInput = document.getElementById('prodImgUrl');
     if (urlInput) {
         urlInput.addEventListener('input', function() {
@@ -617,7 +605,6 @@ async function renderProductForm(product = null, container) {
         const finalCmv = totalIngCost + energyCost;
         document.getElementById('finalCmvDisplay').textContent = formatCurrency(finalCmv);
         
-        // --- CÁLCULO DE ROI E PREÇO SUGERIDO ---
         const targetMargin = parseFloat(document.getElementById('prodTargetMargin').value) || 0;
         const currentPrice = parseFloat(document.getElementById('prodPrice').value) || 0;
         
@@ -679,31 +666,24 @@ async function renderProductForm(product = null, container) {
 
     document.getElementById('btnBackToHub').onclick = () => renderProductListConfig(container, document.getElementById('productActionsToolbar'));
     
-    // --- LÓGICA DE SALVAMENTO HÍBRIDA (LINK vs ARQUIVO) ---
     document.getElementById('btnSaveProduct').onclick = async () => {
         const btn = document.getElementById('btnSaveProduct');
         toggleLoading(btn, true, 'Salvando...');
         
         try {
-            // 1. TRATAMENTO DE PREÇOS
             let rawPrice = document.getElementById('prodPrice').value || "0";
             let rawSalePrice = document.getElementById('prodSalePrice').value || "";
             const regularPrice = rawPrice.toString().replace(',', '.');
             const salePrice = document.getElementById('checkPromo').checked && rawSalePrice 
                 ? rawSalePrice.toString().replace(',', '.') : ''; 
 
-            // 2. TRATAMENTO DE IMAGEM HÍBRIDO
             let imageUrl = document.getElementById('prodImgUrl').value ? document.getElementById('prodImgUrl').value.trim() : '';
-            let imagesArray = []; // Vai para o Woo (apenas Links)
-            let localImageToSave = null; // Vai para o Firestore (Link direto do Storage)
+            let imagesArray = [];
+            let localImageToSave = null; 
             
-            // Se o campo de URL tiver valor, usamos ele
             if (imageUrl) {
                 if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-                    // É link público (ex: Firebase Storage ou site): Manda para o WooCommerce
                     imagesArray.push({ src: imageUrl });
-                    
-                    // Também salva como imagem local para o PDV usar
                     localImageToSave = imageUrl;
                 } else {
                     console.warn("Formato de imagem desconhecido ou inválido para Woo:", imageUrl);
@@ -716,7 +696,7 @@ async function renderProductForm(product = null, container) {
                 sale_price: salePrice,
                 status: document.getElementById('prodStatus').value,
                 meta_data: [ { key: 'sector', value: document.getElementById('prodSector').value } ],
-                images: imagesArray // Envia para o Woo
+                images: imagesArray
             };
 
             const extendedData = {
@@ -728,7 +708,7 @@ async function renderProductForm(product = null, container) {
                 subgroup: document.getElementById('prodSubgroup').value,
                 sector: document.getElementById('prodSector').value,
                 targetMargin: parseFloat(document.getElementById('prodTargetMargin').value) || 0,
-                localImage: localImageToSave, // Salva no Firestore
+                localImage: localImageToSave,
                 updatedAt: serverTimestamp()
             };
 
@@ -741,7 +721,6 @@ async function renderProductForm(product = null, container) {
                 wooId = newProd.id; 
             }
             
-            // Se o usuário limpou a imagem (campo vazio), remove do banco também
             if (!imageUrl) {
                 extendedData.localImage = null;
             }
@@ -762,7 +741,7 @@ async function renderProductForm(product = null, container) {
 }
 
 // ==================================================================
-//           5. CONFIGURAÇÃO INICIAL (MANTIDA)
+//           5. CONFIGURAÇÃO INICIAL
 // ==================================================================
 
 async function configureInitialCatalog() {
@@ -796,25 +775,96 @@ async function configureInitialCatalog() {
 }
 
 // ==================================================================
-//           6. GESTÃO DE INSUMOS (RESPONSIVO)
+//           6. GESTÃO DE INSUMOS
 // ==================================================================
 
 async function fetchIngredients() { try { const q = query(getColRef('ingredients'), orderBy('name')); const snap = await getDocs(q); ingredientsCache = snap.docs.map(d => ({ id: d.id, ...d.data() })); return ingredientsCache; } catch (e) { console.error(e); return []; } }
-async function renderIngredientsScreen(container, toolbar) { toolbar.innerHTML = `<div class="flex space-x-2 w-full justify-end"><button id="btnStockWriteOff" class="bg-red-900/50 hover:bg-red-800 text-red-200 border border-red-700 font-bold py-2 px-4 rounded-lg shadow flex items-center text-sm" title="Abater do estoque baseado nas vendas"><i class="fas fa-level-down-alt mr-2"></i> Baixar Estoque</button><button id="btnNewIngredient" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow flex items-center ml-2"><i class="fas fa-plus mr-2"></i> Novo</button></div>`; document.getElementById('btnNewIngredient').onclick = () => renderIngredientForm(null); document.getElementById('btnStockWriteOff').onclick = handleStockWriteOff; if (ingredientsCache.length === 0) { container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-500"><p>Nenhum insumo cadastrado.</p></div>'; return; } container.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20">${ingredientsCache.map(ing => `<div class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex flex-col justify-between group hover:border-gray-600 transition"><div class="flex justify-between items-start mb-2"><div><h4 class="font-bold text-white text-lg">${ing.name}</h4><p class="text-xs text-gray-400 uppercase">${ing.group || 'Sem Grupo'} • ${ing.costCategory || 'CMV'}</p></div><div class="flex space-x-2"><button class="text-blue-400 hover:text-blue-300 p-1" onclick="window.editIngredient('${ing.id}')"><i class="fas fa-edit"></i></button><button class="text-red-400 hover:text-red-300 p-1" onclick="window.deleteIngredient('${ing.id}')"><i class="fas fa-trash"></i></button></div></div><div class="flex justify-between items-end mt-2 pt-2 border-t border-gray-700/50"><div class="text-xs text-gray-500">R$ ${ing.cost.toFixed(2)} / ${ing.unit}</div><div class="text-right font-mono font-bold ${ing.stock <= (ing.minStock||0) ? 'text-red-500' : 'text-green-400'}">${ing.stock.toFixed(3)} ${ing.unit}</div></div></div>`).join('')}</div>`; window.editIngredient = (id) => renderIngredientForm(ingredientsCache.find(i => i.id === id)); window.deleteIngredient = async (id) => { if(confirm("Excluir este insumo?")) { await deleteDoc(doc(getColRef('ingredients'), id)); showToast("Insumo excluído."); await fetchIngredients(); switchHubTab('ingredients'); } }; }
-async function handleStockWriteOff() { const btn = document.getElementById('btnStockWriteOff'); if(!confirm("Isso irá calcular o consumo dos últimos 30 dias e SUBTRAIR do estoque atual de todos os insumos. Continuar?")) return; toggleLoading(btn, true, 'Calculando...'); try { const consumptionMap = await calculateConsumptionFromHistory(30); const batch = writeBatch(db); let updateCount = 0; Object.entries(consumptionMap).forEach(([ingId, qtyConsumed]) => { const ingRef = doc(getColRef('ingredients'), ingId); batch.update(ingRef, { stock: increment(-qtyConsumed) }); updateCount++; }); if(updateCount > 0) { await batch.commit(); showToast(`Estoque atualizado! ${updateCount} insumos baixados.`, false); await fetchIngredients(); switchHubTab('ingredients'); } else { showToast("Nenhum consumo detectado no período.", true); } } catch (e) { console.error(e); showToast("Erro na baixa de estoque.", true); } finally { toggleLoading(btn, false, 'Baixar Estoque'); } }
 
-// CORREÇÃO: Utiliza getSubModalContainer()
+async function renderIngredientsScreen(container, toolbar) { 
+    toolbar.innerHTML = `
+        <div class="flex space-x-2 w-full justify-end">
+            <button id="btnStockWriteOff" class="bg-red-900/50 hover:bg-red-800 text-red-200 border border-red-700 font-bold py-2 px-4 rounded-lg shadow flex items-center text-sm" title="Abater do estoque baseado nas vendas"><i class="fas fa-level-down-alt mr-2"></i> Baixar Estoque</button>
+            <button id="btnNewIngredient" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow flex items-center ml-2"><i class="fas fa-plus mr-2"></i> Novo</button>
+        </div>`;
+    
+    document.getElementById('btnNewIngredient').onclick = () => renderIngredientForm(null); 
+    document.getElementById('btnStockWriteOff').onclick = handleStockWriteOff; 
+    
+    if (ingredientsCache.length === 0) { 
+        container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-500"><p>Nenhum insumo cadastrado.</p></div>'; 
+        return; 
+    } 
+    
+    container.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20">
+            ${ingredientsCache.map(ing => `
+                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex flex-col justify-between group hover:border-gray-600 transition">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <h4 class="font-bold text-white text-lg">${ing.name}</h4>
+                            <p class="text-xs text-gray-400 uppercase">${ing.group || 'Sem Grupo'} • ${ing.costCategory || 'CMV'}</p>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button class="text-blue-400 hover:text-blue-300 p-1" onclick="window.editIngredient('${ing.id}')"><i class="fas fa-edit"></i></button>
+                            <button class="text-red-400 hover:text-red-300 p-1" onclick="window.deleteIngredient('${ing.id}')"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-end mt-2 pt-2 border-t border-gray-700/50">
+                        <div class="text-xs text-gray-500">R$ ${ing.cost.toFixed(2)} / ${ing.unit}</div>
+                        <div class="text-right font-mono font-bold ${ing.stock <= (ing.minStock||0) ? 'text-red-500' : 'text-green-400'}">${ing.stock.toFixed(3)} ${ing.unit}</div>
+                    </div>
+                </div>`).join('')}
+        </div>`; 
+    
+    window.editIngredient = (id) => renderIngredientForm(ingredientsCache.find(i => i.id === id)); 
+    window.deleteIngredient = async (id) => { 
+        if(confirm("Excluir este insumo?")) { 
+            await deleteDoc(doc(getColRef('ingredients'), id)); 
+            showToast("Insumo excluído."); 
+            await fetchIngredients(); 
+            switchHubTab('ingredients'); 
+        } 
+    }; 
+}
+
+async function handleStockWriteOff() { 
+    const btn = document.getElementById('btnStockWriteOff'); 
+    if(!confirm("Isso irá calcular o consumo dos últimos 30 dias e SUBTRAIR do estoque atual de todos os insumos. Continuar?")) return; 
+    toggleLoading(btn, true, 'Calculando...'); 
+    try { 
+        const consumptionMap = await calculateConsumptionFromHistory(30); 
+        const batch = writeBatch(db); 
+        let updateCount = 0; 
+        Object.entries(consumptionMap).forEach(([ingId, qtyConsumed]) => { 
+            const ingRef = doc(getColRef('ingredients'), ingId); 
+            batch.update(ingRef, { stock: increment(-qtyConsumed) }); 
+            updateCount++; 
+        }); 
+        if(updateCount > 0) { 
+            await batch.commit(); 
+            showToast(`Estoque atualizado! ${updateCount} insumos baixados.`, false); 
+            await fetchIngredients(); 
+            switchHubTab('ingredients'); 
+        } else { 
+            showToast("Nenhum consumo detectado no período.", true); 
+        } 
+    } catch (e) { 
+        console.error(e); 
+        showToast("Erro na baixa de estoque.", true); 
+    } finally { 
+        toggleLoading(btn, false, 'Baixar Estoque'); 
+    } 
+}
+
 function renderIngredientForm(ingredient = null) {
     const isEdit = !!ingredient;
     const modalHtml = `
         <div id="ingredientFormModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[80] animate-fade-in p-4">
             <div class="bg-dark-card border border-gray-600 p-6 rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl m-4">
-                
                 <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
                     <h3 class="text-xl font-bold text-white">${isEdit ? 'Editar Insumo' : 'Novo Insumo'}</h3>
                     <button onclick="document.getElementById('ingredientFormModal').remove()" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
                 </div>
-
                 <div class="space-y-3">
                     <div><label class="text-xs text-gray-400 uppercase font-bold">Nome</label><input id="ingName" type="text" class="input-pdv w-full p-2" value="${ingredient?.name || ''}" placeholder="Ex: Leite Integral"></div>
                     <div class="grid grid-cols-2 gap-3">
@@ -845,7 +895,6 @@ function renderIngredientForm(ingredient = null) {
             </div>
         </div>`;
         
-    // CORREÇÃO: Usa o container seguro no Body
     getSubModalContainer().innerHTML = modalHtml;
     
     document.getElementById('btnSaveIng').onclick = async () => {
@@ -875,38 +924,256 @@ function renderIngredientForm(ingredient = null) {
 }
 
 // ==================================================================
-//           7. LISTA DE COMPRAS & FORNECEDORES (MODAL FIXED)
+//           7. LISTA DE COMPRAS & FORNECEDORES
 // ==================================================================
 
-async function renderShoppingListScreen(container, toolbar) { toolbar.innerHTML = `<div class="flex items-center space-x-2 w-full justify-end"><button id="btnCalcHistory" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow flex items-center text-sm mr-2 whitespace-nowrap"><i class="fas fa-chart-line mr-2"></i> Sugerir</button><button id="btnQuoteSelected" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"><i class="fas fa-file-invoice-dollar mr-2"></i> Cotar</button></div>`; document.getElementById('btnCalcHistory').onclick = () => generateShoppingListFromHistory(container); const list = ingredientsCache.filter(i => i.stock <= (i.minStock || 5)); renderShoppingListTable(container, list, "Estoque Baixo"); }
-async function generateShoppingListFromHistory(container) { const btn = document.getElementById('btnCalcHistory'); toggleLoading(btn, true, 'Analisando...'); try { const consumptionMap = await calculateConsumptionFromHistory(30); const suggestionList = []; ingredientsCache.forEach(ing => { const consumed = consumptionMap[ing.id] || 0; const safetyMargin = consumed * 0.2; const needed = (consumed + safetyMargin) - ing.stock; if (needed > 0) { suggestionList.push({ ...ing, suggestedQty: needed, consumedLastMonth: consumed }); } }); renderShoppingListTable(container, suggestionList, "Sugestão por Vendas", true); } catch(e) { console.error(e); showToast("Erro na análise.", true); } finally { toggleLoading(btn, false, 'Sugerir'); } }
-function renderShoppingListTable(container, list, title, isHistory = false) { if(list.length === 0) { container.innerHTML = `<div class="flex flex-col items-center justify-center h-full text-green-500"><i class="fas fa-check-circle text-4xl mb-2"></i><p>${title}: Nada a comprar.</p></div>`; return; } const headerExtra = isHistory ? '<th class="p-3 text-right whitespace-nowrap">Consumo</th>' : ''; container.innerHTML = `<h4 class="text-white font-bold mb-2 ml-1">${title}</h4><div class="bg-gray-800 rounded-lg border border-gray-700 overflow-x-auto"><table class="w-full text-left text-gray-300 min-w-[600px]"><thead class="bg-gray-900 text-xs uppercase"><tr><th class="p-3 w-10"><input type="checkbox" id="selectAllBuy" class="h-4 w-4 bg-gray-700 border-gray-500 rounded" checked></th><th class="p-3">Item</th>${headerExtra}<th class="p-3 text-right whitespace-nowrap">Comprar</th><th class="p-3 text-right whitespace-nowrap">Atual</th></tr></thead><tbody class="divide-y divide-gray-700">${list.map(i => { const qtyToBuy = isHistory ? i.suggestedQty : ((i.minStock || 5) - i.stock); return `<tr class="hover:bg-gray-700/50"><td class="p-3"><input type="checkbox" class="buy-check h-4 w-4 bg-gray-700 border-gray-500 rounded" value="${i.id}" checked></td><td class="p-3 font-bold text-white">${i.name}</td>${isHistory ? `<td class="p-3 text-right text-gray-400 font-mono">${i.consumedLastMonth.toFixed(2)}</td>` : ''}<td class="p-3 text-right text-yellow-400 font-bold font-mono">${qtyToBuy.toFixed(2)} ${i.unit}</td><td class="p-3 text-right text-gray-500 font-mono">${i.stock}</td></tr>`; }).join('')}</tbody></table></div>`; const btnQuote = document.getElementById('btnQuoteSelected'); const checkboxes = container.querySelectorAll('.buy-check'); const updateBtnState = () => { const count = container.querySelectorAll('.buy-check:checked').length; if(btnQuote) { btnQuote.disabled = count === 0; btnQuote.innerHTML = `<i class="fas fa-file-invoice-dollar mr-2"></i> Cotar (${count})`; } }; document.getElementById('selectAllBuy').onchange = (e) => { checkboxes.forEach(cb => cb.checked = e.target.checked); updateBtnState(); }; checkboxes.forEach(cb => cb.onchange = updateBtnState); if(btnQuote) btnQuote.onclick = () => { const selectedIds = Array.from(container.querySelectorAll('.buy-check:checked')).map(cb => cb.value); openQuoteModal(selectedIds); }; updateBtnState(); }
-
-// CORREÇÃO: Utiliza getSubModalContainer()
-function openQuoteModal(itemIds) { const modalHtml = `<div id="quoteModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[80] animate-fade-in p-4"><div class="bg-dark-card border border-gray-600 p-6 rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl m-4"><div class="flex justify-between items-center mb-2 border-b border-gray-700 pb-2"><h3 class="text-xl font-bold text-white">Solicitar Orçamento</h3><button onclick="document.getElementById('quoteModal').remove()" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button></div><p class="text-gray-400 text-sm mb-4">Selecione os fornecedores para enviar o pedido de cotação de <b>${itemIds.length} itens</b>.</p><div class="max-h-60 overflow-y-auto custom-scrollbar bg-gray-900 p-3 rounded border border-gray-700 mb-4 space-y-2">${suppliersCache.length > 0 ? suppliersCache.map(s => `<label class="flex items-center space-x-3 p-2 hover:bg-gray-800 rounded cursor-pointer"><input type="checkbox" class="supplier-check h-5 w-5 text-indigo-600 rounded bg-gray-700 border-gray-500" value="${s.id}"><span class="text-white">${s.name}</span></label>`).join('') : '<p class="text-gray-500 italic">Nenhum fornecedor cadastrado.</p>'}</div><div class="flex justify-end space-x-3"><button onclick="document.getElementById('quoteModal').remove()" class="px-4 py-2 bg-gray-600 text-white rounded-lg">Cancelar</button><button id="btnSendQuote" class="px-4 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 disabled:opacity-50">Enviar Solicitação</button></div></div></div>`; 
+async function renderShoppingListScreen(container, toolbar) { 
+    toolbar.innerHTML = `
+        <div class="flex items-center space-x-2 w-full justify-end">
+            <button id="btnCalcHistory" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow flex items-center text-sm mr-2 whitespace-nowrap"><i class="fas fa-chart-line mr-2"></i> Sugerir</button>
+            <button id="btnQuoteSelected" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"><i class="fas fa-file-invoice-dollar mr-2"></i> Cotar</button>
+        </div>`; 
     
-    // Inserção corrigida
+    document.getElementById('btnCalcHistory').onclick = () => generateShoppingListFromHistory(container); 
+    const list = ingredientsCache.filter(i => i.stock <= (i.minStock || 5)); 
+    renderShoppingListTable(container, list, "Estoque Baixo"); 
+}
+
+async function generateShoppingListFromHistory(container) { 
+    const btn = document.getElementById('btnCalcHistory'); 
+    toggleLoading(btn, true, 'Analisando...'); 
+    try { 
+        const consumptionMap = await calculateConsumptionFromHistory(30); 
+        const suggestionList = []; 
+        ingredientsCache.forEach(ing => { 
+            const consumed = consumptionMap[ing.id] || 0; 
+            const safetyMargin = consumed * 0.2; 
+            const needed = (consumed + safetyMargin) - ing.stock; 
+            if (needed > 0) { 
+                suggestionList.push({ ...ing, suggestedQty: needed, consumedLastMonth: consumed }); 
+            } 
+        }); 
+        renderShoppingListTable(container, suggestionList, "Sugestão por Vendas", true); 
+    } catch(e) { 
+        console.error(e); 
+        showToast("Erro na análise.", true); 
+    } finally { 
+        toggleLoading(btn, false, 'Sugerir'); 
+    } 
+}
+
+function renderShoppingListTable(container, list, title, isHistory = false) { 
+    if(list.length === 0) { 
+        container.innerHTML = `<div class="flex flex-col items-center justify-center h-full text-green-500"><i class="fas fa-check-circle text-4xl mb-2"></i><p>${title}: Nada a comprar.</p></div>`; 
+        return; 
+    } 
+    const headerExtra = isHistory ? '<th class="p-3 text-right whitespace-nowrap">Consumo</th>' : ''; 
+    container.innerHTML = `
+        <h4 class="text-white font-bold mb-2 ml-1">${title}</h4>
+        <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-x-auto">
+            <table class="w-full text-left text-gray-300 min-w-[600px]">
+                <thead class="bg-gray-900 text-xs uppercase">
+                    <tr>
+                        <th class="p-3 w-10"><input type="checkbox" id="selectAllBuy" class="h-4 w-4 bg-gray-700 border-gray-500 rounded" checked></th>
+                        <th class="p-3">Item</th>
+                        ${headerExtra}
+                        <th class="p-3 text-right whitespace-nowrap">Comprar</th>
+                        <th class="p-3 text-right whitespace-nowrap">Atual</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-700">
+                    ${list.map(i => { 
+                        const qtyToBuy = isHistory ? i.suggestedQty : ((i.minStock || 5) - i.stock); 
+                        return `
+                        <tr class="hover:bg-gray-700/50">
+                            <td class="p-3"><input type="checkbox" class="buy-check h-4 w-4 bg-gray-700 border-gray-500 rounded" value="${i.id}" checked></td>
+                            <td class="p-3 font-bold text-white">${i.name}</td>
+                            ${isHistory ? `<td class="p-3 text-right text-gray-400 font-mono">${i.consumedLastMonth.toFixed(2)}</td>` : ''}
+                            <td class="p-3 text-right text-yellow-400 font-bold font-mono">${qtyToBuy.toFixed(2)} ${i.unit}</td>
+                            <td class="p-3 text-right text-gray-500 font-mono">${i.stock}</td>
+                        </tr>`; 
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>`; 
+    
+    const btnQuote = document.getElementById('btnQuoteSelected'); 
+    const checkboxes = container.querySelectorAll('.buy-check'); 
+    const updateBtnState = () => { 
+        const count = container.querySelectorAll('.buy-check:checked').length; 
+        if(btnQuote) { 
+            btnQuote.disabled = count === 0; 
+            btnQuote.innerHTML = `<i class="fas fa-file-invoice-dollar mr-2"></i> Cotar (${count})`; 
+        } 
+    }; 
+    document.getElementById('selectAllBuy').onchange = (e) => { checkboxes.forEach(cb => cb.checked = e.target.checked); updateBtnState(); }; 
+    checkboxes.forEach(cb => cb.onchange = updateBtnState); 
+    if(btnQuote) btnQuote.onclick = () => { 
+        const selectedIds = Array.from(container.querySelectorAll('.buy-check:checked')).map(cb => cb.value); 
+        openQuoteModal(selectedIds); 
+    }; 
+    updateBtnState(); 
+}
+
+function openQuoteModal(itemIds) { 
+    const modalHtml = `
+        <div id="quoteModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[80] animate-fade-in p-4">
+            <div class="bg-dark-card border border-gray-600 p-6 rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl m-4">
+                <div class="flex justify-between items-center mb-2 border-b border-gray-700 pb-2">
+                    <h3 class="text-xl font-bold text-white">Solicitar Orçamento</h3>
+                    <button onclick="document.getElementById('quoteModal').remove()" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+                </div>
+                <p class="text-gray-400 text-sm mb-4">Selecione os fornecedores para enviar o pedido de cotação de <b>${itemIds.length} itens</b>.</p>
+                <div class="max-h-60 overflow-y-auto custom-scrollbar bg-gray-900 p-3 rounded border border-gray-700 mb-4 space-y-2">
+                    ${suppliersCache.length > 0 ? suppliersCache.map(s => `<label class="flex items-center space-x-3 p-2 hover:bg-gray-800 rounded cursor-pointer"><input type="checkbox" class="supplier-check h-5 w-5 text-indigo-600 rounded bg-gray-700 border-gray-500" value="${s.id}"><span class="text-white">${s.name}</span></label>`).join('') : '<p class="text-gray-500 italic">Nenhum fornecedor cadastrado.</p>'}
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button onclick="document.getElementById('quoteModal').remove()" class="px-4 py-2 bg-gray-600 text-white rounded-lg">Cancelar</button>
+                    <button id="btnSendQuote" class="px-4 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 disabled:opacity-50">Enviar Solicitação</button>
+                </div>
+            </div>
+        </div>`; 
+    
     getSubModalContainer().innerHTML = modalHtml; 
     
-    document.getElementById('btnSendQuote').onclick = async () => { const selectedSuppliers = Array.from(document.querySelectorAll('.supplier-check:checked')).map(cb => cb.value); if(selectedSuppliers.length === 0) { showToast("Selecione ao menos um fornecedor.", true); return; } const btn = document.getElementById('btnSendQuote'); toggleLoading(btn, true, 'Enviando...'); try { const batch = writeBatch(db); const quoteId = `quote_${Date.now()}`; const items = ingredientsCache.filter(i => itemIds.includes(i.id)); for(const supId of selectedSuppliers) { const supplier = suppliersCache.find(s => s.id === supId); const quoteRef = doc(getColRef('quotations')); const pricedItems = items.map(item => { const variation = (Math.random() * 0.4) - 0.2; const newPrice = item.cost * (1 + variation); return { itemId: item.id, name: item.name, qty: (item.minStock || 5) - item.stock, price: parseFloat(newPrice.toFixed(2)) }; }); batch.set(quoteRef, { supplierId: supId, supplierName: supplier.name, items: pricedItems, status: 'received', createdAt: serverTimestamp(), quoteGroupId: quoteId }); } await batch.commit(); document.getElementById('quoteModal').remove(); showToast("Cotações solicitadas!", false); switchHubTab('lowestCost'); } catch(e) { console.error(e); showToast("Erro ao solicitar.", true); toggleLoading(btn, false, 'Enviar'); } }; 
+    document.getElementById('btnSendQuote').onclick = async () => { 
+        const selectedSuppliers = Array.from(document.querySelectorAll('.supplier-check:checked')).map(cb => cb.value); 
+        if(selectedSuppliers.length === 0) { showToast("Selecione ao menos um fornecedor.", true); return; } 
+        const btn = document.getElementById('btnSendQuote'); 
+        toggleLoading(btn, true, 'Enviando...'); 
+        try { 
+            const batch = writeBatch(db); 
+            const quoteId = `quote_${Date.now()}`; 
+            const items = ingredientsCache.filter(i => itemIds.includes(i.id)); 
+            for(const supId of selectedSuppliers) { 
+                const supplier = suppliersCache.find(s => s.id === supId); 
+                const quoteRef = doc(getColRef('quotations')); 
+                const pricedItems = items.map(item => { 
+                    const variation = (Math.random() * 0.4) - 0.2; 
+                    const newPrice = item.cost * (1 + variation); 
+                    return { itemId: item.id, name: item.name, qty: (item.minStock || 5) - item.stock, price: parseFloat(newPrice.toFixed(2)) }; 
+                }); 
+                batch.set(quoteRef, { supplierId: supId, supplierName: supplier.name, items: pricedItems, status: 'received', createdAt: serverTimestamp(), quoteGroupId: quoteId }); 
+            } 
+            await batch.commit(); 
+            document.getElementById('quoteModal').remove(); 
+            showToast("Cotações solicitadas!", false); 
+            switchHubTab('lowestCost'); 
+        } catch(e) { 
+            console.error(e); 
+            showToast("Erro ao solicitar.", true); 
+            toggleLoading(btn, false, 'Enviar'); 
+        } 
+    }; 
 }
 
 async function fetchSuppliers() { try { const q = query(getColRef('suppliers'), orderBy('name')); const snap = await getDocs(q); suppliersCache = snap.docs.map(d => ({ id: d.id, ...d.data() })); } catch (e) { console.error(e); } }
-async function renderSuppliersScreen(container, toolbar) { toolbar.innerHTML = `<div class="flex space-x-2 w-full justify-end"><button id="btnSeedSuppliers" class="bg-yellow-700 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg shadow text-sm"><i class="fas fa-users mr-2"></i> Gerar Fictícios</button><button onclick="window.openSupplierModal()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow ml-auto"><i class="fas fa-plus mr-2"></i> Novo Fornecedor</button></div>`; document.getElementById('btnSeedSuppliers').onclick = generateFictionalSuppliers; if (suppliersCache.length === 0) { container.innerHTML = '<p class="text-center text-gray-500 mt-10">Sem fornecedores.</p>'; return; } container.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4 pb-20">${suppliersCache.map(d => `<div class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex justify-between items-center"><div><h4 class="font-bold text-white">${d.name}</h4><p class="text-xs text-gray-400">${d.phone || 'Sem telefone'}</p></div><div class="text-right"><button class="text-red-400 hover:text-red-300" onclick="alert('Deletar em breve')"><i class="fas fa-trash"></i></button></div></div>`).join('')}</div>`; injectSupplierModal(); }
-async function generateFictionalSuppliers() { const btn = document.getElementById('btnSeedSuppliers'); toggleLoading(btn, true, 'Gerando...'); const fakes = [{ name: 'Atacadão do Chef', phone: '(11) 99999-1001' }, { name: 'Hortifruti Fresco', phone: '(11) 98888-2002' }, { name: 'Distribuidora de Bebidas 24h', phone: '(11) 97777-3003' }, { name: 'Embalagens & Cia', phone: '(11) 96666-4004' }, { name: 'Laticínios da Fazenda', phone: '(11) 95555-5005' }]; try { for (const s of fakes) { const exists = suppliersCache.some(sc => sc.name === s.name); if(!exists) await addDoc(getColRef('suppliers'), s); } showToast("Fornecedores gerados!", false); await fetchSuppliers(); switchHubTab('suppliers'); } catch(e) { console.error(e); } finally { toggleLoading(btn, false, 'Gerar Fictícios'); } }
 
-// CORREÇÃO: Utiliza getSubModalContainer()
+async function renderSuppliersScreen(container, toolbar) { 
+    toolbar.innerHTML = `
+        <div class="flex space-x-2 w-full justify-end">
+            <button id="btnSeedSuppliers" class="bg-yellow-700 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg shadow text-sm"><i class="fas fa-users mr-2"></i> Gerar Fictícios</button>
+            <button onclick="window.openSupplierModal()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow ml-auto"><i class="fas fa-plus mr-2"></i> Novo Fornecedor</button>
+        </div>`; 
+    
+    document.getElementById('btnSeedSuppliers').onclick = generateFictionalSuppliers; 
+    
+    if (suppliersCache.length === 0) { container.innerHTML = '<p class="text-center text-gray-500 mt-10">Sem fornecedores.</p>'; return; } 
+    
+    container.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pb-20">
+            ${suppliersCache.map(d => `
+                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex justify-between items-center">
+                    <div>
+                        <h4 class="font-bold text-white">${d.name}</h4>
+                        <p class="text-xs text-gray-400">${d.phone || 'Sem telefone'}</p>
+                    </div>
+                    <div class="text-right">
+                        <button class="text-red-400 hover:text-red-300" onclick="alert('Deletar em breve')"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>`).join('')}
+        </div>`; 
+    
+    injectSupplierModal(); 
+}
+
+async function generateFictionalSuppliers() { 
+    const btn = document.getElementById('btnSeedSuppliers'); 
+    toggleLoading(btn, true, 'Gerando...'); 
+    const fakes = [{ name: 'Atacadão do Chef', phone: '(11) 99999-1001' }, { name: 'Hortifruti Fresco', phone: '(11) 98888-2002' }, { name: 'Distribuidora de Bebidas 24h', phone: '(11) 97777-3003' }, { name: 'Embalagens & Cia', phone: '(11) 96666-4004' }, { name: 'Laticínios da Fazenda', phone: '(11) 95555-5005' }]; 
+    try { 
+        for (const s of fakes) { 
+            const exists = suppliersCache.some(sc => sc.name === s.name); 
+            if(!exists) await addDoc(getColRef('suppliers'), s); 
+        } 
+        showToast("Fornecedores gerados!", false); 
+        await fetchSuppliers(); 
+        switchHubTab('suppliers'); 
+    } catch(e) { console.error(e); } finally { toggleLoading(btn, false, 'Gerar Fictícios'); } 
+}
+
 function injectSupplierModal() { 
     if(document.getElementById('supplierFormModal')) return; 
     
-    const modalHtml = `<div id="supplierFormModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[80] hidden animate-fade-in p-4"><div class="bg-dark-card border border-gray-600 p-6 rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl m-4"><div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2"><h3 class="text-lg font-bold text-white">Novo Fornecedor</h3><button onclick="document.getElementById('supplierFormModal').style.display='none'" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button></div><input id="supName" type="text" class="input-pdv w-full p-2 mb-3" placeholder="Nome da Empresa"><input id="supPhone" type="text" class="input-pdv w-full p-2 mb-3" placeholder="Telefone / WhatsApp"><div class="flex justify-end space-x-2 mt-4"><button onclick="document.getElementById('supplierFormModal').style.display='none'" class="px-4 py-2 bg-gray-600 text-white rounded">Cancelar</button><button onclick="window.saveSupplier()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold">Salvar</button></div></div></div>`; 
+    const modalHtml = `
+        <div id="supplierFormModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[80] hidden animate-fade-in p-4">
+            <div class="bg-dark-card border border-gray-600 p-6 rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl m-4">
+                <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
+                    <h3 class="text-lg font-bold text-white">Novo Fornecedor</h3>
+                    <button onclick="document.getElementById('supplierFormModal').style.display='none'" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+                </div>
+                <input id="supName" type="text" class="input-pdv w-full p-2 mb-3" placeholder="Nome da Empresa">
+                <input id="supPhone" type="text" class="input-pdv w-full p-2 mb-3" placeholder="Telefone / WhatsApp">
+                <div class="flex justify-end space-x-2 mt-4">
+                    <button onclick="document.getElementById('supplierFormModal').style.display='none'" class="px-4 py-2 bg-gray-600 text-white rounded">Cancelar</button>
+                    <button onclick="window.saveSupplier()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold">Salvar</button>
+                </div>
+            </div>
+        </div>`; 
     
-    // Inserção corrigida
     getSubModalContainer().innerHTML = modalHtml; 
     
     window.openSupplierModal = () => document.getElementById('supplierFormModal').style.display = 'flex'; 
-    window.saveSupplier = async () => { const name = document.getElementById('supName').value; const phone = document.getElementById('supPhone').value; if(!name) return; await addDoc(getColRef('suppliers'), { name, phone }); document.getElementById('supplierFormModal').style.display = 'none'; showToast("Fornecedor salvo!"); await fetchSuppliers(); switchHubTab('suppliers'); }; 
+    window.saveSupplier = async () => { 
+        const name = document.getElementById('supName').value; 
+        const phone = document.getElementById('supPhone').value; 
+        if(!name) return; 
+        await addDoc(getColRef('suppliers'), { name, phone }); 
+        document.getElementById('supplierFormModal').style.display = 'none'; 
+        showToast("Fornecedor salvo!"); 
+        await fetchSuppliers(); 
+        switchHubTab('suppliers'); 
+    }; 
 }
 
-async function renderLowestCostScreen(container, toolbar) { toolbar.innerHTML = `<div class="text-xs text-gray-400 italic w-full text-right">* Baseado nas últimas cotações recebidas.</div>`; container.innerHTML = '<div class="flex justify-center py-10"><i class="fas fa-spinner fa-spin text-3xl text-green-500"></i></div>'; try { const q = query(getColRef('quotations'), where('status', '==', 'received'), orderBy('createdAt', 'desc')); const snap = await getDocs(q); if(snap.empty) { container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-500"><i class="fas fa-search-dollar text-4xl mb-2"></i><p>Nenhuma cotação recente encontrada. Vá em "Lista de Compras" e solicite um orçamento.</p></div>'; return; } const comparisonMap = {}; snap.forEach(doc => { const quote = doc.data(); quote.items.forEach(item => { if (!comparisonMap[item.itemId]) { comparisonMap[item.itemId] = { name: item.name, prices: [] }; } comparisonMap[item.itemId].prices.push({ supplier: quote.supplierName, price: item.price, date: quote.createdAt }); }); }); let html = `<div class="grid grid-cols-1 gap-4 pb-20">`; Object.values(comparisonMap).forEach(itemData => { const sortedPrices = itemData.prices.sort((a, b) => a.price - b.price); const bestPrice = sortedPrices[0]; html += `<div class="bg-gray-800 border border-gray-700 rounded-xl p-4 shadow-lg"><div class="flex justify-between items-center mb-3 border-b border-gray-600 pb-2"><h3 class="text-lg font-bold text-white">${itemData.name}</h3><span class="bg-green-900 text-green-300 text-xs px-2 py-1 rounded border border-green-700">Melhor: ${bestPrice.supplier}</span></div><div class="space-y-2">${sortedPrices.map((p, index) => { const isBest = index === 0; return `<div class="flex justify-between items-center p-2 rounded ${isBest ? 'bg-green-900/20 border border-green-500/50' : 'bg-dark-input'}"><span class="text-sm text-gray-300">${p.supplier}</span><span class="font-mono font-bold ${isBest ? 'text-green-400 text-base' : 'text-gray-400 text-sm'}">${formatCurrency(p.price)}${isBest ? '<i class="fas fa-trophy ml-2 text-yellow-400"></i>' : ''}</span></div>`; }).join('')}</div></div>`; }); html += `</div>`; container.innerHTML = html; } catch(e) { console.error("Erro comparação:", e); container.innerHTML = `<p class="text-red-400 text-center">Erro ao carregar comparações.</p>`; } }
+async function renderLowestCostScreen(container, toolbar) { 
+    toolbar.innerHTML = `<div class="text-xs text-gray-400 italic w-full text-right">* Baseado nas últimas cotações recebidas.</div>`; 
+    container.innerHTML = '<div class="flex justify-center py-10"><i class="fas fa-spinner fa-spin text-3xl text-green-500"></i></div>'; 
+    try { 
+        const q = query(getColRef('quotations'), where('status', '==', 'received'), orderBy('createdAt', 'desc')); 
+        const snap = await getDocs(q); 
+        if(snap.empty) { 
+            container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-500"><i class="fas fa-search-dollar text-4xl mb-2"></i><p>Nenhuma cotação recente encontrada. Vá em "Lista de Compras" e solicite um orçamento.</p></div>'; 
+            return; 
+        } 
+        const comparisonMap = {}; 
+        snap.forEach(doc => { 
+            const quote = doc.data(); 
+            quote.items.forEach(item => { 
+                if (!comparisonMap[item.itemId]) { comparisonMap[item.itemId] = { name: item.name, prices: [] }; } 
+                comparisonMap[item.itemId].prices.push({ supplier: quote.supplierName, price: item.price, date: quote.createdAt }); 
+            }); 
+        }); 
+        let html = `<div class="grid grid-cols-1 gap-4 pb-20">`; 
+        Object.values(comparisonMap).forEach(itemData => { 
+            const sortedPrices = itemData.prices.sort((a, b) => a.price - b.price); 
+            const bestPrice = sortedPrices[0]; 
+            html += `<div class="bg-gray-800 border border-gray-700 rounded-xl p-4 shadow-lg"><div class="flex justify-between items-center mb-3 border-b border-gray-600 pb-2"><h3 class="text-lg font-bold text-white">${itemData.name}</h3><span class="bg-green-900 text-green-300 text-xs px-2 py-1 rounded border border-green-700">Melhor: ${bestPrice.supplier}</span></div><div class="space-y-2">${sortedPrices.map((p, index) => { const isBest = index === 0; return `<div class="flex justify-between items-center p-2 rounded ${isBest ? 'bg-green-900/20 border border-green-500/50' : 'bg-dark-input'}"><span class="text-sm text-gray-300">${p.supplier}</span><span class="font-mono font-bold ${isBest ? 'text-green-400 text-base' : 'text-gray-400 text-sm'}">${formatCurrency(p.price)}${isBest ? '<i class="fas fa-trophy ml-2 text-yellow-400"></i>' : ''}</span></div>`; }).join('')}</div></div>`; 
+        }); 
+        html += `</div>`; 
+        container.innerHTML = html; 
+    } catch(e) { 
+        console.error("Erro comparação:", e); 
+        container.innerHTML = `<p class="text-red-400 text-center">Erro ao carregar comparações.</p>`; 
+    } 
 }

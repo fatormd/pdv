@@ -1,7 +1,16 @@
-// --- SERVICES/FIREBASESERVICE.JS (COM STORAGE & MODO OFFLINE ATIVOS) ---
+// --- SERVICES/FIREBASESERVICE.JS (CORREÇÃO: FALLBACK DE SEGURANÇA) ---
 
-// 1. Adicionamos 'enableIndexedDbPersistence' na importação
-import { collection, doc, updateDoc, arrayUnion, serverTimestamp, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { 
+    collection, 
+    doc, 
+    updateDoc, 
+    arrayUnion, 
+    serverTimestamp, 
+    initializeFirestore, 
+    persistentLocalCache,
+    getFirestore // <--- Importante para o plano B
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
 // Variáveis globais exportadas
@@ -15,32 +24,33 @@ export let storage = null;
 export { arrayUnion, serverTimestamp, ref, uploadBytes, getDownloadURL };
 
 // Função de inicialização
-export const initializeFirebase = (database, authentication, appIdentifier, appFunctions) => {
-    db = database;
+export const initializeFirebase = (app, authentication, appIdentifier, appFunctions) => {
     auth = authentication;
     appId = appIdentifier;
     functions = appFunctions;
 
-    // 2. ATIVAÇÃO DA PERSISTÊNCIA OFFLINE (NOVO)
-    // Isso permite que o sistema funcione mesmo se a internet cair
-    enableIndexedDbPersistence(db)
-        .then(() => {
-            console.log("[FirebaseService] Modo Offline ativado com sucesso.");
-        })
-        .catch((err) => {
-            if (err.code == 'failed-precondition') {
-                // Provavelmente múltiplas abas abertas ao mesmo tempo
-                console.warn('[FirebaseService] Persistência offline falhou: Múltiplas abas abertas.');
-            } else if (err.code == 'unimplemented') {
-                // Navegador não suporta (ex: modo anônimo de alguns browsers)
-                console.warn('[FirebaseService] Persistência offline não suportada neste navegador.');
-            }
+    // 1. INICIALIZA O FIRESTORE
+    try {
+        // Tenta iniciar com Cache Persistente (Modo Offline)
+        db = initializeFirestore(app, {
+            localCache: persistentLocalCache()
         });
+        console.log("[FirebaseService] Firestore inicializado com sucesso (Modo Offline Ativo).");
+    } catch (e) {
+        // SE FALHAR (ex: já foi iniciado antes), usa a instância padrão para não travar o app
+        if (e.code === 'failed-precondition' || e.message.includes('already been started')) {
+            console.warn("[FirebaseService] Firestore já estava ativo. Usando instância existente (sem persistência nova).");
+            db = getFirestore(app);
+        } else {
+            console.error("[FirebaseService] Erro crítico desconhecido:", e);
+            db = getFirestore(app); // Tenta recuperar de qualquer jeito
+        }
+    }
 
-    // 3. INICIALIZAÇÃO AUTOMÁTICA DO STORAGE
-    if (db && db.app) {
+    // 2. INICIALIZAÇÃO DO STORAGE
+    if (app) {
         try {
-            storage = getStorage(db.app);
+            storage = getStorage(app);
             console.log("[FirebaseService] Storage inicializado.");
         } catch (e) {
             console.error("[FirebaseService] Erro ao iniciar Storage:", e);

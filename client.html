@@ -59,7 +59,6 @@
         .crm-tabs-container::-webkit-scrollbar { display: none; }
         .crm-tabs-container { -ms-overflow-style: none; scrollbar-width: none; }
 
-        /* Abas do Modal de Associação */
         .assoc-tab-btn { flex: 1; padding: 10px; text-align: center; color: #6b7280; border-bottom: 2px solid #374151; cursor: pointer; font-weight: 600; transition: all 0.3s; }
         .assoc-tab-btn.active { color: #ff7518; border-bottom-color: #ff7518; }
         .assoc-tab-content { display: none; animation: fadeIn 0.3s ease-in-out; }
@@ -80,6 +79,18 @@
         <div id="appContainer" class="flex transition-transform duration-300 ease-out">
 
             <div id="clientOrderScreen" class="w-screen flex-shrink-0 flex flex-col">
+                
+                <div class="w-full bg-gray-800/80 p-2 mb-4 rounded-lg flex items-center justify-between border border-gray-700 shadow-sm flex-shrink-0">
+                    <span class="text-xs text-gray-400 font-bold uppercase tracking-wider flex items-center">
+                        <i class="fas fa-magic mr-2 text-pumpkin"></i>Modo Demo
+                    </span>
+                    <select id="businessTypeSelector" class="bg-dark-input text-white text-xs py-1 px-3 rounded border border-gray-600 focus:outline-none focus:border-pumpkin cursor-pointer hover:bg-gray-700 transition">
+                        <option value="food">🍔 Alimentação (Real)</option>
+                        <option value="retail">🛍️ Varejo / Loja</option>
+                        <option value="services">🛠️ Serviços (Geral)</option>
+                    </select>
+                </div>
+
                 <div class="flex items-center justify-between mb-4 md:mb-6 flex-shrink-0">
                     <div class="flex items-center text-green-400">
                         <span class="text-xl md:text-2xl font-semibold mr-3" id="client-table-number">Cardápio</span>
@@ -91,9 +102,12 @@
 
                     </div>
                     
-                    <button id="goToPaymentBtnClient" class="rounded-full bg-gray-700 p-2 md:p-3 text-white shadow-lg hover:bg-gray-600 transition w-10 h-10 md:w-12 md:h-12 flex items-center justify-center" title="Entrar">
-                        <i class="fas fa-user"></i> 
-                    </button>
+                    <div class="flex items-center gap-3">
+                        <span id="headerClientNameDisplay" class="text-sm font-bold text-pumpkin hidden md:block"></span>
+                        <button id="goToPaymentBtnClient" class="rounded-full bg-gray-700 p-2 md:p-3 text-white shadow-lg hover:bg-gray-600 transition w-10 h-10 md:w-12 md:h-12 flex items-center justify-center" title="Entrar">
+                            <i class="fas fa-user"></i> 
+                        </button>
+                    </div>
                 </div>
 
                 <div id="orderingInputsClient" class="mb-6 md:mb-8 flex-shrink-0">
@@ -112,9 +126,9 @@
                 </div>
 
                 <div id="menuContainerClient" class="flex flex-col"> 
-                    <div class="flex justify-between items-center mb-3 md:mb-4 px-1 flex-shrink-0">
-                        <h2 class="text-lg md:text-xl font-bold text-dark-text">Cardápio</h2>
-                        <div class="relative">
+                    <div class="flex justify-between items-center mb-4 px-1 gap-2 flex-shrink-0">
+                        <h2 id="restaurantTitle" class="text-xl md:text-2xl font-bold text-dark-text truncate mr-2">Carregando...</h2>
+                        <div class="relative flex-shrink-0">
                             <input type="text" id="searchProductInputClient" placeholder="Buscar..." class="pr-8 input-pdv text-sm w-32 md:w-48 lg:w-64">
                             <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-dark-placeholder"></i>
                         </div>
@@ -316,14 +330,7 @@
         window.handleTableTransferConfirmed = () => {};
 
         window.__app_id = "1:1097659747429:web:8ec0a7c3978c311dbe0a8c";
-        window.__firebase_config = JSON.stringify({
-            apiKey: "AIzaSyCQINQFRyAES3hkG8bVpQlRXGv9AzQuYYY",
-            authDomain: "fator-pdv.firebaseapp.com",
-            projectId: "fator-pdv",
-            storageBucket: "fator-pdv.appspot.com",
-            messagingSenderId: "1097659747429",
-            appId: "1:1097659747429:web:8ec0a7c3978c311dbe0a8c"
-        });
+        // CONFIGURAÇÃO CORRIGIDA NO APP.JS, AQUI MANTEMOS SÓ O ID PARA REFERÊNCIA SE NECESSÁRIO
     </script>
 
     <script type="module" src="app.js"></script>

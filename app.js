@@ -1,4 +1,4 @@
-// --- APP.JS (VERSÃO ATUALIZADA - ESTRUTURA HUB/MODULES) ---
+// --- APP.JS (CORRIGIDO: QUEBRA DE DEPENDÊNCIA CIRCULAR) ---
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -6,7 +6,7 @@ import { getFirestore, serverTimestamp, doc, setDoc, updateDoc, getDoc, onSnapsh
 import { getFunctions } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
 
 // Serviços e Utils
-import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef } from '/services/firebaseService.js';
+import { initializeFirebase, saveSelectedItemsToFirebase, getTableDocRef, db as serviceDb } from '/services/firebaseService.js';
 import { fetchWooCommerceProducts, fetchWooCommerceCategories } from '/services/wooCommerceService.js';
 import { showToast } from '/utils.js'; 
 
@@ -17,10 +17,7 @@ export { showToast };
 import { initPanelController, loadOpenTables, renderTableFilters, openTableMergeModal } from '/controllers/panelController.js';
 import { initOrderController, renderOrderScreen, renderMenu } from '/controllers/orderController.js';
 import { initPaymentController, renderPaymentSummary, handleMassActionRequest, openTableTransferModal, handleMassDeleteConfirmed, executeDeletePayment, handleConfirmTableTransfer } from '/controllers/paymentController.js';
-
-// --- ALTERAÇÃO AQUI: Novo caminho do ManagerController (Hub) ---
 import { initManagerController } from '/controllers/manager/hub/managerController.js'; 
-
 import { initUserManagementController, openUserManagementModal } from '/controllers/userManagementController.js';
 import { initCashierController } from '/controllers/cashierController.js';
 import { initKdsController } from '/controllers/kdsController.js';
@@ -59,7 +56,7 @@ export let userId = null;
 export let unsubscribeTable = null;
 
 // Elementos UI
-export let db = null;
+export let db = null; 
 export let auth = null;
 export let functions = null;
 export let appId = null;
@@ -67,8 +64,9 @@ export let appId = null;
 let statusScreen, mainContent, appContainer, mainHeader;
 let clientLoginModal;
 
-// Garante compatibilidade global apenas para o que não depende de controllers
+// Disponibiliza globais para quebrar dependência circular
 window.showToast = showToast;
+window.currentTableId = null; 
 
 // --- FUNÇÕES DE ROTEAMENTO ---
 
@@ -170,6 +168,7 @@ export const setTableListener = (tableId, isClientMode = false) => {
             if (isClientMode && currentOrderSnapshot.status === 'merged') {
                  if (unsubscribeTable) unsubscribeTable(); unsubscribeTable = null;
                  currentTableId = null;
+                 window.currentTableId = null;
                  alert(`Esta mesa foi agrupada na Mesa ${currentOrderSnapshot.masterTable}.`);
                  return;
             }
@@ -193,7 +192,9 @@ export const setTableListener = (tableId, isClientMode = false) => {
              if (currentTableId === tableId) {
                  showToast(`Mesa ${tableId} fechada.`, true);
                  if (unsubscribeTable) unsubscribeTable(); 
-                 currentTableId = null; currentOrderSnapshot = null; selectedItems.length = 0;
+                 currentTableId = null; 
+                 window.currentTableId = null;
+                 currentOrderSnapshot = null; selectedItems.length = 0;
                  if (!isClientMode) goToScreen('panelScreen');
              }
         }
@@ -201,6 +202,7 @@ export const setTableListener = (tableId, isClientMode = false) => {
         console.error(`[APP] Erro listener mesa ${tableId}:`, error);
     });
 };
+window.setTableListener = setTableListener; // EXPOSTO GLOBALMENTE
 
 export const setCurrentTable = (tableId, isClientMode = false, shouldListen = true) => {
     if (currentTableId === tableId && unsubscribeTable && shouldListen) {
@@ -215,6 +217,7 @@ export const setCurrentTable = (tableId, isClientMode = false, shouldListen = tr
     }
 
     currentTableId = tableId;
+    window.currentTableId = tableId; // SINCRONIZA GLOBAL
     selectedItems.length = 0;
     currentOrderSnapshot = null;
 
@@ -331,8 +334,6 @@ window.openManagerAuthModal = (action, payload = null) => {
                 case 'openTableMerge': openTableMergeModal(); break; 
                 case 'deletePayment': executeDeletePayment(payload); break;
                 case 'goToManagerPanel': await goToScreen('managerScreen'); break;
-                
-                // --- ALTERAÇÃO AQUI: Uso explícito de window.handleGerencialAction ---
                 case 'exportCsv': window.handleGerencialAction(action); break;
                 default: window.handleGerencialAction(action, payload); break;
             }
@@ -362,8 +363,6 @@ const applyUserPermissions = (role) => {
     if(elements.kdsBtn) elements.kdsBtn.classList.add('hidden');
     if(elements.cashierBtn) elements.cashierBtn.classList.add('hidden');
     
-    console.log(`[APP] Permissões: ${role}`);
-
     switch (role) {
         case 'gerente':
             if(elements.managerBtn) elements.managerBtn.classList.remove('hidden');
@@ -383,14 +382,12 @@ const applyUserPermissions = (role) => {
 // --- LÓGICA DE LOGIN ---
 const handleStaffLogin = async (event) => {
     if(event) event.preventDefault();
-
     const loginEmailInput = document.getElementById('loginEmail');
     const loginPasswordInput = document.getElementById('loginPassword');
     const loginBtn = document.getElementById('loginBtn');
     const loginErrorMsg = document.getElementById('loginErrorMsg');
 
     if (!loginEmailInput || !loginPasswordInput) return;
-
     const email = loginEmailInput.value;
     const password = loginPasswordInput.value;
 
@@ -416,7 +413,7 @@ const handleStaffLogin = async (event) => {
 };
 
 const handleLogout = () => {
-    userId = null; currentTableId = null; selectedItems.length = 0; userRole = 'anonymous'; currentOrderSnapshot = null;
+    userId = null; currentTableId = null; window.currentTableId = null; selectedItems.length = 0; userRole = 'anonymous'; currentOrderSnapshot = null;
     if (unsubscribeTable) { unsubscribeTable(); unsubscribeTable = null; }
     if (auth) signOut(auth);
     showLoginScreen();
@@ -429,10 +426,11 @@ window.handleLogout = handleLogout;
 const initStaffApp = async (staffName) => { 
     console.log("[StaffApp] Iniciando..."); 
     try {
-        // HELPERS GLOBAIS PARA HTML (Definidos aqui para evitar erro de inicialização)
         window.handleMassActionRequest = handleMassActionRequest;
         window.openTableTransferModal = openTableTransferModal;
         window.openTableMergeModal = openTableMergeModal; 
+        window.showConfirm = showConfirm; 
+        window.showAlert = showAlert;
 
         initPanelController();
         initOrderController();
@@ -443,7 +441,6 @@ const initStaffApp = async (staffName) => {
         initKdsController();
 
         applyUserPermissions(userRole);
-
         renderTableFilters();
         
         fetchWooCommerceProducts().catch(e => console.error("[INIT] Falha produtos:", e));
@@ -467,6 +464,9 @@ const initStaffApp = async (staffName) => {
 const initClientApp = async () => {
     console.log("[ClientApp] Iniciando..."); 
     try {
+        window.showConfirm = showConfirm; 
+        window.showAlert = showAlert;
+
         if (auth && !auth.currentUser) await signInAnonymously(auth); 
         initClientOrderController();
         initClientPaymentController();
@@ -474,7 +474,7 @@ const initClientApp = async () => {
         if (clientLoginModal) clientLoginModal.style.display = 'none';
         
         import('/controllers/clientOrderController.js').then(module => {
-             window.decreaseLocalItemQuantity = module.decreaseLocalItemQuantity;
+             window.decreaseLocalItemQuantity = module.decreaseLocalItemQuantity; // Para HTML
              window.increaseLocalItemQuantity = module.increaseLocalItemQuantity;
         });
     } catch (error) {
@@ -488,17 +488,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         const isClientMode = window.location.pathname.includes('/client');
         console.log(`[APP] Modo: ${isClientMode ? 'CLIENTE' : 'STAFF'}`);
 
-        const firebaseConfigRaw = typeof window.__firebase_config !== 'undefined' ? window.__firebase_config : null;
-        const firebaseConfig = firebaseConfigRaw ? JSON.parse(firebaseConfigRaw) : FIREBASE_CONFIG;
-        const appIdentifier = typeof window.__app_id !== 'undefined' ? window.__app_id : "pdv_fator_instance_001";
+        const appIdentifier = "pdv_fator_instance_001";
         appId = appIdentifier;
         
-        const app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
+        const app = initializeApp(FIREBASE_CONFIG);
         auth = getAuth(app);
         functions = getFunctions(app, 'us-central1');
-        
-        initializeFirebase(db, auth, appId, functions);
+        initializeFirebase(app, auth, appId, functions);
+        db = serviceDb;
 
         statusScreen = document.getElementById('statusScreen');
         mainContent = document.getElementById('mainContent');
@@ -578,29 +575,20 @@ export const playNotificationSound = () => {
 window.showConfirm = (message, title = "Confirmação") => {
     return new Promise((resolve) => {
         const modal = document.getElementById('customConfirmModal');
-        if(!modal) {
-            // Fallback se o modal não existir no HTML ainda
-            resolve(confirm(message));
-            return;
-        }
+        if(!modal) { resolve(confirm(message)); return; }
         document.getElementById('confirmTitle').textContent = title;
         document.getElementById('confirmMessage').textContent = message;
-        
         const btnYes = document.getElementById('btnConfirmYes');
         const btnNo = document.getElementById('btnConfirmNo');
-        
         const handleYes = () => { close(); resolve(true); };
         const handleNo = () => { close(); resolve(false); };
-        
         const close = () => {
             modal.classList.add('hidden');
             btnYes.removeEventListener('click', handleYes);
             btnNo.removeEventListener('click', handleNo);
         };
-
         btnYes.addEventListener('click', handleYes);
         btnNo.addEventListener('click', handleNo);
-        
         modal.classList.remove('hidden');
     });
 };
@@ -608,21 +596,15 @@ window.showConfirm = (message, title = "Confirmação") => {
 window.showAlert = (message) => {
     return new Promise((resolve) => {
         const modal = document.getElementById('customAlertModal');
-        if(!modal) {
-            alert(message);
-            resolve();
-            return;
-        }
-        document.getElementById('alertMessage').textContent = message;
+        if(!modal) { alert(message); resolve(); return; }
+        if(document.getElementById('alertMessage')) document.getElementById('alertMessage').textContent = message;
         const btnOk = document.getElementById('btnAlertOk');
-        
         const handleOk = () => {
             modal.classList.add('hidden');
-            btnOk.removeEventListener('click', handleOk);
+            if(btnOk) btnOk.removeEventListener('click', handleOk);
             resolve();
         };
-        
-        btnOk.addEventListener('click', handleOk);
+        if(btnOk) btnOk.addEventListener('click', handleOk);
         modal.classList.remove('hidden');
     });
 };
