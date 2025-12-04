@@ -1,4 +1,4 @@
-// --- CONTROLLERS/MANAGER/MODULES/PRODUCTMANAGER.JS (VERSÃO FINAL: FORMATADA & CORRIGIDA) ---
+// --- CONTROLLERS/MANAGER/MODULES/PRODUCTMANAGER.JS (VERSÃO ATUALIZADA: FILTROS E CORREÇÕES) ---
 
 import { 
     db, appId, storage, ref, uploadBytes, getDownloadURL, 
@@ -21,8 +21,12 @@ import {
 const getColRef = (name) => collection(db, 'artifacts', appId, 'public', 'data', name);
 let managerModal = null;
 let currentTab = 'products';
+let currentGroupFilter = 'all'; // Novo estado para o filtro
+
+// Cache
 let ingredientsCache = [];
 let suppliersCache = [];
+let groupsCache = []; // Cache para os grupos de insumos (Açougue, Mercearia...)
 let currentProductComposition = []; 
 let productExtensionsCache = {}; 
 
@@ -44,14 +48,14 @@ function getSubModalContainer() {
 }
 
 // ==================================================================
-//           1. API PÚBLICA & LÓGICA DE UPLOAD
+//            1. API PÚBLICA & LÓGICA DE UPLOAD
 // ==================================================================
 
 export const init = () => {
     console.log("[ProductModule] Inicializado.");
     managerModal = document.getElementById('managerModal');
     
-    // --- LÓGICA DE UPLOAD BLINDADA (COM VALIDAÇÃO) ---
+    // --- LÓGICA DE UPLOAD BLINDADA ---
     window.handleImageUpload = async (input) => {
         if (input.files && input.files[0]) {
             const file = input.files[0];
@@ -60,7 +64,6 @@ export const init = () => {
             const urlInput = document.getElementById('prodImgUrl');
             const btnSave = document.getElementById('btnSaveProduct');
 
-            // 1. Validar Tipo de Arquivo
             const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
             if (!validTypes.includes(file.type)) {
                 showToast("Formato inválido! Use apenas JPG, PNG ou WEBP.", true);
@@ -68,7 +71,6 @@ export const init = () => {
                 return;
             }
 
-            // 2. Validar Tamanho (Máximo 2MB)
             const maxSize = 2 * 1024 * 1024; // 2MB
             if (file.size > maxSize) {
                 showToast("Imagem muito grande! O limite é 2MB.", true);
@@ -76,7 +78,6 @@ export const init = () => {
                 return;
             }
 
-            // Preview imediato
             const reader = new FileReader();
             reader.onload = (e) => {
                 if(preview) { preview.src = e.target.result; preview.classList.remove('hidden'); }
@@ -84,10 +85,7 @@ export const init = () => {
             };
             reader.readAsDataURL(file);
 
-            if (!storage) {
-                showToast("Erro: Storage não inicializado.", true);
-                return;
-            }
+            if (!storage) { showToast("Erro: Storage não inicializado.", true); return; }
 
             if(btnSave) {
                 btnSave.disabled = true;
@@ -97,7 +95,6 @@ export const init = () => {
             showToast("Enviando para a nuvem...", false);
             
             try {
-                // Sanitização do nome
                 const ext = file.name.split('.').pop().toLowerCase();
                 const cleanName = file.name.split('.')[0]
                     .normalize('NFD').replace(/[\u0300-\u036f]/g, "")
@@ -113,7 +110,6 @@ export const init = () => {
                 if(urlInput) {
                     urlInput.value = publicUrl;
                     urlInput.dispatchEvent(new Event('input')); 
-                    console.log("LINK GERADO:", publicUrl);
                 }
                 
                 showToast("Upload concluído! Pode salvar.", false);
@@ -149,38 +145,43 @@ export const sync = async () => {
 export const openSettings = async () => { alert("Configurações de setores em breve."); };
 
 // ==================================================================
-//           2. HUB PRINCIPAL
+//            2. HUB PRINCIPAL & CACHES
 // ==================================================================
 
 async function calculateConsumptionFromHistory(days = 30) {
-    const orders = await fetchSalesHistory(days);
-    if (!orders || orders.length === 0) return {};
+    try {
+        const orders = await fetchSalesHistory(days);
+        if (!orders || orders.length === 0) return {};
 
-    const salesMap = {};
-    orders.forEach(order => {
-        order.line_items.forEach(item => {
-            const pid = item.product_id.toString();
-            salesMap[pid] = (salesMap[pid] || 0) + item.quantity;
-        });
-    });
-
-    const consumptionMap = {};
-    const productsSnap = await getDocs(getColRef('products'));
-    const productCompositions = {};
-    productsSnap.forEach(doc => {
-        productCompositions[doc.id] = doc.data().composition || [];
-    });
-
-    Object.entries(salesMap).forEach(([pid, qtySold]) => {
-        const composition = productCompositions[pid];
-        if (composition) {
-            composition.forEach(ing => {
-                consumptionMap[ing.id] = (consumptionMap[ing.id] || 0) + (ing.qty * qtySold);
+        const salesMap = {};
+        orders.forEach(order => {
+            order.line_items.forEach(item => {
+                const pid = item.product_id.toString();
+                salesMap[pid] = (salesMap[pid] || 0) + item.quantity;
             });
-        }
-    });
+        });
 
-    return consumptionMap;
+        const consumptionMap = {};
+        const productsSnap = await getDocs(getColRef('products'));
+        const productCompositions = {};
+        productsSnap.forEach(doc => {
+            productCompositions[doc.id] = doc.data().composition || [];
+        });
+
+        Object.entries(salesMap).forEach(([pid, qtySold]) => {
+            const composition = productCompositions[pid];
+            if (composition) {
+                composition.forEach(ing => {
+                    consumptionMap[ing.id] = (consumptionMap[ing.id] || 0) + (ing.qty * qtySold);
+                });
+            }
+        });
+
+        return consumptionMap;
+    } catch (e) {
+        console.error("Erro ao calcular consumo:", e);
+        return {};
+    }
 }
 
 async function fetchProductExtensions() {
@@ -193,11 +194,20 @@ async function fetchProductExtensions() {
     } catch(e) { console.error("Erro cache ext:", e); }
 }
 
+async function fetchGroups() {
+    try {
+        const q = query(getColRef('ingredient_types'), orderBy('name'));
+        const snap = await getDocs(q);
+        groupsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (e) { console.error("Erro ao buscar grupos:", e); groupsCache = []; }
+}
+
 async function renderProductHub(activeTab = 'products') {
     if (!managerModal) return;
     
     await fetchIngredients();
     await fetchSuppliers();
+    await fetchGroups(); // Busca os grupos para os filtros
     await fetchProductExtensions(); 
     
     managerModal.innerHTML = `
@@ -237,6 +247,9 @@ async function renderProductHub(activeTab = 'products') {
 
 async function switchHubTab(tab) {
     currentTab = tab;
+    // Reseta filtro ao trocar de aba
+    currentGroupFilter = 'all';
+
     document.querySelectorAll('.hub-tab-btn').forEach(btn => {
         if(btn.id === `tab-${tab}`) { btn.classList.add('bg-indigo-600', 'text-white'); btn.classList.remove('bg-dark-input', 'text-gray-300', 'bg-green-900/30', 'text-green-400'); } 
         else if (btn.id === 'tab-lowestCost') { btn.classList.add('bg-green-900/30', 'text-green-400'); btn.classList.remove('bg-indigo-600', 'text-white'); }
@@ -256,7 +269,7 @@ async function switchHubTab(tab) {
 }
 
 // ==================================================================
-//           3. GESTÃO DE PRODUTOS
+//            3. GESTÃO DE PRODUTOS
 // ==================================================================
 
 async function renderProductListConfig(contentDiv, toolbarDiv) {
@@ -288,7 +301,7 @@ async function renderProductListConfig(contentDiv, toolbarDiv) {
     const renderList = async (page = 1) => {
         contentDiv.innerHTML = '<div class="flex justify-center py-10"><i class="fas fa-spinner fa-spin text-3xl text-gray-500"></i></div>';
         await fetchWooCommerceProducts(page, hubSearch, hubCategory, false);
-        await fetchProductExtensions(); // Atualiza cache local
+        await fetchProductExtensions();
         
         const products = getProducts();
         
@@ -420,7 +433,7 @@ async function renderProductForm(product = null, container) {
                                     </button>
                                     <input type="file" id="prodImgInput" class="hidden" accept="image/*" onchange="window.handleImageUpload(this)">
                                 </div>
-                                <p class="text-[10px] text-gray-500">Cole o link direto ou use o clipe para anexar (apenas preview).</p>
+                                <p class="text-[10px] text-gray-500">Cole o link direto ou use o clipe para anexar.</p>
                             </div>
                         </div>
 
@@ -685,8 +698,6 @@ async function renderProductForm(product = null, container) {
                 if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
                     imagesArray.push({ src: imageUrl });
                     localImageToSave = imageUrl;
-                } else {
-                    console.warn("Formato de imagem desconhecido ou inválido para Woo:", imageUrl);
                 }
             }
 
@@ -741,68 +752,76 @@ async function renderProductForm(product = null, container) {
 }
 
 // ==================================================================
-//           5. CONFIGURAÇÃO INICIAL
+//            5. CONFIGURAÇÃO INICIAL (DEMONSTRATIVA)
 // ==================================================================
 
 async function configureInitialCatalog() {
     const btn = document.getElementById('btnConfigInit');
-    if(!confirm("Deseja configurar/atualizar Água, Café, Rolha e Salmão com fichas técnicas?")) return;
+    if(!confirm("Atenção: Isso irá criar dados demonstrativos (Água, Café, etc) e seus insumos. Continuar?")) return;
     toggleLoading(btn, true, 'Configurando...');
     try {
-        const sectors = [{ name: 'Copa', type: 'production' }, { name: 'Bar', type: 'production' }, { name: 'Cozinha', type: 'production' }];
-        for (const s of sectors) { const q = query(getSectorsCollectionRef(), where('name', '==', s.name)); const snap = await getDocs(q); if(snap.empty) await addDoc(getSectorsCollectionRef(), s); }
-        const ingredientsData = [
-            { name: 'Café em Grão', cost: 85.00, unit: 'kg', stock: 5, minStock: 1, group: 'Bebidas', costCategory: 'CMV' },
-            { name: 'Água Mineral 500ml (Custo)', cost: 1.20, unit: 'un', stock: 100, minStock: 24, group: 'Bebidas', costCategory: 'CMV' },
-            { name: 'Açúcar Sachê', cost: 0.10, unit: 'un', stock: 500, minStock: 50, group: 'Mercearia', costCategory: 'CMV' },
-            { name: 'Filé de Salmão Fresco', cost: 65.00, unit: 'kg', stock: 5, minStock: 2, group: 'Hortifruti', costCategory: 'CMV' },
-            { name: 'Polpa de Maracujá', cost: 18.00, unit: 'kg', stock: 2, minStock: 0.5, group: 'Hortifruti', costCategory: 'CMV' },
-            { name: 'Manteiga sem Sal', cost: 45.00, unit: 'kg', stock: 5, minStock: 1, group: 'Laticínios', costCategory: 'CMV' },
-            { name: 'Açúcar Refinado', cost: 4.50, unit: 'kg', stock: 10, minStock: 2, group: 'Mercearia', costCategory: 'CMV' }
-        ];
-        const createdIngs = {}; 
-        for (const ing of ingredientsData) { const q = query(getColRef('ingredients'), where('name', '==', ing.name)); const snap = await getDocs(q); if(snap.empty) { const ref = await addDoc(getColRef('ingredients'), ing); createdIngs[ing.name] = ref.id; } else { createdIngs[ing.name] = snap.docs[0].id; } }
-        const productsToConfig = [
-            { searchName: 'Café', basic: { name: 'Café Expresso', regular_price: "8.00", status: 'publish', meta_data: [{ key: 'sector', value: 'Copa' }] }, extended: { group: 'Cafeteria', subgroup: 'Bebidas Quentes', sector: 'Copa', prepMethod: 'Moer o grão na hora. Extração de 30ml em 25 segundos.', cookTime: 0, energyType: 'electric', composition: [{ id: createdIngs['Café em Grão'], name: 'Café em Grão', qty: 0.007, cost: 85.00, unit: 'kg' }, { id: createdIngs['Açúcar Sachê'], name: 'Açúcar', qty: 1, cost: 0.10, unit: 'un' }] } },
-            { searchName: 'Água', basic: { name: 'Água sem Gás 500ml', regular_price: "5.00", status: 'publish', meta_data: [{ key: 'sector', value: 'Copa' }] }, extended: { group: 'Bebidas', subgroup: 'Águas', sector: 'Copa', prepMethod: 'Servir gelada (ou natural) com copo.', cookTime: 0, energyType: 'none', composition: [{ id: createdIngs['Água Mineral 500ml (Custo)'], name: 'Água Mineral', qty: 1, cost: 1.20, unit: 'un' }] } },
-            { searchName: 'Rolha', basic: { name: 'Taxa de Rolha', regular_price: "40.00", status: 'publish', meta_data: [{ key: 'sector', value: 'Bar' }] }, extended: { group: 'Serviços', subgroup: 'Taxas', sector: 'Bar', prepMethod: 'Serviço de abertura e taças.', cookTime: 0, energyType: 'none', composition: [] } },
-            { searchName: 'Salmão', basic: { name: 'Salmão Grelhado ao Molho de Maracujá', regular_price: "58.00", status: 'publish', meta_data: [{ key: 'sector', value: 'Cozinha' }] }, extended: { group: 'Pratos Principais', subgroup: 'Peixes', sector: 'Cozinha', prepMethod: '1. Temperar o filé com sal e pimenta.\n2. Grelhar em chapa ou frigideira quente com um fio de azeite por 4-5 min de cada lado.\n3. Em uma sauteuse, colocar a polpa de maracujá e o açúcar. Deixar reduzir em fogo baixo.\n4. Finalizar o molho com a manteiga gelada para dar brilho (monter au beurre).\n5. Servir o peixe com o molho por cima.', cookTime: 15, energyType: 'gas', composition: [{ id: createdIngs['Filé de Salmão Fresco'], name: 'Filé de Salmão', qty: 0.220, cost: 65.00, unit: 'kg' }, { id: createdIngs['Polpa de Maracujá'], name: 'Polpa Maracujá', qty: 0.060, cost: 18.00, unit: 'kg' }, { id: createdIngs['Açúcar Refinado'], name: 'Açúcar', qty: 0.020, cost: 4.50, unit: 'kg' }, { id: createdIngs['Manteiga sem Sal'], name: 'Manteiga', qty: 0.010, cost: 45.00, unit: 'kg' }] } }
-        ];
-        const currentProducts = getProducts(); 
-        for (const p of productsToConfig) { const existingProd = currentProducts.find(cp => cp.name.toLowerCase().includes(p.searchName.toLowerCase())); let wooId; if (existingProd) { wooId = existingProd.id; await updateWooProduct(wooId, p.basic); } else { const newProd = await createWooProduct(p.basic); wooId = newProd.id; } if (wooId) { await setDoc(doc(getColRef('products'), wooId.toString()), { ...p.extended, updatedAt: serverTimestamp() }, { merge: true }); } }
-        showToast("Catálogo configurado com sucesso!", false); await fetchIngredients(); switchHubTab('products'); 
-    } catch (e) { console.error(e); showToast("Erro ao configurar: " + e.message, true); } finally { toggleLoading(btn, false, 'Config. Iniciais'); }
+        await window.runInitialSetup(); // Usa o script que já está carregado no app.js
+        showToast("Dados demonstrativos carregados!", false);
+        await refreshCache();
+        switchHubTab('products');
+    } catch (e) { console.error(e); showToast("Erro: " + e.message, true); } 
+    finally { toggleLoading(btn, false, 'Config. Iniciais'); }
 }
 
 // ==================================================================
-//           6. GESTÃO DE INSUMOS
+//            6. GESTÃO DE INSUMOS
 // ==================================================================
 
 async function fetchIngredients() { try { const q = query(getColRef('ingredients'), orderBy('name')); const snap = await getDocs(q); ingredientsCache = snap.docs.map(d => ({ id: d.id, ...d.data() })); return ingredientsCache; } catch (e) { console.error(e); return []; } }
 
 async function renderIngredientsScreen(container, toolbar) { 
+    
+    // Filtros
+    let groupOptions = '<option value="all">Todos os Grupos</option>';
+    if (groupsCache.length > 0) {
+        groupOptions += groupsCache.map(g => {
+            const gId = g.name.toLowerCase().replace(/ /g, '_').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            return `<option value="${gId}" ${currentGroupFilter === gId ? 'selected' : ''}>${g.name}</option>`;
+        }).join('');
+    }
+
     toolbar.innerHTML = `
-        <div class="flex space-x-2 w-full justify-end">
-            <button id="btnStockWriteOff" class="bg-red-900/50 hover:bg-red-800 text-red-200 border border-red-700 font-bold py-2 px-4 rounded-lg shadow flex items-center text-sm" title="Abater do estoque baseado nas vendas"><i class="fas fa-level-down-alt mr-2"></i> Baixar Estoque</button>
-            <button id="btnNewIngredient" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow flex items-center ml-2"><i class="fas fa-plus mr-2"></i> Novo</button>
+        <div class="flex items-center space-x-2 w-full justify-between">
+            <select id="ingredientGroupFilter" class="bg-gray-700 text-white text-sm py-2 px-3 rounded-lg border border-gray-600 focus:outline-none focus:border-indigo-500 w-48" onchange="window.filterIngredients(this.value)">
+                ${groupOptions}
+            </select>
+            <div class="flex space-x-2">
+                <button id="btnStockWriteOff" class="bg-red-900/50 hover:bg-red-800 text-red-200 border border-red-700 font-bold py-2 px-4 rounded-lg shadow flex items-center text-sm" title="Abater do estoque baseado nas vendas"><i class="fas fa-level-down-alt mr-2"></i> Baixar Estoque</button>
+                <button id="btnNewIngredient" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow flex items-center ml-2"><i class="fas fa-plus mr-2"></i> Novo</button>
+            </div>
         </div>`;
     
     document.getElementById('btnNewIngredient').onclick = () => renderIngredientForm(null); 
     document.getElementById('btnStockWriteOff').onclick = handleStockWriteOff; 
     
-    if (ingredientsCache.length === 0) { 
-        container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-500"><p>Nenhum insumo cadastrado.</p></div>'; 
+    const filteredList = currentGroupFilter === 'all' 
+        ? ingredientsCache 
+        : ingredientsCache.filter(i => i.group === currentGroupFilter);
+
+    if (filteredList.length === 0) { 
+        container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-500"><p>Nenhum insumo encontrado.</p></div>'; 
         return; 
     } 
     
     container.innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20">
-            ${ingredientsCache.map(ing => `
+            ${filteredList.map(ing => {
+                const groupName = groupsCache.find(g => {
+                    const gId = g.name.toLowerCase().replace(/ /g, '_').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                    return gId === ing.group;
+                })?.name || ing.group || 'Geral';
+
+                return `
                 <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex flex-col justify-between group hover:border-gray-600 transition">
                     <div class="flex justify-between items-start mb-2">
                         <div>
                             <h4 class="font-bold text-white text-lg">${ing.name}</h4>
-                            <p class="text-xs text-gray-400 uppercase">${ing.group || 'Sem Grupo'} • ${ing.costCategory || 'CMV'}</p>
+                            <p class="text-xs text-gray-400 uppercase">${groupName} • ${ing.costCategory || 'CMV'}</p>
                         </div>
                         <div class="flex space-x-2">
                             <button class="text-blue-400 hover:text-blue-300 p-1" onclick="window.editIngredient('${ing.id}')"><i class="fas fa-edit"></i></button>
@@ -813,7 +832,8 @@ async function renderIngredientsScreen(container, toolbar) {
                         <div class="text-xs text-gray-500">R$ ${ing.cost.toFixed(2)} / ${ing.unit}</div>
                         <div class="text-right font-mono font-bold ${ing.stock <= (ing.minStock||0) ? 'text-red-500' : 'text-green-400'}">${ing.stock.toFixed(3)} ${ing.unit}</div>
                     </div>
-                </div>`).join('')}
+                </div>`
+            }).join('')}
         </div>`; 
     
     window.editIngredient = (id) => renderIngredientForm(ingredientsCache.find(i => i.id === id)); 
@@ -826,6 +846,14 @@ async function renderIngredientsScreen(container, toolbar) {
         } 
     }; 
 }
+
+// Filtro Global
+window.filterIngredients = (group) => {
+    currentGroupFilter = group;
+    const container = document.getElementById('hubContent');
+    const toolbar = document.getElementById('productActionsToolbar');
+    if (container && toolbar) renderIngredientsScreen(container, toolbar);
+};
 
 async function handleStockWriteOff() { 
     const btn = document.getElementById('btnStockWriteOff'); 
@@ -858,6 +886,16 @@ async function handleStockWriteOff() {
 
 function renderIngredientForm(ingredient = null) {
     const isEdit = !!ingredient;
+    
+    // Popula select de grupos
+    let groupOptions = '<option value="">Selecione...</option>';
+    if (groupsCache.length > 0) {
+        groupOptions += groupsCache.map(g => {
+            const gId = g.name.toLowerCase().replace(/ /g, '_').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            return `<option value="${gId}" ${ingredient?.group === gId ? 'selected' : ''}>${g.name}</option>`;
+        }).join('');
+    }
+
     const modalHtml = `
         <div id="ingredientFormModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[80] animate-fade-in p-4">
             <div class="bg-dark-card border border-gray-600 p-6 rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl m-4">
@@ -876,7 +914,12 @@ function renderIngredientForm(ingredient = null) {
                          <div><label class="text-xs text-gray-400 uppercase font-bold">Estoque Mínimo</label><input id="ingMinStock" type="number" class="input-pdv w-full p-2" value="${ingredient?.minStock || 5}" placeholder="5"></div>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
-                        <div><label class="text-xs text-gray-400 uppercase font-bold">Grupo/Tipo</label><input id="ingGroup" type="text" class="input-pdv w-full p-2" value="${ingredient?.group || ''}" placeholder="Ex: Laticínios"></div>
+                        <div>
+                            <label class="text-xs text-gray-400 uppercase font-bold">Grupo</label>
+                            <select id="ingGroup" class="input-pdv w-full p-2">
+                                ${groupOptions}
+                            </select>
+                        </div>
                         <div>
                             <label class="text-xs text-gray-400 uppercase font-bold">Categ. Custo</label>
                             <select id="ingCostCategory" class="input-pdv w-full p-2">
@@ -924,27 +967,56 @@ function renderIngredientForm(ingredient = null) {
 }
 
 // ==================================================================
-//           7. LISTA DE COMPRAS & FORNECEDORES
+//            7. LISTA DE COMPRAS & FORNECEDORES
 // ==================================================================
 
 async function renderShoppingListScreen(container, toolbar) { 
+    
+    // Filtros no Toolbar
+    let groupOptions = '<option value="all">Todos os Grupos</option>';
+    if (groupsCache.length > 0) {
+        groupOptions += groupsCache.map(g => {
+            const gId = g.name.toLowerCase().replace(/ /g, '_').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            return `<option value="${gId}" ${currentGroupFilter === gId ? 'selected' : ''}>${g.name}</option>`;
+        }).join('');
+    }
+
     toolbar.innerHTML = `
-        <div class="flex items-center space-x-2 w-full justify-end">
-            <button id="btnCalcHistory" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow flex items-center text-sm mr-2 whitespace-nowrap"><i class="fas fa-chart-line mr-2"></i> Sugerir</button>
-            <button id="btnQuoteSelected" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"><i class="fas fa-file-invoice-dollar mr-2"></i> Cotar</button>
+        <div class="flex items-center space-x-2 w-full justify-between">
+            <select id="shoppingGroupFilter" class="bg-gray-700 text-white text-sm py-2 px-3 rounded-lg border border-gray-600 focus:outline-none focus:border-indigo-500 w-48" onchange="window.filterShoppingList(this.value)">
+                ${groupOptions}
+            </select>
+            <div class="flex space-x-2">
+                <button id="btnCalcHistory" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow flex items-center text-sm mr-2 whitespace-nowrap"><i class="fas fa-chart-line mr-2"></i> Sugerir</button>
+                <button id="btnQuoteSelected" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"><i class="fas fa-file-invoice-dollar mr-2"></i> Cotar</button>
+            </div>
         </div>`; 
     
     document.getElementById('btnCalcHistory').onclick = () => generateShoppingListFromHistory(container); 
-    const list = ingredientsCache.filter(i => i.stock <= (i.minStock || 5)); 
+    
+    // Filtra lista
+    let list = ingredientsCache.filter(i => i.stock <= (i.minStock || 5)); 
+    if (currentGroupFilter !== 'all') {
+        list = list.filter(i => i.group === currentGroupFilter);
+    }
+
     renderShoppingListTable(container, list, "Estoque Baixo"); 
 }
+
+// Filtro Global para Compras
+window.filterShoppingList = (group) => {
+    currentGroupFilter = group;
+    const container = document.getElementById('hubContent');
+    const toolbar = document.getElementById('productActionsToolbar');
+    if (container && toolbar) renderShoppingListScreen(container, toolbar);
+};
 
 async function generateShoppingListFromHistory(container) { 
     const btn = document.getElementById('btnCalcHistory'); 
     toggleLoading(btn, true, 'Analisando...'); 
     try { 
         const consumptionMap = await calculateConsumptionFromHistory(30); 
-        const suggestionList = []; 
+        let suggestionList = []; 
         ingredientsCache.forEach(ing => { 
             const consumed = consumptionMap[ing.id] || 0; 
             const safetyMargin = consumed * 0.2; 
@@ -953,6 +1025,12 @@ async function generateShoppingListFromHistory(container) {
                 suggestionList.push({ ...ing, suggestedQty: needed, consumedLastMonth: consumed }); 
             } 
         }); 
+        
+        // Aplica filtro também na sugestão
+        if (currentGroupFilter !== 'all') {
+            suggestionList = suggestionList.filter(i => i.group === currentGroupFilter);
+        }
+
         renderShoppingListTable(container, suggestionList, "Sugestão por Vendas", true); 
     } catch(e) { 
         console.error(e); 
@@ -964,7 +1042,7 @@ async function generateShoppingListFromHistory(container) {
 
 function renderShoppingListTable(container, list, title, isHistory = false) { 
     if(list.length === 0) { 
-        container.innerHTML = `<div class="flex flex-col items-center justify-center h-full text-green-500"><i class="fas fa-check-circle text-4xl mb-2"></i><p>${title}: Nada a comprar.</p></div>`; 
+        container.innerHTML = `<div class="flex flex-col items-center justify-center h-full text-green-500"><i class="fas fa-check-circle text-4xl mb-2"></i><p>${title}: Nada a comprar neste grupo.</p></div>`; 
         return; 
     } 
     const headerExtra = isHistory ? '<th class="p-3 text-right whitespace-nowrap">Consumo</th>' : ''; 
@@ -1047,7 +1125,7 @@ function openQuoteModal(itemIds) {
             const items = ingredientsCache.filter(i => itemIds.includes(i.id)); 
             for(const supId of selectedSuppliers) { 
                 const supplier = suppliersCache.find(s => s.id === supId); 
-                const quoteRef = doc(getColRef('quotations')); 
+                const quoteRef = doc(getColRef('price_quotations')); 
                 const pricedItems = items.map(item => { 
                     const variation = (Math.random() * 0.4) - 0.2; 
                     const newPrice = item.cost * (1 + variation); 
@@ -1150,7 +1228,7 @@ async function renderLowestCostScreen(container, toolbar) {
     toolbar.innerHTML = `<div class="text-xs text-gray-400 italic w-full text-right">* Baseado nas últimas cotações recebidas.</div>`; 
     container.innerHTML = '<div class="flex justify-center py-10"><i class="fas fa-spinner fa-spin text-3xl text-green-500"></i></div>'; 
     try { 
-        const q = query(getColRef('quotations'), where('status', '==', 'received'), orderBy('createdAt', 'desc')); 
+        const q = query(getColRef('price_quotations'), where('status', '==', 'received'), orderBy('createdAt', 'desc')); 
         const snap = await getDocs(q); 
         if(snap.empty) { 
             container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-500"><i class="fas fa-search-dollar text-4xl mb-2"></i><p>Nenhuma cotação recente encontrada. Vá em "Lista de Compras" e solicite um orçamento.</p></div>'; 
@@ -1174,6 +1252,13 @@ async function renderLowestCostScreen(container, toolbar) {
         container.innerHTML = html; 
     } catch(e) { 
         console.error("Erro comparação:", e); 
-        container.innerHTML = `<p class="text-red-400 text-center">Erro ao carregar comparações.</p>`; 
+        // Tratamento de erro amigável na UI
+        container.innerHTML = `
+            <div class="p-6 bg-red-900/20 border border-red-800 rounded-lg text-center mt-4">
+                <h3 class="text-red-400 font-bold mb-2">Acesso Negado ou Erro</h3>
+                <p class="text-gray-400 text-sm">Verifique se você tem permissão de 'Gerente' e se as regras de segurança foram atualizadas.</p>
+                <p class="text-xs text-gray-600 mt-4">${e.message}</p>
+            </div>
+        `;
     } 
 }

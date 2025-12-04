@@ -1,4 +1,4 @@
-// --- APP.JS (CORRIGIDO: INIT CLIENTE E DEPENDÊNCIAS) ---
+// --- APP.JS (CORRIGIDO: SEM IMPORTAÇÃO QUEBRADA) ---
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -478,13 +478,11 @@ const initClientApp = async () => {
              window.increaseLocalItemQuantity = module.increaseLocalItemQuantity;
         });
 
-        // CORREÇÃO: Remove o loading e força a tela do cliente a aparecer
         hideStatus();
         await goToScreen('clientOrderScreen');
 
     } catch (error) {
         console.error("Erro CRÍTICO no initClientApp:", error);
-        // Garante que o loading some para o utilizador ver erros/alertas
         hideStatus();
     }
 };

@@ -29,7 +29,7 @@ service cloud.firestore {
           allow write: if isGerente();
         }
         
-        // CORREÇÃO: Adicionada regra para 'settings' (Info do Estabelecimento)
+        // Configurações da Loja (Nome, Logo, etc.)
         match /settings/{docId} {
           allow read: if isAuthenticated(); // Clientes precisam ler o nome/logo
           allow write: if isGerente();      // Apenas gerente altera
@@ -40,7 +40,7 @@ service cloud.firestore {
           allow write: if isGerente();
         }
 
-        // 2. SETORES (Mesas)
+        // 2. SETORES (Mesas e KDS)
         match /sectors/{sectorId} {
           allow read: if isAuthenticated();
           allow write: if isGerente();
@@ -99,7 +99,8 @@ service cloud.firestore {
               'clientOrderPending', 'waiterNotification', 'billRequested', 
               'payments', 'serviceTaxApplied', 
               'accessPin', 'lastKdsSentAt', 'masterTable', 'mergedTables', 'waiterId',
-              'closedAt', 'finalTotal', 'wooOrderId', 'closedBy', 'kdsAlert', 'isPickup', 'note'
+              'closedAt', 'finalTotal', 'wooOrderId', 'closedBy', 'kdsAlert', 'isPickup', 'note',
+              'pointsGenerated'
             ])
           );
           allow delete: if isStaff();
@@ -159,7 +160,7 @@ service cloud.firestore {
           allow write: if isGerente();
         }
 
-        // 16. TIPOS DE INSUMO (AUXILIAR)
+        // 16. TIPOS DE INSUMO (GRUPOS DE ESTOQUE)
         match /ingredient_types/{docId} {
           allow read: if isAuthenticated();
           allow write: if isGerente();
@@ -177,10 +178,16 @@ service cloud.firestore {
           allow write: if isStaff();
         }
         
-        // 19. FILA DE PEDIDOS (NOVO)
-        match /orders_queue/{orderId} {
-          allow read, write: if isStaff();
-          // Garçom/Caixa cria o pedido na fila
+        // 19. LISTAS DE COMPRAS (NOVO)
+        match /shopping_lists/{listId} {
+          allow read: if isStaff();
+          allow write: if isGerente();
+        }
+        
+        // 20. COTAÇÕES DE PREÇO (NOVO)
+        match /price_quotations/{quoteId} {
+          allow read: if isStaff();
+          allow write: if isStaff();
         }
 
         // Bloqueio padrão para qualquer outra coleção dentro de /data
@@ -190,7 +197,6 @@ service cloud.firestore {
       } 
 
       // --- CONFIGURAÇÕES PÚBLICAS (Irmão de /data) ---
-      // Agora ele consegue ver as funções isGerente() e isAuthenticated()
       match /product_config {
         allow read: if isAuthenticated();
         allow write: if isGerente();
