@@ -1,7 +1,8 @@
 import { storage, ref, uploadBytes, getDownloadURL, getSectorsCollectionRef } from "/services/firebaseService.js";
 import { doc, setDoc, deleteDoc, serverTimestamp, getDoc, query, where, getDocs, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { formatCurrency, toggleLoading, showToast } from "/utils.js";
-import { getProducts, getCategories, createWooProduct, updateWooProduct, deleteWooProduct, fetchWooCommerceProducts } from "/services/wooCommerceService.js?v=2";
+// CORREÇÃO: Removido 'getCategories' da importação
+import { getProducts, createWooProduct, updateWooProduct, deleteWooProduct, fetchWooCommerceProducts } from "/services/wooCommerceService.js?v=2";
 import * as Store from "./store.js";
 
 let currentProductComposition = []; 
@@ -68,15 +69,30 @@ export function setupImageUpload() {
 //            2. LISTA DE PRODUTOS (GRID RESPONSIVO)
 // ==================================================================
 export async function renderProductListConfig(contentDiv, toolbarDiv) {
-    const categories = getCategories();
-    let catOptions = '<option value="all">Todas as Categorias</option>';
-    if (categories.length > 0) categories.forEach(c => { if(c.id !== 'all' && c.id !== 'top10') catOptions += `<option value="${c.id}">${c.name}</option>`; });
+    // CORREÇÃO: Busca de setores do Firebase em vez de categorias do Woo
+    let sectorOptions = '<option value="all">Todos os Setores</option>';
+    try {
+        const q = query(getSectorsCollectionRef(), orderBy('order', 'asc'));
+        const querySnapshot = await getDocs(q);
+        querySnapshot.forEach(doc => {
+            const s = doc.data();
+            if (s.isActive !== false) {
+                sectorOptions += `<option value="${s.name}">${s.name}</option>`;
+            }
+        });
+        // Fallback se vazio
+        if (querySnapshot.empty) {
+            sectorOptions += '<option value="Cozinha">Cozinha</option><option value="Bar">Bar</option>';
+        }
+    } catch (e) {
+        console.error("Erro ao buscar setores:", e);
+    }
     
     toolbarDiv.innerHTML = `
         <div class="flex flex-col md:flex-row items-center w-full gap-3">
             <div class="flex items-center space-x-2 w-full md:w-auto flex-grow">
                 <select id="hubCategoryFilter" class="bg-gray-700 text-white text-sm py-2 px-3 rounded-lg border border-gray-600 focus:outline-none focus:border-indigo-500 w-1/3 md:w-48">
-                    ${catOptions}
+                    ${sectorOptions}
                 </select>
                 <div class="relative w-2/3 md:w-full">
                     <input type="text" id="hubSearchInput" placeholder="Buscar produto..." class="bg-dark-input text-white text-sm py-2 px-3 pl-9 rounded-lg border border-gray-600 focus:outline-none focus:border-indigo-500 w-full">
@@ -100,17 +116,27 @@ export async function renderProductListConfig(contentDiv, toolbarDiv) {
     const btnConfig = document.getElementById('btnConfigInit');
     if(btnConfig) btnConfig.onclick = configureInitialCatalog; 
     
-    let hubCategory = 'all';
+    let hubSector = 'all'; // Renomeado de hubCategory para hubSector
     let hubSearch = '';
     let searchTimeout;
 
     const renderList = async (page = 1) => {
         contentDiv.innerHTML = '<div class="flex justify-center py-10"><i class="fas fa-spinner fa-spin text-3xl text-gray-500"></i></div>';
         
-        await fetchWooCommerceProducts(page, hubSearch, hubCategory, false);
+        // CORREÇÃO: Passamos string vazia no filtro de categoria do Woo, pois filtraremos por setor localmente
+        await fetchWooCommerceProducts(page, hubSearch, '', false);
         await Store.fetchProductExtensions();
         
-        const products = getProducts();
+        let products = getProducts();
+        
+        // CORREÇÃO: Filtro local por Setor
+        if (hubSector !== 'all') {
+            products = products.filter(p => {
+                const extData = Store.productExtensionsCache[p.id] || {};
+                const pSector = extData.sector || p.sector || '';
+                return pSector.toLowerCase() === hubSector.toLowerCase();
+            });
+        }
         
         if (products.length === 0) {
             contentDiv.innerHTML = `
@@ -128,6 +154,7 @@ export async function renderProductListConfig(contentDiv, toolbarDiv) {
             
             const alertIcon = !hasComposition ? `<i class="fas fa-exclamation-triangle text-yellow-500 absolute top-1 left-1 bg-black/60 rounded-full p-1 text-[10px]" title="Sem ficha técnica"></i>` : '';
             const statusBadge = p.status === 'draft' ? `<span class="absolute top-1 left-1 bg-gray-600 text-white text-[9px] px-1 py-0.5 rounded shadow">Rascunho</span>` : '';
+            const sectorLabel = p.sector || extData.sector || 'Geral';
 
             return `
             <div class="bg-dark-input rounded-xl border border-gray-700 hover:border-indigo-500 transition group relative overflow-hidden flex flex-col h-full shadow-sm hover:shadow-md cursor-pointer btn-edit-prod" data-id="${p.id}">
@@ -144,7 +171,7 @@ export async function renderProductListConfig(contentDiv, toolbarDiv) {
                 <div class="p-2 flex flex-col flex-grow justify-between">
                     <div>
                         <h4 class="font-bold text-white text-xs md:text-sm leading-tight mb-1 line-clamp-2">${p.name}</h4>
-                        <p class="text-[9px] text-gray-400 uppercase tracking-wide mb-1 truncate">${p.category || 'Geral'}</p>
+                        <p class="text-[9px] text-gray-400 uppercase tracking-wide mb-1 truncate">${sectorLabel}</p>
                     </div>
                     <div class="flex items-center justify-between border-t border-gray-700 pt-1 mt-1">
                         <div class="flex flex-col">
@@ -184,7 +211,7 @@ export async function renderProductListConfig(contentDiv, toolbarDiv) {
     };
 
     const catFilter = document.getElementById('hubCategoryFilter');
-    if(catFilter) catFilter.onchange = (e) => { hubCategory = e.target.value; renderList(1); };
+    if(catFilter) catFilter.onchange = (e) => { hubSector = e.target.value; renderList(1); };
     
     const searchInput = document.getElementById('hubSearchInput');
     if(searchInput) searchInput.oninput = (e) => { hubSearch = e.target.value; clearTimeout(searchTimeout); searchTimeout = setTimeout(() => renderList(1), 600); };
@@ -210,8 +237,13 @@ async function renderProductForm(product = null, container) {
         } catch (e) { console.error("Erro ao carregar ficha técnica:", e); }
     }
 
-    const sectorsSnap = await getDocs(query(getSectorsCollectionRef(), where('type', '==', 'production'), orderBy('name')));
-    const sectors = sectorsSnap.docs.map(d => d.data().name);
+    // Busca setores do Firebase para preencher o Select
+    let sectors = [];
+    try {
+        const sectorsSnap = await getDocs(query(getSectorsCollectionRef(), orderBy('order', 'asc')));
+        sectors = sectorsSnap.docs.map(d => d.data().name);
+    } catch(e) { console.error("Erro setores:", e); }
+    
     if(sectors.length === 0) sectors.push('Cozinha', 'Bar', 'Copa'); 
     
     const price = product?.price || '';
@@ -586,6 +618,7 @@ async function renderProductForm(product = null, container) {
                 regular_price: document.getElementById('prodPrice').value.replace(',','.'), 
                 sale_price: checkPromo.checked ? document.getElementById('prodSalePrice').value.replace(',','.') : '', 
                 status: document.getElementById('prodStatus').value, 
+                // CORREÇÃO: Salva o setor no metadado do Woo também
                 meta_data: [{ key: 'sector', value: document.getElementById('prodSector').value }], 
                 images: document.getElementById('prodImgUrl').value ? [{ src: document.getElementById('prodImgUrl').value }] : [] 
             };

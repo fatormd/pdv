@@ -1,8 +1,8 @@
-// --- CONTROLLERS/ORDERCONTROLLER.JS (VERSÃO FINAL - MENSAGENS DE ERRO CLARAS) ---
+// --- CONTROLLERS/ORDERCONTROLLER.JS (CORRIGIDO: SETORES VIA FIREBASE) ---
 
-import { getProducts, getCategories, fetchWooCommerceProducts } from "/services/wooCommerceService.js"; 
+import { getProducts, fetchWooCommerceProducts } from "/services/wooCommerceService.js"; 
 import { formatCurrency, formatElapsedTime, maskPhoneNumber, toggleLoading } from "/utils.js";
-import { saveSelectedItemsToFirebase, getTableDocRef, getKdsCollectionRef, getQuickObsCollectionRef } from "/services/firebaseService.js";
+import { saveSelectedItemsToFirebase, getTableDocRef, getKdsCollectionRef, getQuickObsCollectionRef, getSectorsCollectionRef } from "/services/firebaseService.js";
 import { currentTableId, selectedItems, currentOrderSnapshot, showToast, userId } from "/app.js"; 
 import { arrayUnion, serverTimestamp, doc, setDoc, updateDoc, arrayRemove, getDocs, query, orderBy, getDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { goToScreen } from "/app.js"; 
@@ -16,11 +16,46 @@ let loadMoreProductsBtn;
 
 // --- ESTADO LOCAL ---
 let currentSearch = '';
-let currentCategoryFilter = 'all';
+let currentSectorFilter = 'all'; // Substitui currentCategoryFilter
+let FIREBASE_SECTORS = [];       // Cache dos setores
 let currentPage = 1;
 let searchTimeout = null;
 let orderInitialized = false;
 
+// ==================================================================
+//               1. BUSCA DE SETORES (FIREBASE)
+// ==================================================================
+
+async function fetchFirebaseSectors() {
+    try {
+        const q = query(getSectorsCollectionRef(), orderBy('order', 'asc')); 
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+            FIREBASE_SECTORS = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                name: doc.data().name,
+                isActive: doc.data().isActive !== false
+            })).filter(s => s.isActive);
+        } else {
+            // Fallback
+            FIREBASE_SECTORS = [
+                { id: 'cozinha', name: 'Cozinha' },
+                { id: 'bar', name: 'Bar' },
+                { id: 'churrasqueira', name: 'Churrasqueira' }
+            ];
+        }
+        
+        // Adiciona "Todos" e "Top 10"
+        FIREBASE_SECTORS.unshift({ id: 'top10', name: '🔥 Top 10' });
+        FIREBASE_SECTORS.unshift({ id: 'all', name: 'Todos' });
+
+        renderMenu(false); // Re-renderiza o menu com os novos botões
+
+    } catch (error) {
+        console.error("Erro ao buscar setores:", error);
+    }
+}
 
 // ==================================================================
 //               RENDERIZAÇÃO DO CARDÁPIO
@@ -29,33 +64,53 @@ let orderInitialized = false;
 export const renderMenu = (append = false) => {
     if (!menuItemsGrid || !categoryFiltersContainer) return;
 
-    const categories = getCategories();
+    // 1. Renderiza os Botões de Setor (apenas se não for append ou se estiver vazio)
     if (categoryFiltersContainer.innerHTML.trim() === '' || !append) {
-        categoryFiltersContainer.innerHTML = categories.map(cat => {
-            const isActive = cat.slug === currentCategoryFilter ? 'bg-pumpkin text-white' : 'bg-dark-input text-dark-text border border-gray-600';
-            return `<button class="category-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap ${isActive}" data-category="${cat.slug || cat.id}">${cat.name}</button>`;
-        }).join('');
+        if (FIREBASE_SECTORS.length === 0) {
+            categoryFiltersContainer.innerHTML = '<span class="text-xs text-gray-500">Carregando setores...</span>';
+        } else {
+            categoryFiltersContainer.innerHTML = FIREBASE_SECTORS.map(sector => {
+                const isActive = sector.id === currentSectorFilter ? 'bg-pumpkin text-white' : 'bg-dark-input text-dark-text border border-gray-600';
+                return `<button class="sector-btn px-4 py-3 rounded-full text-base font-semibold whitespace-nowrap ${isActive}" data-sector-id="${sector.id}">${sector.name}</button>`;
+            }).join('');
+        }
     }
 
     const products = getProducts();
     if (!append) menuItemsGrid.innerHTML = '';
 
-    if (products.length === 0) {
-        menuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-gray-500 italic">Nenhum produto encontrado.</div>`;
+    // 2. Filtragem de Produtos
+    let displayProducts = products;
+
+    if (currentSectorFilter === 'top10') {
+        const top10Ids = JSON.parse(localStorage.getItem('top10_products') || '[]');
+        displayProducts = products.filter(p => top10Ids.includes(p.id.toString()));
+        // Ordena pela posição no array top10
+        displayProducts.sort((a, b) => top10Ids.indexOf(a.id.toString()) - top10Ids.indexOf(b.id.toString()));
+    } else if (currentSectorFilter !== 'all') {
+        // Filtra pelo metadado 'sector' ou categoria que bate com o ID do setor
+        const targetId = currentSectorFilter.toLowerCase();
+        displayProducts = products.filter(p => {
+            const pSector = (p.sector || 'cozinha').toLowerCase();
+            return pSector === targetId;
+        });
+    }
+    
+    // Filtro de busca (já aplicado no fetch, mas reforçando localmente)
+    if (currentSearch) {
+        displayProducts = displayProducts.filter(p => p.name.toLowerCase().includes(currentSearch.toLowerCase()));
+    }
+
+    if (displayProducts.length === 0) {
+        menuItemsGrid.innerHTML = `<div class="col-span-full text-center p-6 text-gray-500 italic">Nenhum produto encontrado neste setor.</div>`;
         removeLoadMoreButton();
         return;
     }
 
-    let displayProducts = products;
-    if (currentCategoryFilter === 'top10') {
-        const top10Ids = JSON.parse(localStorage.getItem('top10_products') || '[]');
-        displayProducts = products.filter(p => top10Ids.includes(p.id.toString()));
-        displayProducts.sort((a, b) => top10Ids.indexOf(a.id.toString()) - top10Ids.indexOf(b.id.toString()));
-    }
-
+    // 3. Renderização dos Cards
     const itemsHtml = displayProducts.map((product, index) => {
         let badge = '';
-        if (currentCategoryFilter === 'top10' && index < 3) {
+        if (currentSectorFilter === 'top10' && index < 3) {
             const colors = ['text-yellow-400', 'text-gray-300', 'text-orange-400'];
             badge = `<i class="fas fa-medal ${colors[index]} absolute top-2 right-2 text-xl drop-shadow-md"></i>`;
         }
@@ -82,7 +137,8 @@ export const renderMenu = (append = false) => {
         menuItemsGrid.innerHTML = itemsHtml;
     }
 
-    if (currentCategoryFilter !== 'top10') {
+    // Só mostra "Carregar Mais" se não estivermos no Top 10 (que é estático)
+    if (currentSectorFilter !== 'top10') {
         renderLoadMoreButton();
     }
 };
@@ -106,7 +162,10 @@ const handleLoadMore = async () => {
     currentPage++;
     const btn = document.getElementById('loadMoreProductsBtn');
     toggleLoading(btn, true, 'Carregando...');
-    const newItems = await fetchWooCommerceProducts(currentPage, currentSearch, currentCategoryFilter, true);
+    
+    // Nota: Passamos '' no filtro de categoria do Woo, pois filtramos por setor localmente
+    const newItems = await fetchWooCommerceProducts(currentPage, currentSearch, '', true);
+    
     if (newItems.length === 0) {
         showToast("Não há mais produtos.", false);
         if(btn) btn.style.display = 'none';
@@ -122,24 +181,33 @@ const handleSearch = (e) => {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(async () => {
         menuItemsGrid.innerHTML = '<div class="col-span-full text-center py-10"><i class="fas fa-spinner fa-spin text-pumpkin text-3xl"></i><p class="text-gray-500 mt-2">Buscando...</p></div>';
-        await fetchWooCommerceProducts(1, currentSearch, currentCategoryFilter, false);
+        await fetchWooCommerceProducts(1, currentSearch, '', false);
         renderMenu(false);
     }, 600); 
 };
 
-const handleCategoryClick = async (e) => {
-    const btn = e.target.closest('.category-btn');
+const handleSectorClick = async (e) => {
+    const btn = e.target.closest('.sector-btn');
     if (!btn) return;
-    document.querySelectorAll('.category-btn').forEach(b => {
+
+    // Atualiza classes visuais
+    document.querySelectorAll('.sector-btn').forEach(b => {
         b.classList.remove('bg-pumpkin', 'text-white', 'border-pumpkin');
         b.classList.add('bg-dark-input', 'text-dark-text', 'border-gray-600');
     });
     btn.classList.remove('bg-dark-input', 'text-dark-text', 'border-gray-600');
     btn.classList.add('bg-pumpkin', 'text-white', 'border-pumpkin');
-    currentCategoryFilter = btn.dataset.category;
+    
+    currentSectorFilter = btn.dataset.sectorId;
     currentPage = 1;
+    
     menuItemsGrid.innerHTML = '<div class="col-span-full text-center py-10"><i class="fas fa-spinner fa-spin text-pumpkin text-3xl"></i></div>';
-    await fetchWooCommerceProducts(1, currentSearch, currentCategoryFilter, false);
+    
+    // Garante que temos produtos carregados (caso a primeira carga tenha sido parcial)
+    if (getProducts().length === 0) {
+        await fetchWooCommerceProducts(1, currentSearch, '', false);
+    }
+    
     renderMenu(false);
 };
 
@@ -474,10 +542,14 @@ export const initOrderController = () => {
 
     if (!menuItemsGrid || !openOrderList || !obsModal) return;
 
+    fetchFirebaseSectors(); // INICIA A BUSCA DE SETORES
     fetchQuickObservations(quickObsButtons);
 
     if (searchProductInput) searchProductInput.addEventListener('input', handleSearch);
-    if (categoryFiltersContainer) categoryFiltersContainer.addEventListener('click', handleCategoryClick);
+    
+    // Mudamos o listener de Category para Sector
+    if (categoryFiltersContainer) categoryFiltersContainer.addEventListener('click', handleSectorClick);
+    
     if (sendSelectedItemsBtn) sendSelectedItemsBtn.addEventListener('click', handleSendSelectedItems);
 
     menuItemsGrid.addEventListener('click', (e) => {
