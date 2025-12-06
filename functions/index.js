@@ -2,7 +2,7 @@
 // IMPORTS GLOBAIS
 // =======================================================
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
-const { onDocumentCreated } = require("firebase-functions/v2/firestore"); // <--- NOVO IMPORT ADICIONADO
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
@@ -13,28 +13,41 @@ const crypto = require("crypto");
 initializeApp();
 
 // =======================================================
-// CONFIGURAÇÃO SSL & REDE
+// CONFIGURAÇÃO SSL & REDE (LAZY LOADING)
 // =======================================================
-const httpsAgent = new https.Agent({
-  rejectUnauthorized: false, 
-  secureOptions: crypto.constants.SSL_OP_LEGACY_SERVER_CONNECT,
-  minVersion: "TLSv1",
-  ciphers: "DEFAULT@SECLEVEL=0",
-  family: 4, 
-  keepAlive: true
-});
-
-const wooClient = axios.create({
-  httpsAgent: httpsAgent,
-  timeout: 290000, 
-  headers: {
-    "Content-Type": "application/json",
-    "User-Agent": "FatorPDV/1.0 (FirebaseFunctions)",
-    "Connection": "keep-alive"
-  }
-});
+// Variável global para cachear o cliente após o primeiro uso
+let cachedWooClient = null;
 
 const WOOCOMMERCE_URL = "https://nossotempero.fatormd.com";
+
+/**
+ * Função auxiliar para obter o cliente Axios apenas quando necessário.
+ * Isso evita que o 'deploy' trave tentando configurar rede na inicialização.
+ */
+function getWooClient() {
+  if (cachedWooClient) return cachedWooClient;
+
+  const httpsAgent = new https.Agent({
+    rejectUnauthorized: false, 
+    secureOptions: crypto.constants.SSL_OP_LEGACY_SERVER_CONNECT,
+    minVersion: "TLSv1",
+    ciphers: "DEFAULT@SECLEVEL=0",
+    family: 4, 
+    keepAlive: true
+  });
+
+  cachedWooClient = axios.create({
+    httpsAgent: httpsAgent,
+    timeout: 290000, 
+    headers: {
+      "Content-Type": "application/json",
+      "User-Agent": "FatorPDV/1.0 (FirebaseFunctions)",
+      "Connection": "keep-alive"
+    }
+  });
+
+  return cachedWooClient;
+}
 
 // =======================================================
 // 1. PROXY WOOCOMMERCE (COM DIAGNÓSTICO DETALHADO)
@@ -53,18 +66,21 @@ exports.proxyWooCommerce = onCall({ timeoutSeconds: 300, memory: "512MiB" }, asy
   const querySeparator = endpoint.includes("?") ? "&" : "?";
   const url = `${WOOCOMMERCE_URL}/wp-json/wc/v3/${endpoint}${querySeparator}${authParams}`;
 
+  // Obtém o cliente aqui dentro, não no topo
+  const client = getWooClient();
+
   try {
     console.log(`[Proxy] ${method} ${endpoint}`);
     
     let response;
     if (method.toUpperCase() === "GET") {
-      response = await wooClient.get(url);
+      response = await client.get(url);
     } else if (method.toUpperCase() === "POST") {
-      response = await wooClient.post(url, payload);
+      response = await client.post(url, payload);
     } else if (method.toUpperCase() === "PUT") { 
-      response = await wooClient.put(url, payload);
+      response = await client.put(url, payload);
     } else if (method.toUpperCase() === "DELETE") { 
-      response = await wooClient.delete(url);
+      response = await client.delete(url);
     }
     
     return response.data;
@@ -72,17 +88,12 @@ exports.proxyWooCommerce = onCall({ timeoutSeconds: 300, memory: "512MiB" }, asy
   } catch (error) {
     console.error("Erro Proxy Woo:", error.message);
     
-    // --- MELHORIA AQUI: Retorna o detalhe do erro para o App ---
     if (error.response && error.response.data) {
         console.error("Detalhes do erro Woo:", JSON.stringify(error.response.data));
-        // Formata a mensagem de erro para ser legível no Toast
         const wooError = error.response.data;
         const msg = wooError.message || wooError.code || "Erro desconhecido no Woo";
-        
-        // Lança um erro que o front-end consegue ler
         throw new HttpsError("invalid-argument", `WooCommerce Recusou: ${msg}`);
     }
-    // -----------------------------------------------------------
 
     if (error.code === 'ECONNABORTED') {
        throw new HttpsError("deadline-exceeded", "O servidor WooCommerce demorou muito para responder.");
@@ -101,15 +112,17 @@ exports.syncProductsFromWoo = onCall({ timeoutSeconds: 540, memory: "1GiB" }, as
   const consumerKey = process.env.WOO_APP_KEY;
   const consumerSecret = process.env.WOO_APP_SECRET;
   const firestore = getFirestore();
-  // Idealmente, torne este APP_ID dinâmico no futuro (ex: request.data.appId)
   const APP_ID = "1:1097659747429:web:8ec0a7c3978c311dbe0a8c"; 
+
+  // Obtém o cliente aqui dentro
+  const client = getWooClient();
 
   try {
     const authParams = `consumer_key=${consumerKey}&consumer_secret=${consumerSecret}`;
     const url = `${WOOCOMMERCE_URL}/wp-json/wc/v3/products?per_page=100&status=publish&${authParams}`;
 
     console.log("Iniciando busca no Woo (Sync)...");
-    const response = await wooClient.get(url);
+    const response = await client.get(url);
     const products = response.data;
 
     const batch = firestore.batch();
@@ -177,14 +190,10 @@ exports.deleteUser = onCall(async (request) => {
 // =======================================================
 // 4. PROCESSADOR DE FILA DE PEDIDOS (NOVO - ASSÍNCRONO)
 // =======================================================
-/**
- * Gatilho: Dispara sempre que um documento é criado na coleção 'orders_queue'.
- * Caminho: artifacts/{appId}/public/data/orders_queue/{orderId}
- */
 exports.processOrderQueue = onDocumentCreated(
   { 
     document: "artifacts/{appId}/public/data/orders_queue/{orderId}",
-    timeoutSeconds: 300, // 5 minutos para tentar processar
+    timeoutSeconds: 300, 
     memory: "256MiB"
   }, 
   async (event) => {
@@ -196,52 +205,42 @@ exports.processOrderQueue = onDocumentCreated(
 
     const orderData = snapshot.data();
     const orderId = event.params.orderId;
-    // const appId = event.params.appId; // Disponível se precisar tornar dinâmico no futuro
 
-    // Evita loop infinito se a função for re-executada num documento já processado
     if (orderData.status === 'completed' || orderData.status === 'processing') {
         return;
     }
 
-    // 1. Marcar como "Em processamento" (para ninguém mais mexer)
     await snapshot.ref.update({ 
         status: 'processing', 
         attempts: FieldValue.increment(1),
         lastAttempt: FieldValue.serverTimestamp()
     });
 
+    // Obtém o cliente aqui dentro
+    const client = getWooClient();
+
     try {
         const consumerKey = process.env.WOO_APP_KEY;
         const consumerSecret = process.env.WOO_APP_SECRET;
         
-        // Monta a URL para criar pedido (endpoint /orders)
         const authParams = `consumer_key=${consumerKey}&consumer_secret=${consumerSecret}`;
         const url = `${WOOCOMMERCE_URL}/wp-json/wc/v3/orders?${authParams}`;
 
         console.log(`[Queue] Processando pedido ${orderId} para o Woo...`);
 
-        // ---------------------------------------------------
-        // ENVIO PARA O WOOCOMMERCE
-        // ---------------------------------------------------
-        const response = await wooClient.post(url, orderData.payload);
+        const response = await client.post(url, orderData.payload);
 
-        // ---------------------------------------------------
-        // SUCESSO
-        // ---------------------------------------------------
         console.log(`[Queue] Sucesso! ID Woo: ${response.data.id}`);
         
         await snapshot.ref.update({
             status: 'completed',
-            wooId: response.data.id, // Salva o ID real do WooCommerce
+            wooId: response.data.id, 
             wooOrderKey: response.data.order_key,
             processedAt: FieldValue.serverTimestamp(),
-            error: null // Limpa erros anteriores
+            error: null
         });
 
     } catch (error) {
-        // ---------------------------------------------------
-        // TRATAMENTO DE ERRO
-        // ---------------------------------------------------
         console.error(`[Queue] Falha no pedido ${orderId}:`, error.message);
         
         let errorMessage = error.message;
@@ -253,7 +252,7 @@ exports.processOrderQueue = onDocumentCreated(
         await snapshot.ref.update({
             status: 'error',
             error: errorMessage,
-            retryEligible: true // Pode ser usado para retentativas futuras
+            retryEligible: true 
         });
     }
 });

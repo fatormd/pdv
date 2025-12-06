@@ -1,11 +1,11 @@
 // --- CONTROLLERS/MANAGERCONTROLLER.JS (VERSÃO HUB - "O GERENTE GERAL") ---
 
 // 1. IMPORTAÇÃO DOS MÓDULOS ("ESPECIALISTAS")
-// O Delivery já está pronto. Os outros (comentados) iremos criar a seguir.
-import * as DeliveryMgr from './manager_modules/deliveryManager.js';
-// import * as ProductMgr from './manager_modules/productManager.js'; 
-// import * as FinanceMgr from './manager_modules/financeManager.js';
-// import * as TeamMgr from './manager_modules/teamManager.js';
+import * as DeliveryMgr from './manager/modules/deliveryManager.js';
+// CAMINHO CORRIGIDO E DESCOMENTADO:
+import * as ProductMgr from './manager/modules/productManager.js'; 
+// import * as FinanceMgr from './manager/modules/financeManager.js';
+// import * as TeamMgr from './manager/modules/teamManager.js';
 
 let isInitialized = false;
 let managerModal = null; // Referência ao modal principal do HTML
@@ -24,8 +24,10 @@ export const initManagerController = () => {
     try {
         if(DeliveryMgr && DeliveryMgr.init) DeliveryMgr.init();
         
+        // MÓDULO PRODUTOS INICIALIZADO:
+        if(ProductMgr && ProductMgr.init) ProductMgr.init();
+
         // Futuras inicializações:
-        // if(ProductMgr) ProductMgr.init();
         // if(FinanceMgr) FinanceMgr.init();
     } catch (error) {
         console.error("[ManagerHub] Erro ao inicializar módulos:", error);
@@ -38,7 +40,6 @@ export const initManagerController = () => {
 // ==================================================================
 //           2. ROTEAMENTO GLOBAL (API DO PAINEL)
 // ==================================================================
-// Estas funções conectam os botões do seu HTML antigo com os novos módulos.
 
 const setupGlobalRoutes = () => {
 
@@ -53,9 +54,12 @@ const setupGlobalRoutes = () => {
                 break;
 
             case 'products':
-                // Antes: renderProductHub()
-                // Agora: ProductMgr.open()
-                alert("Módulo PRODUTOS: Aguardando migração para 'productManager.js'");
+                // CONECTADO CORRETAMENTE:
+                if (ProductMgr && ProductMgr.open) {
+                    ProductMgr.open();
+                } else {
+                    console.error("Erro: Módulo ProductMgr não carregado.");
+                }
                 break;
 
             case 'finance':
@@ -91,7 +95,6 @@ const setupGlobalRoutes = () => {
     };
 
     // B. Roteador de Modos de Pedido (Modal de Cliente - Novo!)
-    // Conecta o HTML atualizado com o deliveryManager.js
     window.switchOrderMode = (mode) => {
         if (DeliveryMgr && DeliveryMgr.switchTab) {
             DeliveryMgr.switchTab(mode);
@@ -113,7 +116,6 @@ const setupGlobalRoutes = () => {
     };
     
     // D. Roteador "Legado" (Compatibilidade com botões antigos do HTML)
-    // Mantém o sistema funcionando enquanto migramos as partes
     window.handleGerencialAction = (action, payload) => {
         if (managerModal) managerModal.style.display = 'none';
 
@@ -146,8 +148,6 @@ const setupGlobalRoutes = () => {
         // Futuramente mover para authManager.js
         const password = prompt("Senha de Gerente:");
         if (password === "1234") { 
-             // Extrai o nome do módulo da ação (ex: 'openProductHub' -> 'products')
-             // Mapa simples de tradução
              const map = {
                  'openProductHub': 'products',
                  'openFinancialModule': 'finance',
