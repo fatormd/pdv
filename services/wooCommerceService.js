@@ -1,23 +1,18 @@
-// --- SERVICES/WOOCOMMERCESERVICE.JS (ATUALIZADO COM CORREÇÃO DE CATEGORIAS) ---
+// --- SERVICES/WOOCOMMERCESERVICE.JS (MANTENDO APENAS PRODUTOS) ---
 
 import { functions } from "/services/firebaseService.js"; 
 import { httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
 
 // --- ESTADO LOCAL (CACHE) ---
 let WOOCOMMERCE_PRODUCTS = [];
-let WOOCOMMERCE_CATEGORIES = [];
 
 export const getProducts = () => WOOCOMMERCE_PRODUCTS;
-export const getCategories = () => WOOCOMMERCE_CATEGORIES;
 
 // --- FUNÇÃO PROXY (HELPER) ---
 const callWooProxy = async (data) => {
     try {
         if (!functions) throw new Error("Firebase Functions não inicializado.");
-        
         const callWooApi = httpsCallable(functions, 'proxyWooCommerce');
-        console.log(`[WooProxy] ${data.method} ${data.endpoint}`);
-        
         const result = await callWooApi(data);
         return result.data;
     } catch (error) {
@@ -29,24 +24,15 @@ const callWooProxy = async (data) => {
 // ==================================================================
 //               BUSCA DE HISTÓRICO
 // ==================================================================
-
-/**
- * Busca pedidos concluídos num período de dias.
- * @param {number} days - Quantos dias para trás (ex: 30)
- */
 export const fetchSalesHistory = async (days = 30) => {
     try {
         const date = new Date();
         date.setDate(date.getDate() - days);
         const afterDate = date.toISOString();
-
-        // Busca pedidos (completed, processing, on-hold)
         const orders = await callWooProxy({
             method: 'GET',
             endpoint: `orders?after=${afterDate}&per_page=100&status=completed,processing,on-hold`
         });
-        
-        console.log(`[Woo] Histórico: ${orders.length} pedidos encontrados nos últimos ${days} dias.`);
         return orders;
     } catch (error) {
         console.error("[Woo] Falha ao buscar histórico:", error);
@@ -61,9 +47,10 @@ export const fetchSalesHistory = async (days = 30) => {
 export const fetchWooCommerceProducts = async (page = 1, search = '', category = '', append = false) => {
     try {
         let endpoint = `products?per_page=50&page=${page}&status=publish`;
+        // Nota: O filtro 'category' aqui é do Woo. Se usarmos setores do Firebase,
+        // não passamos category para a API, filtramos no front.
         if (search) endpoint += `&search=${encodeURIComponent(search)}`;
-        if (category && category !== 'all' && category !== 'top10') endpoint += `&category=${category}`;
-
+        
         const products = await callWooProxy({ method: 'GET', endpoint: endpoint });
 
         const mappedProducts = products.map(p => ({
@@ -73,12 +60,13 @@ export const fetchWooCommerceProducts = async (page = 1, search = '', category =
             regular_price: parseFloat(p.regular_price || 0),
             sale_price: parseFloat(p.sale_price || 0),
             on_sale: p.on_sale,
-            // --- CORREÇÃO AQUI: Lista completa de categorias ---
             categories: p.categories || [], 
-            // ---------------------------------------------------
             category: p.categories && p.categories.length > 0 ? p.categories[0].slug : 'uncategorized',
             categoryId: p.categories && p.categories.length > 0 ? p.categories[0].id : null,
+            
+            // IMPORTANTE: Mapeamos 'sector' do metadado para filtrar com o Firebase depois
             sector: getMetaValue(p.meta_data, 'sector') || 'cozinha',
+            
             status: p.status,
             description: p.description || '',
             image: (p.images && p.images.length > 0) ? p.images[0].src : 'https://placehold.co/600x400/1f2937/d1d5db?text=Produto'
@@ -105,92 +93,16 @@ const getMetaValue = (metaData, key) => {
     return meta ? meta.value : null;
 };
 
-// ==================================================================
-//               OUTRAS FUNÇÕES (CATEGORIAS, PEDIDOS, ETC)
-// ==================================================================
+// MANTEMOS APENAS PARA FINS DE SINCRONIZAÇÃO INTERNA, SE NECESSÁRIO
+// MAS NÃO EXPORTAMOS MAIS PARA A UI DO CLIENTE
+export const fetchWooCommerceCategories = async () => { return []; }; 
 
-export const fetchWooCommerceCategories = async (callback) => { 
-    try { 
-        const categories = await callWooProxy({ method: 'GET', endpoint: 'products/categories?per_page=100' }); 
-        const mapped = categories.map(c => ({ id: c.id, name: c.name, slug: c.slug, parent: c.parent || 0, count: c.count })); 
-        
-        WOOCOMMERCE_CATEGORIES = [ 
-            { id: 'all', name: 'Novidades', slug: 'all', parent: 0 }, 
-            { id: 'top10', name: '🔥 Top 10', slug: 'top10', parent: 0 }, 
-            ...mapped 
-        ]; 
-        
-        if (callback) callback(); 
-        return WOOCOMMERCE_CATEGORIES; 
-    } catch (error) { 
-        console.error("[Woo] Erro ao buscar categorias:", error); 
-        WOOCOMMERCE_CATEGORIES = [{ id: 'all', name: 'Novidades', slug: 'all', parent: 0 }]; 
-        return WOOCOMMERCE_CATEGORIES; 
-    } 
-};
-
-export const createWooCommerceOrder = async (orderSnapshot) => { 
-    const groupedItems = (orderSnapshot.sentItems || []).reduce((acc, item) => { 
-        const key = item.id; 
-        if (!acc[key]) { acc[key] = { product_id: item.id, name: item.name, quantity: 0, total: 0 }; } 
-        acc[key].quantity++; 
-        acc[key].total += (item.price || 0); 
-        return acc; 
-    }, {}); 
-    
-    const line_items = Object.values(groupedItems).map(group => ({ 
-        product_id: group.product_id, 
-        quantity: group.quantity, 
-        subtotal: (group.total || 0).toFixed(2).toString() 
-    })); 
-    
-    if (line_items.length === 0) { throw new Error("A conta não possui itens enviados para registrar no WooCommerce."); } 
-    
-    const payments = (orderSnapshot.payments || []); 
-    const payment_method_title = payments.length > 0 ? payments.map(p => `${p.method} (${p.value})`).join(', ') : 'PDV Local'; 
-    const finalBillTotal = orderSnapshot.total ? parseFloat(orderSnapshot.total) : 0; 
-    
-    const customerData = {}; 
-    if (orderSnapshot.clientName) { 
-        customerData.billing = { 
-            first_name: orderSnapshot.clientName.split(' ')[0], 
-            last_name: orderSnapshot.clientName.split(' ').slice(1).join(' ') || 'PDV', 
-        }; 
-    } 
-    
-    const orderPayload = { 
-        payment_method: "bacs", 
-        payment_method_title: payment_method_title, 
-        set_paid: true, 
-        status: "completed", 
-        total: finalBillTotal.toFixed(2).toString(), 
-        line_items: line_items, 
-        ...customerData, 
-        customer_note: `Pedido do PDV - Mesa ${orderSnapshot.tableNumber || 'N/A'}.` 
-    }; 
-    
-    const createdOrder = await callWooProxy({ method: 'POST', endpoint: 'orders', payload: orderPayload }); 
-    return createdOrder; 
-};
-
-// CRUD PRODUTOS
+// ... (Restante das funções de criação de pedidos e CRUD mantidas) ...
+export const createWooCommerceOrder = async (orderSnapshot) => { const groupedItems = (orderSnapshot.sentItems || []).reduce((acc, item) => { const key = item.id; if (!acc[key]) { acc[key] = { product_id: item.id, name: item.name, quantity: 0, total: 0 }; } acc[key].quantity++; acc[key].total += (item.price || 0); return acc; }, {}); const line_items = Object.values(groupedItems).map(group => ({ product_id: group.product_id, quantity: group.quantity, subtotal: (group.total || 0).toFixed(2).toString() })); if (line_items.length === 0) { throw new Error("A conta não possui itens enviados para registrar no WooCommerce."); } const payments = (orderSnapshot.payments || []); const payment_method_title = payments.length > 0 ? payments.map(p => `${p.method} (${p.value})`).join(', ') : 'PDV Local'; const finalBillTotal = orderSnapshot.total ? parseFloat(orderSnapshot.total) : 0; const customerData = {}; if (orderSnapshot.clientName) { customerData.billing = { first_name: orderSnapshot.clientName.split(' ')[0], last_name: orderSnapshot.clientName.split(' ').slice(1).join(' ') || 'PDV', }; } const orderPayload = { payment_method: "bacs", payment_method_title: payment_method_title, set_paid: true, status: "completed", total: finalBillTotal.toFixed(2).toString(), line_items: line_items, ...customerData, customer_note: `Pedido do PDV - Mesa ${orderSnapshot.tableNumber || 'N/A'}.` }; const createdOrder = await callWooProxy({ method: 'POST', endpoint: 'orders', payload: orderPayload }); return createdOrder; };
 export const createWooProduct = async (productData) => { const result = await callWooProxy({ method: 'POST', endpoint: 'products', payload: productData }); await fetchWooCommerceProducts(1, '', '', false); return result; };
 export const updateWooProduct = async (id, productData) => { const result = await callWooProxy({ method: 'PUT', endpoint: `products/${id}`, payload: productData }); await fetchWooCommerceProducts(1, '', '', false); return result; };
 export const deleteWooProduct = async (id, force = false) => { const result = await callWooProxy({ method: 'DELETE', endpoint: `products/${id}?force=${force}` }); await fetchWooCommerceProducts(1, '', '', false); return result; };
-
-// CRUD CATEGORIAS
-export const createWooCategory = async (name, parentId = 0) => { const result = await callWooProxy({ method: 'POST', endpoint: 'products/categories', payload: { name: name, parent: parentId } }); await fetchWooCommerceCategories(); return result; };
-export const updateWooCategory = async (id, data) => { const result = await callWooProxy({ method: 'PUT', endpoint: `products/categories/${id}`, payload: data }); await fetchWooCommerceCategories(); return result; };
-export const deleteWooCategory = async (id) => { const result = await callWooProxy({ method: 'DELETE', endpoint: `products/categories/${id}?force=true` }); await fetchWooCommerceCategories(); return result; };
-
-export const syncWithWooCommerce = async () => { 
-    if (!functions) throw new Error("Firebase Functions indisponível."); 
-    const syncFunc = httpsCallable(functions, 'syncProductsFromWoo'); 
-    const result = await syncFunc(); 
-    const data = result.data; 
-    if (data.success) { 
-        await fetchWooCommerceProducts(1, '', '', false); 
-        await fetchWooCommerceCategories(); 
-    } 
-    return data; 
-};
+export const createWooCategory = async (name, parentId = 0) => { const result = await callWooProxy({ method: 'POST', endpoint: 'products/categories', payload: { name: name, parent: parentId } }); return result; };
+export const updateWooCategory = async (id, data) => { const result = await callWooProxy({ method: 'PUT', endpoint: `products/categories/${id}`, payload: data }); return result; };
+export const deleteWooCategory = async (id) => { const result = await callWooProxy({ method: 'DELETE', endpoint: `products/categories/${id}?force=true` }); return result; };
+export const syncWithWooCommerce = async () => { if (!functions) throw new Error("Firebase Functions indisponível."); const syncFunc = httpsCallable(functions, 'syncProductsFromWoo'); const result = await syncFunc(); const data = result.data; if (data.success) { await fetchWooCommerceProducts(1, '', '', false); } return data; };
