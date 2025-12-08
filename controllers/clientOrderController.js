@@ -66,8 +66,11 @@ let loadMoreBtn;
 // Elementos do DOM
 let clientMenuContainer, clientCategoryFilters, sendOrderBtn, clientCartCount;
 let associationModal, activateAndSendBtn, googleLoginBtn, activationForm;
-let activateTableNumber, activatePickupPin, btnCallMotoboy;
+let activateTableNumber, activateWhatsappRetirada, activateWhatsappEntrega, btnCallMotoboy; 
+let deliveryAddressCEP, deliveryAddressStreet, deliveryAddressNumber, deliveryAddressNeighborhood; 
+let deliveryAddressComplement, deliveryAddressReference; 
 let authActionBtn, clientUserName, clientTableNumber, loggedInStep, loggedInUserName, assocErrorMsg;
+let closeAssociationModalBtn; 
 let statusScreen, mainContent, appContainer;
 let searchProductInputClient; 
 let clientObsModal, clientObsText, clientQuickObsButtons, clientConfirmObsBtn, clientCancelObsBtn;
@@ -247,7 +250,13 @@ function renderMenu(append = false) {
     if (!append) clientMenuContainer.innerHTML = ''; 
     
     if (filteredProducts.length === 0) { 
-        clientMenuContainer.innerHTML = `<div class="col-span-full text-center p-6 text-yellow-400 italic">Nenhum produto encontrado neste setor.</div>`; 
+        // CORREÇÃO DE FLICKER: Só mostra a mensagem de "Nenhum produto" se o usuário filtrou/buscou ativamente.
+        if (currentSearch || currentSectorFilter !== 'all') {
+             clientMenuContainer.innerHTML = `<div class="col-span-full text-center p-6 text-yellow-400 italic">Nenhum produto encontrado neste setor.</div>`; 
+        } else {
+            // Caso contrário (carga inicial), mostra uma mensagem neutra ou o esqueleto de carregamento.
+             clientMenuContainer.innerHTML = `<div class="col-span-full text-center p-6 text-dark-placeholder italic">Carregando cardápio ou sem produtos disponíveis.</div>`;
+        }
     } else { 
         const html = filteredProducts.map((product, index) => { 
             let badge = ''; 
@@ -299,17 +308,263 @@ const handleSectorClick = async (e) => {
     renderMenu(false);
 };
 
-// ... (Outros handlers)
-async function handleSendOrderClick() { const tableId = localCurrentTableId || window.currentTableId; if (!selectedItems || selectedItems.length === 0) { showToast("Seu carrinho está vazio.", true); return; } if (!tableId) { openAssociationModal(); } else { await sendOrderToFirebase(); } }
+// NOVO: Função para enviar o pedido para o Firebase (Centralizada)
+async function sendOrderToFirebase(closeModalOnSuccess = false) {
+    if (!localCurrentTableId) {
+        openAssociationModal();
+        return;
+    }
+    if (selectedItems.length === 0) {
+        showToast("Seu carrinho está vazio.", true);
+        return;
+    }
+
+    toggleLoading(sendOrderBtn, true, "Enviando...");
+
+    try {
+        const tableRef = getTableDocRef(localCurrentTableId);
+        
+        // 1. Criar o payload do pedido a ser enviado
+        const orderPayload = selectedItems.map(item => ({
+            ...item,
+            // CORREÇÃO: Usar new Date() para elementos em arrays com arrayUnion
+            timestamp: new Date(), 
+            status: 'pending_client_send', // Indica que está na fila do cliente
+        }));
+        
+        // 2. Adicionar o pedido à fila de pendentes do cliente na mesa
+        // serverTimestamp() é válido aqui, pois está no nível superior do updateDoc
+        await updateDoc(tableRef, {
+            clientOrderPending: arrayUnion(...orderPayload),
+            lastClientOrderSent: serverTimestamp() 
+        });
+
+        // 3. Limpar o carrinho local
+        selectedItems = [];
+
+        // 4. Sucesso
+        showToast("Pedido enviado para o garçom!", false);
+        if (closeModalOnSuccess) {
+            closeAssociationModal();
+        }
+
+    } catch (error) {
+        console.error("Erro ao enviar pedido para Firebase:", error);
+        showToast("Falha ao enviar pedido. Tente novamente.", true);
+    } finally {
+        toggleLoading(sendOrderBtn, false, "ENVIAR");
+        renderClientOrderScreen(); // Re-renderiza para limpar o carrinho e atualizar o estado do botão
+    }
+}
+
+
+// ATUALIZADO: Chama a função de envio centralizada
+async function handleSendOrderClick() { 
+    const tableId = localCurrentTableId || window.currentTableId; 
+    
+    if (!tableId) { 
+        // Se não houver mesa/comanda ativa, abre o modal de associação
+        openAssociationModal(); 
+    } else { 
+        await sendOrderToFirebase(); 
+    } 
+}
 function handleAuthActionClick() { if (localCurrentClientUser) { if(confirm("Deseja realmente sair da sua conta?")) { signOut(auth).then(() => { showToast("Você saiu da sua conta."); window.location.reload(); }); } } else { openAssociationModal(); } }
 async function signInWithGoogle(e) { if(e) e.preventDefault(); const provider = new GoogleAuthProvider(); try { await signInWithPopup(auth, provider); } catch (error) { console.error("Erro Login:", error); showAssocError("Erro ao tentar logar. Tente novamente."); } }
-async function handleActivationAndSend(e) { if (e) e.preventDefault(); let identifier = ''; let isPickup = false; if (currentAssociationTab === 'mesa') { identifier = activateTableNumber.value.trim(); if (!identifier) { showAssocError("Informe o número da mesa."); return; } } else if (currentAssociationTab === 'retirada') { identifier = activatePickupPin.value.trim(); if (!identifier || identifier.length < 4) { showAssocError("PIN inválido (min 4 dígitos)."); return; } isPickup = true; } if (!localCurrentClientUser) { showAssocError("Faça login para continuar."); return; } toggleLoading(activateAndSendBtn, true); assocErrorMsg.style.display = 'none'; try { const tableDocId = isPickup ? `pickup_${identifier}` : identifier; const tableRef = getTableDocRef(tableDocId); const tableSnap = await getDoc(tableRef); localCurrentTableId = tableDocId; if (window.setCurrentTable) window.setCurrentTable(tableDocId, true, false); const clientData = { uid: localCurrentClientUser.uid, name: localCurrentClientUser.displayName, phone: localCurrentClientUser.phone || null }; if (tableSnap.exists()) { const tData = tableSnap.data(); if (tData.status !== 'closed' && tData.clientId && tData.clientId !== clientData.uid) { throw new Error(`Mesa em uso por ${tData.clientName || 'outro cliente'}.`); } if (tData.status === 'closed') { const historyRef = doc(getTablesCollectionRef(), `${tableDocId}_closed_${Date.now()}`); await setDoc(historyRef, tData); await setDoc(tableRef, { tableNumber: isPickup ? identifier : parseInt(identifier), status: 'open', sector: isPickup ? 'Retirada' : (tData.sector || 'Salão'), isPickup: isPickup, createdAt: serverTimestamp(), total: 0, sentItems: [], payments: [], serviceTaxApplied: true, selectedItems: [], requestedOrders: [], clientId: clientData.uid, clientName: clientData.name, clientPhone: clientData.phone, anonymousUid: null }); } else { if (!tData.clientId) { await updateDoc(tableRef, { clientId: clientData.uid, clientName: clientData.name, clientPhone: clientData.phone }); } } } else { if (!isPickup && !confirm(`Mesa ${identifier} não existe. Abrir nova conta?`)) { throw new Error("Ação cancelada."); } await setDoc(tableRef, { tableNumber: isPickup ? identifier : parseInt(identifier), status: 'open', sector: isPickup ? 'Retirada' : 'Cliente', isPickup: isPickup, createdAt: serverTimestamp(), total: 0, sentItems: [], payments: [], serviceTaxApplied: true, selectedItems: [], requestedOrders: [], clientId: clientData.uid, clientName: clientData.name, clientPhone: clientData.phone, anonymousUid: null }); } if (window.setTableListener) window.setTableListener(tableDocId, true); startClientKdsListener(tableDocId); if (selectedItems.length > 0) { await sendOrderToFirebase(); } closeAssociationModal(); showToast(isPickup ? `Retirada #${identifier} iniciada!` : `Mesa ${identifier} vinculada!`, false); if(clientTableNumber) clientTableNumber.textContent = isPickup ? `PIN: ${identifier}` : `Mesa ${identifier}`; } catch (error) { console.error(error); showAssocError(error.message); } finally { toggleLoading(activateAndSendBtn, false, 'Confirmar'); } }
+
+// ATUALIZADO: Lógica para Mesa, Retirada (WhatsApp/PIN) e Entrega (WhatsApp/Endereço)
+async function handleActivationAndSend(e) { 
+    if (e) e.preventDefault(); 
+    let identifier = '';
+    let tableDocId = '';
+    let isPickup = false;
+    let isDelivery = false;
+    let deliveryAddress = null;
+    let whatsapp = '';
+    
+    if (!localCurrentClientUser) { showAssocError("Faça login para continuar."); return; }
+
+    // --- 1. COLETAR E VALIDAR DADOS DE ACORDO COM A ABA ---
+
+    if (currentAssociationTab === 'mesa') {
+        identifier = activateTableNumber.value.trim();
+        if (!identifier) { showAssocError("Informe o número da mesa."); return; }
+        tableDocId = identifier;
+
+    } else if (currentAssociationTab === 'retirada') {
+        whatsapp = (activateWhatsappRetirada.value || '').replace(/\D/g, '');
+        if (whatsapp.length < 10) { showAssocError("Informe um WhatsApp válido (mín. 10 dígitos)."); return; }
+        
+        const pin = whatsapp.slice(-4);
+        identifier = whatsapp; 
+        tableDocId = `pickup_${pin}`; 
+        isPickup = true;
+
+    } else if (currentAssociationTab === 'entrega') {
+        whatsapp = (activateWhatsappEntrega.value || '').replace(/\D/g, '');
+        const street = deliveryAddressStreet.value.trim();
+        const number = deliveryAddressNumber.value.trim();
+        const neighborhood = deliveryAddressNeighborhood.value.trim();
+        
+        if (whatsapp.length < 10 || !street || !number || !neighborhood) {
+            showAssocError("Preencha WhatsApp, Rua, Número e Bairro."); 
+            return;
+        }
+
+        const pin = whatsapp.slice(-4);
+        identifier = whatsapp; 
+        tableDocId = `delivery_${pin}`; 
+        isDelivery = true;
+        
+        deliveryAddress = {
+            cep: deliveryAddressCEP.value.trim(),
+            street: street,
+            number: number,
+            neighborhood: neighborhood,
+            complement: deliveryAddressComplement.value.trim(),
+            reference: deliveryAddressReference.value.trim(),
+        };
+    } else {
+        showAssocError("Selecione uma opção de pedido."); return;
+    }
+
+    // --- 2. PREPARAR AÇÃO ---
+
+    toggleLoading(activateAndSendBtn, true);
+    assocErrorMsg.style.display = 'none';
+
+    try {
+        const tableRef = getTableDocRef(tableDocId);
+        const tableSnap = await getDoc(tableRef);
+        
+        localCurrentTableId = tableDocId;
+        if (window.setCurrentTable) window.setCurrentTable(tableDocId, true, false);
+
+        const clientData = { 
+            uid: localCurrentClientUser.uid, 
+            name: localCurrentClientUser.displayName, 
+            phone: whatsapp || localCurrentClientUser.phone || null 
+        };
+
+        const newTableData = {
+            tableNumber: isPickup || isDelivery ? identifier : parseInt(identifier), 
+            status: 'open',
+            sector: isPickup ? 'Retirada' : (isDelivery ? 'Entrega' : 'Cliente'),
+            isPickup: isPickup,
+            isDelivery: isDelivery, 
+            deliveryAddress: deliveryAddress, 
+            createdAt: serverTimestamp(),
+            total: 0, 
+            sentItems: [], 
+            payments: [], 
+            serviceTaxApplied: !isDelivery, // Sem taxa para delivery por padrão
+            selectedItems: [], 
+            requestedOrders: [], 
+            clientId: clientData.uid, 
+            clientName: clientData.name, 
+            clientPhone: clientData.phone, 
+            anonymousUid: null
+        };
+        
+        // --- 3. LÓGICA DE ABERTURA/VINCULAÇÃO DA MESA/COMANDA ---
+
+        if (tableSnap.exists()) {
+            const tData = tableSnap.data();
+
+            if (tData.status === 'closed') {
+                // Fechar conta anterior e abrir nova
+                const historyRef = doc(getTablesCollectionRef(), `${tableDocId}_closed_${Date.now()}`);
+                await setDoc(historyRef, tData);
+                await setDoc(tableRef, newTableData);
+
+            } else if (tData.status !== 'open' || (tData.clientId && tData.clientId !== clientData.uid)) {
+                 // Comanda em uso por outro cliente
+                 throw new Error(`Comanda em uso por ${tData.clientName || 'outro cliente'}.`);
+            } else {
+                // Comanda/Mesa aberta pelo mesmo cliente. Atualizar info e vincular
+                const updatePayload = {
+                    clientId: clientData.uid, 
+                    clientName: clientData.name, 
+                    clientPhone: clientData.phone,
+                    ...(isDelivery && { deliveryAddress: deliveryAddress, sector: 'Entrega' }),
+                };
+                await updateDoc(tableRef, updatePayload);
+            }
+        } else {
+            // Abrir nova comanda/mesa/delivery
+            if (!isPickup && !isDelivery && !confirm(`Mesa ${identifier} não existe. Abrir nova conta?`)) { 
+                throw new Error("Ação cancelada."); 
+            }
+            await setDoc(tableRef, newTableData);
+        }
+
+        // --- 4. FINALIZAÇÃO ---
+
+        if (window.setTableListener) window.setTableListener(tableDocId, true);
+        startClientKdsListener(tableDocId);
+        
+        // Envia o pedido se houver itens no carrinho, fechando o modal
+        if (selectedItems.length > 0) {
+            await sendOrderToFirebase(true); 
+        } else {
+            closeAssociationModal(); 
+            const pinDisplay = tableDocId.includes('_') ? tableDocId.split('_')[1] : identifier;
+            let successMessage = `Mesa ${identifier} vinculada!`;
+            if (isPickup) successMessage = `Retirada #${pinDisplay} iniciada!`;
+            if (isDelivery) successMessage = `Delivery #${pinDisplay} iniciado!`;
+            showToast(successMessage, false); 
+        }
+
+        const pinDisplay = tableDocId.includes('_') ? tableDocId.split('_')[1] : identifier;
+        if(clientTableNumber) clientTableNumber.textContent = isPickup ? `Retirada: ${pinDisplay}` : (isDelivery ? `Delivery: ${pinDisplay}` : `Mesa ${identifier}`);
+
+    } catch (error) { 
+        console.error(error); 
+        showAssocError(error.message); 
+    } finally { 
+        toggleLoading(activateAndSendBtn, false, 'Confirmar'); 
+    } 
+}
+
+
 const handleCallMotoboy = () => { if (!localCurrentClientUser) { showAssocError("Faça login para chamar o entregador."); return; } alert("Redirecionando para o sistema de entregas... (Em Breve)"); };
 async function handleNewCustomerRegistration(e) { e.preventDefault(); if (!tempUserData) { showAssocError("Erro: Dados perdidos. Logue novamente."); return; } const whatsapp = regCustomerWhatsapp.value; const birthday = regCustomerBirthday.value; if (!whatsapp || !birthday) { regErrorMsg.textContent = "Preencha todos os campos."; regErrorMsg.style.display = 'block'; return; } regErrorMsg.style.display = 'none'; const completeUserData = { ...tempUserData, whatsapp: whatsapp, nascimento: birthday }; saveRegistrationBtn.disabled = true; saveRegistrationBtn.textContent = "Salvando..."; try { await saveCustomerData(completeUserData); if(localCurrentClientUser) localCurrentClientUser.phone = whatsapp; showToast("Cadastro concluído!", false); closeCustomerRegistrationModal(); openAssociationModal(); updateCustomerInfo(localCurrentClientUser, false); } catch (error) { console.error("Erro salvar:", error); regErrorMsg.textContent = "Falha ao salvar."; regErrorMsg.style.display = 'block'; } finally { saveRegistrationBtn.disabled = false; saveRegistrationBtn.textContent = "Salvar e Continuar"; } }
 const handleSearch = (e) => { currentSearch = e.target.value; currentPage = 1; clearTimeout(searchTimeout); searchTimeout = setTimeout(async () => { showMenuSkeleton(); if (currentBusinessType === 'food') { await fetchWooCommerceProducts(1, currentSearch, '', false); } renderMenu(false); }, 600); };
 const handleLoadMore = async () => { currentPage++; toggleLoading(loadMoreBtn, true, 'Carregando...'); if (currentBusinessType === 'food') { const newItems = await fetchWooCommerceProducts(currentPage, currentSearch, '', true); if (newItems.length === 0) { showToast("Fim da lista.", false); loadMoreBtn.style.display = 'none'; } else { renderMenu(true); } } else { loadMoreBtn.style.display = 'none'; showToast("Fim da lista.", false); } };
 
 function updateRestaurantTitle() { const titleEl = document.getElementById('restaurantTitle'); const headerTitleEl = document.getElementById('client-table-number'); if (currentBusinessType !== 'food') { const name = DEMO_DATA[currentBusinessType].title; restaurantNameCache = name; if(titleEl) titleEl.textContent = name; if(headerTitleEl && !localCurrentTableId) headerTitleEl.textContent = name; } }
+
+/**
+ * Habilita ou desabilita campos de input na aba ativa.
+ * @param {string} activeTabName - Nome da aba ativa ('mesa', 'retirada', 'entrega').
+ */
+function toggleTabInputs(activeTabName) {
+    document.querySelectorAll('.assoc-tab-content').forEach(content => {
+        const isActive = content.id === `content-${activeTabName}`;
+        const inputs = content.querySelectorAll('input, textarea, select');
+        
+        inputs.forEach(input => {
+            if (isActive) {
+                // Ativa apenas campos obrigatórios e necessários
+                if (input.id === 'deliveryAddressCEP' || input.id.includes('Complement') || input.id.includes('Reference')) {
+                    // Campos opcionais/secundários: mantidos habilitados se a aba for Entrega, mas não "required"
+                    input.disabled = (activeTabName !== 'entrega'); 
+                } else {
+                    input.disabled = false;
+                }
+            } else {
+                // Desabilita todos os campos em abas inativas para evitar validação
+                input.disabled = true;
+            }
+        });
+    });
+
+    // Garante que o input da aba Mesa esteja ativo se for a aba Mesa
+    if (activeTabName === 'mesa') {
+        if(activateTableNumber) activateTableNumber.disabled = false;
+    }
+}
+
 
 // ==================================================================
 //               4. INICIALIZAÇÃO
@@ -347,10 +602,22 @@ export const initClientOrderController = () => {
     loggedInStep = document.getElementById('loggedInStep'); 
     loggedInUserName = document.getElementById('loggedInUserName'); 
     assocErrorMsg = document.getElementById('assocErrorMsg');
+    
+    // CAMPOS DE ASSOCIAÇÃO ATUALIZADOS
     activateTableNumber = document.getElementById('activateTableNumber'); 
-    activatePickupPin = document.getElementById('activatePickupPin');
+    activateWhatsappRetirada = document.getElementById('activateWhatsappRetirada'); 
+    activateWhatsappEntrega = document.getElementById('activateWhatsappEntrega'); 
     btnCallMotoboy = document.getElementById('btnCallMotoboy');
+    closeAssociationModalBtn = document.getElementById('closeAssociationModalBtn'); 
 
+    // Novos campos de endereço (Entrega)
+    deliveryAddressCEP = document.getElementById('deliveryAddressCEP');
+    deliveryAddressStreet = document.getElementById('deliveryAddressStreet');
+    deliveryAddressNumber = document.getElementById('deliveryAddressNumber');
+    deliveryAddressNeighborhood = document.getElementById('deliveryAddressNeighborhood');
+    deliveryAddressComplement = document.getElementById('deliveryAddressComplement');
+    deliveryAddressReference = document.getElementById('deliveryAddressReference');
+    
     tabButtons = document.querySelectorAll('.assoc-tab-btn');
     tabContents = document.querySelectorAll('.assoc-tab-content');
     const defaultActionButtons = document.getElementById('defaultActionButtons');
@@ -365,12 +632,25 @@ export const initClientOrderController = () => {
                 const contentEl = document.getElementById(`content-${tabName}`);
                 if(contentEl) {
                     contentEl.style.display = 'block';
-                    if (tabName === 'mesa' || tabName === 'retirada') { if(defaultActionButtons) defaultActionButtons.style.display = 'flex'; }
-                    else if (tabName === 'entrega') { if(defaultActionButtons) defaultActionButtons.style.display = 'none'; }
+                    if (tabName === 'mesa' || tabName === 'retirada' || tabName === 'entrega') { 
+                         if(defaultActionButtons) defaultActionButtons.style.display = 'flex'; 
+                    } else {
+                        if(defaultActionButtons) defaultActionButtons.style.display = 'none'; 
+                    }
                 }
+                toggleTabInputs(tabName); // Chama a função para lidar com os inputs
             });
         });
     }
+
+    // Adiciona listener para o novo botão 'X' do modal
+    if (closeAssociationModalBtn) {
+        closeAssociationModalBtn.addEventListener('click', closeAssociationModal);
+    }
+    
+    // Inicializa o estado dos inputs para a aba 'mesa'
+    toggleTabInputs(currentAssociationTab);
+
 
     if (btnCallMotoboy) btnCallMotoboy.addEventListener('click', handleCallMotoboy);
     if (businessTypeSelector) {
@@ -491,6 +771,8 @@ export const initClientOrderController = () => {
  * EXPORTAÇÃO CORRIGIDA - ESSENCIAL PARA O APP.JS
  */
 export const renderClientOrderScreen = (orderSnapshot = null) => {
+    
+    // --- Lógica para o contador do carrinho ---
     if (clientCartCount) {
         const totalItems = selectedItems.length;
         clientCartCount.textContent = totalItems;
@@ -502,6 +784,17 @@ export const renderClientOrderScreen = (orderSnapshot = null) => {
             clientCartCount.classList.add('hidden');
         }
     }
+
+    // --- Lógica para habilitar/desabilitar o botão ENVIAR ---
+    if (sendOrderBtn) {
+        if (selectedItems.length > 0) {
+            sendOrderBtn.disabled = false;
+        } else {
+            sendOrderBtn.disabled = true;
+        }
+    }
+    // -----------------------------------------------------------
+
     _renderClientCart();
 };
 
@@ -510,7 +803,7 @@ async function loadMenu() {
     currentPage = 1;
     if (currentBusinessType === 'food') {
         try {
-            await fetchWooCommerceProducts(1, '', '', false);
+            await fetchWooCommerceProducts(1, '', '', false); 
         } catch (error) {
             console.error("Erro ao carregar menu:", error);
             showToast("Erro ao carregar cardápio.", true);
@@ -536,7 +829,27 @@ function showAssocError(message) { if (assocErrorMsg) { assocErrorMsg.textConten
 function renderClientQuickObsButtons(observations) { if (!clientQuickObsButtons) return; if (observations.length === 0) { clientQuickObsButtons.innerHTML = '<p class="text-xs italic">Nenhuma obs.</p>'; return; } clientQuickObsButtons.innerHTML = observations.map(obs => `<button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input rounded-full hover:bg-gray-600" data-obs="${obs.text}">${obs.text}</button>`).join(''); }
 export const fetchQuickObservations = async () => { try { if (quickObsCache.length > 0) { renderClientQuickObsButtons(quickObsCache); return quickObsCache; } const q = query(getQuickObsCollectionRef(), orderBy('text', 'asc')); const snap = await getDocs(q); quickObsCache = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })); renderClientQuickObsButtons(quickObsCache); } catch (e) { console.error(e); } };
 function showMenuSkeleton() { if (!clientMenuContainer) return; clientMenuContainer.innerHTML = Array(6).fill(0).map(() => `<div class="bg-dark-card border border-dark-border rounded-xl shadow-md flex flex-col overflow-hidden h-64"><div class="w-full h-32 skeleton"></div><div class="p-4 flex flex-col flex-grow space-y-3"><div class="h-4 w-3/4 skeleton"></div><div class="h-4 w-1/2 skeleton"></div><div class="mt-auto h-8 w-full skeleton rounded-lg"></div></div></div>`).join(''); }
-function openAssociationModal() { if (associationModal) { if(assocErrorMsg) assocErrorMsg.style.display = 'none'; associationModal.style.display = 'flex'; document.querySelectorAll('.assoc-tab-btn').forEach(b => b.classList.remove('active')); document.querySelectorAll('.assoc-tab-content').forEach(c => c.style.display = 'none'); const mesaTab = document.querySelector('.assoc-tab-btn[data-tab="mesa"]'); const mesaContent = document.getElementById('content-mesa'); if(mesaTab) mesaTab.classList.add('active'); if(mesaContent) mesaContent.style.display = 'block'; currentAssociationTab = 'mesa'; if (activateTableNumber) activateTableNumber.focus(); const defaultActionButtons = document.getElementById('defaultActionButtons'); if (defaultActionButtons) defaultActionButtons.style.display = 'flex'; } }
+function openAssociationModal() { 
+    if (associationModal) { 
+        if(assocErrorMsg) assocErrorMsg.style.display = 'none'; 
+        associationModal.style.display = 'flex'; 
+        document.querySelectorAll('.assoc-tab-btn').forEach(b => b.classList.remove('active')); 
+        document.querySelectorAll('.assoc-tab-content').forEach(c => c.style.display = 'none'); 
+        
+        // Padrão: Abrir na aba 'mesa'
+        const mesaTab = document.querySelector('.assoc-tab-btn[data-tab="mesa"]'); 
+        const mesaContent = document.getElementById('content-mesa'); 
+        if(mesaTab) mesaTab.classList.add('active'); 
+        if(mesaContent) mesaContent.style.display = 'block'; 
+        currentAssociationTab = 'mesa'; 
+        
+        toggleTabInputs('mesa'); // Habilita inputs da aba 'mesa'
+        
+        if (activateTableNumber) activateTableNumber.focus(); 
+        const defaultActionButtons = document.getElementById('defaultActionButtons'); 
+        if (defaultActionButtons) defaultActionButtons.style.display = 'flex'; 
+    } 
+}
 function closeAssociationModal() { if (associationModal) associationModal.style.display = 'none'; }
 function openCustomerRegistrationModal() { if (customerRegistrationModal && tempUserData) { regCustomerName.textContent = tempUserData.name || 'Nome não encontrado'; regCustomerEmail.textContent = tempUserData.email || 'Email não encontrado'; regCustomerWhatsapp.value = ''; regCustomerBirthday.value = ''; if(regErrorMsg) regErrorMsg.style.display = 'none'; customerRegistrationModal.style.display = 'flex'; associationModal.style.display = 'none'; } }
 function closeCustomerRegistrationModal() { if (customerRegistrationModal) customerRegistrationModal.style.display = 'none'; }
