@@ -1,8 +1,5 @@
-// --- CONTROLLERS/MANAGER_MODULES/DELIVERYMANAGER.JS (CORRIGIDO) ---
-
-// CORREÇÃO: Importar formatCurrency, showToast, toggleLoading de utils.js
-import { formatCurrency, toggleLoading, showToast } from "/utils.js";
-import { currentTableId, goToScreen } from "/app.js"; 
+// --- CONTROLLERS/MANAGER_MODULES/DELIVERYMANAGER.JS ---
+import { showToast, currentTableId, goToScreen } from "/app.js"; 
 import { getTableDocRef, getTablesCollectionRef } from "/services/firebaseService.js";
 import { setDoc, serverTimestamp, updateDoc, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -16,13 +13,17 @@ let generatedPin = null;
 export const init = () => {
     console.log("[DeliveryModule] Inicializando...");
     
+    // Vincula o botão "Confirmar/Iniciar Pedido" do modal
     const confirmBtn = document.getElementById('confirmOrderModeBtn');
     if(confirmBtn) {
+        // Remove listeners antigos clonando o botão (truque simples para evitar duplicação de eventos)
         const newBtn = confirmBtn.cloneNode(true);
         confirmBtn.parentNode.replaceChild(newBtn, confirmBtn);
+        
         newBtn.addEventListener('click', handleConfirmOrder);
     }
     
+    // Garante que o estado inicial visual esteja correto
     switchTab('mesa');
 };
 
@@ -33,6 +34,7 @@ export const init = () => {
 export const switchTab = (mode) => {
     currentMode = mode;
     
+    // 1. Atualiza visual das Abas
     document.querySelectorAll('.tab-btn').forEach(btn => {
         if(btn.dataset.tab === `tab-${mode}`) {
             btn.classList.add('text-pumpkin', 'border-b-2', 'border-pumpkin', 'bg-gray-700');
@@ -43,10 +45,12 @@ export const switchTab = (mode) => {
         }
     });
 
+    // 2. Mostra/Esconde Conteúdo
     document.querySelectorAll('.order-mode-content').forEach(div => div.classList.add('hidden'));
     const targetDiv = document.getElementById(`tab-${mode}`);
     if(targetDiv) targetDiv.classList.remove('hidden');
 
+    // 3. Lógica Específica de cada Aba
     if (mode === 'mesa') {
         const display = document.getElementById('modalCurrentTableDisplay');
         if(display) display.innerText = currentTableId || '--';
@@ -71,6 +75,7 @@ const updateConfirmButtonText = (text) => {
 // ==================================================================
 
 const generatePin = () => {
+    // Gera PIN aleatório (Letra + 3 Números) ex: A123
     const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
     const letter = letters.charAt(Math.floor(Math.random() * letters.length));
     const numbers = Math.floor(100 + Math.random() * 900);
@@ -88,6 +93,7 @@ export const handleCallMotoboy = () => {
         return;
     }
     
+    // Simulação de integração com API de Logística
     const btn = document.getElementById('callMotoboyBtn');
     const originalText = btn.innerHTML;
     
@@ -101,6 +107,7 @@ export const handleCallMotoboy = () => {
     }, 1500);
 };
 
+// Função Principal: Decide se vincula mesa ou cria pedido virtual
 const handleConfirmOrder = async () => {
     const customerName = document.getElementById('customerNameInput').value || 'Cliente Não Identificado';
     const customerCpf = document.getElementById('customerSearchCpf').value || '';
@@ -124,6 +131,7 @@ const handleConfirmOrder = async () => {
     }
 };
 
+// Caso 1: Vincular a uma Mesa Física existente
 const linkCustomerToTable = async (name, cpf) => {
     if(!currentTableId) {
         showToast("Erro: Nenhuma mesa selecionada no fundo.", true);
@@ -140,7 +148,8 @@ const linkCustomerToTable = async (name, cpf) => {
         showToast(`Mesa ${currentTableId} vinculada a ${name}`);
         document.getElementById('customerRegModal').style.display = 'none';
         
-        const nameDisplay = document.getElementById('order-screen-client-name'); 
+        // Atualiza interface se necessário
+        const nameDisplay = document.getElementById('order-screen-client-name'); // Se existir esse elemento
         if(nameDisplay) nameDisplay.textContent = name;
         
     } catch(e) {
@@ -148,21 +157,27 @@ const linkCustomerToTable = async (name, cpf) => {
     }
 };
 
+// Caso 2: Criar Mesa Virtual (Retirada ou Entrega)
 const createVirtualOrder = async (name, cpf) => {
+    // ID Virtual: 
+    // 9000-9999 para Retirada (Balcão)
+    // 8000-8999 para Entrega (Delivery)
     const prefix = currentMode === 'retirada' ? 9000 : 8000;
+    
+    // Tenta encontrar um ID livre (simples)
     const randomId = prefix + Math.floor(Math.random() * 999);
     
     const orderData = {
         tableNumber: randomId,
         status: 'open',
-        type: currentMode,
+        type: currentMode, // 'retirada' ou 'entrega'
         clientName: name,
         clientCpf: cpf,
         openedAt: serverTimestamp(),
         total: 0,
         selectedItems: [],
         payments: [],
-        isVirtual: true
+        isVirtual: true // Flag importante para relatórios
     };
 
     if (currentMode === 'retirada') {
@@ -189,14 +204,18 @@ const createVirtualOrder = async (name, cpf) => {
         orderData.sector = 'Delivery';
     }
 
+    // Cria o documento no Firestore
     await setDoc(getTableDocRef(randomId), orderData);
 
+    // Finaliza
     document.getElementById('customerRegModal').style.display = 'none';
     showToast(`${currentMode === 'retirada' ? 'Retirada' : 'Entrega'} iniciada! Pedido #${randomId}`);
     
+    // Redireciona para a tela de pedidos dessa nova "mesa"
     if(window.loadTable) {
         window.loadTable(randomId);
     } else {
+        // Fallback se loadTable não estiver global
         window.location.reload(); 
     }
 };

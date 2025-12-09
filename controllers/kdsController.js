@@ -1,4 +1,4 @@
-// --- CONTROLLERS/KDSCONTROLLER.JS (VERSÃO FINAL - COM RECUSA DE PEDIDO) ---
+// --- CONTROLLERS/KDSCONTROLLER.JS (VERSÃO FINAL - COM NOTIFICAÇÃO DE MESA) ---
 import { getKdsCollectionRef, getTableDocRef, db } from "/services/firebaseService.js"; 
 import { query, where, orderBy, limit, onSnapshot, updateDoc, doc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { formatElapsedTime, toggleLoading } from "/utils.js"; 
@@ -137,13 +137,6 @@ const renderKdsCard = (container, docId, data) => {
     const btnColor = isPreparing ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700';
     const btnIcon = isPreparing ? '<i class="fas fa-check mr-2"></i>' : '<i class="fas fa-fire mr-2"></i>';
 
-    // HTML do Botão "Recusar"
-    const rejectBtnHtml = !isPreparing ? `
-        <button class="py-3 px-4 bg-red-900/50 hover:bg-red-800 text-red-300 rounded-lg transition shadow-sm btn-reject-order mr-2" title="Recusar Pedido">
-            <i class="fas fa-times"></i>
-        </button>
-    ` : '';
-
     card.innerHTML = `
         <div class="flex justify-between items-start mb-3 border-b border-gray-700 pb-2">
             <div>
@@ -165,17 +158,14 @@ const renderKdsCard = (container, docId, data) => {
             ${itemsHtml}
         </div>
 
-        <div class="flex items-center">
-            ${rejectBtnHtml}
-            <button class="flex-grow py-3 ${btnColor} text-white font-bold rounded-lg transition shadow-md btn-advance-status flex items-center justify-center uppercase tracking-wide text-sm">
-                ${btnIcon} ${btnText}
-            </button>
-        </div>
+        <button class="w-full py-3 ${btnColor} text-white font-bold rounded-lg transition shadow-md btn-advance-status flex items-center justify-center uppercase tracking-wide text-sm">
+            ${btnIcon} ${btnText}
+        </button>
     `;
 
     container.appendChild(card);
 
-    // Listener do Botão Avançar
+    // Listener do Botão
     const btn = card.querySelector('.btn-advance-status');
     btn.addEventListener('click', async () => {
         const newStatus = data.status === 'pending' ? 'preparing' : 'finished';
@@ -186,10 +176,11 @@ const renderKdsCard = (container, docId, data) => {
         try {
             await updateDoc(doc(getKdsCollectionRef(), docId), { status: newStatus });
             
+            // --- NOTIFICAÇÃO PARA O GARÇOM (PAINEL) ---
             if (newStatus === 'finished') {
-                const tableRef = getTableDocRef(data.tableNumber);
+                const tableRef = getTableDocRef(data.tableNumber); // Usa o ID numérico da mesa
                 await updateDoc(tableRef, { 
-                    kdsAlert: 'ready' 
+                    kdsAlert: 'ready' // Marca a mesa como pronta
                 });
             }
 
@@ -199,26 +190,6 @@ const renderKdsCard = (container, docId, data) => {
             toggleLoading(btn, false);
         }
     });
-
-    // Listener do Botão Recusar
-    const rejectBtn = card.querySelector('.btn-reject-order');
-    if (rejectBtn) {
-        rejectBtn.addEventListener('click', async () => {
-            const reason = prompt(`Motivo da recusa para Mesa ${data.tableNumber}:`);
-            if (reason !== null) { // Permite string vazia, mas cancela se for null (Esc)
-                try {
-                    await updateDoc(doc(getKdsCollectionRef(), docId), { 
-                        status: 'cancelled',
-                        cancelReason: reason || 'Sem motivo'
-                    });
-                    showToast("Pedido recusado.", true);
-                } catch (err) {
-                    console.error("Erro ao recusar KDS:", err);
-                    showToast("Erro ao recusar.", true);
-                }
-            }
-        });
-    }
 };
 
 // --- HISTÓRICO (MANTIDO) ---
@@ -263,7 +234,6 @@ const loadKdsHistory = async () => {
                         <span class="text-xs font-mono text-gray-500">${time}</span>
                     </div>
                     <div class="mb-2">${itemsList}</div>
-                    ${data.cancelReason ? `<p class="text-xs text-red-400 mb-2">Motivo: ${data.cancelReason}</p>` : ''}
                     <div class="text-right">
                         <span class="text-[10px] uppercase font-bold px-2 py-1 rounded ${data.status === 'finished' ? 'bg-green-900 text-green-400' : 'bg-red-900 text-red-400'}">
                             ${data.status === 'finished' ? 'ENTREGUE' : 'CANCELADO'}

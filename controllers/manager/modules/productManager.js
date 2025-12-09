@@ -1,58 +1,42 @@
-// --- CONTROLLERS/MANAGER/MODULES/PRODUCTMANAGER.JS (VERSÃO FINAL - PROMOÇÃO & HIERARQUIA) ---
-
+// --- CONTROLLERS/MANAGER/MODULES/PRODUCTMANAGER.JS ---
 import { 
     db, appId, 
     getSectorsCollectionRef, 
-    getCollectionRef 
+    getCollectionRef // Helper genérico se existir, ou criaremos abaixo
 } from "/services/firebaseService.js"; 
 
 import { 
     collection, query, where, getDocs, orderBy, 
-    doc, setDoc, deleteDoc, updateDoc, serverTimestamp, getDoc, addDoc, writeBatch, increment
+    doc, setDoc, deleteDoc, updateDoc, serverTimestamp, writeBatch, increment, addDoc
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-import { formatCurrency, toggleLoading, showToast } from "/utils.js";
-
+import { formatCurrency, toggleLoading } from "/utils.js";
 import { 
-    syncWithWooCommerce, getProducts, getCategories, fetchSalesHistory,
-    createWooProduct, updateWooProduct, deleteWooProduct, fetchWooCommerceProducts 
+    syncWithWooCommerce, getProducts, getCategories, 
+    createWooProduct, updateWooProduct, deleteWooProduct, fetchWooCommerceProducts, 
+    createWooCategory, updateWooCategory, deleteWooCategory 
 } from "/services/wooCommerceService.js"; 
+import { showToast } from "/app.js"; 
 
+// Helpers Locais
 const getColRef = (name) => collection(db, 'artifacts', appId, 'public', 'data', name);
 let managerModal = null;
 let currentTab = 'products';
+let currentComposition = [];
 let ingredientsCache = [];
 let suppliersCache = [];
-let currentProductComposition = []; 
-
-const COST_GAS_PER_HOUR = 6.00; 
-const COST_ENERGY_PER_HOUR = 1.50; 
+let inventoryChecklist = [];
 
 // ==================================================================
-//           1. API PÚBLICA
+//           1. API PÚBLICA DO MÓDULO
 // ==================================================================
 
 export const init = () => {
     console.log("[ProductModule] Inicializado.");
     managerModal = document.getElementById('managerModal');
     
-    window.handleImageUpload = (input) => {
-        if (input.files && input.files[0]) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const preview = document.getElementById('imgPreview');
-                const icon = document.getElementById('imgPlaceholderIcon');
-                const urlInput = document.getElementById('prodImgUrl');
-                
-                if(preview) { preview.src = e.target.result; preview.classList.remove('hidden'); }
-                if(icon) icon.classList.add('hidden');
-                if(urlInput) urlInput.value = e.target.result; 
-
-                showToast("Imagem carregada (Preview).", false);
-            };
-            reader.readAsDataURL(input.files[0]);
-        }
-    };
+    // Configura listeners globais de importação XML (se houver input no HTML)
+    // window.handleImportXML = handleImportXML; (Exposto sob demanda)
 };
 
 export const open = async () => {
@@ -60,72 +44,47 @@ export const open = async () => {
 };
 
 export const sync = async () => {
-    showToast("Sincronizando...", false);
+    showToast("Iniciando sincronização com WooCommerce...", false);
     try {
         await syncWithWooCommerce();
         showToast("Sincronização concluída!", false);
+        // Se estiver com painel aberto, recarrega
         if(managerModal && managerModal.style.display === 'flex' && currentTab === 'products') {
             switchHubTab('products');
         }
-    } catch (e) { console.error(e); showToast("Erro sync.", true); }
+    } catch (e) {
+        console.error(e);
+        showToast("Erro na sincronização.", true);
+    }
 };
 
-export const openSettings = async () => { alert("Configurações de setores em breve."); };
+export const openSettings = async () => {
+    renderSectorManagementModal();
+};
 
 // ==================================================================
-//           2. HUB PRINCIPAL
+//           2. HUB PRINCIPAL (UI)
 // ==================================================================
-
-async function calculateConsumptionFromHistory(days = 30) {
-    const orders = await fetchSalesHistory(days);
-    if (!orders || orders.length === 0) return {};
-
-    const salesMap = {};
-    orders.forEach(order => {
-        order.line_items.forEach(item => {
-            const pid = item.product_id.toString();
-            salesMap[pid] = (salesMap[pid] || 0) + item.quantity;
-        });
-    });
-
-    const consumptionMap = {};
-    const productsSnap = await getDocs(getColRef('products'));
-    const productCompositions = {};
-    productsSnap.forEach(doc => {
-        productCompositions[doc.id] = doc.data().composition || [];
-    });
-
-    Object.entries(salesMap).forEach(([pid, qtySold]) => {
-        const composition = productCompositions[pid];
-        if (composition) {
-            composition.forEach(ing => {
-                consumptionMap[ing.id] = (consumptionMap[ing.id] || 0) + (ing.qty * qtySold);
-            });
-        }
-    });
-
-    return consumptionMap;
-}
 
 async function renderProductHub(activeTab = 'products') {
     if (!managerModal) return;
     
+    // Carrega dependências iniciais
     await fetchIngredients();
-    await fetchSuppliers();
     
     managerModal.innerHTML = `
         <div class="bg-dark-card border-0 md:border md:border-dark-border w-full h-full md:h-[90vh] md:max-w-6xl flex flex-col md:rounded-xl shadow-2xl overflow-hidden">
             <div class="flex justify-between items-center p-4 md:p-6 border-b border-gray-700 bg-gray-800 flex-shrink-0">
-                <div><h3 class="text-xl md:text-2xl font-bold text-white">Gestão de Produtos</h3><p class="text-xs md:text-sm text-gray-400">Cardápio, Estoque e Compras Inteligentes</p></div>
+                <div><h3 class="text-xl md:text-2xl font-bold text-white">Gestão de Produtos</h3><p class="text-xs md:text-sm text-gray-400">Cardápio, Estoque e Fornecedores</p></div>
                 <button class="text-gray-400 hover:text-white text-3xl leading-none p-2" onclick="document.getElementById('managerModal').style.display='none'">&times;</button>
             </div>
             
             <div class="flex items-center space-x-2 p-3 bg-dark-bg border-b border-gray-700 overflow-x-auto flex-shrink-0 whitespace-nowrap">
                 <button id="tab-products" class="hub-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition flex items-center"><i class="fas fa-hamburger mr-2"></i> Produtos</button>
                 <button id="tab-ingredients" class="hub-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition flex items-center"><i class="fas fa-cubes mr-2"></i> Insumos</button>
-                <button id="tab-shoppingList" class="hub-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition flex items-center"><i class="fas fa-shopping-cart mr-2"></i> Lista de Compras</button>
                 <button id="tab-suppliers" class="hub-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition flex items-center"><i class="fas fa-truck mr-2"></i> Fornecedores</button>
-                <button id="tab-lowestCost" class="hub-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition flex items-center bg-green-900/30 text-green-400 border border-green-600/50 hover:bg-green-900/50"><i class="fas fa-percent mr-2"></i> Menor Custo</button>
+                <button id="tab-shoppingList" class="hub-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition flex items-center"><i class="fas fa-shopping-cart mr-2"></i> Compras</button>
+                <button id="tab-categories" class="hub-tab-btn px-4 py-2 rounded-lg font-bold text-sm transition flex items-center"><i class="fas fa-tags mr-2"></i> Categorias</button>
             </div>
 
             <div id="productActionsToolbar" class="flex flex-col md:flex-row items-stretch md:items-center justify-between p-3 bg-dark-bg border-b border-gray-700 gap-3 flex-shrink-0"></div>
@@ -134,42 +93,51 @@ async function renderProductHub(activeTab = 'products') {
                 <div class="flex items-center justify-center h-full text-gray-500"><i class="fas fa-spinner fa-spin text-3xl"></i></div>
             </div>
         </div>
-        <div id="subModalContainer"></div>`;
+        
+        <div id="subModalContainer"></div>
+    `;
 
     managerModal.style.display = 'flex';
-    managerModal.classList.remove('p-4'); managerModal.classList.add('p-0', 'md:p-4');
+    managerModal.classList.remove('p-4'); 
+    managerModal.classList.add('p-0', 'md:p-4');
 
+    // Bind Tabs
     document.getElementById('tab-products').onclick = () => switchHubTab('products');
     document.getElementById('tab-ingredients').onclick = () => switchHubTab('ingredients');
-    document.getElementById('tab-shoppingList').onclick = () => switchHubTab('shoppingList');
     document.getElementById('tab-suppliers').onclick = () => switchHubTab('suppliers');
-    document.getElementById('tab-lowestCost').onclick = () => switchHubTab('lowestCost');
+    document.getElementById('tab-shoppingList').onclick = () => switchHubTab('shoppingList');
+    document.getElementById('tab-categories').onclick = () => switchHubTab('categories');
 
     await switchHubTab(activeTab);
 }
 
 async function switchHubTab(tab) {
     currentTab = tab;
+    
+    // Atualiza Visual Tabs
     document.querySelectorAll('.hub-tab-btn').forEach(btn => {
-        if(btn.id === `tab-${tab}`) { btn.classList.add('bg-indigo-600', 'text-white'); btn.classList.remove('bg-dark-input', 'text-gray-300', 'bg-green-900/30', 'text-green-400'); } 
-        else if (btn.id === 'tab-lowestCost') { btn.classList.add('bg-green-900/30', 'text-green-400'); btn.classList.remove('bg-indigo-600', 'text-white'); }
-        else { btn.classList.remove('bg-indigo-600', 'text-white'); btn.classList.add('bg-dark-input', 'text-gray-300'); }
+        if(btn.id === `tab-${tab}`) {
+            btn.classList.add('bg-indigo-600', 'text-white'); btn.classList.remove('bg-dark-input', 'text-gray-300');
+        } else {
+            btn.classList.remove('bg-indigo-600', 'text-white'); btn.classList.add('bg-dark-input', 'text-gray-300');
+        }
     });
 
     const contentDiv = document.getElementById('hubContent');
     const toolbarDiv = document.getElementById('productActionsToolbar');
+    
     contentDiv.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500"><i class="fas fa-spinner fa-spin text-3xl"></i></div>';
     toolbarDiv.innerHTML = '';
 
     if (tab === 'products') await renderProductListConfig(contentDiv, toolbarDiv);
     else if (tab === 'ingredients') await renderIngredientsScreen(contentDiv, toolbarDiv);
-    else if (tab === 'shoppingList') await renderShoppingListScreen(contentDiv, toolbarDiv);
     else if (tab === 'suppliers') await renderSuppliersScreen(contentDiv, toolbarDiv);
-    else if (tab === 'lowestCost') await renderLowestCostScreen(contentDiv, toolbarDiv);
+    else if (tab === 'shoppingList') await renderShoppingListScreen(contentDiv, toolbarDiv);
+    else if (tab === 'categories') await renderCategoryManagement(contentDiv);
 }
 
 // ==================================================================
-//           3. GESTÃO DE PRODUTOS (LISTA E FORM - ATUALIZADO)
+//           3. GESTÃO DE PRODUTOS (LISTAGEM E EDIÇÃO)
 // ==================================================================
 
 async function renderProductListConfig(contentDiv, toolbarDiv) {
@@ -182,28 +150,28 @@ async function renderProductListConfig(contentDiv, toolbarDiv) {
             <select id="hubCategoryFilter" class="bg-gray-700 text-white text-sm py-3 px-3 rounded-lg border border-gray-600 w-full md:w-[200px]">${catOptions}</select>
         </div>
         <div class="flex items-center space-x-2 w-full md:w-auto">
-            <input type="text" id="hubSearchInput" placeholder="Pesquisar..." class="bg-dark-input text-white text-sm py-3 px-3 rounded-lg border border-gray-600 w-full">
-            
-            <button id="btnConfigInit" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 px-4 rounded-lg shadow flex items-center text-sm whitespace-nowrap" title="Gerar/Atualizar Catálogo Base">
-                <i class="fas fa-cogs mr-2"></i> Config. Iniciais
+            <div class="relative w-full md:w-64">
+                <input type="text" id="hubSearchInput" placeholder="Pesquisar..." class="bg-dark-input text-white text-sm py-3 pl-3 pr-8 rounded-lg border border-gray-600 w-full focus:border-indigo-500">
+                <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+            </div>
+            <button id="hubNewProductBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition shadow-lg flex items-center justify-center whitespace-nowrap">
+                <i class="fas fa-plus mr-2"></i> <span class="hidden md:inline">Novo</span>
             </button>
-            
-            <button id="hubNewProductBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow flex items-center"><i class="fas fa-plus mr-2"></i> Novo</button>
         </div>`;
 
     document.getElementById('hubNewProductBtn').onclick = () => renderProductForm(null, contentDiv);
-    document.getElementById('btnConfigInit').onclick = configureInitialCatalog; 
     
     let hubCategory = 'all';
     let hubSearch = '';
     let searchTimeout;
 
-    const renderList = async (page = 1) => {
-        contentDiv.innerHTML = '<div class="flex justify-center py-10"><i class="fas fa-spinner fa-spin text-3xl text-gray-500"></i></div>';
-        await fetchWooCommerceProducts(page, hubSearch, hubCategory, false);
+    const renderList = async (page = 1, append = false) => {
+        if (!append) contentDiv.innerHTML = '<div class="flex justify-center py-10"><i class="fas fa-spinner fa-spin text-3xl text-gray-500"></i></div>';
+        
+        await fetchWooCommerceProducts(page, hubSearch, hubCategory, append);
         const products = getProducts();
         
-        if (products.length === 0) {
+        if (products.length === 0 && !append) {
             contentDiv.innerHTML = '<p class="text-center text-gray-500 py-10">Nenhum produto encontrado.</p>';
             return;
         }
@@ -211,365 +179,72 @@ async function renderProductListConfig(contentDiv, toolbarDiv) {
         const listHtml = products.map(p => `
             <div class="flex justify-between items-center bg-dark-input p-3 rounded-lg mb-2 border border-gray-700 hover:border-gray-500 transition group">
                 <div class="flex items-center space-x-3 overflow-hidden">
-                    <div class="w-12 h-12 rounded-lg bg-gray-800 overflow-hidden flex-shrink-0 border border-gray-600 relative">
+                    <div class="w-12 h-12 rounded-lg bg-gray-800 overflow-hidden flex-shrink-0 border border-gray-600">
                         <img src="${p.image || 'https://placehold.co/50'}" class="w-full h-full object-cover">
                     </div>
                     <div class="min-w-0">
                         <h4 class="font-bold text-white text-sm truncate">${p.name}</h4>
                         <div class="flex items-center text-xs space-x-2 mt-1">
                             <span class="text-green-400 font-mono bg-green-900/30 px-1.5 py-0.5 rounded">${formatCurrency(p.price)}</span>
-                            ${p.on_sale ? `<span class="text-yellow-400 font-mono bg-yellow-900/30 px-1.5 py-0.5 rounded ml-1 border border-yellow-600/50" title="Em Promoção"><i class="fas fa-tag mr-1"></i>${formatCurrency(p.sale_price)}</span>` : ''}
-                            <span class="text-gray-500 ml-2">${p.category || 'Sem Categoria'}</span>
+                            ${p.status !== 'publish' ? '<span class="text-yellow-500 bg-yellow-900/30 px-1.5 rounded">Oculto</span>' : ''}
                         </div>
                     </div>
                 </div>
                 <div class="flex space-x-2 flex-shrink-0">
-                    <button class="bg-indigo-600 hover:bg-indigo-500 text-white p-2 rounded-lg text-sm btn-edit-prod shadow" data-id="${p.id}" title="Editar / Ficha Técnica"><i class="fas fa-edit"></i></button>
+                    <button class="bg-indigo-600 hover:bg-indigo-500 text-white p-2 rounded-lg text-sm btn-edit-prod shadow" data-id="${p.id}"><i class="fas fa-edit"></i></button>
                     <button class="bg-red-600 hover:bg-red-500 text-white p-2 rounded-lg text-sm btn-del-prod shadow" data-id="${p.id}"><i class="fas fa-trash"></i></button>
                 </div>
             </div>`).join('');
             
-        contentDiv.innerHTML = `<div class="pb-20">${listHtml}</div>`;
+        contentDiv.innerHTML = `<div class="pb-4">${listHtml}</div>`;
         
+        // Re-bind buttons
         contentDiv.querySelectorAll('.btn-edit-prod').forEach(btn => 
             btn.onclick = () => { const prod = products.find(p => p.id == btn.dataset.id); renderProductForm(prod, contentDiv); }
         );
-        
         contentDiv.querySelectorAll('.btn-del-prod').forEach(btn => 
-            btn.onclick = () => handleDeleteProduct(btn.dataset.id)
+            btn.onclick = () => handleDeleteProduct(btn.dataset.id, () => renderList(1, false))
         );
     };
 
-    document.getElementById('hubCategoryFilter').onchange = (e) => { hubCategory = e.target.value; renderList(1); };
-    document.getElementById('hubSearchInput').oninput = (e) => { hubSearch = e.target.value; clearTimeout(searchTimeout); searchTimeout = setTimeout(() => renderList(1), 600); };
+    document.getElementById('hubCategoryFilter').onchange = (e) => { hubCategory = e.target.value; renderList(1, false); };
+    document.getElementById('hubSearchInput').oninput = (e) => { 
+        hubSearch = e.target.value; 
+        clearTimeout(searchTimeout); 
+        searchTimeout = setTimeout(() => renderList(1, false), 600); 
+    };
 
-    renderList(1);
-}
-
-async function handleDeleteProduct(id) {
-    if(confirm("Tem certeza que deseja excluir este produto?")) {
-        try {
-            await deleteWooProduct(id);
-            await deleteDoc(doc(getColRef('products'), id.toString()));
-            showToast("Produto excluído com sucesso.", false);
-            const contentDiv = document.getElementById('hubContent');
-            const toolbarDiv = document.getElementById('productActionsToolbar');
-            if(contentDiv && toolbarDiv) renderProductListConfig(contentDiv, toolbarDiv);
-        } catch(e) {
-            console.error(e);
-            showToast("Erro ao excluir: " + e.message, true);
-        }
-    }
+    renderList(1, false);
 }
 
 async function renderProductForm(product = null, container) {
     const isEdit = !!product;
-    
-    let extendedData = {};
-    currentProductComposition = [];
-    
-    if (isEdit) {
-        try {
-            const docSnap = await getDoc(doc(getColRef('products'), product.id.toString()));
-            if (docSnap.exists()) {
-                extendedData = docSnap.data();
-                currentProductComposition = extendedData.composition || [];
-            }
-        } catch (e) { console.error("Erro ao carregar ficha técnica:", e); }
-    }
-
     const sectorsSnap = await getDocs(query(getSectorsCollectionRef(), where('type', '==', 'production'), orderBy('name')));
     const sectors = sectorsSnap.docs.map(d => d.data().name);
-    if(sectors.length === 0) sectors.push('Cozinha', 'Bar', 'Copa'); 
+    currentComposition = product?.composition || [];
     
-    const price = product?.price || '';
-    const salePrice = product?.sale_price || '';
-    const onSale = !!salePrice; 
-    const prodImage = product?.image && !product.image.includes('placehold') ? product.image : '';
-
     container.innerHTML = `
         <div class="w-full h-full flex flex-col bg-dark-bg animate-fade-in">
             <div class="flex justify-between items-center mb-2 pb-2 border-b border-gray-700 flex-shrink-0">
-                <h4 class="text-lg font-bold text-white flex items-center truncate">
-                    <i class="fas ${isEdit ? 'fa-edit text-blue-400' : 'fa-plus-circle text-green-400'} mr-2"></i>
-                    ${isEdit ? 'Editor & Ficha Técnica' : 'Novo Produto'}
-                </h4>
+                <h4 class="text-lg font-bold text-white flex items-center truncate"><i class="fas ${isEdit ? 'fa-edit text-blue-400' : 'fa-plus-circle text-green-400'} mr-2"></i>${isEdit ? 'Editar Produto' : 'Novo Produto'}</h4>
                 <button id="btnBackToHub" class="text-gray-400 hover:text-white flex items-center text-sm py-2 px-3 rounded bg-gray-800"><i class="fas fa-arrow-left mr-1"></i> Voltar</button>
             </div>
             
-            <div class="flex space-x-1 bg-gray-800 p-1 rounded-lg mb-4">
-                <button class="flex-1 py-2 text-sm font-bold rounded-md bg-indigo-600 text-white form-tab-btn" data-tab="geral">Geral</button>
-                <button class="flex-1 py-2 text-sm font-bold rounded-md text-gray-400 hover:text-white form-tab-btn" data-tab="ficha">Ficha Técnica</button>
-                <button class="flex-1 py-2 text-sm font-bold rounded-md text-gray-400 hover:text-white form-tab-btn" data-tab="preparo">Preparo & Custos</button>
-            </div>
-
-            <div class="flex-grow overflow-y-auto custom-scrollbar pr-1 pb-20" id="formTabContainer">
-                
-                <div id="ft-geral" class="form-tab-content">
-                    <div class="space-y-4">
-                        
-                        <div class="flex gap-4 mb-2 bg-gray-800/50 p-3 rounded border border-gray-700">
-                            <div class="w-24 h-24 bg-gray-700 rounded-lg border border-gray-600 flex items-center justify-center overflow-hidden relative group flex-shrink-0">
-                                <img id="imgPreview" src="${prodImage}" class="w-full h-full object-cover ${!prodImage ? 'hidden' : ''}">
-                                <i class="fas fa-camera text-gray-500 text-2xl ${prodImage ? 'hidden' : ''}" id="imgPlaceholderIcon"></i>
-                                <div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer" onclick="document.getElementById('prodImgInput').click()">
-                                    <i class="fas fa-edit text-white"></i>
-                                </div>
-                            </div>
-                            <div class="flex-grow space-y-2">
-                                <label class="block text-xs text-gray-400 uppercase font-bold">Imagem do Produto</label>
-                                <div class="flex space-x-2">
-                                    <input type="text" id="prodImgUrl" class="input-pdv w-full text-sm" placeholder="Cole a URL da imagem aqui..." value="${prodImage}">
-                                    <button class="bg-gray-700 text-white px-3 rounded-lg border border-gray-600 hover:bg-gray-600" onclick="document.getElementById('prodImgInput').click()" title="Carregar do Dispositivo">
-                                        <i class="fas fa-paperclip"></i>
-                                    </button>
-                                    <input type="file" id="prodImgInput" class="hidden" accept="image/*" onchange="window.handleImageUpload(this)">
-                                </div>
-                                <p class="text-[10px] text-gray-500">Cole o link direto ou use o clipe para anexar (apenas preview).</p>
-                            </div>
-                        </div>
-
-                        <div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Nome do Produto</label><input type="text" id="prodName" class="input-pdv w-full text-lg" value="${product?.name || ''}" required></div>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Preço de Venda (R$)</label><input type="number" id="prodPrice" class="input-pdv w-full font-mono text-white font-bold text-lg" step="0.01" value="${price}" required></div>
-                            
-                            <div class="bg-gray-800 p-2 rounded border border-gray-600">
-                                <div class="flex justify-between items-center mb-1">
-                                    <label class="block text-[10px] text-gray-400 uppercase font-bold">Promoção</label>
-                                    <label class="inline-flex items-center cursor-pointer">
-                                        <input type="checkbox" id="checkPromo" class="form-checkbox h-4 w-4 text-yellow-500 bg-gray-700 border-gray-500 rounded focus:ring-0" ${onSale ? 'checked' : ''}>
-                                        <span class="ml-2 text-xs text-yellow-400 font-bold">Ativar</span>
-                                    </label>
-                                </div>
-                                <input type="number" id="prodSalePrice" class="input-pdv w-full font-mono text-yellow-400 font-bold" step="0.01" value="${salePrice}" placeholder="0.00" ${!onSale ? 'disabled' : ''}>
-                            </div>
-
-                            <div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Setor KDS</label><select id="prodSector" class="input-pdv w-full">${sectors.map(s => `<option value="${s}" ${product?.sector === s || extendedData?.sector === s ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-4 p-3 bg-gray-800/50 rounded border border-gray-700">
-                            <div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Grupo (Gestão)</label><input type="text" id="prodGroup" class="input-pdv w-full text-sm" placeholder="Ex: Pratos Principais" value="${extendedData.group || ''}"></div>
-                            <div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Subgrupo</label><input type="text" id="prodSubgroup" class="input-pdv w-full text-sm" placeholder="Ex: Peixes" value="${extendedData.subgroup || ''}"></div>
-                        </div>
-
-                        <div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Status no Cardápio</label><select id="prodStatus" class="input-pdv w-full"><option value="publish" ${product?.status === 'publish' ? 'selected' : ''}>Ativo (Visível)</option><option value="draft" ${product?.status === 'draft' ? 'selected' : ''}>Rascunho (Oculto)</option></select></div>
-                    </div>
-                </div>
-
-                <div id="ft-ficha" class="form-tab-content hidden">
-                    <div class="flex flex-col space-y-3 mb-4 bg-gray-800 p-3 rounded border border-gray-700">
-                        <div>
-                            <label class="block text-xs text-gray-400 uppercase font-bold mb-1">Insumo</label>
-                            <select id="ingSelect" class="input-pdv w-full text-sm">
-                                <option value="">Selecione...</option>
-                                ${ingredientsCache.map(i => `<option value="${i.id}" data-unit="${i.unit}" data-cost="${i.cost}">${i.name} (R$ ${i.cost}/${i.unit})</option>`).join('')}
-                            </select>
-                        </div>
-                        <div class="flex space-x-2">
-                            <div class="flex-grow">
-                                <label class="block text-xs text-gray-400 uppercase font-bold mb-1">Quantidade</label>
-                                <input type="number" id="ingQty" placeholder="0.000" class="input-pdv w-full text-sm" step="0.001">
-                            </div>
-                            <div class="flex items-end">
-                                <button id="btnAddIng" class="bg-green-600 hover:bg-green-500 text-white px-6 py-2.5 rounded-lg font-bold transition shadow h-[42px]"><i class="fas fa-plus mr-2"></i> Adicionar</button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
-                        <table class="w-full text-left text-sm text-gray-300">
-                            <thead class="bg-gray-900 text-xs uppercase font-bold"><tr><th class="p-3">Insumo</th><th class="p-3 text-right">Qtd</th><th class="p-3 text-right">Custo</th><th class="p-3 text-center">Ações</th></tr></thead>
-                            <tbody id="compositionTableBody"></tbody>
-                        </table>
-                    </div>
-                    <div class="mt-3 text-right text-sm text-gray-400">Total Insumos: <span id="totalIngredientsCost" class="text-white font-bold font-mono">R$ 0,00</span></div>
-                </div>
-
-                <div id="ft-preparo" class="form-tab-content hidden">
-                    <div class="space-y-4">
-                        <div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Modo de Preparo</label><textarea id="prodPrepMethod" class="input-pdv w-full h-32 text-sm" placeholder="Descreva o passo a passo...">${extendedData.prepMethod || ''}</textarea></div>
-                        
-                        <div class="bg-gray-800 p-3 rounded-lg border border-gray-700">
-                            <h5 class="text-xs font-bold text-pink-400 uppercase mb-3">Custo Operacional (Estimado)</h5>
-                            <div class="grid grid-cols-2 gap-4">
-                                <div><label class="block text-[10px] text-gray-500 uppercase mb-1">Tempo de Preparo (Min)</label><input type="number" id="prodCookTime" class="input-pdv w-full" value="${extendedData.cookTime || 0}"></div>
-                                <div><label class="block text-[10px] text-gray-500 uppercase mb-1">Fonte de Energia</label><select id="prodEnergy" class="input-pdv w-full"><option value="gas" ${extendedData.energyType === 'gas' ? 'selected' : ''}>Gás (Fogão/Forno)</option><option value="electric" ${extendedData.energyType === 'electric' ? 'selected' : ''}>Elétrico (Fritadeira)</option><option value="none" ${!extendedData.energyType || extendedData.energyType === 'none' ? 'selected' : ''}>Nenhum</option></select></div>
-                            </div>
-                            <p class="text-xs text-gray-500 mt-2 italic">* Adiciona custo ao CMV baseado no tempo.</p>
-                        </div>
-
-                        <div class="p-3 bg-gray-900 rounded-lg border border-gray-700 flex justify-between items-center">
-                            <span class="text-sm font-bold text-gray-400">CMV Total Estimado</span>
-                            <span id="finalCmvDisplay" class="text-xl font-bold text-red-400">R$ 0,00</span>
-                        </div>
-
-                        <div class="bg-gray-800 p-3 rounded-lg border border-gray-700 mt-2">
-                            <h5 class="text-xs font-bold text-green-400 uppercase mb-3">Precificação & Lucro</h5>
-                            <div class="grid grid-cols-2 gap-4 mb-3">
-                                <div>
-                                    <label class="block text-[10px] text-gray-500 uppercase mb-1">Margem Alvo (%)</label>
-                                    <input type="number" id="prodTargetMargin" class="input-pdv w-full" value="${extendedData.targetMargin || 100}" placeholder="100">
-                                </div>
-                                <div>
-                                    <label class="block text-[10px] text-gray-500 uppercase mb-1">Preço Sugerido</label>
-                                    <input type="text" id="prodSuggestedPrice" class="input-pdv w-full bg-gray-700 text-gray-400 cursor-not-allowed" readonly value="R$ 0,00">
-                                </div>
-                            </div>
-                            <div class="p-2 bg-gray-900 rounded border border-gray-700">
-                                <div class="flex justify-between items-center mb-1">
-                                    <span class="text-xs text-gray-400">Preço Venda Atual:</span>
-                                    <span class="text-sm font-bold text-white">${formatCurrency(parseFloat(price) || 0)}</span>
-                                </div>
-                                <div class="flex justify-between items-center mb-1">
-                                    <span class="text-xs text-gray-400">Custo Total (CMV):</span>
-                                    <span id="analysisCmvDisplay" class="text-sm font-bold text-red-400">R$ 0,00</span>
-                                </div>
-                                <div class="border-t border-gray-600 my-1"></div>
-                                <div class="flex justify-between items-center">
-                                    <span class="text-sm font-bold text-gray-300">Lucro Real:</span>
-                                    <span id="analysisProfitDisplay" class="text-lg font-bold text-green-400">R$ 0,00</span>
-                                </div>
-                                <div class="text-right">
-                                    <span id="analysisMarginDisplay" class="text-xs font-mono text-gray-500">(Markup Real: 0%)</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <div class="flex-grow overflow-y-auto custom-scrollbar pr-1 pb-20">
+                <form id="productForm" class="space-y-4">
+                     <div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Nome</label><input type="text" id="prodName" class="input-pdv w-full text-lg p-3" value="${product?.name || ''}" required></div>
+                     <div class="grid grid-cols-2 gap-4">
+                        <div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Preço (R$)</label><input type="number" id="prodPrice" class="input-pdv w-full font-mono text-green-400 font-bold text-lg p-3" step="0.01" value="${product?.price || ''}" required></div>
+                        <div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Setor KDS</label><select id="prodSector" class="input-pdv w-full p-3">${sectors.length > 0 ? sectors.map(s => `<option value="${s}" ${product?.sector === s ? 'selected' : ''}>${s}</option>`).join('') : '<option value="cozinha">Cozinha</option>'}</select></div>
+                     </div>
+                     <div><label class="block text-xs text-gray-400 uppercase font-bold mb-1">Status</label><select id="prodStatus" class="input-pdv w-full p-3"><option value="publish" ${product?.status === 'publish' ? 'selected' : ''}>Publicado</option><option value="draft" ${product?.status === 'draft' ? 'selected' : ''}>Rascunho (Oculto)</option></select></div>
+                </form>
             </div>
 
             <div class="border-t border-gray-700 pt-4 mt-auto flex space-x-3 flex-shrink-0 bg-dark-bg">
-                <button type="button" id="btnSaveProduct" class="flex-1 py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition shadow-lg flex items-center justify-center"><i class="fas fa-save mr-2"></i> Salvar Ficha</button>
+                <button type="button" id="btnSaveProduct" class="flex-1 py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition shadow-lg flex items-center justify-center"><i class="fas fa-save mr-2"></i> Salvar</button>
             </div>
         </div>`;
-
-    // Listeners para Preview de Imagem
-    const urlInput = document.getElementById('prodImgUrl');
-    if (urlInput) {
-        urlInput.addEventListener('input', function() {
-            const preview = document.getElementById('imgPreview');
-            const icon = document.getElementById('imgPlaceholderIcon');
-            if (this.value) {
-                preview.src = this.value;
-                preview.classList.remove('hidden');
-                icon.classList.add('hidden');
-            } else {
-                preview.classList.add('hidden');
-                icon.classList.remove('hidden');
-            }
-        });
-    }
-
-    const checkPromo = document.getElementById('checkPromo');
-    const inputPromo = document.getElementById('prodSalePrice');
-    checkPromo.onchange = () => {
-        inputPromo.disabled = !checkPromo.checked;
-        if(!checkPromo.checked) inputPromo.value = '';
-        else inputPromo.focus();
-    };
-
-    const tabs = container.querySelectorAll('.form-tab-btn');
-    tabs.forEach(btn => {
-        btn.onclick = () => {
-            tabs.forEach(b => { b.classList.remove('bg-indigo-600', 'text-white'); b.classList.add('text-gray-400'); });
-            btn.classList.add('bg-indigo-600', 'text-white'); btn.classList.remove('text-gray-400');
-            container.querySelectorAll('.form-tab-content').forEach(c => c.classList.add('hidden'));
-            document.getElementById(`ft-${btn.dataset.tab}`).classList.remove('hidden');
-        };
-    });
-
-    const renderComposition = () => {
-        const tbody = document.getElementById('compositionTableBody');
-        let totalIngCost = 0;
-        tbody.innerHTML = currentProductComposition.map((item, idx) => {
-            const cost = item.cost * item.qty;
-            totalIngCost += cost;
-            return `
-                <tr class="border-b border-gray-700 last:border-0 hover:bg-gray-700/30 transition">
-                    <td class="p-3">
-                        <span class="block font-bold text-white">${item.name}</span>
-                        <span class="text-xs text-gray-500">R$ ${item.cost}/${item.unit}</span>
-                    </td>
-                    <td class="p-3 text-right font-mono text-yellow-400 font-bold">${item.qty} ${item.unit}</td>
-                    <td class="p-3 text-right text-red-300 font-mono text-sm">${formatCurrency(cost)}</td>
-                    <td class="p-3 text-center whitespace-nowrap">
-                        <button class="text-blue-400 hover:text-blue-300 btn-edit-ing mr-3" data-idx="${idx}" title="Editar Quantidade"><i class="fas fa-edit"></i></button>
-                        <button class="text-red-500 hover:text-red-400 btn-rem-ing" data-idx="${idx}" title="Remover"><i class="fas fa-trash"></i></button>
-                    </td>
-                </tr>`;
-        }).join('');
-        
-        document.getElementById('totalIngredientsCost').textContent = formatCurrency(totalIngCost);
-        
-        const time = parseFloat(document.getElementById('prodCookTime').value) || 0;
-        const energyType = document.getElementById('prodEnergy').value;
-        let energyCost = 0;
-        if (energyType === 'gas') energyCost = (time / 60) * COST_GAS_PER_HOUR;
-        if (energyType === 'electric') energyCost = (time / 60) * COST_ENERGY_PER_HOUR;
-        
-        const finalCmv = totalIngCost + energyCost;
-        document.getElementById('finalCmvDisplay').textContent = formatCurrency(finalCmv);
-        
-        // --- CÁLCULO DE ROI E PREÇO SUGERIDO ---
-        const targetMargin = parseFloat(document.getElementById('prodTargetMargin').value) || 0;
-        const currentPrice = parseFloat(document.getElementById('prodPrice').value) || 0;
-        
-        const suggested = finalCmv * (1 + (targetMargin / 100));
-        document.getElementById('prodSuggestedPrice').value = formatCurrency(suggested);
-        
-        document.getElementById('analysisCmvDisplay').textContent = formatCurrency(finalCmv);
-        const profit = currentPrice - finalCmv;
-        const profitEl = document.getElementById('analysisProfitDisplay');
-        profitEl.textContent = formatCurrency(profit);
-        profitEl.className = `text-lg font-bold ${profit > 0 ? 'text-green-400' : 'text-red-500'}`;
-        
-        const realMarkup = finalCmv > 0 ? ((profit / finalCmv) * 100).toFixed(1) : 0;
-        document.getElementById('analysisMarginDisplay').textContent = `(Markup Real: ${realMarkup}%)`;
-        
-        container.querySelectorAll('.btn-edit-ing').forEach(btn => {
-            btn.onclick = () => {
-                const idx = btn.dataset.idx;
-                const item = currentProductComposition[idx];
-                const newQty = prompt(`Ajustar quantidade de ${item.name} (${item.unit}):`, item.qty);
-                if (newQty !== null) {
-                    const val = parseFloat(newQty.replace(',', '.'));
-                    if (!isNaN(val) && val > 0) { currentProductComposition[idx].qty = val; renderComposition(); } 
-                    else if (newQty.trim() !== "") { showToast("Quantidade inválida.", true); }
-                }
-            };
-        });
-
-        container.querySelectorAll('.btn-rem-ing').forEach(btn => {
-            btn.onclick = () => {
-                currentProductComposition.splice(btn.dataset.idx, 1);
-                renderComposition();
-            };
-        });
-    };
-
-    document.getElementById('btnAddIng').onclick = (e) => {
-        e.preventDefault();
-        const select = document.getElementById('ingSelect');
-        const qtyInput = document.getElementById('ingQty');
-        const id = select.value;
-        const qty = parseFloat(qtyInput.value);
-        if (id && qty > 0) {
-            const opt = select.selectedOptions[0];
-            currentProductComposition.push({
-                id: id, name: opt.text.split(' (')[0], unit: opt.dataset.unit, cost: parseFloat(opt.dataset.cost), qty: qty
-            });
-            qtyInput.value = '';
-            renderComposition();
-        }
-    };
-
-    document.getElementById('prodCookTime').oninput = renderComposition;
-    document.getElementById('prodEnergy').onchange = renderComposition;
-    document.getElementById('prodTargetMargin').oninput = renderComposition;
-    document.getElementById('prodPrice').oninput = renderComposition;
-
-    renderComposition();
 
     document.getElementById('btnBackToHub').onclick = () => renderProductListConfig(container, document.getElementById('productActionsToolbar'));
     
@@ -577,167 +252,126 @@ async function renderProductForm(product = null, container) {
         const btn = document.getElementById('btnSaveProduct');
         toggleLoading(btn, true, 'Salvando...');
         
-        const isPromoActive = document.getElementById('checkPromo').checked;
-        const salePriceVal = isPromoActive ? document.getElementById('prodSalePrice').value : '';
-
-        const basicData = {
+        const data = {
             name: document.getElementById('prodName').value,
-            regular_price: document.getElementById('prodPrice').value.toString(),
-            sale_price: salePriceVal ? salePriceVal.toString() : '', 
+            price: document.getElementById('prodPrice').value,
             status: document.getElementById('prodStatus').value,
-            meta_data: [ { key: 'sector', value: document.getElementById('prodSector').value } ],
-            images: document.getElementById('prodImgUrl').value ? [{ src: document.getElementById('prodImgUrl').value }] : []
-        };
-
-        const extendedData = {
-            composition: currentProductComposition,
-            prepMethod: document.getElementById('prodPrepMethod').value,
-            cookTime: parseFloat(document.getElementById('prodCookTime').value) || 0,
-            energyType: document.getElementById('prodEnergy').value,
-            group: document.getElementById('prodGroup').value,
-            subgroup: document.getElementById('prodSubgroup').value,
-            sector: document.getElementById('prodSector').value,
-            targetMargin: parseFloat(document.getElementById('prodTargetMargin').value) || 0,
-            updatedAt: serverTimestamp()
+            meta_data: [ { key: 'sector', value: document.getElementById('prodSector').value } ]
         };
 
         try { 
-            let wooId = product?.id;
-            if(isEdit) { await updateWooProduct(product.id, basicData); } 
-            else { const newProd = await createWooProduct(basicData); wooId = newProd.id; }
-            await setDoc(doc(getColRef('products'), wooId.toString()), extendedData, { merge: true });
-
+            if(isEdit) await updateWooProduct(product.id, data); else await createWooProduct(data); 
             showToast("Produto salvo com sucesso!", false); 
             renderProductListConfig(container, document.getElementById('productActionsToolbar'));
         } catch(e) { 
-            console.error(e); showToast("Erro ao salvar: " + e.message, true); 
+            showToast(e.message, true); 
         } finally { 
             toggleLoading(btn, false); 
         }
     };
 }
 
-// ==================================================================
-//           5. CONFIGURAÇÃO INICIAL (MANTIDA)
-// ==================================================================
-
-async function configureInitialCatalog() {
-    const btn = document.getElementById('btnConfigInit');
-    if(!confirm("Deseja configurar/atualizar Água, Café, Rolha e Salmão com fichas técnicas?")) return;
-    toggleLoading(btn, true, 'Configurando...');
-    try {
-        const sectors = [{ name: 'Copa', type: 'production' }, { name: 'Bar', type: 'production' }, { name: 'Cozinha', type: 'production' }];
-        for (const s of sectors) { const q = query(getSectorsCollectionRef(), where('name', '==', s.name)); const snap = await getDocs(q); if(snap.empty) await addDoc(getSectorsCollectionRef(), s); }
-        const ingredientsData = [
-            { name: 'Café em Grão', cost: 85.00, unit: 'kg', stock: 5, minStock: 1, group: 'Bebidas', costCategory: 'CMV' },
-            { name: 'Água Mineral 500ml (Custo)', cost: 1.20, unit: 'un', stock: 100, minStock: 24, group: 'Bebidas', costCategory: 'CMV' },
-            { name: 'Açúcar Sachê', cost: 0.10, unit: 'un', stock: 500, minStock: 50, group: 'Mercearia', costCategory: 'CMV' },
-            { name: 'Filé de Salmão Fresco', cost: 65.00, unit: 'kg', stock: 5, minStock: 2, group: 'Hortifruti', costCategory: 'CMV' },
-            { name: 'Polpa de Maracujá', cost: 18.00, unit: 'kg', stock: 2, minStock: 0.5, group: 'Hortifruti', costCategory: 'CMV' },
-            { name: 'Manteiga sem Sal', cost: 45.00, unit: 'kg', stock: 5, minStock: 1, group: 'Laticínios', costCategory: 'CMV' },
-            { name: 'Açúcar Refinado', cost: 4.50, unit: 'kg', stock: 10, minStock: 2, group: 'Mercearia', costCategory: 'CMV' }
-        ];
-        const createdIngs = {}; 
-        for (const ing of ingredientsData) { const q = query(getColRef('ingredients'), where('name', '==', ing.name)); const snap = await getDocs(q); if(snap.empty) { const ref = await addDoc(getColRef('ingredients'), ing); createdIngs[ing.name] = ref.id; } else { createdIngs[ing.name] = snap.docs[0].id; } }
-        const productsToConfig = [
-            { searchName: 'Café', basic: { name: 'Café Expresso', regular_price: "8.00", status: 'publish', meta_data: [{ key: 'sector', value: 'Copa' }] }, extended: { group: 'Cafeteria', subgroup: 'Bebidas Quentes', sector: 'Copa', prepMethod: 'Moer o grão na hora. Extração de 30ml em 25 segundos.', cookTime: 0, energyType: 'electric', composition: [{ id: createdIngs['Café em Grão'], name: 'Café em Grão', qty: 0.007, cost: 85.00, unit: 'kg' }, { id: createdIngs['Açúcar Sachê'], name: 'Açúcar', qty: 1, cost: 0.10, unit: 'un' }] } },
-            { searchName: 'Água', basic: { name: 'Água sem Gás 500ml', regular_price: "5.00", status: 'publish', meta_data: [{ key: 'sector', value: 'Copa' }] }, extended: { group: 'Bebidas', subgroup: 'Águas', sector: 'Copa', prepMethod: 'Servir gelada (ou natural) com copo.', cookTime: 0, energyType: 'none', composition: [{ id: createdIngs['Água Mineral 500ml (Custo)'], name: 'Água Mineral', qty: 1, cost: 1.20, unit: 'un' }] } },
-            { searchName: 'Rolha', basic: { name: 'Taxa de Rolha', regular_price: "40.00", status: 'publish', meta_data: [{ key: 'sector', value: 'Bar' }] }, extended: { group: 'Serviços', subgroup: 'Taxas', sector: 'Bar', prepMethod: 'Serviço de abertura e taças.', cookTime: 0, energyType: 'none', composition: [] } },
-            { searchName: 'Salmão', basic: { name: 'Salmão Grelhado ao Molho de Maracujá', regular_price: "58.00", status: 'publish', meta_data: [{ key: 'sector', value: 'Cozinha' }] }, extended: { group: 'Pratos Principais', subgroup: 'Peixes', sector: 'Cozinha', prepMethod: '1. Temperar o filé com sal e pimenta.\n2. Grelhar em chapa ou frigideira quente com um fio de azeite por 4-5 min de cada lado.\n3. Em uma sauteuse, colocar a polpa de maracujá e o açúcar. Deixar reduzir em fogo baixo.\n4. Finalizar o molho com a manteiga gelada para dar brilho (monter au beurre).\n5. Servir o peixe com o molho por cima.', cookTime: 15, energyType: 'gas', composition: [{ id: createdIngs['Filé de Salmão Fresco'], name: 'Filé de Salmão', qty: 0.220, cost: 65.00, unit: 'kg' }, { id: createdIngs['Polpa de Maracujá'], name: 'Polpa Maracujá', qty: 0.060, cost: 18.00, unit: 'kg' }, { id: createdIngs['Açúcar Refinado'], name: 'Açúcar', qty: 0.020, cost: 4.50, unit: 'kg' }, { id: createdIngs['Manteiga sem Sal'], name: 'Manteiga', qty: 0.010, cost: 45.00, unit: 'kg' }] } }
-        ];
-        const currentProducts = getProducts(); 
-        for (const p of productsToConfig) { const existingProd = currentProducts.find(cp => cp.name.toLowerCase().includes(p.searchName.toLowerCase())); let wooId; if (existingProd) { wooId = existingProd.id; await updateWooProduct(wooId, p.basic); } else { const newProd = await createWooProduct(p.basic); wooId = newProd.id; } if (wooId) { await setDoc(doc(getColRef('products'), wooId.toString()), { ...p.extended, updatedAt: serverTimestamp() }, { merge: true }); } }
-        showToast("Catálogo configurado com sucesso!", false); await fetchIngredients(); switchHubTab('products'); 
-    } catch (e) { console.error(e); showToast("Erro ao configurar: " + e.message, true); } finally { toggleLoading(btn, false, 'Config. Iniciais'); }
+async function handleDeleteProduct(id, callback) { 
+    if(confirm("Tem certeza que deseja excluir este produto do WooCommerce?")) { 
+        try { 
+            await deleteWooProduct(id); 
+            showToast("Produto excluído.", false); 
+            if(callback) callback(); 
+        } catch(e) { showToast(e.message, true); } 
+    } 
 }
 
 // ==================================================================
-//           6. GESTÃO DE INSUMOS (RESPONSIVO)
+//           4. GESTÃO DE INSUMOS E FORNECEDORES
 // ==================================================================
 
-async function fetchIngredients() { try { const q = query(getColRef('ingredients'), orderBy('name')); const snap = await getDocs(q); ingredientsCache = snap.docs.map(d => ({ id: d.id, ...d.data() })); return ingredientsCache; } catch (e) { console.error(e); return []; } }
-async function renderIngredientsScreen(container, toolbar) { toolbar.innerHTML = `<div class="flex space-x-2 w-full justify-end"><button id="btnStockWriteOff" class="bg-red-900/50 hover:bg-red-800 text-red-200 border border-red-700 font-bold py-2 px-4 rounded-lg shadow flex items-center text-sm" title="Abater do estoque baseado nas vendas"><i class="fas fa-level-down-alt mr-2"></i> Baixar Estoque</button><button id="btnNewIngredient" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow flex items-center ml-2"><i class="fas fa-plus mr-2"></i> Novo</button></div>`; document.getElementById('btnNewIngredient').onclick = () => renderIngredientForm(null); document.getElementById('btnStockWriteOff').onclick = handleStockWriteOff; if (ingredientsCache.length === 0) { container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-500"><p>Nenhum insumo cadastrado.</p></div>'; return; } container.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20">${ingredientsCache.map(ing => `<div class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex flex-col justify-between group hover:border-gray-600 transition"><div class="flex justify-between items-start mb-2"><div><h4 class="font-bold text-white text-lg">${ing.name}</h4><p class="text-xs text-gray-400 uppercase">${ing.group || 'Sem Grupo'} • ${ing.costCategory || 'CMV'}</p></div><div class="flex space-x-2"><button class="text-blue-400 hover:text-blue-300 p-1" onclick="window.editIngredient('${ing.id}')"><i class="fas fa-edit"></i></button><button class="text-red-400 hover:text-red-300 p-1" onclick="window.deleteIngredient('${ing.id}')"><i class="fas fa-trash"></i></button></div></div><div class="flex justify-between items-end mt-2 pt-2 border-t border-gray-700/50"><div class="text-xs text-gray-500">R$ ${ing.cost.toFixed(2)} / ${ing.unit}</div><div class="text-right font-mono font-bold ${ing.stock <= (ing.minStock||0) ? 'text-red-500' : 'text-green-400'}">${ing.stock.toFixed(3)} ${ing.unit}</div></div></div>`).join('')}</div>`; window.editIngredient = (id) => renderIngredientForm(ingredientsCache.find(i => i.id === id)); window.deleteIngredient = async (id) => { if(confirm("Excluir este insumo?")) { await deleteDoc(doc(getColRef('ingredients'), id)); showToast("Insumo excluído."); await fetchIngredients(); switchHubTab('ingredients'); } }; }
-async function handleStockWriteOff() { const btn = document.getElementById('btnStockWriteOff'); if(!confirm("Isso irá calcular o consumo dos últimos 30 dias e SUBTRAIR do estoque atual de todos os insumos. Continuar?")) return; toggleLoading(btn, true, 'Calculando...'); try { const consumptionMap = await calculateConsumptionFromHistory(30); const batch = writeBatch(db); let updateCount = 0; Object.entries(consumptionMap).forEach(([ingId, qtyConsumed]) => { const ingRef = doc(getColRef('ingredients'), ingId); batch.update(ingRef, { stock: increment(-qtyConsumed) }); updateCount++; }); if(updateCount > 0) { await batch.commit(); showToast(`Estoque atualizado! ${updateCount} insumos baixados.`, false); await fetchIngredients(); switchHubTab('ingredients'); } else { showToast("Nenhum consumo detectado no período.", true); } } catch (e) { console.error(e); showToast("Erro na baixa de estoque.", true); } finally { toggleLoading(btn, false, 'Baixar Estoque'); } }
-function renderIngredientForm(ingredient = null) {
-    const isEdit = !!ingredient;
-    // FIXED: Modal fixo e responsivo com botão 'X'
-    const modalHtml = `
-        <div id="ingredientFormModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[80] animate-fade-in p-4">
-            <div class="bg-dark-card border border-gray-600 p-6 rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl m-4">
-                
-                <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
-                    <h3 class="text-xl font-bold text-white">${isEdit ? 'Editar Insumo' : 'Novo Insumo'}</h3>
-                    <button onclick="document.getElementById('ingredientFormModal').remove()" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
-                </div>
+async function fetchIngredients() {
+    try {
+        const q = query(getColRef('ingredients'), orderBy('name'));
+        const snap = await getDocs(q);
+        ingredientsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        return ingredientsCache;
+    } catch (e) { console.error(e); return []; }
+}
 
+async function renderIngredientsScreen(container, toolbar) {
+    toolbar.innerHTML = `<button onclick="window.openIngredientModal()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg flex items-center ml-auto"><i class="fas fa-plus mr-2"></i> Novo Insumo</button>`;
+    
+    if (ingredientsCache.length === 0) { container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-500"><p>Nenhum insumo cadastrado.</p></div>'; return; }
+    
+    container.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">${ingredientsCache.map(ing => `
+        <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex justify-between items-center group">
+            <div><h4 class="font-bold text-white">${ing.name}</h4><p class="text-xs text-gray-400">R$ ${ing.cost.toFixed(2)} / ${ing.unit}</p></div>
+            <div class="text-right font-mono font-bold ${ing.stock <= ing.minStock ? 'text-red-500' : 'text-green-400'}">${ing.stock} ${ing.unit}</div>
+        </div>`).join('')}</div>`;
+
+    // Injeta Modal de Insumo no DOM se não existir
+    injectIngredientModal();
+}
+
+function injectIngredientModal() {
+    if(document.getElementById('ingredientFormModal')) return;
+    const modalHtml = `
+        <div id="ingredientFormModal" class="absolute inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
+            <div class="bg-gray-800 p-6 rounded-lg w-full max-w-md border border-gray-600">
+                <h3 class="text-lg font-bold text-white mb-4">Novo Insumo</h3>
                 <div class="space-y-3">
-                    <div><label class="text-xs text-gray-400 uppercase font-bold">Nome</label><input id="ingName" type="text" class="input-pdv w-full p-2" value="${ingredient?.name || ''}" placeholder="Ex: Leite Integral"></div>
+                    <input id="ingName" type="text" class="input-pdv w-full p-2" placeholder="Nome">
                     <div class="grid grid-cols-2 gap-3">
-                        <div><label class="text-xs text-gray-400 uppercase font-bold">Custo (R$)</label><input id="ingCost" type="number" class="input-pdv w-full p-2" value="${ingredient?.cost || ''}" placeholder="0.00" step="0.01"></div>
-                        <div><label class="text-xs text-gray-400 uppercase font-bold">Unidade</label><input id="ingUnit" type="text" class="input-pdv w-full p-2" value="${ingredient?.unit || ''}" placeholder="Un, Kg, L"></div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
-                         <div><label class="text-xs text-gray-400 uppercase font-bold">Estoque Atual</label><input id="ingStock" type="number" class="input-pdv w-full p-2" value="${ingredient?.stock || ''}" placeholder="0"></div>
-                         <div><label class="text-xs text-gray-400 uppercase font-bold">Estoque Mínimo</label><input id="ingMinStock" type="number" class="input-pdv w-full p-2" value="${ingredient?.minStock || 5}" placeholder="5"></div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div><label class="text-xs text-gray-400 uppercase font-bold">Grupo/Tipo</label><input id="ingGroup" type="text" class="input-pdv w-full p-2" value="${ingredient?.group || ''}" placeholder="Ex: Laticínios"></div>
-                        <div>
-                            <label class="text-xs text-gray-400 uppercase font-bold">Categ. Custo</label>
-                            <select id="ingCostCategory" class="input-pdv w-full p-2">
-                                <option value="CMV" ${ingredient?.costCategory === 'CMV' ? 'selected' : ''}>CMV (Padrão)</option>
-                                <option value="Limpeza" ${ingredient?.costCategory === 'Limpeza' ? 'selected' : ''}>Limpeza</option>
-                                <option value="Embalagem" ${ingredient?.costCategory === 'Embalagem' ? 'selected' : ''}>Embalagem</option>
-                                <option value="Desp. Operacional" ${ingredient?.costCategory === 'Desp. Operacional' ? 'selected' : ''}>Operacional</option>
-                            </select>
-                        </div>
+                        <input id="ingCost" type="number" class="input-pdv w-full p-2" placeholder="Custo (R$)">
+                        <input id="ingStock" type="number" class="input-pdv w-full p-2" placeholder="Estoque Inicial">
                     </div>
                 </div>
-                <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-700">
-                    <button onclick="document.getElementById('ingredientFormModal').remove()" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500">Cancelar</button>
-                    <button id="btnSaveIng" class="px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 shadow-lg">Salvar</button>
+                <div class="flex justify-end space-x-2 mt-6">
+                    <button onclick="document.getElementById('ingredientFormModal').style.display='none'" class="px-4 py-2 bg-gray-600 text-white rounded">Cancelar</button>
+                    <button onclick="window.saveIngredient()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold">Salvar</button>
                 </div>
             </div>
         </div>`;
-        
     document.getElementById('subModalContainer').innerHTML = modalHtml;
     
-    document.getElementById('btnSaveIng').onclick = async () => {
+    window.openIngredientModal = () => document.getElementById('ingredientFormModal').style.display = 'flex';
+    window.saveIngredient = async () => {
         const name = document.getElementById('ingName').value;
         const cost = parseFloat(document.getElementById('ingCost').value) || 0;
-        const unit = document.getElementById('ingUnit').value || 'un';
         const stock = parseFloat(document.getElementById('ingStock').value) || 0;
-        const minStock = parseFloat(document.getElementById('ingMinStock').value) || 0;
-        const group = document.getElementById('ingGroup').value;
-        const costCategory = document.getElementById('ingCostCategory').value;
-        
         if(!name) return;
-        
-        const data = { name, cost, stock, unit, minStock, group, costCategory, updatedAt: serverTimestamp() };
-        
-        if (isEdit) {
-            await updateDoc(doc(getColRef('ingredients'), ingredient.id), data);
-        } else {
-            await addDoc(getColRef('ingredients'), { ...data, createdAt: serverTimestamp() });
-        }
-        
-        document.getElementById('ingredientFormModal').remove();
+        await addDoc(getColRef('ingredients'), { name, cost, stock, unit: 'un', minStock: 10 });
+        document.getElementById('ingredientFormModal').style.display = 'none';
         showToast("Insumo Salvo!");
         await fetchIngredients();
         switchHubTab('ingredients');
     };
 }
 
-// ==================================================================
-//           7. LISTA DE COMPRAS & FORNECEDORES (MODAL FIXED)
-// ==================================================================
+async function renderSuppliersScreen(container, toolbar) {
+    toolbar.innerHTML = `<button class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg ml-auto" onclick="alert('Em breve')">Novo</button>`;
+    const q = query(getColRef('suppliers'), orderBy('name'));
+    const snap = await getDocs(q);
+    
+    if (snap.empty) { container.innerHTML = '<p class="text-center text-gray-500 mt-10">Sem fornecedores.</p>'; return; }
+    
+    container.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">${snap.docs.map(d => `
+        <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
+            <h4 class="font-bold text-white">${d.data().name}</h4>
+            <p class="text-xs text-gray-400">${d.data().phone || ''}</p>
+        </div>`).join('')}</div>`;
+}
 
-async function renderShoppingListScreen(container, toolbar) { toolbar.innerHTML = `<div class="flex items-center space-x-2 w-full justify-end"><button id="btnCalcHistory" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow flex items-center text-sm mr-2 whitespace-nowrap"><i class="fas fa-chart-line mr-2"></i> Sugerir</button><button id="btnQuoteSelected" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"><i class="fas fa-file-invoice-dollar mr-2"></i> Cotar</button></div>`; document.getElementById('btnCalcHistory').onclick = () => generateShoppingListFromHistory(container); const list = ingredientsCache.filter(i => i.stock <= (i.minStock || 5)); renderShoppingListTable(container, list, "Estoque Baixo"); }
-async function generateShoppingListFromHistory(container) { const btn = document.getElementById('btnCalcHistory'); toggleLoading(btn, true, 'Analisando...'); try { const consumptionMap = await calculateConsumptionFromHistory(30); const suggestionList = []; ingredientsCache.forEach(ing => { const consumed = consumptionMap[ing.id] || 0; const safetyMargin = consumed * 0.2; const needed = (consumed + safetyMargin) - ing.stock; if (needed > 0) { suggestionList.push({ ...ing, suggestedQty: needed, consumedLastMonth: consumed }); } }); renderShoppingListTable(container, suggestionList, "Sugestão por Vendas", true); } catch(e) { console.error(e); showToast("Erro na análise.", true); } finally { toggleLoading(btn, false, 'Sugerir'); } }
-function renderShoppingListTable(container, list, title, isHistory = false) { if(list.length === 0) { container.innerHTML = `<div class="flex flex-col items-center justify-center h-full text-green-500"><i class="fas fa-check-circle text-4xl mb-2"></i><p>${title}: Nada a comprar.</p></div>`; return; } const headerExtra = isHistory ? '<th class="p-3 text-right whitespace-nowrap">Consumo</th>' : ''; container.innerHTML = `<h4 class="text-white font-bold mb-2 ml-1">${title}</h4><div class="bg-gray-800 rounded-lg border border-gray-700 overflow-x-auto"><table class="w-full text-left text-gray-300 min-w-[600px]"><thead class="bg-gray-900 text-xs uppercase"><tr><th class="p-3 w-10"><input type="checkbox" id="selectAllBuy" class="h-4 w-4 bg-gray-700 border-gray-500 rounded" checked></th><th class="p-3">Item</th>${headerExtra}<th class="p-3 text-right whitespace-nowrap">Comprar</th><th class="p-3 text-right whitespace-nowrap">Atual</th></tr></thead><tbody class="divide-y divide-gray-700">${list.map(i => { const qtyToBuy = isHistory ? i.suggestedQty : ((i.minStock || 5) - i.stock); return `<tr class="hover:bg-gray-700/50"><td class="p-3"><input type="checkbox" class="buy-check h-4 w-4 bg-gray-700 border-gray-500 rounded" value="${i.id}" checked></td><td class="p-3 font-bold text-white">${i.name}</td>${isHistory ? `<td class="p-3 text-right text-gray-400 font-mono">${i.consumedLastMonth.toFixed(2)}</td>` : ''}<td class="p-3 text-right text-yellow-400 font-bold font-mono">${qtyToBuy.toFixed(2)} ${i.unit}</td><td class="p-3 text-right text-gray-500 font-mono">${i.stock}</td></tr>`; }).join('')}</tbody></table></div>`; const btnQuote = document.getElementById('btnQuoteSelected'); const checkboxes = container.querySelectorAll('.buy-check'); const updateBtnState = () => { const count = container.querySelectorAll('.buy-check:checked').length; if(btnQuote) { btnQuote.disabled = count === 0; btnQuote.innerHTML = `<i class="fas fa-file-invoice-dollar mr-2"></i> Cotar (${count})`; } }; document.getElementById('selectAllBuy').onchange = (e) => { checkboxes.forEach(cb => cb.checked = e.target.checked); updateBtnState(); }; checkboxes.forEach(cb => cb.onchange = updateBtnState); if(btnQuote) btnQuote.onclick = () => { const selectedIds = Array.from(container.querySelectorAll('.buy-check:checked')).map(cb => cb.value); openQuoteModal(selectedIds); }; updateBtnState(); }
-function openQuoteModal(itemIds) { const modalHtml = `<div id="quoteModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[80] animate-fade-in p-4"><div class="bg-dark-card border border-gray-600 p-6 rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl m-4"><div class="flex justify-between items-center mb-2 border-b border-gray-700 pb-2"><h3 class="text-xl font-bold text-white">Solicitar Orçamento</h3><button onclick="document.getElementById('quoteModal').remove()" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button></div><p class="text-gray-400 text-sm mb-4">Selecione os fornecedores para enviar o pedido de cotação de <b>${itemIds.length} itens</b>.</p><div class="max-h-60 overflow-y-auto custom-scrollbar bg-gray-900 p-3 rounded border border-gray-700 mb-4 space-y-2">${suppliersCache.length > 0 ? suppliersCache.map(s => `<label class="flex items-center space-x-3 p-2 hover:bg-gray-800 rounded cursor-pointer"><input type="checkbox" class="supplier-check h-5 w-5 text-indigo-600 rounded bg-gray-700 border-gray-500" value="${s.id}"><span class="text-white">${s.name}</span></label>`).join('') : '<p class="text-gray-500 italic">Nenhum fornecedor cadastrado.</p>'}</div><div class="flex justify-end space-x-3"><button onclick="document.getElementById('quoteModal').remove()" class="px-4 py-2 bg-gray-600 text-white rounded-lg">Cancelar</button><button id="btnSendQuote" class="px-4 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 disabled:opacity-50">Enviar Solicitação</button></div></div></div>`; document.getElementById('subModalContainer').innerHTML = modalHtml; document.getElementById('btnSendQuote').onclick = async () => { const selectedSuppliers = Array.from(document.querySelectorAll('.supplier-check:checked')).map(cb => cb.value); if(selectedSuppliers.length === 0) { showToast("Selecione ao menos um fornecedor.", true); return; } const btn = document.getElementById('btnSendQuote'); toggleLoading(btn, true, 'Enviando...'); try { const batch = writeBatch(db); const quoteId = `quote_${Date.now()}`; const items = ingredientsCache.filter(i => itemIds.includes(i.id)); for(const supId of selectedSuppliers) { const supplier = suppliersCache.find(s => s.id === supId); const quoteRef = doc(getColRef('quotations')); const pricedItems = items.map(item => { const variation = (Math.random() * 0.4) - 0.2; const newPrice = item.cost * (1 + variation); return { itemId: item.id, name: item.name, qty: (item.minStock || 5) - item.stock, price: parseFloat(newPrice.toFixed(2)) }; }); batch.set(quoteRef, { supplierId: supId, supplierName: supplier.name, items: pricedItems, status: 'received', createdAt: serverTimestamp(), quoteGroupId: quoteId }); } await batch.commit(); document.getElementById('quoteModal').remove(); showToast("Cotações solicitadas!", false); switchHubTab('lowestCost'); } catch(e) { console.error(e); showToast("Erro ao solicitar.", true); toggleLoading(btn, false, 'Enviar'); } }; }
-async function fetchSuppliers() { try { const q = query(getColRef('suppliers'), orderBy('name')); const snap = await getDocs(q); suppliersCache = snap.docs.map(d => ({ id: d.id, ...d.data() })); } catch (e) { console.error(e); } }
-async function renderSuppliersScreen(container, toolbar) { toolbar.innerHTML = `<div class="flex space-x-2 w-full justify-end"><button id="btnSeedSuppliers" class="bg-yellow-700 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg shadow text-sm"><i class="fas fa-users mr-2"></i> Gerar Fictícios</button><button onclick="window.openSupplierModal()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow ml-auto"><i class="fas fa-plus mr-2"></i> Novo Fornecedor</button></div>`; document.getElementById('btnSeedSuppliers').onclick = generateFictionalSuppliers; if (suppliersCache.length === 0) { container.innerHTML = '<p class="text-center text-gray-500 mt-10">Sem fornecedores.</p>'; return; } container.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4 pb-20">${suppliersCache.map(d => `<div class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex justify-between items-center"><div><h4 class="font-bold text-white">${d.name}</h4><p class="text-xs text-gray-400">${d.phone || 'Sem telefone'}</p></div><div class="text-right"><button class="text-red-400 hover:text-red-300" onclick="alert('Deletar em breve')"><i class="fas fa-trash"></i></button></div></div>`).join('')}</div>`; injectSupplierModal(); }
-async function generateFictionalSuppliers() { const btn = document.getElementById('btnSeedSuppliers'); toggleLoading(btn, true, 'Gerando...'); const fakes = [{ name: 'Atacadão do Chef', phone: '(11) 99999-1001' }, { name: 'Hortifruti Fresco', phone: '(11) 98888-2002' }, { name: 'Distribuidora de Bebidas 24h', phone: '(11) 97777-3003' }, { name: 'Embalagens & Cia', phone: '(11) 96666-4004' }, { name: 'Laticínios da Fazenda', phone: '(11) 95555-5005' }]; try { for (const s of fakes) { const exists = suppliersCache.some(sc => sc.name === s.name); if(!exists) await addDoc(getColRef('suppliers'), s); } showToast("Fornecedores gerados!", false); await fetchSuppliers(); switchHubTab('suppliers'); } catch(e) { console.error(e); } finally { toggleLoading(btn, false, 'Gerar Fictícios'); } }
-function injectSupplierModal() { if(document.getElementById('supplierFormModal')) return; const modalHtml = `<div id="supplierFormModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[80] hidden animate-fade-in p-4"><div class="bg-dark-card border border-gray-600 p-6 rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl m-4"><div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2"><h3 class="text-lg font-bold text-white">Novo Fornecedor</h3><button onclick="document.getElementById('supplierFormModal').style.display='none'" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button></div><input id="supName" type="text" class="input-pdv w-full p-2 mb-3" placeholder="Nome da Empresa"><input id="supPhone" type="text" class="input-pdv w-full p-2 mb-3" placeholder="Telefone / WhatsApp"><div class="flex justify-end space-x-2 mt-4"><button onclick="document.getElementById('supplierFormModal').style.display='none'" class="px-4 py-2 bg-gray-600 text-white rounded">Cancelar</button><button onclick="window.saveSupplier()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold">Salvar</button></div></div></div>`; document.getElementById('subModalContainer').innerHTML = modalHtml; window.openSupplierModal = () => document.getElementById('supplierFormModal').style.display = 'flex'; window.saveSupplier = async () => { const name = document.getElementById('supName').value; const phone = document.getElementById('supPhone').value; if(!name) return; await addDoc(getColRef('suppliers'), { name, phone }); document.getElementById('supplierFormModal').style.display = 'none'; showToast("Fornecedor salvo!"); await fetchSuppliers(); switchHubTab('suppliers'); }; }
-async function renderLowestCostScreen(container, toolbar) { toolbar.innerHTML = `<div class="text-xs text-gray-400 italic w-full text-right">* Baseado nas últimas cotações recebidas.</div>`; container.innerHTML = '<div class="flex justify-center py-10"><i class="fas fa-spinner fa-spin text-3xl text-green-500"></i></div>'; try { const q = query(getColRef('quotations'), where('status', '==', 'received'), orderBy('createdAt', 'desc')); const snap = await getDocs(q); if(snap.empty) { container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-500"><i class="fas fa-search-dollar text-4xl mb-2"></i><p>Nenhuma cotação recente encontrada. Vá em "Lista de Compras" e solicite um orçamento.</p></div>'; return; } const comparisonMap = {}; snap.forEach(doc => { const quote = doc.data(); quote.items.forEach(item => { if (!comparisonMap[item.itemId]) { comparisonMap[item.itemId] = { name: item.name, prices: [] }; } comparisonMap[item.itemId].prices.push({ supplier: quote.supplierName, price: item.price, date: quote.createdAt }); }); }); let html = `<div class="grid grid-cols-1 gap-4 pb-20">`; Object.values(comparisonMap).forEach(itemData => { const sortedPrices = itemData.prices.sort((a, b) => a.price - b.price); const bestPrice = sortedPrices[0]; html += `<div class="bg-gray-800 border border-gray-700 rounded-xl p-4 shadow-lg"><div class="flex justify-between items-center mb-3 border-b border-gray-600 pb-2"><h3 class="text-lg font-bold text-white">${itemData.name}</h3><span class="bg-green-900 text-green-300 text-xs px-2 py-1 rounded border border-green-700">Melhor: ${bestPrice.supplier}</span></div><div class="space-y-2">${sortedPrices.map((p, index) => { const isBest = index === 0; return `<div class="flex justify-between items-center p-2 rounded ${isBest ? 'bg-green-900/20 border border-green-500/50' : 'bg-dark-input'}"><span class="text-sm text-gray-300">${p.supplier}</span><span class="font-mono font-bold ${isBest ? 'text-green-400 text-base' : 'text-gray-400 text-sm'}">${formatCurrency(p.price)}${isBest ? '<i class="fas fa-trophy ml-2 text-yellow-400"></i>' : ''}</span></div>`; }).join('')}</div></div>`; }); html += `</div>`; container.innerHTML = html; } catch(e) { console.error("Erro comparação:", e); container.innerHTML = `<p class="text-red-400 text-center">Erro ao carregar comparações.</p>`; } }
+async function renderShoppingListScreen(container, toolbar) {
+    toolbar.innerHTML = `<button onclick="window.print()" class="bg-gray-700 text-white px-4 py-2 rounded ml-auto"><i class="fas fa-print"></i></button>`;
+    const list = ingredientsCache.filter(i => i.stock <= (i.minStock || 5));
+    if(list.length === 0) { container.innerHTML = '<p class="text-center text-green-500 mt-10">Estoque OK.</p>'; return; }
+    
+    container.innerHTML = `<table class="w-full text-left text-gray-300"><thead class="bg-gray-900 text-xs uppercase"><tr><th class="p-3">Item</th><th class="p-3 text-right">Comprar</th></tr></thead><tbody>${list.map(i => `
+        <tr class="border-b border-gray-700"><td class="p-3 font-bold text-white">${i.name}</td><td class="p-3 text-right text-yellow-400">${(i.minStock || 5) - i.stock} ${i.unit}</td></tr>
+    `).join('')}</tbody></table>`;
+}
+
+async function renderCategoryManagement(container) {
+    container.innerHTML = '<p class="text-center text-gray-500 mt-10">Gestão de Categorias (Em manutenção na v2)</p>';
+}
+
+async function renderSectorManagementModal() {
+    alert("Configuração de Setores será movida para settingsManager.js");
+}

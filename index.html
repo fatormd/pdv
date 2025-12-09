@@ -66,12 +66,9 @@
             <button id="openCashierBtn" class="p-2 text-green-400 hover:text-green-300 transition hidden" title="Meu Caixa">
                 <i class="fas fa-cash-register text-lg"></i>
             </button>
-            
-            <button id="openKdsBtn" class="p-2 text-yellow-400 hover:text-yellow-300 transition hidden relative" title="Tela da Cozinha (KDS)" onclick="window.goToScreen('kdsScreen')">
+            <button id="openKdsBtn" class="p-2 text-yellow-400 hover:text-yellow-300 transition hidden" title="Tela da Cozinha (KDS)" onclick="window.goToScreen('kdsScreen')">
                 <i class="fas fa-utensils text-lg"></i>
-                <span id="kdsBadge" class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full hidden shadow-sm border border-dark-bg">0</span>
             </button>
-
             <button id="openManagerPanelBtn" class="p-2 text-dark-placeholder hover:text-dark-text transition hidden" title="Painel Gerencial">
                 <i class="fas fa-shield-alt text-lg"></i>
             </button>
@@ -377,13 +374,136 @@
         </div> 
     </main>
     
-    <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"></div>
+    <div id="reportsModal" class="fixed inset-0 bg-gray-900 bg-opacity-95 flex items-center justify-center z-50 hidden p-4 print-hide">
+         <div class="bg-dark-card border border-dark-border w-full max-w-5xl h-[90vh] flex flex-col rounded-xl shadow-2xl">
+            </div>
+    </div>
 
     <div id="shiftDetailsModal" class="fixed inset-0 bg-gray-900 bg-opacity-95 flex items-center justify-center z-[60] hidden p-4 print-hide"><div class="bg-dark-card border border-dark-border w-full max-w-4xl max-h-[90vh] flex flex-col rounded-xl shadow-2xl"><div class="flex justify-between items-center p-5 border-b border-gray-700 bg-gray-800 rounded-t-xl"><div><h3 class="text-xl font-bold text-indigo-400">Auditoria de Turno</h3><p class="text-sm text-gray-400" id="shiftDetailsHeader">Carregando...</p></div><button class="text-gray-400 hover:text-white text-2xl" onclick="document.getElementById('shiftDetailsModal').style.display='none'">&times;</button></div><div class="flex-grow overflow-y-auto p-5 custom-scrollbar bg-dark-bg"><h4 class="text-sm font-bold text-white uppercase mb-3 border-b border-gray-700 pb-2">Vendas Realizadas neste Turno</h4><table class="w-full text-left text-sm text-gray-400"><thead class="bg-gray-900 text-xs uppercase font-bold text-gray-300"><tr><th class="p-3">Hora</th><th class="p-3">Mesa</th><th class="p-3">Responsável</th><th class="p-3 text-right">Total</th></tr></thead><tbody id="shiftSalesTableBody" class="divide-y divide-gray-700"></tbody></table></div><div class="p-4 border-t border-gray-700 bg-gray-800 rounded-b-xl text-right"><button onclick="document.getElementById('shiftDetailsModal').style.display='none'" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-500 font-bold">Fechar</button></div></div></div>
+    
     <div id="tableKdsModal" class="fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center z-[70] hidden p-4 print-hide"><div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md flex flex-col max-h-[80vh]"><div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2 flex-shrink-0"><h3 class="text-xl font-bold text-white" id="tableKdsTitle">Status da Cozinha</h3><button onclick="document.getElementById('tableKdsModal').style.display='none'" class="text-gray-400 hover:text-white text-2xl">&times;</button></div><div id="tableKdsContent" class="space-y-3 overflow-y-auto custom-scrollbar flex-grow"></div><div class="mt-4 pt-2 border-t border-gray-700 text-right flex-shrink-0"><button onclick="document.getElementById('tableKdsModal').style.display='none'" class="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg font-bold w-full sm:w-auto">Fechar</button></div></div></div>
+    
     <div id="kdsHistoryModal" class="fixed inset-0 bg-gray-900 bg-opacity-95 flex items-center justify-center z-[80] hidden p-4 print-hide"><div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col"><div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-4 flex-shrink-0"><h3 class="text-2xl font-bold text-indigo-400"><i class="fas fa-history mr-2"></i>Histórico de Produção (Turno Atual)</h3><button onclick="document.getElementById('kdsHistoryModal').style.display='none'" class="text-gray-400 hover:text-white text-2xl">&times;</button></div><div id="kdsHistoryList" class="flex-grow overflow-y-auto custom-scrollbar grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 content-start"></div></div></div>
+
     <div id="userManagementModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"><div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col"><div class="flex justify-between items-center mb-4 flex-shrink-0"><h3 class="text-xl font-bold text-red-400">Gerenciar Usuários</h3><button class="px-4 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('userManagementModal').style.display='none'; document.getElementById('userForm').style.display='none';">Fechar</button></div><div class="flex-grow overflow-y-auto mb-4 custom-scrollbar"><div id="userListContainer" class="mb-4 border border-gray-600 p-3 rounded-lg bg-dark-bg min-h-[200px]"><p class="text-dark-placeholder italic">Carregando...</p></div><button id="showUserFormBtn" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition mb-4"><i class="fas fa-plus"></i> Adicionar Novo Usuário</button><form id="userForm" class="hidden p-4 border border-gray-600 rounded-lg bg-dark-input space-y-3"><h4 id="userFormTitle" class="text-lg font-semibold text-pumpkin mb-2">Adicionar Novo Usuário</h4><input type="hidden" id="userIdInput"><div><label class="block text-sm font-medium text-dark-placeholder mb-1">Nome Completo*</label><input type="text" id="userNameInput" placeholder="Nome" class="input-pdv w-full" required></div><div><label class="block text-sm font-medium text-dark-placeholder mb-1">E-mail*</label><input type="email" id="userEmailInput" placeholder="email@exemplo.com" class="input-pdv w-full" required autocomplete="username"></div><div id="userPasswordContainer"><label class="block text-sm font-medium text-dark-placeholder mb-1">Senha*</label><input type="password" id="userPasswordInput" placeholder="Senha" class="input-pdv w-full" autocomplete="new-password"><p id="passwordHint" class="text-xs text-dark-placeholder mt-1" style="display: none;">Deixe em branco para não alterar.</p></div><div><label class="block text-sm font-medium text-dark-placeholder mb-1">Função*</label><select id="userRoleSelect" class="input-pdv w-full" required><option value="" disabled selected>Selecione</option><option value="garcom">Garçom</option><option value="caixa">Caixa</option><option value="gerente">Gerente</option></select></div><div><label class="flex items-center space-x-2 text-dark-text"><input type="checkbox" id="userIsActiveCheckbox" class="h-4 w-4 rounded text-pumpkin bg-dark-input" checked><span>Usuário Ativo</span></label></div><div class="flex justify-end space-x-3 pt-3"><button type="button" id="cancelUserFormBtn" class="px-4 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition">Cancelar</button><button type="submit" id="saveUserBtn" class="px-4 py-2 bg-pumpkin text-white rounded-lg hover:bg-pumpkin-dark transition">Salvar Usuário</button></div><p id="userFormError" class="text-red-400 text-sm mt-2" style="display: none;"></p></form></div></div></div>
+    
     <div id="nfeModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"><div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md"><h3 class="text-xl font-bold mb-4 text-indigo-400">Emissão de Nota Fiscal</h3><div id="nfeError" class="hidden p-3 rounded-lg bg-red-900 border border-red-700 text-red-200 mb-4"><p id="nfeErrorMessage" class="font-semibold">Erro aqui</p></div><div id="nfeDetails"><div class="mb-4"><label class="block text-sm font-medium text-dark-placeholder mb-1">Cliente</label><p id="nfeCustomerName" class="text-lg font-semibold text-dark-text">Carregando...</p></div><div class="mb-4"><label class="block text-sm font-medium text-dark-placeholder mb-1">Documento</label><p id="nfeCustomerDoc" class="text-lg font-semibold text-dark-text">Carregando...</p></div><div class="mb-4"><label class="block text-sm font-medium text-dark-placeholder mb-1">Valor Total</label><p id="nfeTotalValue" class="text-2xl font-bold text-pumpkin">R$ 0,00</p></div></div><div class="flex justify-end space-x-3 mt-6"><button class="px-4 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('nfeModal').style.display='none'">Cancelar</button><button id="nfeConfirmBtn" class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"><i class="fas fa-check-circle"></i> Emitir</button></div></div></div>
+    
+    <div id="voucherManagementModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"><div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col"><div class="flex justify-between items-center mb-4 flex-shrink-0"><h3 class="text-xl font-bold text-pumpkin">Gerenciar Vouchers</h3><button class="px-4 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('voucherManagementModal').style.display='none'; document.getElementById('voucherForm').reset(); document.getElementById('voucherForm').style.display='none';">Fechar</button></div><div class="flex-grow overflow-y-auto mb-4 custom-scrollbar"><div id="voucherListContainer" class="mb-4 border border-gray-600 p-3 rounded-lg bg-dark-bg min-h-[100px]"><p class="text-dark-placeholder italic">Carregando vouchers...</p></div><form id="voucherForm" class="p-4 border border-gray-600 rounded-lg bg-dark-input space-y-3" style="display: none;"><h4 id="voucherFormTitle" class="text-lg font-semibold text-indigo-400 mb-2">Novo Voucher</h4><input type="hidden" id="voucherIdInput"><div><label class="block text-sm font-medium text-dark-placeholder mb-1">Nome*</label><input type="text" id="voucherNameInput" placeholder="Ex: R$10 desconto" class="input-pdv w-full" required></div><div class="grid grid-cols-2 gap-4"><div><label class="block text-sm font-medium text-dark-placeholder mb-1">Pontos*</label><input type="number" id="voucherPointsInput" placeholder="Ex: 100" class="input-pdv w-full" required min="1"></div><div><label class="block text-sm font-medium text-dark-placeholder mb-1">Desconto (R$)*</label><input type="number" id="voucherValueInput" placeholder="Ex: 10.00" class="input-pdv w-full" required min="0.01" step="0.01"></div></div><div class="flex justify-end space-x-3 pt-3"><button type="button" id="cancelVoucherFormBtn" class="px-4 py-2 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition" onclick="document.getElementById('voucherForm').reset(); document.getElementById('voucherForm').style.display='none';">Cancelar</button><button type="submit" id="saveVoucherBtn" class="px-4 py-2 bg-pumpkin text-white rounded-lg hover:bg-pumpkin-dark transition">Salvar Voucher</button></div><p id="voucherFormError" class="text-red-400 text-sm mt-2" style="display: none;"></p></form><button id="showVoucherFormBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition mt-4"><i class="fas fa-plus"></i> Adicionar Novo Voucher</button></div></div></div>
+    
+    <div id="customerRegModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide">
+        <div class="bg-dark-card border border-dark-border p-0 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+            
+            <div class="bg-gray-800 border-b border-gray-700 flex text-center select-none">
+                <button class="flex-1 py-4 text-sm font-bold text-gray-400 hover:text-white hover:bg-gray-700 transition border-r border-gray-700 tab-btn group" data-tab="tab-mesa" onclick="window.switchOrderMode('mesa')">
+                    <i class="fas fa-chair mb-1 block text-lg group-hover:scale-110 transition-transform"></i> MESA
+                </button>
+                <button class="flex-1 py-4 text-sm font-bold text-gray-400 hover:text-white hover:bg-gray-700 transition border-r border-gray-700 tab-btn group" data-tab="tab-retirada" onclick="window.switchOrderMode('retirada')">
+                    <i class="fas fa-walking mb-1 block text-lg group-hover:scale-110 transition-transform"></i> RETIRADA
+                </button>
+                <button class="flex-1 py-4 text-sm font-bold text-gray-400 hover:text-white hover:bg-gray-700 transition tab-btn group" data-tab="tab-entrega" onclick="window.switchOrderMode('entrega')">
+                    <i class="fas fa-motorcycle mb-1 block text-lg group-hover:scale-110 transition-transform"></i> ENTREGA
+                </button>
+            </div>
+    
+            <div class="p-6 overflow-y-auto custom-scrollbar flex-grow">
+                
+                <div class="mb-6 bg-dark-bg p-4 rounded-lg border border-gray-700">
+                    <label class="block text-xs uppercase font-bold text-dark-placeholder mb-2">1. Identificar Cliente</label>
+                    
+                    <button id="googleAuthBtn" class="w-full mb-3 bg-white text-gray-800 font-bold py-3 rounded flex items-center justify-center shadow hover:bg-gray-100 transition">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5 h-5 mr-3">
+                        Entrar com Google
+                    </button>
+    
+                    <div class="relative flex py-2 items-center">
+                        <div class="flex-grow border-t border-gray-600"></div>
+                        <span class="flex-shrink-0 mx-4 text-gray-500 text-xs">OU MANUALMENTE</span>
+                        <div class="flex-grow border-t border-gray-600"></div>
+                    </div>
+    
+                    <div class="flex space-x-2 mt-2">
+                        <input type="text" id="customerSearchCpf" placeholder="CPF, Telefone ou E-mail" class="input-pdv w-full">
+                        <button id="searchCustomerByCpfBtn" class="p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition w-14 shadow-lg">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="customerSearchResults" class="mb-4 hidden p-3 bg-green-900/20 border border-green-500/50 rounded-lg text-green-400 text-sm flex items-center justify-center animate-pulse">
+                    <i class="fas fa-check-circle mr-2"></i> Cliente identificado com sucesso!
+                </div>
+    
+                <hr class="border-gray-700 mb-6">
+    
+                <div class="relative min-h-[150px]">
+                    
+                    <div id="tab-mesa" class="order-mode-content absolute inset-0 transition-opacity duration-300">
+                        <label class="block text-xs uppercase font-bold text-dark-placeholder mb-2">2. Destino do Pedido</label>
+                        <div class="bg-gray-800 p-6 rounded-xl text-center border border-gray-600">
+                            <span class="text-gray-400 text-sm block mb-1">Mesa Selecionada</span>
+                            <h2 class="text-4xl font-extrabold text-white" id="modalCurrentTableDisplay">--</h2>
+                            <p class="text-xs text-gray-500 mt-2">O cliente será vinculado a esta mesa.</p>
+                        </div>
+                    </div>
+    
+                    <div id="tab-retirada" class="order-mode-content hidden absolute inset-0 transition-opacity duration-300">
+                        <label class="block text-xs uppercase font-bold text-dark-placeholder mb-2">2. Dados de Retirada</label>
+                        <div class="flex flex-col items-center justify-center h-full">
+                            <p class="text-sm text-gray-400 mb-3">Informe este PIN ao cliente:</p>
+                            <div class="bg-gray-800 px-8 py-4 rounded-xl border-2 border-dashed border-pumpkin shadow-[0_0_15px_rgba(255,117,24,0.2)]">
+                                <span class="block text-[10px] text-gray-500 uppercase text-center tracking-widest mb-1">PIN DO PEDIDO</span>
+                                <span id="generatedPinDisplay" class="text-5xl font-mono font-bold text-white tracking-wider">----</span>
+                            </div>
+                        </div>
+                    </div>
+    
+                    <div id="tab-entrega" class="order-mode-content hidden absolute inset-0 transition-opacity duration-300 space-y-3">
+                        <div class="flex justify-between items-end mb-1">
+                            <label class="block text-xs uppercase font-bold text-dark-placeholder">2. Endereço de Entrega</label>
+                            <button id="callMotoboyBtn" class="px-3 py-1 bg-orange-600 text-white text-[10px] uppercase tracking-wide rounded hover:bg-orange-700 transition font-bold flex items-center shadow-md transform hover:scale-105" onclick="if(window.renderExternalRecruitmentModal) window.renderExternalRecruitmentModal('motoboy');">
+                                <i class="fas fa-bullhorn mr-1"></i> Chamar Motoca
+                            </button>
+                        </div>
+                        
+                        <div class="grid grid-cols-3 gap-3">
+                            <input type="text" id="deliveryZip" placeholder="CEP" class="input-pdv col-span-1 text-sm">
+                            <input type="text" id="deliveryCity" placeholder="Cidade" class="input-pdv col-span-2 text-sm bg-gray-700 text-gray-400" readonly value="São Paulo">
+                        </div>
+                        <div class="grid grid-cols-4 gap-3">
+                            <input type="text" id="deliveryStreet" placeholder="Rua / Avenida" class="input-pdv col-span-3">
+                            <input type="text" id="deliveryNumber" placeholder="Nº" class="input-pdv col-span-1 text-center">
+                        </div>
+                        <input type="text" id="deliveryComplement" placeholder="Complemento / Ponto de Referência" class="input-pdv w-full text-sm">
+                    </div>
+                </div>
+    
+                <div class="mt-48 md:mt-40 pt-4 border-t border-gray-700"> <label class="block text-xs text-gray-500 mb-1">Nome do Cliente (Confirmar)</label>
+                     <input type="text" id="customerNameInput" class="input-pdv w-full" placeholder="Nome do Cliente">
+                </div>
+    
+            </div>
+    
+            <div class="p-4 border-t border-gray-700 bg-gray-800 flex justify-end space-x-3 z-10 relative">
+                <button class="px-5 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition font-bold" onclick="document.getElementById('customerRegModal').style.display='none'">
+                    Cancelar
+                </button>
+                <button id="confirmOrderModeBtn" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-bold shadow-lg flex items-center disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-check-circle mr-2"></i> INICIAR PEDIDO
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="customAlertModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"><div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm text-center"><h3 class="text-xl font-bold mb-4 text-red-400" id="customAlertTitle">Aviso</h3><p class="text-base mb-6 text-dark-text" id="customAlertMessage">Msg.</p><button id="customAlertOkBtn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg transition">OK</button></div></div>
+    
+    <div id="managerModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"></div>
+    
+    <div id="orderDetailsModal" class="fixed inset-0 bg-gray-900 bg-opacity-95 flex items-center justify-center z-[60] hidden p-4 print-hide"><div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col"><div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-4"><h3 class="text-2xl font-bold text-green-400">Detalhes do Pedido</h3><button onclick="document.getElementById('orderDetailsModal').style.display='none'" class="text-gray-400 hover:text-white text-2xl">&times;</button></div><div id="orderDetailsContent" class="flex-grow overflow-y-auto custom-scrollbar space-y-4"><p class="text-center text-gray-500 italic">Carregando...</p></div><div class="pt-4 border-t border-gray-700 flex justify-end"><button onclick="document.getElementById('orderDetailsModal').style.display='none'" class="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg">Fechar</button></div></div></div>
+    
+    <div id="cashierModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4 print-hide"><div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto custom-scrollbar"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold text-green-400" id="cashierModalTitle">Meu Caixa</h3><button class="text-gray-400 hover:text-white" onclick="document.getElementById('cashierModal').style.display='none'"><i class="fas fa-times"></i></button></div><div id="cashierOpenScreen" class="hidden"><div class="text-center mb-6"><i class="fas fa-cash-register text-4xl text-pumpkin mb-3"></i><p class="text-dark-text">Seu caixa está fechado.</p><p class="text-sm text-dark-placeholder">Informe o fundo de troco recebido para iniciar.</p></div><label class="block text-sm font-medium text-dark-placeholder mb-1">Fundo de Troco (R$)</label><input type="number" id="cashierStartFloat" class="input-pdv w-full mb-6 text-lg text-center font-bold" placeholder="0.00" step="0.01"><button id="confirmOpenCashierBtn" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition">Abrir Caixa</button></div><div id="cashierStatusScreen" class="hidden space-y-3"><div class="grid grid-cols-2 gap-3"><div class="p-3 bg-dark-bg rounded border border-dark-border"><span class="text-xs text-dark-placeholder block">Abertura</span><span id="cashierOpenedAtDisplay" class="font-bold text-white">--:--</span></div><div class="p-3 bg-dark-bg rounded border border-dark-border"><span class="text-xs text-dark-placeholder block">Fundo Inicial</span><span id="cashierStartFloatDisplay" class="font-bold text-green-400">R$ 0,00</span></div></div><div class="p-3 bg-dark-bg rounded border border-dark-border"><p class="text-xs uppercase font-bold text-dark-placeholder mb-2 border-b border-gray-700 pb-1">Vendas (Turno Atual)</p><div class="flex justify-between items-center mb-1 text-sm"><span class="text-gray-300">Cartão/Pix:</span><span id="cashierSalesDigital" class="font-semibold text-white">R$ 0,00</span></div><div class="flex justify-between items-center mb-1 text-sm"><span class="text-gray-300">Dinheiro:</span><span id="cashierSalesMoney" class="font-semibold text-green-400">R$ 0,00</span></div><div class="my-2 border-t border-gray-700 border-dashed"></div><div class="flex justify-between items-center mb-1 text-xs text-gray-400"><span>Produtos Vendidos:</span><span id="cashierTotalProducts">R$ 0,00</span></div><div class="flex justify-between items-center mb-1 text-xs text-blue-400"><span>Taxa de Serviço (10%):</span><span id="cashierTotalService">R$ 0,00</span></div><div class="mt-2 pt-2 border-t border-gray-700 flex justify-between items-center"><span class="font-bold text-pumpkin">Total Vendas:</span><span id="cashierSalesTotal" class="font-bold text-pumpkin text-lg">R$ 0,00</span></div></div><div class="bg-dark-bg rounded border border-dark-border overflow-hidden"><div class="bg-gray-800 px-3 py-2 border-b border-dark-border"><p class="text-xs uppercase font-bold text-gray-400">Movimentações (Mesas Fechadas)</p></div><div id="cashierTransactionsList" class="max-h-32 overflow-y-auto p-2 space-y-1 custom-scrollbar"><p class="text-center text-xs text-gray-600 italic">Nenhuma movimentação.</p></div></div><div class="p-3 bg-dark-bg rounded border border-red-900/30"><div class="flex justify-between items-center mb-2"><span class="text-sm text-red-300 font-semibold">Sangrias (Retiradas)</span><button id="openSangriaModalBtn" class="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded transition">+ Registrar</button></div><div id="sangriaList" class="text-xs text-gray-400 max-h-20 overflow-y-auto space-y-1"><p class="italic opacity-50">Nenhuma sangria registrada.</p></div><div class="flex justify-between items-center mt-2 pt-1 border-t border-red-900/30 font-bold text-red-400 text-sm"><span>Total Retirado:</span><span id="cashierTotalSangria">R$ 0,00</span></div></div><hr class="border-gray-600 my-4"><div><p class="text-sm text-white font-bold mb-2">Fechamento de Turno</p><div class="flex justify-between text-sm mb-2 bg-gray-800 p-2 rounded"><span>Dinheiro Esperado na Gaveta:</span><span id="cashierExpectedMoney" class="font-bold text-white">R$ 0,00</span></div><label class="block text-xs text-dark-placeholder mb-1">Contagem Final (Dinheiro na Mão)*</label><input type="number" id="cashierEndFloat" class="input-pdv w-full mb-2 text-lg font-bold text-white bg-gray-700 border-gray-600" placeholder="0.00" step="0.01"><div id="cashierDifferenceContainer" class="hidden mb-3 p-2 rounded text-center text-sm"><span class="block text-xs opacity-75">Diferença (Quebra de Caixa)</span><span id="cashierDifferenceValue" class="font-bold text-lg">R$ 0,00</span></div><div id="cashierJustificationContainer" class="hidden"><label class="block text-xs text-red-400 mb-1">Justificativa da Diferença*</label><textarea id="cashierClosingNote" class="input-pdv w-full text-sm p-2 h-16" placeholder="Explique a sobra ou falta..."></textarea></div></div><button id="confirmCloseCashierBtn" class="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition mt-2">Encerrar Turno</button></div></div></div>
+    
+    <div id="sangriaModal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[60] hidden p-4 print-hide"><div class="bg-dark-card border border-red-500/50 p-5 rounded-lg shadow-xl w-full max-w-xs"><h4 class="text-lg font-bold text-red-400 mb-3">Nova Sangria</h4><p class="text-xs text-gray-400 mb-3">Registre o valor entregue ao gerente.</p><input type="number" id="sangriaValueInput" class="input-pdv w-full mb-2" placeholder="Valor (R$)" step="0.01"><input type="text" id="sangriaReasonInput" class="input-pdv w-full mb-4" placeholder="Motivo (Ex: Recolhimento)"><div class="flex space-x-2"><button class="flex-1 bg-gray-600 text-white py-2 rounded hover:bg-gray-500" onclick="document.getElementById('sangriaModal').style.display='none'">Cancelar</button><button id="confirmSangriaBtn" class="flex-1 bg-red-600 text-white py-2 rounded hover:bg-red-700 font-bold">Salvar</button></div></div></div>
     
     <div id="waiterRegModal" class="hidden"></div>
     <div id="selectiveTransferModal" class="hidden"></div>
@@ -393,15 +513,21 @@
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md">
             <h3 class="text-xl font-bold text-pumpkin mb-2" id="obsItemName">Item</h3>
             <p class="text-sm text-gray-400 mb-3">Adicione observações para a cozinha.</p>
+            
             <textarea id="obsInput" class="input-pdv w-full h-24 mb-4 p-3 text-white bg-dark-input border-gray-600 rounded-lg focus:ring-pumpkin focus:border-pumpkin" placeholder="Ex: Sem cebola, bem passado..."></textarea>
+            
             <div class="flex items-center justify-between mb-4 p-3 bg-dark-input rounded-lg border border-gray-700">
                 <label class="flex items-center space-x-3 text-dark-text cursor-pointer w-full">
                     <input type="checkbox" id="esperaSwitch" class="h-5 w-5 rounded text-pumpkin bg-gray-700 border-gray-500 focus:ring-pumpkin">
                     <span class="font-bold text-yellow-400"><i class="fas fa-pause-circle mr-1"></i> Em Espera (Não enviar agora)</span>
                 </label>
             </div>
+
             <p class="text-xs text-gray-500 mb-2 uppercase font-bold">Obs. Rápidas:</p>
-            <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-6"><span class="text-xs text-gray-600 italic">Carregando...</span></div>
+            <div id="quickObsButtons" class="flex flex-wrap gap-2 mb-6">
+                <span class="text-xs text-gray-600 italic">Carregando...</span>
+            </div>
+
             <div class="flex space-x-3">
                 <button id="cancelObsBtn" class="flex-1 bg-gray-600 hover:bg-gray-500 text-white py-3 rounded-lg font-bold transition">Cancelar</button>
                 <button id="saveObsBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold transition shadow-lg">Salvar</button>
@@ -415,24 +541,30 @@
                 <h3 class="text-lg font-bold text-indigo-400"><i class="fas fa-calculator mr-2"></i>Calculadora</h3>
                 <button id="closeCalcBtnX" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
             </div>
+            
             <input type="text" id="calcDisplay" class="w-full bg-dark-bg text-right text-3xl font-mono text-white p-4 rounded-lg mb-4 border border-gray-600 shadow-inner focus:outline-none" readonly value="0">
+            
             <div class="calculator-buttons grid grid-cols-4 gap-2">
                 <button class="calc-btn bg-gray-600 text-white p-4 rounded-lg font-bold hover:bg-gray-500 text-lg shadow" data-action="clear">C</button>
                 <button class="calc-btn bg-gray-700 text-indigo-300 p-4 rounded-lg font-bold hover:bg-gray-600 text-lg shadow" data-action="operator" data-value="/">÷</button>
                 <button class="calc-btn bg-gray-700 text-indigo-300 p-4 rounded-lg font-bold hover:bg-gray-600 text-lg shadow" data-action="operator" data-value="*">×</button>
                 <button class="calc-btn bg-red-900/50 text-red-200 p-4 rounded-lg font-bold hover:bg-red-900 text-lg shadow" data-action="backspace">⌫</button>
+
                 <button class="calc-btn bg-gray-800 text-white p-4 rounded-lg font-bold hover:bg-gray-700 text-xl shadow" data-action="number" data-value="7">7</button>
                 <button class="calc-btn bg-gray-800 text-white p-4 rounded-lg font-bold hover:bg-gray-700 text-xl shadow" data-action="number" data-value="8">8</button>
                 <button class="calc-btn bg-gray-800 text-white p-4 rounded-lg font-bold hover:bg-gray-700 text-xl shadow" data-action="number" data-value="9">9</button>
                 <button class="calc-btn bg-gray-700 text-indigo-300 p-4 rounded-lg font-bold hover:bg-gray-600 text-lg shadow" data-action="operator" data-value="-">-</button>
+
                 <button class="calc-btn bg-gray-800 text-white p-4 rounded-lg font-bold hover:bg-gray-700 text-xl shadow" data-action="number" data-value="4">4</button>
                 <button class="calc-btn bg-gray-800 text-white p-4 rounded-lg font-bold hover:bg-gray-700 text-xl shadow" data-action="number" data-value="5">5</button>
                 <button class="calc-btn bg-gray-800 text-white p-4 rounded-lg font-bold hover:bg-gray-700 text-xl shadow" data-action="number" data-value="6">6</button>
                 <button class="calc-btn bg-gray-700 text-indigo-300 p-4 rounded-lg font-bold hover:bg-gray-600 text-lg shadow" data-action="operator" data-value="+">+</button>
+
                 <button class="calc-btn bg-gray-800 text-white p-4 rounded-lg font-bold hover:bg-gray-700 text-xl shadow" data-action="number" data-value="1">1</button>
                 <button class="calc-btn bg-gray-800 text-white p-4 rounded-lg font-bold hover:bg-gray-700 text-xl shadow" data-action="number" data-value="2">2</button>
                 <button class="calc-btn bg-gray-800 text-white p-4 rounded-lg font-bold hover:bg-gray-700 text-xl shadow" data-action="number" data-value="3">3</button>
                 <button class="calc-btn bg-blue-600 text-white p-4 rounded-lg font-bold hover:bg-blue-700 row-span-2 flex items-center justify-center text-2xl shadow" data-action="calculate">=</button>
+
                 <button class="calc-btn bg-gray-800 text-white p-4 rounded-lg font-bold hover:bg-gray-700 col-span-2 text-xl shadow" data-action="number" data-value="0">0</button>
                 <button class="calc-btn bg-gray-800 text-white p-4 rounded-lg font-bold hover:bg-gray-700 text-xl shadow" data-action="decimal">,</button>
             </div>
@@ -446,15 +578,31 @@
                 <h3 class="text-xl font-bold text-indigo-400">Transferir Itens</h3>
                 <button onclick="document.getElementById('tableTransferModal').style.display='none'" class="text-gray-400 hover:text-white text-2xl">&times;</button>
             </div>
+            
             <p class="text-sm text-gray-400 mb-4">Mova os itens selecionados para outra mesa.</p>
-            <div class="mb-4"><label class="block text-xs text-gray-500 uppercase font-bold mb-1">Mesa de Destino</label><input type="number" id="targetTableInput" class="input-pdv w-full text-center text-xl font-bold p-3" placeholder="Nº Mesa"></div>
-            <div id="newTableDinersInput" class="space-y-3 p-3 bg-gray-800 rounded-lg border border-gray-700 mb-6"><p class="text-xs text-yellow-400 flex items-center"><i class="fas fa-info-circle mr-1"></i> Se a mesa não existir, preencha:</p><div class="grid grid-cols-2 gap-2"><input type="number" id="newTableDiners" class="input-pdv w-full text-sm p-2 text-center" placeholder="Pessoas" value="1" min="1"><select id="newTableSector" class="input-pdv w-full text-sm p-2"></select></div></div>
+
+            <div class="mb-4">
+                <label class="block text-xs text-gray-500 uppercase font-bold mb-1">Mesa de Destino</label>
+                <input type="number" id="targetTableInput" class="input-pdv w-full text-center text-xl font-bold p-3" placeholder="Nº Mesa">
+            </div>
+
+            <div id="newTableDinersInput" class="space-y-3 p-3 bg-gray-800 rounded-lg border border-gray-700 mb-6">
+                <p class="text-xs text-yellow-400 flex items-center"><i class="fas fa-info-circle mr-1"></i> Se a mesa não existir, preencha:</p>
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="number" id="newTableDiners" class="input-pdv w-full text-sm p-2 text-center" placeholder="Pessoas" value="1" min="1">
+                    <select id="newTableSector" class="input-pdv w-full text-sm p-2">
+                        </select>
+                </div>
+            </div>
+
             <div id="transferStatus" class="text-sm text-center mb-4 text-yellow-400 hidden font-bold animate-pulse">Processando...</div>
-            <div class="flex space-x-3"><button onclick="document.getElementById('tableTransferModal').style.display='none'" class="flex-1 bg-gray-600 hover:bg-gray-500 text-white py-3 rounded-lg font-bold transition">Cancelar</button><button id="confirmTableTransferBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-bold transition shadow-lg">Transferir</button></div>
+
+            <div class="flex space-x-3">
+                <button onclick="document.getElementById('tableTransferModal').style.display='none'" class="flex-1 bg-gray-600 hover:bg-gray-500 text-white py-3 rounded-lg font-bold transition">Cancelar</button>
+                <button id="confirmTableTransferBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-bold transition shadow-lg">Transferir</button>
+            </div>
         </div>
     </div>
-
-    <div id="sangriaModal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[60] hidden p-4 print-hide"><div class="bg-dark-card border border-red-500/50 p-5 rounded-lg shadow-xl w-full max-w-xs"><h4 class="text-lg font-bold text-red-400 mb-3">Nova Sangria</h4><p class="text-xs text-gray-400 mb-3">Registre o valor entregue ao gerente.</p><input type="number" id="sangriaValueInput" class="input-pdv w-full mb-2" placeholder="Valor (R$)" step="0.01"><input type="text" id="sangriaReasonInput" class="input-pdv w-full mb-4" placeholder="Motivo (Ex: Recolhimento)"><div class="flex space-x-2"><button class="flex-1 bg-gray-600 text-white py-2 rounded hover:bg-gray-500" onclick="document.getElementById('sangriaModal').style.display='none'">Cancelar</button><button id="confirmSangriaBtn" class="flex-1 bg-red-600 text-white py-2 rounded hover:bg-red-700 font-bold">Salvar</button></div></div></div>
 
     <audio id="notificationSound" src="ding.mp3" preload="auto"></audio>
 
