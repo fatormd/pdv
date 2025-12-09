@@ -1,14 +1,17 @@
+// --- CONTROLLERS/MANAGER/MODULES/PRODUCTS/STORE.JS (ATUALIZADO) ---
 import { db, appId, getSectorsCollectionRef } from "/services/firebaseService.js";
 import { collection, query, getDocs, orderBy, doc, getDoc, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { fetchSalesHistory } from "/services/wooCommerceService.js?v=2";
+
+// CORREÇÃO AQUI: Atualizado para v=3 para garantir a sincronia com o wooCommerceService novo
+import { fetchSalesHistory } from "/services/wooCommerceService.js?v=3";
 
 // --- STATE & CACHE ---
 export let ingredientsCache = [];
 export let suppliersCache = [];
 export let groupsCache = [];
 export let productExtensionsCache = {};
-export let sectorsCache = []; // NOVO
-export let operationTypesCache = []; // NOVO
+export let sectorsCache = []; 
+export let operationTypesCache = []; 
 
 // --- HELPERS ---
 export const getColRef = (name) => collection(db, 'artifacts', appId, 'public', 'data', name);

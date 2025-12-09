@@ -1,4 +1,4 @@
-// --- CONTROLLERS/PANELCONTROLLER.JS (COMPLETO E CORRIGIDO) ---
+// --- CONTROLLERS/PANELCONTROLLER.JS (CORRIGIDO: INCLUI CLIENTE/RETIRADA) ---
 import { 
     getTablesCollectionRef, 
     getTableDocRef, 
@@ -33,24 +33,29 @@ let currentTablesSnapshot = [];
 // --- AUXILIARES ---
 const fetchServiceSectors = async () => {
     try {
-        // CORREÇÃO: Busca apenas setores de ATENDIMENTO (service/atendimento)
+        // Busca setores cadastrados (Salão, Bar, etc.)
         const q = query(getSectorsCollectionRef(), where('type', 'in', ['atendimento', 'service']), orderBy('name'));
         const snapshot = await getDocs(q);
         
         const dynamicSectors = snapshot.docs.map(doc => doc.data().name);
         
-        if (dynamicSectors.length > 0) {
-            SECTORS = ['Todos', ...dynamicSectors];
-        } else {
-            // Fallback apenas se não houver nada no banco
-            SECTORS = ['Todos', 'Salão 1', 'Bar', 'Mezanino', 'Calçada']; 
-        }
+        // --- CORREÇÃO PRINCIPAL ---
+        // Adicionamos 'Cliente' e 'Retirada' manualmente à lista.
+        // Assim, mesas abertas pelo QR Code (Setor 'Cliente') aparecem numa aba própria ou em 'Todos'.
+        const fixedSectors = ['Todos', ...dynamicSectors];
+        
+        if (!fixedSectors.includes('Cliente')) fixedSectors.push('Cliente');
+        if (!fixedSectors.includes('Retirada')) fixedSectors.push('Retirada');
+
+        SECTORS = fixedSectors;
         
         renderTableFilters();
         populateSectorDropdown();
 
     } catch (e) {
         console.error("Erro ao carregar setores dinâmicos:", e);
+        // Fallback garantido
+        SECTORS = ['Todos', 'Salão 1', 'Cliente', 'Retirada']; 
         renderTableFilters();
         populateSectorDropdown();
     }
@@ -60,9 +65,9 @@ const populateSectorDropdown = () => {
     const select = document.getElementById('sectorInput');
     const transferSelect = document.getElementById('newTableSector');
     
-    // Filtra 'Todos' para não aparecer no dropdown de cadastro
+    // Remove 'Todos' do dropdown de criar mesa, mas mantém os outros
     const optionsHtml = '<option value="" disabled selected>Setor</option>' + 
-        SECTORS.slice(1).map(s => `<option value="${s}">${s}</option>`).join('');
+        SECTORS.filter(s => s !== 'Todos').map(s => `<option value="${s}">${s}</option>`).join('');
 
     if (select) select.innerHTML = optionsHtml;
     if (transferSelect) transferSelect.innerHTML = optionsHtml;
@@ -76,12 +81,19 @@ export const renderTableFilters = () => {
 
     sectorFiltersContainer.innerHTML = SECTORS.map(sector => {
         const isActive = sector === currentSectorFilter;
-        const activeClasses = 'bg-pumpkin text-white border-pumpkin shadow-md';
+        // Estilo diferente para abas especiais
+        let activeColor = 'bg-pumpkin border-pumpkin';
+        if (sector === 'Cliente') activeColor = 'bg-indigo-600 border-indigo-600';
+        if (sector === 'Retirada') activeColor = 'bg-green-600 border-green-600';
+
+        const activeClasses = `${activeColor} text-white shadow-md`;
         const inactiveClasses = 'bg-dark-input text-dark-text border-gray-600 hover:bg-gray-700';
         
         return `
             <button class="sector-btn px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap border transition ${isActive ? activeClasses : inactiveClasses}" 
                     data-sector="${sector}">
+                ${sector === 'Cliente' ? '<i class="fas fa-mobile-alt mr-1"></i>' : ''}
+                ${sector === 'Retirada' ? '<i class="fas fa-bag-shopping mr-1"></i>' : ''}
                 ${sector}
             </button>
         `;
@@ -117,18 +129,13 @@ const renderTables = (docs) => {
             
             const isBillRequested = t.billRequested === true;
             const isClientPending = t.clientOrderPending === true;
-            // CORREÇÃO VISUAL: Novo Pedido detectado
-            const hasNewOrder = t.hasNewOrder === true; 
             const isMerged = t.status?.toLowerCase() === 'merged';
+            const isPickup = t.isPickup === true || t.sector === 'Retirada';
 
             let cardColorClasses = 'bg-dark-card border-gray-700 text-dark-text hover:border-gray-500';
             let attentionIconHtml = '';
 
-            if (hasNewOrder) { // PRIORIDADE MÁXIMA
-                 cardColorClasses = 'bg-yellow-600 text-white border-yellow-400 animate-pulse ring-2 ring-yellow-300 shadow-xl transform scale-105';
-                 attentionIconHtml = `<span class="bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded-full animate-bounce shadow">NOVO!</span>`;
-            }
-            else if (isMerged) {
+            if (isMerged) {
                  cardColorClasses = 'bg-yellow-900/40 border-yellow-700 text-yellow-100 hover:border-yellow-500';
                  attentionIconHtml = `<i class="fas fa-link text-yellow-400 ml-2" title="Agrupada: Mestra ${t.masterTable}"></i>`;
             } 
@@ -148,7 +155,15 @@ const renderTables = (docs) => {
             else if (total > 0) {
                  cardColorClasses = 'bg-red-900/20 border-red-800/50 text-red-200 hover:border-red-600 hover:bg-red-900/30';
             } else {
+                 // Mesas vazias
                  cardColorClasses = 'bg-green-900/20 border-green-800/50 text-green-200 hover:border-green-600 hover:bg-green-900/30';
+            }
+
+            // Destaque visual para Retirada
+            if (isPickup) {
+                cardColorClasses += ' border-l-4 border-l-green-400';
+            } else if (t.sector === 'Cliente') {
+                cardColorClasses += ' border-l-4 border-l-indigo-400';
             }
 
             let lastSentAt = null;
@@ -177,15 +192,19 @@ const renderTables = (docs) => {
             
             const mergeIconHtml = isMerged ? '' : `<button class="merge-icon-btn text-gray-500 hover:text-white" title="Agrupar Mesas" data-action="open-merge"><i class="fas fa-people-arrows"></i></button>`;
             
-            const clientInfo = t.clientName ? `<p class="text-xs font-semibold truncate w-full">${t.clientName}</p>` : '';
-            const statusText = isMerged ? `<span class="text-xs opacity-75">Mestra: ${t.masterTable}</span>` : `<span class="text-xs opacity-75"><i class="fas fa-user mr-1"></i>${t.diners}</span>`;
+            const clientInfo = t.clientName ? `<p class="text-xs font-semibold truncate w-full"><i class="fas fa-user-circle mr-1"></i>${t.clientName}</p>` : '';
+            const statusText = isMerged ? `<span class="text-xs opacity-75">Mestra: ${t.masterTable}</span>` : `<span class="text-xs opacity-75"><i class="fas fa-chair mr-1"></i>${t.diners || 1}</span>`;
+
+            // Nome da Mesa (Display)
+            let displayTableName = `Mesa ${t.tableNumber}`;
+            if (isPickup) displayTableName = `Retirada #${t.tableNumber}`;
 
             const cardHtml = `
                 <div class="table-card-panel ${cardColorClasses} shadow-sm hover:shadow-md transition-all duration-200 relative rounded-lg p-3 flex flex-col justify-between h-32 border cursor-pointer" data-table-id="${tId}">
                     
                     <div class="flex justify-between items-start">
                         <div>
-                            <h3 class="font-bold text-xl leading-none">Mesa ${t.tableNumber}</h3>
+                            <h3 class="font-bold text-lg leading-none truncate w-24" title="${displayTableName}">${displayTableName}</h3>
                             <p class="text-[10px] uppercase font-bold opacity-60 tracking-wider mt-0.5">${t.sector || 'N/A'}</p>
                         </div>
                         <div class="flex items-center">
@@ -194,7 +213,7 @@ const renderTables = (docs) => {
                         </div>
                     </div>
                     
-                    <div class="flex-grow flex flex-col justify-center py-1">
+                    <div class="flex-grow flex flex-col justify-center py-1 text-indigo-200">
                         ${clientInfo}
                     </div>
 
@@ -209,12 +228,12 @@ const renderTables = (docs) => {
                         </div>
                     </div>
                 </div>`;
-            list.innerHTML += cardHtml;
+            openTablesList.innerHTML += cardHtml;
         }
     });
 
-    countEl.textContent = count;
-    if (count === 0) list.innerHTML = `<div class="col-span-full flex flex-col items-center justify-center p-8 border border-dashed border-gray-700 rounded-xl text-gray-500"><i class="fas fa-chair text-3xl mb-2 opacity-50"></i><p>Nenhuma mesa neste setor.</p></div>`;
+    openTablesCount.textContent = count;
+    if (count === 0) openTablesList.innerHTML = `<div class="col-span-full flex flex-col items-center justify-center p-8 border border-dashed border-gray-700 rounded-xl text-gray-500"><i class="fas fa-chair text-3xl mb-2 opacity-50"></i><p>Nenhuma mesa neste setor.</p></div>`;
 };
 
 // --- FUNÇÃO CENTRAL DE EVENTOS (DELEGAÇÃO) ---
@@ -237,11 +256,7 @@ const setupPanelEventListeners = () => {
         const card = e.target.closest('.table-card-panel');
         if (card) {
             const tableId = card.dataset.tableId;
-            // CORREÇÃO: Limpa o alerta visual "hasNewOrder" ao abrir a mesa
-            if (tableId) {
-                 updateDoc(getTableDocRef(tableId), { hasNewOrder: false }).catch(err => console.error("Erro ao limpar alerta:", err));
-                 selectTableAndStartListener(tableId);
-            }
+            if (tableId) selectTableAndStartListener(tableId);
         }
     });
 };
@@ -250,6 +265,7 @@ export const loadOpenTables = () => {
     if (unsubscribeTables) { unsubscribeTables(); unsubscribeTables = null; }
     
     let qBase = getTablesCollectionRef();
+    // Filtro base: Status aberta ou agrupada
     let constraints = [where('status', 'in', ['open', 'merged']), orderBy('tableNumber', 'asc')];
 
     if (currentSectorFilter !== 'Todos') {
@@ -262,8 +278,7 @@ export const loadOpenTables = () => {
         snapshot.docChanges().forEach((change) => {
             if (change.type === "modified") {
                 const data = change.doc.data();
-                // Toca som se houver novo pedido ou conta
-                if (data.billRequested === true || data.hasNewOrder === true || data.kdsAlert === 'ready') {
+                if (data.billRequested === true || data.clientOrderPending === true || data.kdsAlert === 'ready') {
                     playNotificationSound();
                 }
             }
@@ -277,7 +292,7 @@ export const loadOpenTables = () => {
     });
 };
 
-// ... (Restante do arquivo mantido) ...
+// ... (Restante das funções auxiliares KDS, abrirMesa, etc, mantidas)
 const openKdsStatusModal = async (tableId) => {
     const modal = document.getElementById('tableKdsModal');
     const content = document.getElementById('tableKdsContent');
@@ -327,7 +342,7 @@ export const handleAbrirMesa = async () => {
 
 export const handleSearchTable = async () => { const input = document.getElementById('searchTableInput'); const num = input.value; if (!num) return; const snap = await getDoc(getTableDocRef(num)); if (snap.exists() && snap.data().status === 'open') { selectTableAndStartListener(num); input.value = ''; } else { showToast("Mesa não encontrada.", true); } };
 async function handleBillRequestConfirmation(tableId) { if (!tableId) return; const tableRef = getTableDocRef(tableId); try { await updateDoc(tableRef, { billRequested: false, waiterNotification: null }); selectTableAndStartListener(tableId); goToScreen('paymentScreen'); } catch (e) { console.error(e); showToast("Erro.", true); } }
-export const openTableMergeModal = () => { /* ... (Mantido igual ao anterior) ... */ }; 
+export const openTableMergeModal = () => { /* ... (Mantido) ... */ }; 
 export const handleConfirmTableMerge = async () => { /* ... */ }; 
 const handleConfirmUngroup = async (m, ma) => { /* ... */ }; 
 export const initPanelController = async () => { if (panelInitialized) return; console.log("[PanelController] Inicializando..."); await fetchServiceSectors(); setupPanelEventListeners(); const abrirBtn = document.getElementById('abrirMesaBtn'); if (abrirBtn) abrirBtn.addEventListener('click', handleAbrirMesa); const searchBtn = document.getElementById('searchTableBtn'); if (searchBtn) searchBtn.addEventListener('click', handleSearchTable); const check = () => { if (abrirBtn) { const m = document.getElementById('mesaInput').value; const p = document.getElementById('pessoasInput').value; const s = document.getElementById('sectorInput').value; abrirBtn.disabled = !(m && p && s); } }; ['mesaInput', 'pessoasInput', 'sectorInput'].forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener(id === 'sectorInput' ? 'change' : 'input', check); }); panelInitialized = true; console.log("[PanelController] Inicializado."); };

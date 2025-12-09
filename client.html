@@ -309,7 +309,40 @@
         </div>
     </div>
     <div id="deliveryFeedbackModal" class="hidden"></div>
-    <div id="customerRegistrationModal" class="hidden"></div>
+<div id="customerRegistrationModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-[60] hidden p-4">
+        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm relative">
+            <h3 class="text-xl font-bold mb-4 text-white">Completar Cadastro</h3>
+            <p class="text-gray-400 text-sm mb-4">Para acumular pontos e receber promoções, complete seu cadastro.</p>
+            
+            <form id="customerRegistrationForm" class="space-y-4">
+                <div class="bg-gray-800 p-3 rounded border border-gray-700">
+                    <p class="text-xs text-gray-500">Nome (Google)</p>
+                    <p id="regCustomerName" class="text-white font-semibold">Nome do Usuário</p>
+                </div>
+                <div class="bg-gray-800 p-3 rounded border border-gray-700">
+                    <p class="text-xs text-gray-500">Email (Google)</p>
+                    <p id="regCustomerEmail" class="text-white font-semibold">email@exemplo.com</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">WhatsApp / Telefone</label>
+                    <input type="tel" id="regCustomerWhatsapp" placeholder="Ex: 11999999999" class="input-pdv w-full" pattern="[0-9]{10,11}" required>
+                    <p class="text-[10px] text-gray-500 mt-1">Apenas números (DDD + Número)</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Data de Nascimento</label>
+                    <input type="date" id="regCustomerBirthday" class="input-pdv w-full" required>
+                </div>
+
+                <p id="regErrorMsg" class="text-red-400 text-sm text-center font-bold hidden"></p>
+
+                <button type="submit" id="saveRegistrationBtn" class="w-full bg-brand-primary hover:bg-brand-primary-dark text-white font-bold py-3 rounded-lg transition mt-2">
+                    Salvar e Continuar
+                </button>
+            </form>
+        </div>
+    </div>
     
     <div id="clientObsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-[70] hidden p-4">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md relative">
