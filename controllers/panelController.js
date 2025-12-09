@@ -1,4 +1,4 @@
-// --- CONTROLLERS/PANELCONTROLLER.JS (UX AJUSTADO: CARD COM RODAPÉ EM DUAS LINHAS) ---
+// --- CONTROLLERS/PANELCONTROLLER.JS (FIX DEFINITIVO PARA VISIBILIDADE DE MESAS DE CLIENTE/DELIVERY) ---
 import { 
     getTablesCollectionRef, 
     getTableDocRef, 
@@ -9,7 +9,7 @@ import {
 
 import { 
     query, where, orderBy, onSnapshot, getDoc, setDoc, updateDoc, 
-    serverTimestamp, writeBatch, arrayUnion, arrayRemove, getDocs, doc 
+    serverTimestamp, writeBatch, arrayUnion, arrayRemove, getDocs, doc
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 import { formatCurrency, formatElapsedTime, toggleLoading } from "/utils.js";
@@ -39,8 +39,10 @@ const fetchServiceSectors = async () => {
         const dynamicSectors = snapshot.docs.map(doc => doc.data().name);
         
         const fixedSectors = ['Todos', ...dynamicSectors];
+        
         if (!fixedSectors.includes('Cliente')) fixedSectors.push('Cliente');
         if (!fixedSectors.includes('Retirada')) fixedSectors.push('Retirada');
+        if (!fixedSectors.includes('Entrega')) fixedSectors.push('Entrega'); 
 
         SECTORS = fixedSectors;
         
@@ -49,7 +51,7 @@ const fetchServiceSectors = async () => {
 
     } catch (e) {
         console.error("Erro ao carregar setores dinâmicos:", e);
-        SECTORS = ['Todos', 'Salão 1', 'Cliente', 'Retirada']; 
+        SECTORS = ['Todos', 'Salão 1', 'Cliente', 'Retirada', 'Entrega']; 
         renderTableFilters();
         populateSectorDropdown();
     }
@@ -77,6 +79,7 @@ export const renderTableFilters = () => {
         let activeColor = 'bg-pumpkin border-pumpkin';
         if (sector === 'Cliente') activeColor = 'bg-indigo-600 border-indigo-600';
         if (sector === 'Retirada') activeColor = 'bg-green-600 border-green-600';
+        if (sector === 'Entrega') activeColor = 'bg-yellow-600 border-yellow-600'; 
 
         const activeClasses = `${activeColor} text-white shadow-md`;
         const inactiveClasses = 'bg-dark-input text-dark-text border-gray-600 hover:bg-gray-700';
@@ -86,6 +89,7 @@ export const renderTableFilters = () => {
                     data-sector="${sector}">
                 ${sector === 'Cliente' ? '<i class="fas fa-mobile-alt mr-1"></i>' : ''}
                 ${sector === 'Retirada' ? '<i class="fas fa-bag-shopping mr-1"></i>' : ''}
+                ${sector === 'Entrega' ? '<i class="fas fa-motorcycle mr-1"></i>' : ''}
                 ${sector}
             </button>
         `;
@@ -101,7 +105,7 @@ export const renderTableFilters = () => {
 };
 
 
-// --- RENDERIZAÇÃO DE MESAS (UX ATUALIZADO) ---
+// --- RENDERIZAÇÃO DE MESAS ---
 const renderTables = (docs) => {
     const list = document.getElementById('openTablesList');
     const countEl = document.getElementById('openTablesCount');
@@ -123,12 +127,11 @@ const renderTables = (docs) => {
             const isClientPending = t.clientOrderPending === true;
             const isMerged = t.status?.toLowerCase() === 'merged';
             const isPickup = t.isPickup === true || t.sector === 'Retirada';
+            const isDelivery = t.isDelivery === true || t.sector === 'Entrega'; 
 
-            // --- DEFINIÇÃO DE CORES E ALERTAS ---
             let cardColorClasses = 'bg-dark-card border-gray-700 text-dark-text hover:border-gray-500';
             let attentionIconHtml = '';
 
-            // Lógica de Prioridade de Alertas (Do mais crítico para o menos)
             if (isBillRequested) {
                  cardColorClasses = 'bg-green-900/40 border-green-600 text-white hover:border-green-400 ring-1 ring-green-500/50 animate-pulse';
                  attentionIconHtml = `<button class="attention-icon-btn ml-2 bg-green-700 hover:bg-green-600 p-1.5 rounded text-white shadow flex items-center" data-action="confirm-bill" data-id="${tId}" title="Imprimir Conta">
@@ -152,16 +155,15 @@ const renderTables = (docs) => {
             }
 
             if (isPickup) cardColorClasses += ' border-l-4 border-l-green-400';
+            else if (isDelivery) cardColorClasses += ' border-l-4 border-l-yellow-400'; 
             else if (t.sector === 'Cliente') cardColorClasses += ' border-l-4 border-l-indigo-400';
 
-            // --- TIMER E KDS ---
             let lastSentAt = null;
             if (t.lastKdsSentAt?.toMillis) lastSentAt = t.lastKdsSentAt.toMillis();
             else if (typeof t.lastKdsSentAt === 'number') lastSentAt = t.lastKdsSentAt;
 
             const elapsedTime = lastSentAt ? formatElapsedTime(lastSentAt) : null;
             
-            // Timer agora é um badge mais discreto
             const timerHtml = elapsedTime ? 
                 `<div class="text-[10px] font-mono text-gray-300 bg-black/40 px-2 py-1 rounded flex items-center" title="Tempo desde último pedido">
                     <i class="fas fa-clock mr-1.5 opacity-70"></i><span>${elapsedTime}</span>
@@ -194,6 +196,8 @@ const renderTables = (docs) => {
             // Nome da Mesa
             let displayTableName = `Mesa ${t.tableNumber}`;
             if (isPickup) displayTableName = `Retirada #${t.tableNumber}`;
+            // Se for entrega, exibe o final do número
+            if (isDelivery) displayTableName = `Entrega #${t.tableNumber.slice(-4)}`;
 
             // --- MONTAGEM DO HTML ---
             const cardHtml = `
@@ -264,16 +268,29 @@ const setupPanelEventListeners = () => {
     });
 };
 
+// --- LOAD OPEN TABLES (CORREÇÃO DA QUERY - FOCO AQUI) ---
 export const loadOpenTables = () => {
     if (unsubscribeTables) { unsubscribeTables(); unsubscribeTables = null; }
     
     let qBase = getTablesCollectionRef();
-    let constraints = [where('status', 'in', ['open', 'merged']), orderBy('tableNumber', 'asc')];
-
+    let constraints = [where('status', 'in', ['open', 'merged'])]; 
+    let sortField = 'tableNumber'; // Padrão
+    
+    // 1. Aplica o filtro de setor se não for 'Todos'
     if (currentSectorFilter !== 'Todos') {
-        constraints.splice(1, 0, where('sector', '==', currentSectorFilter));
+        constraints.push(where('sector', '==', currentSectorFilter));
+        
+        // CORREÇÃO CRÍTICA: Se for um setor de cliente/retirada/entrega, 
+        // ordenamos por 'createdAt' (timestamp) para evitar quebras por tipos 
+        // de dados misturados (string vs number) no 'tableNumber'.
+        if (currentSectorFilter === 'Cliente' || currentSectorFilter === 'Retirada' || currentSectorFilter === 'Entrega') {
+            sortField = 'createdAt'; 
+        }
     }
     
+    // 2. Aplica a ordenação
+    constraints.push(orderBy(sortField, 'asc'));
+
     let q = query(qBase, ...constraints);
 
     unsubscribeTables = onSnapshot(q, (snapshot) => {
@@ -294,7 +311,8 @@ export const loadOpenTables = () => {
     });
 };
 
-// ... (KDS, Abrir Mesa, etc - Inalterados)
+// ... (Restante das funções auxiliares mantidas) ...
+
 const openKdsStatusModal = async (tableId) => {
     const modal = document.getElementById('tableKdsModal');
     const content = document.getElementById('tableKdsContent');
@@ -347,4 +365,4 @@ async function handleBillRequestConfirmation(tableId) { if (!tableId) return; co
 export const openTableMergeModal = () => { /* ... */ }; 
 export const handleConfirmTableMerge = async () => { /* ... */ }; 
 const handleConfirmUngroup = async (m, ma) => { /* ... */ }; 
-export const initPanelController = async () => { if (panelInitialized) return; console.log("[PanelController] Inicializando..."); await fetchServiceSectors(); setupPanelEventListeners(); const abrirBtn = document.getElementById('abrirMesaBtn'); if (abrirBtn) abrirBtn.addEventListener('click', handleAbrirMesa); const searchBtn = document.getElementById('searchTableBtn'); if (searchBtn) searchBtn.addEventListener('click', handleSearchTable); const check = () => { if (abrirBtn) { const m = document.getElementById('mesaInput').value; const p = document.getElementById('pessoasInput').value; const s = document.getElementById('sectorInput').value; abrirBtn.disabled = !(m && p && s); } }; ['mesaInput', 'pessoasInput', 'sectorInput'].forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener(id === 'sectorInput' ? 'change' : 'input', check); }); panelInitialized = true; console.log("[PanelController] Inicializado."); };
+export const initPanelController = async () => { if (panelInitialized) return; console.log("[PanelController] Inicializando..."); await fetchServiceSectors(); setupPanelEventListeners(); const abrirBtn = document.getElementById('abrirMesaBtn'); if (abrirBtn) abrirBtn.addEventListener('click', handleAbrirMesa); const searchBtn = document.getElementById('searchTableBtn'); if (searchBtn) searchBtn.addEventListener('click', handleSearchTable); const check = () => { if (abrirBtn) { const m = document.getElementById('mesaInput').value; const p = document.getElementById('pessoasInput').value; const s = document.getElementById('sectorInput').value; abrirBtn.disabled = !(m && p && s); } }; ['mesaInput', 'pessoasInput', 'sectorInput'].forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener(id === 'sectorInput' ? 'change' : 'input', check); }); panelInitialized = true; console.log("[PanelController] Inicializado."); loadOpenTables(); };

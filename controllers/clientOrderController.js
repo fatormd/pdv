@@ -1,4 +1,4 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (COM VERIFICAÇÃO DE SESSÃO ATIVA) ---
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (CORREÇÃO: VALIDAÇÃO DE ABAS) ---
 
 import { db, auth, getQuickObsCollectionRef, appId, getTablesCollectionRef, getTableDocRef, getCustomersCollectionRef, getKdsCollectionRef } from "/services/firebaseService.js";
 import { formatCurrency, toggleLoading } from "/utils.js"; 
@@ -106,28 +106,43 @@ export const initClientOrderController = () => {
     const defaultActionButtons = document.getElementById('defaultActionButtons');
 
     if (tabButtons) {
+        // Função auxiliar para controlar inputs
+        const updateInputState = (tabName) => {
+            tabContents.forEach(content => {
+                const isActive = content.id === `content-${tabName}`;
+                content.style.display = isActive ? 'block' : 'none';
+                
+                // CRÍTICO: Desativa inputs das abas ocultas para não bloquear o submit
+                const inputs = content.querySelectorAll('input, select, textarea');
+                inputs.forEach(input => {
+                    input.disabled = !isActive; 
+                });
+            });
+        };
+
         tabButtons.forEach(button => {
             button.addEventListener('click', () => {
                 // Remove ativo de todos
                 tabButtons.forEach(btn => btn.classList.remove('active', 'border-brand-primary', 'text-brand-primary'));
-                tabContents.forEach(content => content.style.display = 'none');
                 
                 // Ativa o clicado
                 button.classList.add('active', 'border-brand-primary', 'text-brand-primary');
                 const tabName = button.dataset.tab;
                 currentAssociationTab = tabName;
                 
-                const contentEl = document.getElementById(`content-${tabName}`);
-                if(contentEl) {
-                    contentEl.style.display = 'block';
-                    if (defaultActionButtons) defaultActionButtons.style.display = 'flex'; 
-                    
-                    if (tabName === 'mesa' && activateTableNumber) activateTableNumber.focus(); 
-                    if (tabName === 'retirada' && activatePickupPin) activatePickupPin.focus();
-                    if (tabName === 'entrega' && activateWhatsappEntrega) activateWhatsappEntrega.focus();
-                }
+                updateInputState(tabName);
+
+                if (defaultActionButtons) defaultActionButtons.style.display = 'flex'; 
+                
+                // Auto-focus
+                if (tabName === 'mesa' && activateTableNumber) activateTableNumber.focus(); 
+                if (tabName === 'retirada' && activatePickupPin) activatePickupPin.focus();
+                if (tabName === 'entrega' && activateWhatsappEntrega) activateWhatsappEntrega.focus();
             });
         });
+
+        // Inicializa estado correto (Mesa ativa, outros desativados)
+        updateInputState('mesa');
     }
 
     if (btnCallMotoboy) btnCallMotoboy.addEventListener('click', handleCallMotoboy);
@@ -223,7 +238,11 @@ export const initClientOrderController = () => {
     if (sendOrderBtn) sendOrderBtn.onclick = handleSendOrderClick;
     if (authActionBtn) authActionBtn.onclick = handleAuthActionClick;
     if (googleLoginBtn) googleLoginBtn.onclick = signInWithGoogle;
-    if (activationForm) activationForm.onsubmit = handleActivationAndSend;
+    
+    // Uso addEventListener para garantir
+    if (activationForm) {
+        activationForm.addEventListener('submit', handleActivationAndSend);
+    }
     
     const cancelBtn = document.getElementById('cancelActivationBtn');
     if (cancelBtn) {
@@ -431,13 +450,8 @@ function setupAuthStateObserver() {
                 photoURL: user.photoURL
             };
             updateAuthUI(user);
-            
-            // VERIFICAÇÃO 1: Checa cadastro
             checkCustomerRegistration(user); 
-
-            // VERIFICAÇÃO 2: Checa se já tem mesa aberta (Restaura sessão)
-            await checkExistingSession(user);
-
+            await checkExistingSession(user); // Restaura sessão
         } else if (user && user.isAnonymous) {
              closeAssociationModal();
              closeCustomerRegistrationModal();
@@ -472,14 +486,13 @@ async function checkExistingSession(user) {
             
             console.log(`[Session] Usuário já tem mesa ativa: ${tableId}`);
             
-            // Restaura o estado local
             localCurrentTableId = tableId;
             setCurrentTable(tableId, true, false);
             setTableListener(tableId, true);
             startClientKdsListener(tableId);
             
-            // UI Feedback
             closeAssociationModal();
+            
             let msg = `Retornando à Mesa ${tableData.tableNumber}...`;
             if (tableData.isPickup) msg = `Retornando à Retirada #${tableData.tableNumber}...`;
             if (tableData.isDelivery) msg = `Visualizando Delivery ${tableData.tableNumber}...`;
@@ -783,19 +796,13 @@ function openAssociationModal() {
         if(assocErrorMsg) assocErrorMsg.style.display = 'none';
         associationModal.style.display = 'flex';
         
-        // Reset abas
+        // Reset abas (inicia com mesa ativa e inputs corretos)
         document.querySelectorAll('.assoc-tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.assoc-tab-content').forEach(c => c.style.display = 'none');
-        
-        // Padrão: Mesa
         const mesaTab = document.querySelector('.assoc-tab-btn[data-tab="mesa"]');
-        const mesaContent = document.getElementById('content-mesa');
-        
-        if(mesaTab) mesaTab.classList.add('active');
-        if(mesaContent) mesaContent.style.display = 'block';
-        currentAssociationTab = 'mesa';
-        
-        if (activateTableNumber) activateTableNumber.focus();
+        if(mesaTab) {
+             mesaTab.classList.add('active');
+             mesaTab.click(); // Dispara o click para configurar os inputs
+        }
         
         const defaultActionButtons = document.getElementById('defaultActionButtons');
         if (defaultActionButtons) defaultActionButtons.style.display = 'flex';
@@ -908,6 +915,7 @@ function updateCustomerInfo(user, isNew = false) {
 
 async function handleActivationAndSend(e) {
     if (e) e.preventDefault();
+    console.log("Tentando ativar mesa/pedido...");
     
     let identifier = '';
     let isPickup = false;
@@ -951,12 +959,9 @@ async function handleActivationAndSend(e) {
     if(assocErrorMsg) assocErrorMsg.style.display = 'none';
 
     try {
-        // --- BLOQUEIO DE MÚLTIPLAS MESAS (NOVO) ---
-        // Verifica se o usuário já tem OUTRA mesa ativa antes de abrir esta.
-        // Se localCurrentTableId já estiver setado, é provável que a checagem automática já tenha rodado,
-        // mas se o usuário for rápido ou tentar burlar, verificamos de novo.
-        if (localCurrentTableId && localCurrentTableId !== identifier && localCurrentTableId !== `pickup_${identifier}`) {
-             throw new Error(`Você já possui um pedido aberto na mesa/código: ${localCurrentTableId}. Feche-o primeiro.`);
+        // --- BLOQUEIO DE MÚLTIPLAS MESAS ---
+        if (localCurrentTableId && localCurrentTableId !== identifier && localCurrentTableId !== `pickup_${identifier}` && localCurrentTableId !== `delivery_${identifier}`) {
+             throw new Error(`Você já possui um pedido aberto (ID: ${localCurrentTableId}).`);
         }
         
         // --- Definição do ID do Documento ---
