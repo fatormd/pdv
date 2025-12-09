@@ -1,14 +1,10 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (VERSÃO FINAL INTEGRADA E COMPLETA) ---
-// Inclui: Paginação, Busca Otimizada, UX/UI + Toda a lógica de Auth/Associação/Motoca
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (COM VERIFICAÇÃO DE SESSÃO ATIVA) ---
 
 import { db, auth, getQuickObsCollectionRef, appId, getTablesCollectionRef, getTableDocRef, getCustomersCollectionRef, getKdsCollectionRef } from "/services/firebaseService.js";
 import { formatCurrency, toggleLoading } from "/utils.js"; 
-// CORREÇÃO AQUI: Adicionado ?v=2 para quebrar o cache do navegador e corrigir o erro de import
 import { getProducts, getCategories, fetchWooCommerceCategories, fetchWooCommerceProducts } from "/services/wooCommerceService.js?v=4";
-import { onSnapshot, doc, updateDoc, arrayUnion, setDoc, getDoc, getDocs, query, serverTimestamp, orderBy, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { onSnapshot, doc, updateDoc, arrayUnion, setDoc, getDoc, getDocs, query, serverTimestamp, orderBy, where, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-
-// Importa funções globais
 import { showToast, currentTableId, setCurrentTable, setTableListener } from "/app.js"; 
 
 // --- Variáveis de Estado ---
@@ -23,13 +19,13 @@ let tempUserData = null;
 let unsubscribeClientKds = null; 
 let currentAssociationTab = 'mesa';
 
-// Estado de Paginação e Busca (NOVO)
+// Paginação
 let currentPage = 1;
 let currentSearch = '';
 let searchTimeout = null;
 let loadMoreBtn;
 
-// Elementos
+// Elementos UI
 let clientMenuContainer, clientCategoryFilters, sendOrderBtn, clientCartCount;
 let associationModal, activateAndSendBtn, googleLoginBtn, activationForm;
 let activateTableNumber, activatePickupPin, btnCallMotoboy;
@@ -41,12 +37,14 @@ let tabButtons, tabContents;
 let customerRegistrationModal, customerRegistrationForm, saveRegistrationBtn;
 let regCustomerName, regCustomerEmail, regCustomerWhatsapp, regCustomerBirthday, regErrorMsg;
 
+// Elementos de Entrega
+let activateWhatsappEntrega, deliveryAddressStreet, deliveryAddressNumber, deliveryAddressNeighborhood, deliveryAddressComplement, deliveryAddressReference;
 
 export const initClientOrderController = () => {
     if (orderControllerInitialized) return;
     console.log("[ClientOrder] Inicializando...");
 
-    // Mapeamento
+    // 1. Mapeamento de Elementos Básicos
     clientMenuContainer = document.getElementById('client-menu-container');
     clientCategoryFilters = document.getElementById('client-category-filters');
     sendOrderBtn = document.getElementById('sendOrderBtn');
@@ -59,6 +57,7 @@ export const initClientOrderController = () => {
     appContainer = document.getElementById('appContainer');
     searchProductInputClient = document.getElementById('searchProductInputClient');
 
+    // 2. Mapeamento Modal de Associação
     associationModal = document.getElementById('associationModal');
     activationForm = document.getElementById('activationForm'); 
     activateAndSendBtn = document.getElementById('activateAndSendBtn'); 
@@ -66,11 +65,42 @@ export const initClientOrderController = () => {
     loggedInStep = document.getElementById('loggedInStep'); 
     loggedInUserName = document.getElementById('loggedInUserName'); 
     assocErrorMsg = document.getElementById('assocErrorMsg');
+    
+    // Inputs das Abas
     activateTableNumber = document.getElementById('activateTableNumber'); 
     activatePickupPin = document.getElementById('activatePickupPin');
+    
+    // Inputs de Entrega
+    activateWhatsappEntrega = document.getElementById('activateWhatsappEntrega');
+    deliveryAddressStreet = document.getElementById('deliveryAddressStreet');
+    deliveryAddressNumber = document.getElementById('deliveryAddressNumber');
+    deliveryAddressNeighborhood = document.getElementById('deliveryAddressNeighborhood');
+    deliveryAddressComplement = document.getElementById('deliveryAddressComplement');
+    deliveryAddressReference = document.getElementById('deliveryAddressReference');
+
     btnCallMotoboy = document.getElementById('btnCallMotoboy');
 
-    // Lógica de Abas do Modal de Associação
+    // 3. Listeners Específicos
+    
+    // Botão Fechar Modal Associação
+    const closeAssociationModalBtn = document.getElementById('closeAssociationModalBtn');
+    if (closeAssociationModalBtn) {
+        closeAssociationModalBtn.addEventListener('click', closeAssociationModal);
+    }
+
+    // Botão Login no Cabeçalho
+    const goToPaymentBtnClient = document.getElementById('goToPaymentBtnClient');
+    if (goToPaymentBtnClient) {
+        goToPaymentBtnClient.addEventListener('click', () => {
+            if (localCurrentClientUser) {
+                if (window.goToScreen) window.goToScreen('clientPaymentScreen');
+            } else {
+                openAssociationModal();
+            }
+        });
+    }
+
+    // Lógica de Abas (Mesa / Retirada / Entrega)
     tabButtons = document.querySelectorAll('.assoc-tab-btn');
     tabContents = document.querySelectorAll('.assoc-tab-content');
     const defaultActionButtons = document.getElementById('defaultActionButtons');
@@ -78,9 +108,11 @@ export const initClientOrderController = () => {
     if (tabButtons) {
         tabButtons.forEach(button => {
             button.addEventListener('click', () => {
+                // Remove ativo de todos
                 tabButtons.forEach(btn => btn.classList.remove('active', 'border-brand-primary', 'text-brand-primary'));
                 tabContents.forEach(content => content.style.display = 'none');
                 
+                // Ativa o clicado
                 button.classList.add('active', 'border-brand-primary', 'text-brand-primary');
                 const tabName = button.dataset.tab;
                 currentAssociationTab = tabName;
@@ -88,17 +120,11 @@ export const initClientOrderController = () => {
                 const contentEl = document.getElementById(`content-${tabName}`);
                 if(contentEl) {
                     contentEl.style.display = 'block';
-                    if (tabName === 'mesa') { 
-                        if(activateTableNumber) activateTableNumber.focus(); 
-                        if(defaultActionButtons) defaultActionButtons.style.display = 'flex';
-                    }
-                    else if (tabName === 'retirada') { 
-                        if(activatePickupPin) activatePickupPin.focus(); 
-                        if(defaultActionButtons) defaultActionButtons.style.display = 'flex';
-                    }
-                    else if (tabName === 'entrega') {
-                        if(defaultActionButtons) defaultActionButtons.style.display = 'none';
-                    }
+                    if (defaultActionButtons) defaultActionButtons.style.display = 'flex'; 
+                    
+                    if (tabName === 'mesa' && activateTableNumber) activateTableNumber.focus(); 
+                    if (tabName === 'retirada' && activatePickupPin) activatePickupPin.focus();
+                    if (tabName === 'entrega' && activateWhatsappEntrega) activateWhatsappEntrega.focus();
                 }
             });
         });
@@ -106,7 +132,7 @@ export const initClientOrderController = () => {
 
     if (btnCallMotoboy) btnCallMotoboy.addEventListener('click', handleCallMotoboy);
 
-    // Cadastro de Cliente
+    // 4. Cadastro de Cliente
     customerRegistrationModal = document.getElementById('customerRegistrationModal');
     customerRegistrationForm = document.getElementById('customerRegistrationForm');
     saveRegistrationBtn = document.getElementById('saveRegistrationBtn');
@@ -120,7 +146,7 @@ export const initClientOrderController = () => {
         customerRegistrationForm.addEventListener('submit', handleNewCustomerRegistration);
     }
     
-    // Modal de Observações
+    // 5. Modal de Observações
     clientObsModal = document.getElementById('clientObsModal'); 
     clientObsText = document.getElementById('clientObsText'); 
     clientQuickObsButtons = document.getElementById('clientQuickObsButtons'); 
@@ -193,6 +219,7 @@ export const initClientOrderController = () => {
         }
     }
 
+    // 6. Configuração de Botões Globais
     if (sendOrderBtn) sendOrderBtn.onclick = handleSendOrderClick;
     if (authActionBtn) authActionBtn.onclick = handleAuthActionClick;
     if (googleLoginBtn) googleLoginBtn.onclick = signInWithGoogle;
@@ -206,7 +233,7 @@ export const initClientOrderController = () => {
         });
     }
 
-    // Event Delegation para o Menu
+    // 7. Event Delegation para o Menu
     if (clientMenuContainer) {
         clientMenuContainer.addEventListener('click', (e) => {
             const card = e.target.closest('.product-card');
@@ -222,7 +249,7 @@ export const initClientOrderController = () => {
         });
     }
     
-    // Listener no Carrinho (Delegação)
+    // 8. Listener no Carrinho
     document.getElementById('client-cart-items-list')?.addEventListener('click', (e) => {
          const qtyBtn = e.target.closest('.qty-btn');
          const obsSpan = e.target.closest('.obs-span');
@@ -242,7 +269,6 @@ export const initClientOrderController = () => {
          }
     });
 
-    // Listeners de Filtro e Busca (ATUALIZADOS PARA PAGINAÇÃO)
     if (clientCategoryFilters) {
         clientCategoryFilters.addEventListener('click', handleCategoryClick);
     }
@@ -251,6 +277,7 @@ export const initClientOrderController = () => {
         searchProductInputClient.addEventListener('input', handleSearch);
     }
 
+    // 9. Inicialização
     setupAuthStateObserver();
     loadMenu(); 
     fetchQuickObservations(); 
@@ -263,15 +290,17 @@ export const initClientOrderController = () => {
     console.log("[ClientOrder] Inicializado.");
 };
 
-// --- LÓGICA DE PAGINAÇÃO E BUSCA (ADICIONADA) ---
+// =============================================================================
+//                             FUNÇÕES AUXILIARES
+// =============================================================================
 
+// --- Busca e Paginação ---
 const handleSearch = (e) => {
     currentSearch = e.target.value;
     currentPage = 1;
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(async () => {
         clientMenuContainer.innerHTML = '<div class="col-span-full text-center text-pumpkin py-8"><i class="fas fa-spinner fa-spin text-2xl"></i></div>';
-        // Chama serviço com paginação
         await fetchWooCommerceProducts(1, currentSearch, currentCategoryFilter, false);
         renderMenu(false);
     }, 600);
@@ -285,7 +314,6 @@ const handleCategoryClick = async (e) => {
     currentPage = 1;
     
     clientMenuContainer.innerHTML = '<div class="col-span-full text-center text-pumpkin py-8"><i class="fas fa-spinner fa-spin text-2xl"></i></div>';
-    
     await fetchWooCommerceProducts(1, currentSearch, currentCategoryFilter, false);
     renderMenu(false);
 };
@@ -300,7 +328,7 @@ const handleLoadMore = async () => {
         showToast("Fim da lista.", false);
         loadMoreBtn.style.display = 'none';
     } else {
-        renderMenu(true); // Append true
+        renderMenu(true); 
     }
 };
 
@@ -313,7 +341,7 @@ const renderLoadMoreButton = () => {
     clientMenuContainer.appendChild(loadMoreBtn);
 };
 
-// --- FUNÇÃO MOTOCA ---
+// --- Motoboy ---
 const handleCallMotoboy = () => {
     if (!localCurrentClientUser) {
         showAssocError("Faça login para chamar o entregador.");
@@ -322,13 +350,13 @@ const handleCallMotoboy = () => {
     alert("Redirecionando para o sistema de entregas... (Em Breve)");
 };
 
-// --- STATUS KDS ---
+// --- KDS (Status do Pedido) ---
 const startClientKdsListener = (tableId) => {
     if (unsubscribeClientKds) unsubscribeClientKds();
     if (!tableId) return;
 
     let queryVal = tableId;
-    if (!isNaN(tableId) && !tableId.toString().startsWith('pickup_')) {
+    if (!isNaN(tableId) && !tableId.toString().startsWith('pickup_') && !tableId.toString().startsWith('delivery_')) {
         queryVal = parseInt(tableId);
     }
 
@@ -391,9 +419,9 @@ const updateClientStatusUI = (orders) => {
     `;
 };
 
-// --- AUTH & USER ---
+// --- Autenticação ---
 function setupAuthStateObserver() {
-    onAuthStateChanged(auth, (user) => {
+    onAuthStateChanged(auth, async (user) => {
         if (user && !user.isAnonymous) {
             localCurrentClientUser = user; 
             tempUserData = { 
@@ -403,7 +431,13 @@ function setupAuthStateObserver() {
                 photoURL: user.photoURL
             };
             updateAuthUI(user);
+            
+            // VERIFICAÇÃO 1: Checa cadastro
             checkCustomerRegistration(user); 
+
+            // VERIFICAÇÃO 2: Checa se já tem mesa aberta (Restaura sessão)
+            await checkExistingSession(user);
+
         } else if (user && user.isAnonymous) {
              closeAssociationModal();
              closeCustomerRegistrationModal();
@@ -419,16 +453,81 @@ function setupAuthStateObserver() {
     });
 }
 
+// --- FUNÇÃO DE RESTAURAÇÃO DE SESSÃO ---
+async function checkExistingSession(user) {
+    if (!user) return;
+    try {
+        const q = query(
+            getTablesCollectionRef(),
+            where('clientId', '==', user.uid),
+            where('status', 'in', ['open', 'merged']),
+            limit(1)
+        );
+        
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) {
+            const tableDoc = snapshot.docs[0];
+            const tableId = tableDoc.id;
+            const tableData = tableDoc.data();
+            
+            console.log(`[Session] Usuário já tem mesa ativa: ${tableId}`);
+            
+            // Restaura o estado local
+            localCurrentTableId = tableId;
+            setCurrentTable(tableId, true, false);
+            setTableListener(tableId, true);
+            startClientKdsListener(tableId);
+            
+            // UI Feedback
+            closeAssociationModal();
+            let msg = `Retornando à Mesa ${tableData.tableNumber}...`;
+            if (tableData.isPickup) msg = `Retornando à Retirada #${tableData.tableNumber}...`;
+            if (tableData.isDelivery) msg = `Visualizando Delivery ${tableData.tableNumber}...`;
+            showToast(msg, false);
+        }
+    } catch (e) {
+        console.error("Erro ao verificar sessão existente:", e);
+    }
+}
+
 function updateAuthUI(user) {
+    const goToPaymentBtnClient = document.getElementById('goToPaymentBtnClient');
+    const headerClientNameDisplay = document.getElementById('headerClientNameDisplay');
+
     if (clientUserName && authActionBtn) {
         if (user && !user.isAnonymous) {
             clientUserName.textContent = user.displayName || user.name || "Cliente";
             authActionBtn.textContent = "Sair";
             authActionBtn.classList.add('text-red-400');
+
+            if (goToPaymentBtnClient) {
+                if (user.photoURL) {
+                    goToPaymentBtnClient.innerHTML = `<img src="${user.photoURL}" class="w-full h-full rounded-full border-2 border-brand-primary" alt="Foto">`;
+                } else {
+                    goToPaymentBtnClient.innerHTML = `<i class="fas fa-user text-brand-primary text-lg"></i>`;
+                }
+                goToPaymentBtnClient.classList.add('ring-2', 'ring-brand-primary', 'ring-offset-2', 'ring-offset-gray-900');
+            }
+
+            if (headerClientNameDisplay) {
+                const firstName = (user.displayName || user.name || '').split(' ')[0];
+                headerClientNameDisplay.textContent = `Olá, ${firstName}`;
+                headerClientNameDisplay.style.display = 'block';
+            }
+
         } else {
             clientUserName.textContent = "Visitante";
             authActionBtn.textContent = "Entrar";
             authActionBtn.classList.remove('text-red-400');
+
+            if (goToPaymentBtnClient) {
+                goToPaymentBtnClient.innerHTML = `<i class="fas fa-user-slash text-gray-400 text-lg"></i>`;
+                goToPaymentBtnClient.classList.remove('ring-2', 'ring-brand-primary', 'ring-offset-2', 'ring-offset-gray-900');
+            }
+
+            if (headerClientNameDisplay) {
+                headerClientNameDisplay.style.display = 'none';
+            }
         }
     }
 }
@@ -444,10 +543,9 @@ function handleAuthActionClick() {
     }
 }
 
-// --- MENU & CART ---
+// --- Menu e Carrinho ---
 async function loadMenu() {
     try {
-        // Carrega categorias e produtos (Página 1)
         await fetchWooCommerceCategories(null);
         await fetchWooCommerceProducts(1, '', 'all', false);
         
@@ -475,14 +573,12 @@ function renderMenu(append = false) {
     const products = getProducts();
     let filteredProducts = products;
 
-    // Filtro visual para Top 10 (API não filtra isso)
     if (currentCategoryFilter === 'top10') {
         const top10Ids = JSON.parse(localStorage.getItem('top10_products') || '[]');
         filteredProducts = products.filter(p => top10Ids.includes(p.id.toString()));
         filteredProducts.sort((a, b) => top10Ids.indexOf(a.id.toString()) - top10Ids.indexOf(b.id.toString()));
     }
 
-    // Se não for append, limpa o container
     if (!append) clientMenuContainer.innerHTML = '';
     
     if (filteredProducts.length === 0) {
@@ -523,7 +619,6 @@ function renderMenu(append = false) {
         }
     }
 
-    // Adiciona botão Carregar Mais (se não for top10)
     if (currentCategoryFilter !== 'top10') {
         renderLoadMoreButton();
     }
@@ -683,24 +778,16 @@ function handleSendOrderClick() {
     if (!localCurrentTableId && !currentTableId) { openAssociationModal(); } else { sendOrderToFirebase(); }
 }
 
-function showTab(tabName) {
-    if(!tabContents || !tabButtons) return;
-    tabContents.forEach(content => { content.style.display = 'none'; content.classList.remove('active'); });
-    tabButtons.forEach(button => { button.classList.remove('active'); });
-    const activeContent = document.getElementById(`tab-content-${tabName}`);
-    const activeButton = document.querySelector(`.client-tab-btn[data-tab="${tabName}"]`);
-    if (activeContent) { activeContent.style.display = 'block'; activeContent.classList.add('active'); }
-    if (activeButton) { activeButton.classList.add('active'); }
-}
-
 function openAssociationModal() {
     if (associationModal) {
         if(assocErrorMsg) assocErrorMsg.style.display = 'none';
         associationModal.style.display = 'flex';
         
+        // Reset abas
         document.querySelectorAll('.assoc-tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.assoc-tab-content').forEach(c => c.style.display = 'none');
         
+        // Padrão: Mesa
         const mesaTab = document.querySelector('.assoc-tab-btn[data-tab="mesa"]');
         const mesaContent = document.getElementById('content-mesa');
         
@@ -715,8 +802,11 @@ function openAssociationModal() {
     }
 }
 
-function closeAssociationModal() { if (associationModal) associationModal.style.display = 'none'; }
+function closeAssociationModal() {
+    if (associationModal) associationModal.style.display = 'none';
+}
 
+// --- Cadastro de Cliente ---
 function openCustomerRegistrationModal() {
     if (customerRegistrationModal && tempUserData) {
         regCustomerName.textContent = tempUserData.name || 'Nome não encontrado';
@@ -812,24 +902,47 @@ function updateCustomerInfo(user, isNew = false) {
     }
 }
 
-// --- ATIVAÇÃO DE MESA / RETIRADA (CORRIGIDA) ---
+// =============================================================================
+//               LÓGICA CENTRAL DE ATIVAÇÃO E ENVIO
+// =============================================================================
+
 async function handleActivationAndSend(e) {
     if (e) e.preventDefault();
     
     let identifier = '';
     let isPickup = false;
+    let isDelivery = false;
+    let deliveryData = null;
 
+    // --- Captura de Dados conforme a Aba ---
     if (currentAssociationTab === 'mesa') {
         const rawValue = activateTableNumber.value.trim();
         if (!rawValue) { showAssocError("Informe o número da mesa."); return; }
-        
-        // CORREÇÃO: Garante que "05" vire "5", igualando ao painel do Staff
         identifier = parseInt(rawValue).toString(); 
-        
-    } else if (currentAssociationTab === 'retirada') {
+    } 
+    else if (currentAssociationTab === 'retirada') {
         identifier = activatePickupPin.value.trim();
         if (!identifier || identifier.length < 4) { showAssocError("PIN inválido (min 4 dígitos)."); return; }
         isPickup = true;
+    }
+    else if (currentAssociationTab === 'entrega') {
+        identifier = activateWhatsappEntrega.value.trim();
+        if (!identifier || identifier.length < 8) { showAssocError("WhatsApp inválido."); return; }
+        
+        const street = deliveryAddressStreet.value.trim();
+        const num = deliveryAddressNumber.value.trim();
+        const hood = deliveryAddressNeighborhood.value.trim();
+        
+        if (!street || !num || !hood) { showAssocError("Endereço incompleto."); return; }
+        
+        isDelivery = true;
+        deliveryData = {
+            street, 
+            number: num, 
+            neighborhood: hood,
+            complement: deliveryAddressComplement.value.trim(),
+            reference: deliveryAddressReference.value.trim()
+        };
     }
 
     if (!localCurrentClientUser) { showAssocError("Faça login para continuar."); return; }
@@ -838,7 +951,19 @@ async function handleActivationAndSend(e) {
     if(assocErrorMsg) assocErrorMsg.style.display = 'none';
 
     try {
-        const tableDocId = isPickup ? `pickup_${identifier}` : identifier;
+        // --- BLOQUEIO DE MÚLTIPLAS MESAS (NOVO) ---
+        // Verifica se o usuário já tem OUTRA mesa ativa antes de abrir esta.
+        // Se localCurrentTableId já estiver setado, é provável que a checagem automática já tenha rodado,
+        // mas se o usuário for rápido ou tentar burlar, verificamos de novo.
+        if (localCurrentTableId && localCurrentTableId !== identifier && localCurrentTableId !== `pickup_${identifier}`) {
+             throw new Error(`Você já possui um pedido aberto na mesa/código: ${localCurrentTableId}. Feche-o primeiro.`);
+        }
+        
+        // --- Definição do ID do Documento ---
+        let tableDocId = identifier;
+        if (isPickup) tableDocId = `pickup_${identifier}`;
+        if (isDelivery) tableDocId = `delivery_${identifier}`; 
+
         const tableRef = getTableDocRef(tableDocId);
         const tableSnap = await getDoc(tableRef);
 
@@ -854,24 +979,30 @@ async function handleActivationAndSend(e) {
         if (tableSnap.exists()) {
             const tData = tableSnap.data();
             
+            // Validações
             if (tData.status !== 'closed' && tData.clientId && tData.clientId !== clientData.uid) {
-                // throw new Error("Esta mesa/PIN está em uso por outro cliente.");
-                console.warn("Mesa já possui cliente vinculado:", tData.clientName);
+                console.warn("Pedido já possui cliente vinculado:", tData.clientName);
             }
             
             if (tData.status === 'closed') {
                 console.log(`Reabrindo ${tableDocId}...`);
+                // Arquiva a mesa fechada antiga
                 const historyRef = doc(getTablesCollectionRef(), `${tableDocId}_closed_${Date.now()}`);
                 await setDoc(historyRef, tData); 
                 
-                // Mantém setor original se existir (evita sumir do painel do garçom)
-                const originalSector = tData.sector || (isPickup ? 'Retirada' : 'Salão');
+                // Define setor
+                let originalSector = tData.sector || 'Cliente';
+                if (isPickup) originalSector = 'Retirada';
+                if (isDelivery) originalSector = 'Entrega';
 
+                // Reabre
                 await setDoc(tableRef, {
-                    tableNumber: isPickup ? identifier : parseInt(identifier),
+                    tableNumber: isPickup || isDelivery ? identifier : parseInt(identifier),
                     status: 'open',
                     sector: originalSector,
                     isPickup: isPickup,
+                    isDelivery: isDelivery,
+                    deliveryAddress: deliveryData, // Salva endereço se for entrega
                     createdAt: serverTimestamp(),
                     total: 0,
                     sentItems: [], payments: [], serviceTaxApplied: true, selectedItems: [], requestedOrders: [],
@@ -879,7 +1010,7 @@ async function handleActivationAndSend(e) {
                     anonymousUid: null
                 });
             } else {
-                // Mesa já existe e está aberta -> Só vincula o cliente
+                // Mesa já aberta -> Só vincula
                 if (!tData.clientId || tData.clientId !== clientData.uid) {
                     await updateDoc(tableRef, { 
                         clientId: clientData.uid, 
@@ -889,16 +1020,22 @@ async function handleActivationAndSend(e) {
                 }
             }
         } else {
-            // Mesa não existe -> Cria nova
-            if (!isPickup && !confirm(`Mesa ${identifier} não foi aberta pelo garçom. Deseja abrir você mesmo?`)) {
+            // Mesa/Pedido NÃO existe -> Criar Novo
+            if (!isPickup && !isDelivery && !confirm(`Mesa ${identifier} não foi aberta pelo garçom. Deseja abrir você mesmo?`)) {
                  throw new Error("Ação cancelada. Peça ao garçom para abrir a mesa.");
             }
             
+            let sectorName = 'Cliente';
+            if (isPickup) sectorName = 'Retirada';
+            if (isDelivery) sectorName = 'Entrega';
+
             await setDoc(tableRef, {
-                tableNumber: isPickup ? identifier : parseInt(identifier), 
+                tableNumber: isPickup || isDelivery ? identifier : parseInt(identifier), 
                 status: 'open',
-                sector: isPickup ? 'Retirada' : 'Cliente',
+                sector: sectorName,
                 isPickup: isPickup,
+                isDelivery: isDelivery,
+                deliveryAddress: deliveryData,
                 createdAt: serverTimestamp(),
                 total: 0,
                 sentItems: [], payments: [], serviceTaxApplied: true, selectedItems: [], requestedOrders: [],
@@ -907,13 +1044,19 @@ async function handleActivationAndSend(e) {
             });
         }
 
+        // Listener e Envio
         setTableListener(tableDocId, true);
         startClientKdsListener(tableDocId);
 
         if (selectedItems.length > 0) await sendOrderToFirebase();
         
         closeAssociationModal();
-        showToast(isPickup ? `Retirada #${identifier} iniciada!` : `Mesa ${identifier} vinculada!`, false);
+        
+        // Feedback
+        let msg = `Mesa ${identifier} vinculada!`;
+        if (isPickup) msg = `Retirada #${identifier} iniciada!`;
+        if (isDelivery) msg = `Delivery para ${identifier} iniciado!`;
+        showToast(msg, false);
 
     } catch (error) {
         console.error(error);
@@ -923,27 +1066,45 @@ async function handleActivationAndSend(e) {
     }
 }
 
-function showAssocError(message) { if (assocErrorMsg) { assocErrorMsg.textContent = message; assocErrorMsg.style.display = 'block'; } }
+function showAssocError(message) {
+    if (assocErrorMsg) {
+        assocErrorMsg.textContent = message;
+        assocErrorMsg.style.display = 'block';
+    }
+}
 
 function renderClientQuickObsButtons(observations) {
     if (!clientQuickObsButtons) return;
-    if (observations.length === 0) { clientQuickObsButtons.innerHTML = '<p class="text-xs italic">Nenhuma obs.</p>'; return; }
-    clientQuickObsButtons.innerHTML = observations.map(obs => `<button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input rounded-full hover:bg-gray-600" data-obs="${obs.text}">${obs.text}</button>`).join('');
+    if (observations.length === 0) {
+        clientQuickObsButtons.innerHTML = '<p class="text-xs italic">Nenhuma obs.</p>';
+        return;
+    }
+    clientQuickObsButtons.innerHTML = observations.map(obs => 
+        `<button class="quick-obs-btn text-xs px-3 py-1 bg-dark-input rounded-full hover:bg-gray-600" data-obs="${obs.text}">${obs.text}</button>`
+    ).join('');
 }
 
 export const fetchQuickObservations = async () => {
     try {
-        if (quickObsCache.length > 0) { renderClientQuickObsButtons(quickObsCache); return quickObsCache; }
+        if (quickObsCache.length > 0) {
+            renderClientQuickObsButtons(quickObsCache);
+            return quickObsCache;
+        }
         const q = query(getQuickObsCollectionRef(), orderBy('text', 'asc'));
         const snap = await getDocs(q);
         quickObsCache = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         renderClientQuickObsButtons(quickObsCache);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+        console.error(e);
+    }
 };
 
 async function sendOrderToFirebase() {
     const tableId = localCurrentTableId || currentTableId; 
-    if (!tableId || selectedItems.length === 0) { showToast("Carrinho vazio.", true); return; }
+    if (!tableId || selectedItems.length === 0) {
+        showToast("Carrinho vazio.", true);
+        return;
+    }
 
     toggleLoading(sendOrderBtn, true, 'Enviando...');
 
@@ -951,7 +1112,11 @@ async function sendOrderToFirebase() {
     const newOrderRequest = {
         orderId: orderId,
         requestedAt: new Date().toISOString(),
-        clientInfo: { uid: localCurrentClientUser?.uid, name: localCurrentClientUser?.displayName, phone: localCurrentClientUser?.phone },
+        clientInfo: { 
+            uid: localCurrentClientUser?.uid, 
+            name: localCurrentClientUser?.displayName, 
+            phone: localCurrentClientUser?.phone 
+        },
         items: selectedItems.map(item => ({ ...item })) 
     };
 
