@@ -1,4 +1,4 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (CORRIGIDO E COMPLETO) ---
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (COMPLETO E CORRIGIDO) ---
 
 import { db, auth, getQuickObsCollectionRef, appId, getTablesCollectionRef, getTableDocRef, getCustomersCollectionRef, getKdsCollectionRef, getSectorsCollectionRef } from "/services/firebaseService.js";
 import { formatCurrency, toggleLoading, showToast } from "/utils.js"; 
@@ -250,11 +250,9 @@ function renderMenu(append = false) {
     if (!append) clientMenuContainer.innerHTML = ''; 
     
     if (filteredProducts.length === 0) { 
-        // CORREÇÃO DE FLICKER: Só mostra a mensagem de "Nenhum produto" se o usuário filtrou/buscou ativamente.
         if (currentSearch || currentSectorFilter !== 'all') {
              clientMenuContainer.innerHTML = `<div class="col-span-full text-center p-6 text-yellow-400 italic">Nenhum produto encontrado neste setor.</div>`; 
         } else {
-            // Caso contrário (carga inicial), mostra uma mensagem neutra ou o esqueleto de carregamento.
              clientMenuContainer.innerHTML = `<div class="col-span-full text-center p-6 text-dark-placeholder italic">Carregando cardápio ou sem produtos disponíveis.</div>`;
         }
     } else { 
@@ -308,7 +306,7 @@ const handleSectorClick = async (e) => {
     renderMenu(false);
 };
 
-// NOVO: Função para enviar o pedido para o Firebase (Centralizada)
+// --- FUNÇÃO CORRIGIDA DE ENVIO (COM HASNEWORDER) ---
 async function sendOrderToFirebase(closeModalOnSuccess = false) {
     if (!localCurrentTableId) {
         openAssociationModal();
@@ -324,25 +322,22 @@ async function sendOrderToFirebase(closeModalOnSuccess = false) {
     try {
         const tableRef = getTableDocRef(localCurrentTableId);
         
-        // 1. Criar o payload do pedido a ser enviado
         const orderPayload = selectedItems.map(item => ({
             ...item,
-            // CORREÇÃO: Usar new Date() para elementos em arrays com arrayUnion
             timestamp: new Date(), 
-            status: 'pending_client_send', // Indica que está na fila do cliente
+            status: 'pending_client_send',
         }));
         
-        // 2. Adicionar o pedido à fila de pendentes do cliente na mesa
-        // serverTimestamp() é válido aqui, pois está no nível superior do updateDoc
+        // CORREÇÃO: Adicionado hasNewOrder: true para o painel detectar
         await updateDoc(tableRef, {
             clientOrderPending: arrayUnion(...orderPayload),
+            hasNewOrder: true, 
+            status: 'occupied', // Garante que a mesa aparece como ocupada
             lastClientOrderSent: serverTimestamp() 
         });
 
-        // 3. Limpar o carrinho local
         selectedItems = [];
 
-        // 4. Sucesso
         showToast("Pedido enviado para o garçom!", false);
         if (closeModalOnSuccess) {
             closeAssociationModal();
@@ -353,26 +348,24 @@ async function sendOrderToFirebase(closeModalOnSuccess = false) {
         showToast("Falha ao enviar pedido. Tente novamente.", true);
     } finally {
         toggleLoading(sendOrderBtn, false, "ENVIAR");
-        renderClientOrderScreen(); // Re-renderiza para limpar o carrinho e atualizar o estado do botão
+        renderClientOrderScreen(); 
     }
 }
 
 
-// ATUALIZADO: Chama a função de envio centralizada
 async function handleSendOrderClick() { 
     const tableId = localCurrentTableId || window.currentTableId; 
     
     if (!tableId) { 
-        // Se não houver mesa/comanda ativa, abre o modal de associação
         openAssociationModal(); 
     } else { 
         await sendOrderToFirebase(); 
     } 
 }
+
 function handleAuthActionClick() { if (localCurrentClientUser) { if(confirm("Deseja realmente sair da sua conta?")) { signOut(auth).then(() => { showToast("Você saiu da sua conta."); window.location.reload(); }); } } else { openAssociationModal(); } }
 async function signInWithGoogle(e) { if(e) e.preventDefault(); const provider = new GoogleAuthProvider(); try { await signInWithPopup(auth, provider); } catch (error) { console.error("Erro Login:", error); showAssocError("Erro ao tentar logar. Tente novamente."); } }
 
-// ATUALIZADO: Lógica para Mesa, Retirada (WhatsApp/PIN) e Entrega (WhatsApp/Endereço)
 async function handleActivationAndSend(e) { 
     if (e) e.preventDefault(); 
     let identifier = '';
@@ -383,8 +376,6 @@ async function handleActivationAndSend(e) {
     let whatsapp = '';
     
     if (!localCurrentClientUser) { showAssocError("Faça login para continuar."); return; }
-
-    // --- 1. COLETAR E VALIDAR DADOS DE ACORDO COM A ABA ---
 
     if (currentAssociationTab === 'mesa') {
         identifier = activateTableNumber.value.trim();
@@ -428,8 +419,6 @@ async function handleActivationAndSend(e) {
         showAssocError("Selecione uma opção de pedido."); return;
     }
 
-    // --- 2. PREPARAR AÇÃO ---
-
     toggleLoading(activateAndSendBtn, true);
     assocErrorMsg.style.display = 'none';
 
@@ -457,7 +446,7 @@ async function handleActivationAndSend(e) {
             total: 0, 
             sentItems: [], 
             payments: [], 
-            serviceTaxApplied: !isDelivery, // Sem taxa para delivery por padrão
+            serviceTaxApplied: !isDelivery, 
             selectedItems: [], 
             requestedOrders: [], 
             clientId: clientData.uid, 
@@ -466,22 +455,17 @@ async function handleActivationAndSend(e) {
             anonymousUid: null
         };
         
-        // --- 3. LÓGICA DE ABERTURA/VINCULAÇÃO DA MESA/COMANDA ---
-
         if (tableSnap.exists()) {
             const tData = tableSnap.data();
 
             if (tData.status === 'closed') {
-                // Fechar conta anterior e abrir nova
                 const historyRef = doc(getTablesCollectionRef(), `${tableDocId}_closed_${Date.now()}`);
                 await setDoc(historyRef, tData);
                 await setDoc(tableRef, newTableData);
 
             } else if (tData.status !== 'open' || (tData.clientId && tData.clientId !== clientData.uid)) {
-                 // Comanda em uso por outro cliente
                  throw new Error(`Comanda em uso por ${tData.clientName || 'outro cliente'}.`);
             } else {
-                // Comanda/Mesa aberta pelo mesmo cliente. Atualizar info e vincular
                 const updatePayload = {
                     clientId: clientData.uid, 
                     clientName: clientData.name, 
@@ -491,19 +475,15 @@ async function handleActivationAndSend(e) {
                 await updateDoc(tableRef, updatePayload);
             }
         } else {
-            // Abrir nova comanda/mesa/delivery
             if (!isPickup && !isDelivery && !confirm(`Mesa ${identifier} não existe. Abrir nova conta?`)) { 
                 throw new Error("Ação cancelada."); 
             }
             await setDoc(tableRef, newTableData);
         }
 
-        // --- 4. FINALIZAÇÃO ---
-
         if (window.setTableListener) window.setTableListener(tableDocId, true);
         startClientKdsListener(tableDocId);
         
-        // Envia o pedido se houver itens no carrinho, fechando o modal
         if (selectedItems.length > 0) {
             await sendOrderToFirebase(true); 
         } else {
@@ -534,10 +514,6 @@ const handleLoadMore = async () => { currentPage++; toggleLoading(loadMoreBtn, t
 
 function updateRestaurantTitle() { const titleEl = document.getElementById('restaurantTitle'); const headerTitleEl = document.getElementById('client-table-number'); if (currentBusinessType !== 'food') { const name = DEMO_DATA[currentBusinessType].title; restaurantNameCache = name; if(titleEl) titleEl.textContent = name; if(headerTitleEl && !localCurrentTableId) headerTitleEl.textContent = name; } }
 
-/**
- * Habilita ou desabilita campos de input na aba ativa.
- * @param {string} activeTabName - Nome da aba ativa ('mesa', 'retirada', 'entrega').
- */
 function toggleTabInputs(activeTabName) {
     document.querySelectorAll('.assoc-tab-content').forEach(content => {
         const isActive = content.id === `content-${activeTabName}`;
@@ -545,21 +521,17 @@ function toggleTabInputs(activeTabName) {
         
         inputs.forEach(input => {
             if (isActive) {
-                // Ativa apenas campos obrigatórios e necessários
                 if (input.id === 'deliveryAddressCEP' || input.id.includes('Complement') || input.id.includes('Reference')) {
-                    // Campos opcionais/secundários: mantidos habilitados se a aba for Entrega, mas não "required"
                     input.disabled = (activeTabName !== 'entrega'); 
                 } else {
                     input.disabled = false;
                 }
             } else {
-                // Desabilita todos os campos em abas inativas para evitar validação
                 input.disabled = true;
             }
         });
     });
 
-    // Garante que o input da aba Mesa esteja ativo se for a aba Mesa
     if (activeTabName === 'mesa') {
         if(activateTableNumber) activateTableNumber.disabled = false;
     }
@@ -603,14 +575,12 @@ export const initClientOrderController = () => {
     loggedInUserName = document.getElementById('loggedInUserName'); 
     assocErrorMsg = document.getElementById('assocErrorMsg');
     
-    // CAMPOS DE ASSOCIAÇÃO ATUALIZADOS
     activateTableNumber = document.getElementById('activateTableNumber'); 
     activateWhatsappRetirada = document.getElementById('activateWhatsappRetirada'); 
     activateWhatsappEntrega = document.getElementById('activateWhatsappEntrega'); 
     btnCallMotoboy = document.getElementById('btnCallMotoboy');
     closeAssociationModalBtn = document.getElementById('closeAssociationModalBtn'); 
 
-    // Novos campos de endereço (Entrega)
     deliveryAddressCEP = document.getElementById('deliveryAddressCEP');
     deliveryAddressStreet = document.getElementById('deliveryAddressStreet');
     deliveryAddressNumber = document.getElementById('deliveryAddressNumber');
@@ -638,17 +608,15 @@ export const initClientOrderController = () => {
                         if(defaultActionButtons) defaultActionButtons.style.display = 'none'; 
                     }
                 }
-                toggleTabInputs(tabName); // Chama a função para lidar com os inputs
+                toggleTabInputs(tabName); 
             });
         });
     }
 
-    // Adiciona listener para o novo botão 'X' do modal
     if (closeAssociationModalBtn) {
         closeAssociationModalBtn.addEventListener('click', closeAssociationModal);
     }
     
-    // Inicializa o estado dos inputs para a aba 'mesa'
     toggleTabInputs(currentAssociationTab);
 
 
@@ -656,7 +624,7 @@ export const initClientOrderController = () => {
     if (businessTypeSelector) {
         businessTypeSelector.addEventListener('change', (e) => {
             currentBusinessType = e.target.value;
-            currentSectorFilter = 'all'; // Reset
+            currentSectorFilter = 'all'; 
             renderMenu(false); 
             updateRestaurantTitle(); 
         });
@@ -766,13 +734,8 @@ export const initClientOrderController = () => {
 //               5. EXPORTAÇÕES E HELPERS GLOBAIS
 // ==================================================================
 
-/**
- * Renderiza a tela do cliente (atualiza carrinho, contadores, etc.)
- * EXPORTAÇÃO CORRIGIDA - ESSENCIAL PARA O APP.JS
- */
 export const renderClientOrderScreen = (orderSnapshot = null) => {
     
-    // --- Lógica para o contador do carrinho ---
     if (clientCartCount) {
         const totalItems = selectedItems.length;
         clientCartCount.textContent = totalItems;
@@ -785,7 +748,6 @@ export const renderClientOrderScreen = (orderSnapshot = null) => {
         }
     }
 
-    // --- Lógica para habilitar/desabilitar o botão ENVIAR ---
     if (sendOrderBtn) {
         if (selectedItems.length > 0) {
             sendOrderBtn.disabled = false;
@@ -793,7 +755,6 @@ export const renderClientOrderScreen = (orderSnapshot = null) => {
             sendOrderBtn.disabled = true;
         }
     }
-    // -----------------------------------------------------------
 
     _renderClientCart();
 };
