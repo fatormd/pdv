@@ -815,12 +815,28 @@ function closeAssociationModal() {
 
 // --- Cadastro de Cliente ---
 function openCustomerRegistrationModal() {
+    // FIX: Garante que os elementos são válidos (Busca novamente se necessário)
+    if (!regCustomerName) regCustomerName = document.getElementById('regCustomerName');
+    if (!regCustomerEmail) regCustomerEmail = document.getElementById('regCustomerEmail');
+
     if (customerRegistrationModal && tempUserData) {
-        regCustomerName.textContent = tempUserData.name || 'Nome não encontrado';
-        regCustomerEmail.textContent = tempUserData.email || 'Email não encontrado';
+        
+        // Verifica se os elementos cruciais foram encontrados antes de tentar atribuir
+        if (regCustomerName) {
+            regCustomerName.textContent = tempUserData.name || 'Nome não encontrado';
+        } else {
+            console.error("Erro openCustomerRegistrationModal: regCustomerName é null.");
+            // Poderia adicionar um tratamento de erro ou fallback aqui
+        }
+
+        if (regCustomerEmail) {
+            regCustomerEmail.textContent = tempUserData.email || 'Email não encontrado';
+        }
+
         regCustomerWhatsapp.value = ''; 
         regCustomerBirthday.value = ''; 
         if(regErrorMsg) regErrorMsg.style.display = 'none';
+        
         customerRegistrationModal.style.display = 'flex';
         associationModal.style.display = 'none';
     }
