@@ -1,4 +1,4 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (CORREÇÃO: VALIDAÇÃO DE ABAS) ---
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (FIX DEFINITIVO DO NULL NO EDGE/CHROME) ---
 
 import { db, auth, getQuickObsCollectionRef, appId, getTablesCollectionRef, getTableDocRef, getCustomersCollectionRef, getKdsCollectionRef } from "/services/firebaseService.js";
 import { formatCurrency, toggleLoading } from "/utils.js"; 
@@ -35,7 +35,7 @@ let searchProductInputClient;
 let clientObsModal, clientObsText, clientQuickObsButtons, clientConfirmObsBtn, clientCancelObsBtn;
 let tabButtons, tabContents;
 let customerRegistrationModal, customerRegistrationForm, saveRegistrationBtn;
-let regCustomerName, regCustomerEmail, regCustomerWhatsapp, regCustomerBirthday, regErrorMsg;
+let regCustomerName, regCustomerEmail, regCustomerWhatsapp, regCustomerBirthday, regErrorMsg; // Estas variáveis agora podem ser null no init
 
 // Elementos de Entrega
 let activateWhatsappEntrega, deliveryAddressStreet, deliveryAddressNumber, deliveryAddressNeighborhood, deliveryAddressComplement, deliveryAddressReference;
@@ -45,6 +45,7 @@ export const initClientOrderController = () => {
     console.log("[ClientOrder] Inicializando...");
 
     // 1. Mapeamento de Elementos Básicos
+    // Usamos ?. (optional chaining) para evitar que a inicialização pare, caso algum elemento HTML não tenha carregado.
     clientMenuContainer = document.getElementById('client-menu-container');
     clientCategoryFilters = document.getElementById('client-category-filters');
     sendOrderBtn = document.getElementById('sendOrderBtn');
@@ -147,15 +148,17 @@ export const initClientOrderController = () => {
 
     if (btnCallMotoboy) btnCallMotoboy.addEventListener('click', handleCallMotoboy);
 
-    // 4. Cadastro de Cliente
+    // 4. Cadastro de Cliente (Mapeamento protegido)
     customerRegistrationModal = document.getElementById('customerRegistrationModal');
     customerRegistrationForm = document.getElementById('customerRegistrationForm');
     saveRegistrationBtn = document.getElementById('saveRegistrationBtn');
+    regErrorMsg = document.getElementById('regErrorMsg');
+    
+    // Mapeamento de inputs de cadastro que falhavam: se falhar aqui, eles serão buscados no openModal
     regCustomerName = document.getElementById('regCustomerName');
     regCustomerEmail = document.getElementById('regCustomerEmail');
     regCustomerWhatsapp = document.getElementById('regCustomerWhatsapp');
     regCustomerBirthday = document.getElementById('regCustomerBirthday');
-    regErrorMsg = document.getElementById('regErrorMsg');
 
     if(customerRegistrationForm) {
         customerRegistrationForm.addEventListener('submit', handleNewCustomerRegistration);
@@ -239,7 +242,6 @@ export const initClientOrderController = () => {
     if (authActionBtn) authActionBtn.onclick = handleAuthActionClick;
     if (googleLoginBtn) googleLoginBtn.onclick = signInWithGoogle;
     
-    // Uso addEventListener para garantir
     if (activationForm) {
         activationForm.addEventListener('submit', handleActivationAndSend);
     }
@@ -451,7 +453,7 @@ function setupAuthStateObserver() {
             };
             updateAuthUI(user);
             checkCustomerRegistration(user); 
-            await checkExistingSession(user); // Restaura sessão
+            await checkExistingSession(user);
         } else if (user && user.isAnonymous) {
              closeAssociationModal();
              closeCustomerRegistrationModal();
@@ -815,28 +817,31 @@ function closeAssociationModal() {
 
 // --- Cadastro de Cliente ---
 function openCustomerRegistrationModal() {
-    // FIX: Garante que os elementos são válidos (Busca novamente se necessário)
-    if (!regCustomerName) regCustomerName = document.getElementById('regCustomerName');
-    if (!regCustomerEmail) regCustomerEmail = document.getElementById('regCustomerEmail');
+    // --- FIX CRÍTICO: Busca elementos na hora para garantir que o DOM carregou ---
+    const nameEl = document.getElementById('regCustomerName');
+    const emailEl = document.getElementById('regCustomerEmail');
+    const whatsappEl = document.getElementById('regCustomerWhatsapp');
+    const birthdayEl = document.getElementById('regCustomerBirthday');
+    const errorEl = document.getElementById('regErrorMsg');
+    
+    if (!nameEl || !whatsappEl || !birthdayEl) {
+        console.error("Erro FATAL: Elementos do modal de cadastro não encontrados.");
+        if (customerRegistrationModal) customerRegistrationModal.style.display = 'none';
+        showToast("Erro de carregamento do formulário de cadastro.", true);
+        return;
+    }
+    // --- FIM FIX CRÍTICO ---
 
     if (customerRegistrationModal && tempUserData) {
-        
-        // Verifica se os elementos cruciais foram encontrados antes de tentar atribuir
-        if (regCustomerName) {
-            regCustomerName.textContent = tempUserData.name || 'Nome não encontrado';
-        } else {
-            console.error("Erro openCustomerRegistrationModal: regCustomerName é null.");
-            // Poderia adicionar um tratamento de erro ou fallback aqui
-        }
+        // Usa os elementos recém-buscados
+        nameEl.textContent = tempUserData.name || 'Nome não encontrado';
+        emailEl.textContent = tempUserData.email || 'Email não encontrado';
 
-        if (regCustomerEmail) {
-            regCustomerEmail.textContent = tempUserData.email || 'Email não encontrado';
-        }
-
-        regCustomerWhatsapp.value = ''; 
-        regCustomerBirthday.value = ''; 
-        if(regErrorMsg) regErrorMsg.style.display = 'none';
+        // Linhas que causavam o erro de 'Cannot set properties of null (setting 'value')'
+        whatsappEl.value = ''; 
+        birthdayEl.value = ''; 
         
+        if(errorEl) errorEl.style.display = 'none';
         customerRegistrationModal.style.display = 'flex';
         associationModal.style.display = 'none';
     }
@@ -871,13 +876,22 @@ async function checkCustomerRegistration(user) {
 
 async function handleNewCustomerRegistration(e) {
     e.preventDefault();
+    
+    // Busca os elementos novamente, para evitar o uso de variáveis globais possivelmente nulas
+    const whatsappEl = document.getElementById('regCustomerWhatsapp');
+    const birthdayEl = document.getElementById('regCustomerBirthday');
+    const errorEl = document.getElementById('regErrorMsg');
+
     if (!tempUserData) { showAssocError("Erro: Dados perdidos. Logue novamente."); return; }
     
-    const whatsapp = regCustomerWhatsapp.value;
-    const birthday = regCustomerBirthday.value;
+    const whatsapp = whatsappEl ? whatsappEl.value : '';
+    const birthday = birthdayEl ? birthdayEl.value : '';
     
-    if (!whatsapp || !birthday) { regErrorMsg.textContent = "Preencha todos os campos."; regErrorMsg.style.display = 'block'; return; }
-    regErrorMsg.style.display = 'none';
+    if (!whatsapp || !birthday) { 
+        if(errorEl) { errorEl.textContent = "Preencha todos os campos."; errorEl.style.display = 'block'; }
+        return; 
+    }
+    if(errorEl) errorEl.style.display = 'none';
     
     const completeUserData = { ...tempUserData, whatsapp: whatsapp, nascimento: birthday };
     saveRegistrationBtn.disabled = true; saveRegistrationBtn.textContent = "Salvando...";
@@ -891,8 +905,7 @@ async function handleNewCustomerRegistration(e) {
         updateCustomerInfo(localCurrentClientUser, false); 
     } catch (error) {
         console.error("Erro salvar:", error);
-        regErrorMsg.textContent = "Falha ao salvar.";
-        regErrorMsg.style.display = 'block';
+        if(errorEl) { errorEl.textContent = "Falha ao salvar."; errorEl.style.display = 'block'; }
     } finally {
         saveRegistrationBtn.disabled = false; saveRegistrationBtn.textContent = "Salvar e Continuar";
     }
