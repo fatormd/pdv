@@ -274,21 +274,21 @@
             
             <form id="activationForm" class="space-y-4">
                 <div id="content-mesa" class="assoc-tab-content active" data-inputs="activateTableNumber">
-                    <input type="number" id="activateTableNumber" name="mesa_number" placeholder="Número da Mesa" class="input-pdv w-full text-center text-xl font-bold" min="1" required>
+                    <input type="number" id="activateTableNumber" name="mesa_number" placeholder="Número da Mesa" class="input-pdv w-full text-center text-xl font-bold" min="1">
                 </div>
                 
                 <div id="content-retirada" class="assoc-tab-content" style="display: none;" data-inputs="activatePickupPin">
-                    <input type="tel" id="activatePickupPin" name="retirada_whatsapp" placeholder="Seu WhatsApp (apenas números)" class="input-pdv w-full text-center text-xl font-bold" pattern="[0-9]{10,11}" required>
+                    <input type="tel" id="activatePickupPin" name="retirada_whatsapp" placeholder="Seu WhatsApp (apenas números)" class="input-pdv w-full text-center text-xl font-bold" pattern="[0-9]{10,11}">
                     <p class="text-xs text-gray-500 mt-2 text-center">Os últimos 4 dígitos serão seu PIN de retirada.</p>
                 </div>
 
                 <div id="content-entrega" class="assoc-tab-content" style="display: none;" data-inputs="activateWhatsappEntrega deliveryAddressStreet deliveryAddressNumber deliveryAddressNeighborhood">
-                     <input type="tel" id="activateWhatsappEntrega" name="entrega_whatsapp" placeholder="Seu WhatsApp (apenas números)" class="input-pdv w-full text-center text-base" pattern="[0-9]{10,11}" required>
+                     <input type="tel" id="activateWhatsappEntrega" name="entrega_whatsapp" placeholder="Seu WhatsApp (apenas números)" class="input-pdv w-full text-center text-base" pattern="[0-9]{10,11}">
                      <div class="grid grid-cols-2 gap-2 mt-4">
                         <input type="text" id="deliveryAddressCEP" name="entrega_cep" placeholder="CEP (Opcional)" class="input-pdv col-span-1">
-                        <input type="text" id="deliveryAddressStreet" name="entrega_rua" placeholder="Rua / Av." class="input-pdv col-span-2" required>
-                        <input type="text" id="deliveryAddressNumber" name="entrega_numero" placeholder="Número" class="input-pdv col-span-1" required>
-                        <input type="text" id="deliveryAddressNeighborhood" name="entrega_bairro" placeholder="Bairro" class="input-pdv col-span-1" required>
+                        <input type="text" id="deliveryAddressStreet" name="entrega_rua" placeholder="Rua / Av." class="input-pdv col-span-2">
+                        <input type="text" id="deliveryAddressNumber" name="entrega_numero" placeholder="Número" class="input-pdv col-span-1">
+                        <input type="text" id="deliveryAddressNeighborhood" name="entrega_bairro" placeholder="Bairro" class="input-pdv col-span-1">
                      </div>
                      <input type="text" id="deliveryAddressComplement" name="entrega_complemento" placeholder="Complemento (Ex: Apt 101)" class="input-pdv mt-2">
                      <input type="text" id="deliveryAddressReference" name="entrega_referencia" placeholder="Ponto de Referência" class="input-pdv mt-2">
@@ -309,7 +309,42 @@
         </div>
     </div>
     <div id="deliveryFeedbackModal" class="hidden"></div>
-    <div id="customerRegistrationModal" class="hidden"></div>
+    
+    <div id="customerRegistrationModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-[60] hidden p-4">
+        <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-sm relative">
+            <h3 class="text-xl font-bold mb-4 text-white">Completar Cadastro</h3>
+            <p class="text-sm text-gray-400 mb-4">Precisamos de alguns dados para confirmar seus pedidos.</p>
+            
+            <form id="customerRegistrationForm" class="space-y-4">
+                <div class="bg-gray-800 p-3 rounded-lg border border-gray-700">
+                    <div class="mb-2">
+                        <span class="text-xs text-gray-500 uppercase font-bold">Nome</span>
+                        <p id="regCustomerName" class="text-white font-semibold text-lg leading-tight">--</p>
+                    </div>
+                    <div>
+                        <span class="text-xs text-gray-500 uppercase font-bold">Email</span>
+                        <p id="regCustomerEmail" class="text-gray-300 text-sm break-all">--</p>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1 uppercase font-bold">WhatsApp</label>
+                    <input type="tel" id="regCustomerWhatsapp" placeholder="(DDD) 99999-9999" class="input-pdv w-full text-lg" required>
+                </div>
+
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1 uppercase font-bold">Data de Nascimento</label>
+                    <input type="date" id="regCustomerBirthday" class="input-pdv w-full text-lg" required>
+                </div>
+
+                <p id="regErrorMsg" class="text-sm text-red-400 text-center font-bold hidden"></p>
+
+                <button id="saveRegistrationBtn" type="submit" class="w-full py-3 bg-brand-primary hover:bg-brand-primary-dark text-white rounded-lg transition font-bold text-lg shadow-lg">
+                    Salvar e Continuar
+                </button>
+            </form>
+        </div>
+    </div>
     
     <div id="clientObsModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-[70] hidden p-4">
         <div class="bg-dark-card border border-dark-border p-6 rounded-xl shadow-2xl w-full max-w-md relative">

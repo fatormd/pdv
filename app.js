@@ -1,4 +1,4 @@
-// --- APP.JS (CORRIGIDO: SEM IMPORTAÇÃO QUEBRADA) ---
+// --- APP.JS (CORRIGIDO: TRATAMENTO DE SESSÃO STAFF/CLIENTE) ---
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -474,8 +474,11 @@ const initClientApp = async () => {
         if (clientLoginModal) clientLoginModal.style.display = 'none';
         
         import('/controllers/clientOrderController.js').then(module => {
-             window.decreaseLocalItemQuantity = module.decreaseLocalItemQuantity; // Para HTML
-             window.increaseLocalItemQuantity = module.increaseLocalItemQuantity;
+             // Estas exportações foram movidas para clientOrderMenu.js, 
+             // mas mantemos a importação para evitar quebra de código externo.
+             // Certifique-se de que os métodos existem nos novos módulos.
+             // window.decreaseLocalItemQuantity = module.decreaseLocalItemQuantity; 
+             // window.increaseLocalItemQuantity = module.increaseLocalItemQuantity;
         });
 
         hideStatus();
@@ -526,15 +529,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                  }
              }, 3000);
 
+             // CORREÇÃO: LÓGICA DE CHECAGEM DE SESSÃO STAFF
              onAuthStateChanged(auth, async (user) => {
                  clearTimeout(loginTimeout);
+                 const usersCollectionRef = collection(db, 'artifacts', appIdentifier, 'public', 'data', 'users');
+
                  if (user && !user.isAnonymous) {
-                     console.log("[APP] Autenticado.");
-                     const usersCollectionRef = collection(db, 'artifacts', appIdentifier, 'public', 'data', 'users');
                      const userDocRef = doc(usersCollectionRef, user.email);
                      const docSnap = await getDoc(userDocRef);
 
                      if (docSnap.exists()) {
+                         // 1. USUÁRIO É STAFF: Procede com o login Staff.
                          const userData = docSnap.data();
                          if (!userData.isActive) {
                              alert("Conta desativada.");
@@ -545,10 +550,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                          userRole = userData.role;
                          await initStaffApp(userData.name); 
                      } else {
-                         alert("Usuário não encontrado.");
-                         handleLogout();
+                         // 2. USUÁRIO É CLIENTE (ou desconhecido).
+                         // No Painel Staff, forçamos o logout para evitar quebra.
+                         // Removemos o alerta "Usuário não encontrado."
+                         await signOut(auth); // Dispara onAuthStateChanged(null)
                      }
                  } else {
+                     // Usuário deslogado (user=null ou user.isAnonymous=true)
                      showLoginScreen();
                  }
              });

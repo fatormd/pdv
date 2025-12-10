@@ -1,4 +1,4 @@
-// --- SERVICES/FIREBASESERVICE.JS (CORREÇÃO: FALLBACK DE SEGURANÇA) ---
+// --- SERVICES/FIREBASESERVICE.JS (CORRIGIDO) ---
 
 import { 
     collection, 
@@ -8,7 +8,11 @@ import {
     serverTimestamp, 
     initializeFirestore, 
     persistentLocalCache,
-    getFirestore // <--- Importante para o plano B
+    getFirestore,
+    // Novos imports necessários para a busca
+    getDocs,
+    query,
+    where
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
@@ -21,7 +25,7 @@ export let functions = null;
 export let storage = null;
 
 // Exporta as ferramentas para os outros arquivos usarem
-export { arrayUnion, serverTimestamp, ref, uploadBytes, getDownloadURL };
+export { arrayUnion, serverTimestamp, ref, uploadBytes, getDownloadURL, getDocs, query, where, collection, doc, updateDoc };
 
 // Função de inicialização
 export const initializeFirebase = (app, authentication, appIdentifier, appFunctions) => {
@@ -97,5 +101,33 @@ export const saveSelectedItemsToFirebase = async (tableId, selectedItems) => {
         await updateDoc(tableRef, { selectedItems: selectedItems });
     } catch (e) {
         console.error(`[FirebaseService] Erro ao salvar itens da mesa ${tableId}:`, e);
+    }
+};
+
+// --- NOVA FUNÇÃO CORRIGIDA (Exportada corretamente) ---
+export const findActiveTableByUserId = async (userId) => {
+    if (!userId || !db) return null;
+    try {
+        // Busca mesas onde o campo 'clientId' é o usuário atual e o status é 'open' ou 'merged'
+        const q = query(
+            getTablesCollectionRef(),
+            where("clientId", "==", userId),
+            where("status", "in", ["open", "merged"])
+        );
+
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+            // Retorna os dados da primeira mesa encontrada
+            const docData = querySnapshot.docs[0].data();
+            return { 
+                id: querySnapshot.docs[0].id, 
+                ...docData 
+            };
+        }
+        return null;
+    } catch (error) {
+        console.error("Erro ao buscar mesa ativa do usuário:", error);
+        return null;
     }
 };

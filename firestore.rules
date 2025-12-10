@@ -12,10 +12,12 @@ service cloud.firestore {
       }
 
       function isStaff() {
+        // Usuário Staff é qualquer usuário autenticado que NÃO seja anônimo
         return isAuthenticated() && request.auth.token.firebase.sign_in_provider != 'anonymous';
       }
 
       function isGerente() {
+        // Acesso ao role do gerente (assumindo que o email é o ID do doc de users)
         return isStaff() && 
           get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.token.email)).data.role == 'gerente';
       }
@@ -24,170 +26,164 @@ service cloud.firestore {
       match /data {
         
         // 1. STATUS DO SISTEMA & CONFIGURAÇÕES GERAIS
-        match /system_status/{docId} {
-          allow read: if isAuthenticated();
-          allow write: if isGerente();
+        match /system_status/{docId} { 
+          allow read: if isAuthenticated(); 
+          allow write: if isGerente(); 
         }
         
         // Configurações da Loja (Nome, Logo, etc.)
-        match /settings/{docId} {
-          allow read: if isAuthenticated(); // Clientes precisam ler o nome/logo
-          allow write: if isGerente();      // Apenas gerente altera
+        match /settings/{docId} { 
+          allow read: if isAuthenticated(); 
+          allow write: if isGerente(); 
         }
         
-        match /financial_goals/{docId} {
-          allow read: if isStaff();
-          allow write: if isGerente();
+        match /financial_goals/{docId} { 
+          allow read: if isStaff(); 
+          allow write: if isGerente(); 
         }
 
         // 2. SETORES (Mesas e KDS)
-        match /sectors/{sectorId} {
-          allow read: if isAuthenticated();
-          allow write: if isGerente();
+        match /sectors/{sectorId} { 
+          allow read: if isAuthenticated(); 
+          allow write: if isGerente(); 
         }
 
-        // 3. KDS (PEDIDOS DA COZINHA)
+        // 3. KDS (PEDIDOS DA COZINHA) - FIX CRÍTICO: Leitura liberada para Staff e Cliente.
         match /kds_orders/{orderId} {
-          allow read, write: if isAuthenticated();
+          allow read: if isAuthenticated(); // Libera leitura para o listener do Cliente e para o Staff
+          allow write: if isStaff();       // Apenas Staff pode criar/alterar pedidos KDS
         }
 
         // 4. PRODUTOS E CATEGORIAS
-        match /categories/{categoryId} {
-          allow read: if isAuthenticated();
-          allow write: if isGerente();
+        match /categories/{categoryId} { 
+          allow read: if isAuthenticated(); 
+          allow write: if isGerente(); 
         }
-        match /products/{productId} {
-          allow read: if isAuthenticated();
-          allow write: if isGerente();
+        match /products/{productId} { 
+          allow read: if isAuthenticated(); 
+          allow write: if isGerente(); 
         }
         
         // Sincronização de Produtos (Cache)
-        match /products_cache/{productId} {
-          allow read: if isAuthenticated();
+        match /products_cache/{productId} { 
+          allow read: if isAuthenticated(); 
           allow write: if isGerente(); // Apenas Admin/Functions escreve aqui
         }
 
         // 5. VOUCHERS E OBSERVAÇÕES
-        match /vouchers/{voucherId} {
-          allow read: if isAuthenticated();
-          allow write: if isGerente();
+        match /vouchers/{voucherId} { 
+          allow read: if isAuthenticated(); 
+          allow write: if isGerente(); 
         }
-        match /quick_obs/{obsId} {
-          allow read: if isAuthenticated();
+        match /quick_obs/{obsId} { 
+          allow read: if isAuthenticated(); 
           allow write: if isStaff(); 
         }
 
         // 6. USUÁRIOS (STAFF)
-        match /users/{userId} {
+        match /users/{userId} { 
           allow read: if isStaff();
           allow write: if false; // Apenas via Admin SDK (Functions)
         }
 
-        // 7. MESAS (CORE)
+        // 7. MESAS (CORE) - FIX CRÍTICO: Leitura liberada para todos autenticados.
         match /tables/{tableId} {
+          // Permissão de LEITURA: SIMPLIFICADO para resolver o erro do Staff (listar mesas) e Cliente (listener da mesa)
           allow read: if isAuthenticated();
-          allow create: if isAuthenticated();
           
-          allow update: if isAuthenticated() && (
-            isStaff() || 
-            resource.data.clientId == request.auth.uid ||
-            request.resource.data.keys().hasOnly([
-              'tableNumber', 'status', 'diners', 'sector', 'createdAt', 'total', 
-              'clientId', 'clientName', 'clientPhone', 'anonymousUid', 'clientDocType',
-            
-              'selectedItems', 'requestedOrders', 'sentItems', 
-              'clientOrderPending', 'waiterNotification', 'billRequested', 
-              'payments', 'serviceTaxApplied', 
-              'accessPin', 'lastKdsSentAt', 'masterTable', 'mergedTables', 'waiterId',
-              'closedAt', 'finalTotal', 'wooOrderId', 'closedBy', 'kdsAlert', 'isPickup', 'note',
-              'pointsGenerated'
-            ])
-          );
-          allow delete: if isStaff();
+          // Criação: Staff PODE criar OU Cliente PODE criar se vincular seu próprio UID no campo clientId
+          allow create: if isStaff() || (isAuthenticated() && request.resource.data.clientId == request.auth.uid); 
+          
+          // Update: Staff PODE TUDO OU Cliente PODE APENAS SE FOR O CLIENTID DA MESA
+          // Nota: Removemos a verificação complexa de 'keys().hasOnly' para simplificar a regra e confiar na regra de 'clientId'
+          allow update: if isStaff() || (isAuthenticated() && resource.data.clientId == request.auth.uid);
+
+          allow delete: if isGerente();
         }
         
         // 8. CLIENTES (CRM)
         match /customers/{customerId} {
           allow read, write: if isStaff();
+          // Cliente pode ler e escrever no seu próprio perfil
           allow read, write: if request.auth.uid == customerId;
         }
 
         // 9. TURNOS DE CAIXA (SHIFTS)
-        match /shifts/{shiftId} {
-          allow read, update: if isStaff() && resource.data.userId == request.auth.token.email;
-          allow create: if isStaff() && request.resource.data.userId == request.auth.token.email;
-          allow read, write: if isGerente();
+        match /shifts/{shiftId} { 
+          allow read, update: if isStaff() && resource.data.userId == request.auth.token.email; 
+          allow create: if isStaff() && request.resource.data.userId == request.auth.token.email; 
+          allow read, write: if isGerente(); 
         }
 
         // 10. RELATÓRIOS DIÁRIOS
-        match /daily_reports/{reportId} {
-          allow read: if isStaff();
-          allow write: if isGerente();
+        match /daily_reports/{reportId} { 
+          allow read: if isStaff(); 
+          allow write: if isGerente(); 
         }
 
         // 11. DESPESAS (FINANCEIRO)
-        match /expenses/{expenseId} {
-          allow read: if isGerente();
-          allow write: if isGerente();
+        match /expenses/{expenseId} { 
+          allow read: if isGerente(); 
+          allow write: if isGerente(); 
         }
 
         // 12. INSUMOS (COMPOSIÇÃO)
-        match /ingredients/{ingredientId} {
-          allow read: if isAuthenticated();
-          allow write: if isGerente();
+        match /ingredients/{ingredientId} { 
+          allow read: if isAuthenticated(); 
+          allow write: if isGerente(); 
         }
 
         // 13. FORNECEDORES
-        match /suppliers/{supplierId} {
-          allow read: if isAuthenticated();
-          allow write: if isGerente();
+        match /suppliers/{supplierId} { 
+          allow read: if isAuthenticated(); 
+          allow write: if isGerente(); 
         }
 
         // 14. BANCO DE TALENTOS (EXTRAS / MOTOBOYS)
-        match /external_candidates/{candidateId} {
-          allow read: if isAuthenticated();
-          allow write: if isGerente();
+        match /external_candidates/{candidateId} { 
+          allow read: if isAuthenticated(); 
+          allow write: if isGerente(); 
         }
 
         // 15. ESTOQUE E MOVIMENTAÇÕES
-        match /stock/{itemId} {
-          allow read: if isAuthenticated();
-          allow write: if isStaff();
+        match /stock/{itemId} { 
+          allow read: if isAuthenticated(); 
+          allow write: if isStaff(); 
         }
         
-        match /inventory_movements/{movementId} {
-          allow read: if isGerente();
-          allow write: if isGerente();
+        match /inventory_movements/{movementId} { 
+          allow read: if isGerente(); 
+          allow write: if isGerente(); 
         }
 
         // 16. TIPOS DE INSUMO (GRUPOS DE ESTOQUE)
-        match /ingredient_types/{docId} {
-          allow read: if isAuthenticated();
-          allow write: if isGerente();
+        match /ingredient_types/{docId} { 
+          allow read: if isAuthenticated(); 
+          allow write: if isGerente(); 
         }
 
         // 17. CATEGORIAS DE FORNECEDOR (AUXILIAR)
-        match /supplier_categories/{docId} {
-          allow read: if isAuthenticated();
-          allow write: if isGerente();
+        match /supplier_categories/{docId} { 
+          allow read: if isAuthenticated(); 
+          allow write: if isGerente(); 
         }
 
         // 18. RESERVAS
-        match /reservations/{reservationId} {
-          allow read: if isStaff();
-          allow write: if isStaff();
+        match /reservations/{reservationId} { 
+          allow read: if isStaff(); 
+          allow write: if isStaff(); 
         }
         
         // 19. LISTAS DE COMPRAS (NOVO)
-        match /shopping_lists/{listId} {
-          allow read: if isStaff();
-          allow write: if isGerente();
+        match /shopping_lists/{listId} { 
+          allow read: if isStaff(); 
+          allow write: if isGerente(); 
         }
         
         // 20. COTAÇÕES DE PREÇO (NOVO)
-        match /price_quotations/{quoteId} {
-          allow read: if isStaff();
-          allow write: if isStaff();
+        match /price_quotations/{quoteId} { 
+          allow read: if isStaff(); 
+          allow write: if isStaff(); 
         }
 
         // Bloqueio padrão para qualquer outra coleção dentro de /data

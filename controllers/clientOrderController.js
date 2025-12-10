@@ -1,4 +1,4 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (FIX DEFINITIVO DO NULL NO EDGE/CHROME) ---
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (FIX: RESET AUTOMÁTICO APÓS PAGAMENTO) ---
 
 import { db, auth, getQuickObsCollectionRef, appId, getTablesCollectionRef, getTableDocRef, getCustomersCollectionRef, getKdsCollectionRef } from "/services/firebaseService.js";
 import { formatCurrency, toggleLoading } from "/utils.js"; 
@@ -17,6 +17,7 @@ let localCurrentTableId = null;
 let localCurrentClientUser = null; 
 let tempUserData = null;
 let unsubscribeClientKds = null; 
+let unsubscribeTableStatus = null; // NOVO: Listener para detectar fechamento da mesa
 let currentAssociationTab = 'mesa';
 
 // Paginação
@@ -35,7 +36,7 @@ let searchProductInputClient;
 let clientObsModal, clientObsText, clientQuickObsButtons, clientConfirmObsBtn, clientCancelObsBtn;
 let tabButtons, tabContents;
 let customerRegistrationModal, customerRegistrationForm, saveRegistrationBtn;
-let regCustomerName, regCustomerEmail, regCustomerWhatsapp, regCustomerBirthday, regErrorMsg; // Estas variáveis agora podem ser null no init
+let regCustomerName, regCustomerEmail, regCustomerWhatsapp, regCustomerBirthday, regErrorMsg; 
 
 // Elementos de Entrega
 let activateWhatsappEntrega, deliveryAddressStreet, deliveryAddressNumber, deliveryAddressNeighborhood, deliveryAddressComplement, deliveryAddressReference;
@@ -45,7 +46,6 @@ export const initClientOrderController = () => {
     console.log("[ClientOrder] Inicializando...");
 
     // 1. Mapeamento de Elementos Básicos
-    // Usamos ?. (optional chaining) para evitar que a inicialização pare, caso algum elemento HTML não tenha carregado.
     clientMenuContainer = document.getElementById('client-menu-container');
     clientCategoryFilters = document.getElementById('client-category-filters');
     sendOrderBtn = document.getElementById('sendOrderBtn');
@@ -82,14 +82,11 @@ export const initClientOrderController = () => {
     btnCallMotoboy = document.getElementById('btnCallMotoboy');
 
     // 3. Listeners Específicos
-    
-    // Botão Fechar Modal Associação
     const closeAssociationModalBtn = document.getElementById('closeAssociationModalBtn');
     if (closeAssociationModalBtn) {
         closeAssociationModalBtn.addEventListener('click', closeAssociationModal);
     }
 
-    // Botão Login no Cabeçalho
     const goToPaymentBtnClient = document.getElementById('goToPaymentBtnClient');
     if (goToPaymentBtnClient) {
         goToPaymentBtnClient.addEventListener('click', () => {
@@ -101,19 +98,16 @@ export const initClientOrderController = () => {
         });
     }
 
-    // Lógica de Abas (Mesa / Retirada / Entrega)
+    // Lógica de Abas
     tabButtons = document.querySelectorAll('.assoc-tab-btn');
     tabContents = document.querySelectorAll('.assoc-tab-content');
     const defaultActionButtons = document.getElementById('defaultActionButtons');
 
     if (tabButtons) {
-        // Função auxiliar para controlar inputs
         const updateInputState = (tabName) => {
             tabContents.forEach(content => {
                 const isActive = content.id === `content-${tabName}`;
                 content.style.display = isActive ? 'block' : 'none';
-                
-                // CRÍTICO: Desativa inputs das abas ocultas para não bloquear o submit
                 const inputs = content.querySelectorAll('input, select, textarea');
                 inputs.forEach(input => {
                     input.disabled = !isActive; 
@@ -123,38 +117,28 @@ export const initClientOrderController = () => {
 
         tabButtons.forEach(button => {
             button.addEventListener('click', () => {
-                // Remove ativo de todos
                 tabButtons.forEach(btn => btn.classList.remove('active', 'border-brand-primary', 'text-brand-primary'));
-                
-                // Ativa o clicado
                 button.classList.add('active', 'border-brand-primary', 'text-brand-primary');
                 const tabName = button.dataset.tab;
                 currentAssociationTab = tabName;
-                
                 updateInputState(tabName);
-
                 if (defaultActionButtons) defaultActionButtons.style.display = 'flex'; 
                 
-                // Auto-focus
                 if (tabName === 'mesa' && activateTableNumber) activateTableNumber.focus(); 
                 if (tabName === 'retirada' && activatePickupPin) activatePickupPin.focus();
                 if (tabName === 'entrega' && activateWhatsappEntrega) activateWhatsappEntrega.focus();
             });
         });
-
-        // Inicializa estado correto (Mesa ativa, outros desativados)
         updateInputState('mesa');
     }
 
     if (btnCallMotoboy) btnCallMotoboy.addEventListener('click', handleCallMotoboy);
 
-    // 4. Cadastro de Cliente (Mapeamento protegido)
+    // 4. Cadastro de Cliente
     customerRegistrationModal = document.getElementById('customerRegistrationModal');
     customerRegistrationForm = document.getElementById('customerRegistrationForm');
     saveRegistrationBtn = document.getElementById('saveRegistrationBtn');
     regErrorMsg = document.getElementById('regErrorMsg');
-    
-    // Mapeamento de inputs de cadastro que falhavam: se falhar aqui, eles serão buscados no openModal
     regCustomerName = document.getElementById('regCustomerName');
     regCustomerEmail = document.getElementById('regCustomerEmail');
     regCustomerWhatsapp = document.getElementById('regCustomerWhatsapp');
@@ -205,7 +189,6 @@ export const initClientOrderController = () => {
                     newNote = newNote.replace(regexEspera, '').trim();
                     newNote = newNote.replace(/,,/g, ',').replace(/^,/, '').trim();
                 }
-                
                 newNote = newNote.trim(); 
 
                 let updated = false;
@@ -305,6 +288,7 @@ export const initClientOrderController = () => {
     
     if (localCurrentTableId || currentTableId) {
         startClientKdsListener(localCurrentTableId || currentTableId);
+        watchTableStatus(localCurrentTableId || currentTableId); // Monitora status ao iniciar
     }
 
     orderControllerInitialized = true;
@@ -314,6 +298,63 @@ export const initClientOrderController = () => {
 // =============================================================================
 //                             FUNÇÕES AUXILIARES
 // =============================================================================
+
+// --- NOVA FUNÇÃO: Monitor de Status da Mesa (Reset Automático) ---
+function watchTableStatus(tableId) {
+    if (unsubscribeTableStatus) unsubscribeTableStatus(); // Limpa listener anterior
+    if (!tableId) return;
+
+    console.log(`[TableWatch] Monitorando mesa ${tableId} para encerramento...`);
+    const tableRef = getTableDocRef(tableId);
+    
+    unsubscribeTableStatus = onSnapshot(tableRef, (docSnap) => {
+        // Se o documento não existe, significa que foi excluído/arquivado (conta fechada)
+        if (!docSnap.exists()) {
+            console.warn(`[TableWatch] Mesa ${tableId} foi removida. Resetando cliente.`);
+            resetClientSession("Sua conta foi encerrada com sucesso!");
+            return;
+        }
+
+        const data = docSnap.data();
+        // Se o status for 'closed', também devemos resetar
+        if (data.status === 'closed') {
+            console.warn(`[TableWatch] Mesa ${tableId} está fechada. Resetando cliente.`);
+            resetClientSession("Pagamento confirmado. Sessão finalizada.");
+        }
+    });
+}
+
+// --- Função para Limpar Sessão e Reabrir Modal ---
+function resetClientSession(message) {
+    // 1. Limpa variáveis locais e globais
+    localCurrentTableId = null;
+    setCurrentTable(null, true, false); 
+    localStorage.removeItem('lastTableNumber'); 
+    
+    // 2. Limpa carrinho
+    selectedItems = [];
+    renderClientOrderScreen();
+
+    // 3. Reseta UI
+    if(clientTableNumber) clientTableNumber.textContent = "Cardápio";
+    const paymentTableNum = document.getElementById('payment-table-number');
+    if(paymentTableNum) paymentTableNum.textContent = "Minha Conta";
+
+    // 4. Volta para tela de pedido se estiver no pagamento
+    if (window.goToScreen) window.goToScreen('clientOrderScreen');
+
+    // 5. Feedback e Reabertura
+    showToast(message, false);
+    
+    // Remove listeners antigos para evitar erros de "No document to update"
+    if (unsubscribeClientKds) unsubscribeClientKds();
+    if (unsubscribeTableStatus) unsubscribeTableStatus();
+
+    // Abre o modal novamente após curto delay
+    setTimeout(() => {
+        openAssociationModal();
+    }, 2000);
+}
 
 // --- Busca e Paginação ---
 const handleSearch = (e) => {
@@ -492,6 +533,7 @@ async function checkExistingSession(user) {
             setCurrentTable(tableId, true, false);
             setTableListener(tableId, true);
             startClientKdsListener(tableId);
+            watchTableStatus(tableId); // Ativa monitoramento
             
             closeAssociationModal();
             
@@ -666,10 +708,9 @@ function increaseCartItemQuantity(itemId, noteKey) {
 function decreaseCartItemQuantity(itemId, noteKey) {
     let indexToRemove = -1;
     for (let i = selectedItems.length - 1; i >= 0; i--) {
-        if (selectedItems[i].id == itemId && (selectedItems[i].note || '') === noteKey) {
+        if (selectedItems[i].id == itemId && (selectedItems[i].note || '') === noteKey);
             indexToRemove = i;
             break;
-        }
     }
     if (indexToRemove > -1) {
         selectedItems.splice(indexToRemove, 1); 
@@ -803,7 +844,7 @@ function openAssociationModal() {
         const mesaTab = document.querySelector('.assoc-tab-btn[data-tab="mesa"]');
         if(mesaTab) {
              mesaTab.classList.add('active');
-             mesaTab.click(); // Dispara o click para configurar os inputs
+             mesaTab.click(); 
         }
         
         const defaultActionButtons = document.getElementById('defaultActionButtons');
@@ -833,11 +874,9 @@ function openCustomerRegistrationModal() {
     // --- FIM FIX CRÍTICO ---
 
     if (customerRegistrationModal && tempUserData) {
-        // Usa os elementos recém-buscados
         nameEl.textContent = tempUserData.name || 'Nome não encontrado';
         emailEl.textContent = tempUserData.email || 'Email não encontrado';
 
-        // Linhas que causavam o erro de 'Cannot set properties of null (setting 'value')'
         whatsappEl.value = ''; 
         birthdayEl.value = ''; 
         
@@ -877,7 +916,6 @@ async function checkCustomerRegistration(user) {
 async function handleNewCustomerRegistration(e) {
     e.preventDefault();
     
-    // Busca os elementos novamente, para evitar o uso de variáveis globais possivelmente nulas
     const whatsappEl = document.getElementById('regCustomerWhatsapp');
     const birthdayEl = document.getElementById('regCustomerBirthday');
     const errorEl = document.getElementById('regErrorMsg');
@@ -951,7 +989,6 @@ async function handleActivationAndSend(e) {
     let isDelivery = false;
     let deliveryData = null;
 
-    // --- Captura de Dados conforme a Aba ---
     if (currentAssociationTab === 'mesa') {
         const rawValue = activateTableNumber.value.trim();
         if (!rawValue) { showAssocError("Informe o número da mesa."); return; }
@@ -988,12 +1025,43 @@ async function handleActivationAndSend(e) {
     if(assocErrorMsg) assocErrorMsg.style.display = 'none';
 
     try {
-        // --- BLOQUEIO DE MÚLTIPLAS MESAS ---
-        if (localCurrentTableId && localCurrentTableId !== identifier && localCurrentTableId !== `pickup_${identifier}` && localCurrentTableId !== `delivery_${identifier}`) {
-             throw new Error(`Você já possui um pedido aberto (ID: ${localCurrentTableId}).`);
-        }
+        // --- ANTI-DUPLICAÇÃO ---
+        const tablesRef = getTablesCollectionRef();
+        const qCheck = query(
+            tablesRef,
+            where("clientId", "==", localCurrentClientUser.uid),
+            where("status", "in", ["open", "merged"]) 
+        );
         
-        // --- Definição do ID do Documento ---
+        const existingSnap = await getDocs(qCheck);
+        
+        if (!existingSnap.empty) {
+            const existingDoc = existingSnap.docs[0];
+            const existingData = existingDoc.data();
+            const existingId = existingDoc.id;
+            
+            let targetId = identifier;
+            if (isPickup) targetId = `pickup_${identifier}`;
+            if (isDelivery) targetId = `delivery_${identifier}`;
+            
+            if (existingId !== targetId) {
+                console.log(`[Anti-Duplicação] Redirecionando usuário da mesa ${targetId} para ${existingId}`);
+                
+                showToast(`Você já possui um pedido aberto (Mesa/Delivery ${existingData.tableNumber}). Redirecionando...`, false);
+                
+                localCurrentTableId = existingId;
+                setCurrentTable(existingId, true, false);
+                setTableListener(existingId, true);
+                startClientKdsListener(existingId);
+                watchTableStatus(existingId); // Monitora
+                
+                closeAssociationModal();
+                toggleLoading(activateAndSendBtn, false, 'Confirmar');
+                return; 
+            }
+        }
+        // --- FIM ANTI-DUPLICAÇÃO ---
+
         let tableDocId = identifier;
         if (isPickup) tableDocId = `pickup_${identifier}`;
         if (isDelivery) tableDocId = `delivery_${identifier}`; 
@@ -1013,30 +1081,26 @@ async function handleActivationAndSend(e) {
         if (tableSnap.exists()) {
             const tData = tableSnap.data();
             
-            // Validações
             if (tData.status !== 'closed' && tData.clientId && tData.clientId !== clientData.uid) {
                 console.warn("Pedido já possui cliente vinculado:", tData.clientName);
             }
             
             if (tData.status === 'closed') {
                 console.log(`Reabrindo ${tableDocId}...`);
-                // Arquiva a mesa fechada antiga
                 const historyRef = doc(getTablesCollectionRef(), `${tableDocId}_closed_${Date.now()}`);
                 await setDoc(historyRef, tData); 
                 
-                // Define setor
                 let originalSector = tData.sector || 'Cliente';
                 if (isPickup) originalSector = 'Retirada';
                 if (isDelivery) originalSector = 'Entrega';
 
-                // Reabre
                 await setDoc(tableRef, {
                     tableNumber: isPickup || isDelivery ? identifier : parseInt(identifier),
                     status: 'open',
                     sector: originalSector,
                     isPickup: isPickup,
                     isDelivery: isDelivery,
-                    deliveryAddress: deliveryData, // Salva endereço se for entrega
+                    deliveryAddress: deliveryData, 
                     createdAt: serverTimestamp(),
                     total: 0,
                     sentItems: [], payments: [], serviceTaxApplied: true, selectedItems: [], requestedOrders: [],
@@ -1044,7 +1108,6 @@ async function handleActivationAndSend(e) {
                     anonymousUid: null
                 });
             } else {
-                // Mesa já aberta -> Só vincula
                 if (!tData.clientId || tData.clientId !== clientData.uid) {
                     await updateDoc(tableRef, { 
                         clientId: clientData.uid, 
@@ -1054,7 +1117,6 @@ async function handleActivationAndSend(e) {
                 }
             }
         } else {
-            // Mesa/Pedido NÃO existe -> Criar Novo
             if (!isPickup && !isDelivery && !confirm(`Mesa ${identifier} não foi aberta pelo garçom. Deseja abrir você mesmo?`)) {
                  throw new Error("Ação cancelada. Peça ao garçom para abrir a mesa.");
             }
@@ -1078,15 +1140,14 @@ async function handleActivationAndSend(e) {
             });
         }
 
-        // Listener e Envio
         setTableListener(tableDocId, true);
         startClientKdsListener(tableDocId);
+        watchTableStatus(tableDocId); // Ativa monitoramento
 
         if (selectedItems.length > 0) await sendOrderToFirebase();
         
         closeAssociationModal();
         
-        // Feedback
         let msg = `Mesa ${identifier} vinculada!`;
         if (isPickup) msg = `Retirada #${identifier} iniciada!`;
         if (isDelivery) msg = `Delivery para ${identifier} iniciado!`;
@@ -1135,8 +1196,10 @@ export const fetchQuickObservations = async () => {
 
 async function sendOrderToFirebase() {
     const tableId = localCurrentTableId || currentTableId; 
+    
+    // Proteção Adicional contra "No document to update"
     if (!tableId || selectedItems.length === 0) {
-        showToast("Carrinho vazio.", true);
+        showToast("Sessão inválida ou carrinho vazio.", true);
         return;
     }
 
@@ -1166,7 +1229,11 @@ async function sendOrderToFirebase() {
         showToast("Pedido enviado! Aguarde confirmação.", false);
     } catch (e) {
         console.error("Erro envio:", e);
-        showToast("Falha ao enviar pedido.", true);
+        if (e.message.includes("No document to update")) {
+            resetClientSession("Mesa não encontrada. Sua conta foi encerrada?");
+        } else {
+            showToast("Falha ao enviar pedido.", true);
+        }
     } finally {
         toggleLoading(sendOrderBtn, false, '<i class="fas fa-check-circle"></i>');
     }
