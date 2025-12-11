@@ -1,4 +1,4 @@
-// --- SERVICES/FIREBASESERVICE.JS (CORRIGIDO) ---
+// --- SERVICES/FIREBASESERVICE.JS (CORRIGIDO COM addDoc) ---
 
 import { 
     collection, 
@@ -9,10 +9,10 @@ import {
     initializeFirestore, 
     persistentLocalCache,
     getFirestore,
-    // Novos imports necessários para a busca
     getDocs,
     query,
-    where
+    where,
+    addDoc // <--- ADICIONADO AQUI
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
@@ -25,7 +25,8 @@ export let functions = null;
 export let storage = null;
 
 // Exporta as ferramentas para os outros arquivos usarem
-export { arrayUnion, serverTimestamp, ref, uploadBytes, getDownloadURL, getDocs, query, where, collection, doc, updateDoc };
+// ADICIONEI 'addDoc' NA LISTA ABAIXO
+export { arrayUnion, serverTimestamp, ref, uploadBytes, getDownloadURL, getDocs, query, where, collection, doc, updateDoc, addDoc };
 
 // Função de inicialização
 export const initializeFirebase = (app, authentication, appIdentifier, appFunctions) => {
@@ -78,10 +79,14 @@ export const getKdsCollectionRef = () => getCollectionRef('kds_orders');
 // CRM e Clientes
 export const getCustomersCollectionRef = () => getCollectionRef('customers');
 
-// Configurações do Sistema
+// Configurações do Sistema e Loja
 export const getQuickObsCollectionRef = () => getCollectionRef('quick_obs');
 export const getVouchersCollectionRef = () => getCollectionRef('vouchers');
 export const getSectorsCollectionRef = () => getCollectionRef('sectors');
+export const getStoreSettingsDocRef = () => doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'store');
+
+// Reservas (NOVO)
+export const getReservationsCollectionRef = () => getCollectionRef('reservations');
 
 // ==================================================================
 //               REFERÊNCIAS DE DOCUMENTOS ÚNICOS
@@ -104,7 +109,6 @@ export const saveSelectedItemsToFirebase = async (tableId, selectedItems) => {
     }
 };
 
-// --- NOVA FUNÇÃO CORRIGIDA (Exportada corretamente) ---
 export const findActiveTableByUserId = async (userId) => {
     if (!userId || !db) return null;
     try {

@@ -1,4 +1,4 @@
-// --- CONTROLLERS/MANAGER/MODULES/SETTINGSMANAGER.JS (ATUALIZADO: GERENCIAR TIPOS DE OPERAÇÃO) ---
+// --- CONTROLLERS/MANAGER/MODULES/SETTINGSMANAGER.JS (CORRIGIDO E COMPLETO) ---
 
 import { db, appId, getSectorsCollectionRef } from "/services/firebaseService.js";
 import { 
@@ -26,7 +26,7 @@ function getSubModalContainer() {
 }
 
 // ==================================================================
-//           1. API PÚBLICA
+//            1. API PÚBLICA
 // ==================================================================
 
 export const init = () => {
@@ -39,7 +39,7 @@ export const open = async () => {
 };
 
 // ==================================================================
-//           2. UI PRINCIPAL
+//            2. UI PRINCIPAL
 // ==================================================================
 
 async function renderSettingsPanel() {
@@ -50,7 +50,7 @@ async function renderSettingsPanel() {
             <div class="flex justify-between items-center p-4 md:p-6 border-b border-gray-700 bg-gray-800 flex-shrink-0">
                 <div>
                     <h3 class="text-xl md:text-2xl font-bold text-white"><i class="fas fa-cogs mr-2 text-gray-400"></i>Configurações</h3>
-                    <p class="text-xs md:text-sm text-gray-400">Dados e Hierarquia</p>
+                    <p class="text-xs md:text-sm text-gray-400">Dados da Loja e Hierarquia</p>
                 </div>
                 <button class="text-gray-400 hover:text-white text-3xl leading-none" onclick="document.getElementById('managerModal').style.display='none'">&times;</button>
             </div>
@@ -97,35 +97,43 @@ async function switchSettingsTab(tabName) {
 }
 
 // ==================================================================
-//           3. ABA: ESTABELECIMENTO
+//            3. ABA: ESTABELECIMENTO (ATUALIZADA)
 // ==================================================================
 
 async function renderEstablishmentTab(container) {
     let data = {};
     try {
-        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'store_info');
+        // ATENÇÃO: Mudado de 'store_info' para 'store' para bater com o Client App
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'store');
         const snap = await getDoc(docRef);
         if (snap.exists()) data = snap.data();
     } catch (e) { console.log("Config ainda não criada", e); }
 
     container.innerHTML = `
         <div class="max-w-3xl mx-auto space-y-6 animate-fade-in">
+            
             <div class="bg-gray-800 p-5 rounded-xl border border-gray-700">
                 <h4 class="text-white font-bold text-lg mb-4 border-b border-gray-600 pb-2">Identidade Visual</h4>
                 <div class="flex items-center gap-4">
                     <div class="w-24 h-24 bg-gray-700 rounded-lg flex items-center justify-center overflow-hidden border border-gray-600 relative group">
-                        <img id="storeLogoPreview" src="${data.logo || ''}" class="w-full h-full object-cover ${!data.logo ? 'hidden' : ''}">
-                        <i class="fas fa-store text-gray-500 text-3xl ${data.logo ? 'hidden' : ''}" id="storeLogoIcon"></i>
+                        <img id="storeLogoPreview" src="${data.logoUrl || ''}" class="w-full h-full object-cover ${!data.logoUrl ? 'hidden' : ''}">
+                        <i class="fas fa-store text-gray-500 text-3xl ${data.logoUrl ? 'hidden' : ''}" id="storeLogoIcon"></i>
                     </div>
-                    <div class="flex-grow">
-                        <label class="block text-xs text-gray-400 uppercase font-bold mb-1">URL da Logo</label>
-                        <input type="text" id="storeLogoUrl" class="input-pdv w-full" value="${data.logo || ''}" placeholder="https://...">
+                    <div class="flex-grow space-y-3">
+                        <div>
+                            <label class="block text-xs text-gray-400 uppercase font-bold mb-1">URL da Logo</label>
+                            <input type="text" id="storeLogoUrl" class="input-pdv w-full" value="${data.logoUrl || ''}" placeholder="https://...">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 uppercase font-bold mb-1">Slogan / Descrição Curta</label>
+                            <input type="text" id="storeDescription" class="input-pdv w-full" value="${data.description || ''}" placeholder="Ex: O melhor sabor da cidade">
+                        </div>
                     </div>
                 </div>
             </div>
 
             <div class="bg-gray-800 p-5 rounded-xl border border-gray-700">
-                <h4 class="text-white font-bold text-lg mb-4 border-b border-gray-600 pb-2">Informações Básicas</h4>
+                <h4 class="text-white font-bold text-lg mb-4 border-b border-gray-600 pb-2">Informações de Contato</h4>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs text-gray-400 uppercase font-bold mb-1">Nome do Restaurante</label>
@@ -135,25 +143,56 @@ async function renderEstablishmentTab(container) {
                         <label class="block text-xs text-gray-400 uppercase font-bold mb-1">Telefone / WhatsApp</label>
                         <input type="text" id="storePhone" class="input-pdv w-full" value="${data.phone || ''}">
                     </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 uppercase font-bold mb-1">Instagram (@usuario)</label>
+                        <input type="text" id="storeInstagram" class="input-pdv w-full" value="${data.instagram || ''}" placeholder="@sualoja">
+                    </div>
                     <div class="md:col-span-2">
                         <label class="block text-xs text-gray-400 uppercase font-bold mb-1">Endereço Completo</label>
                         <input type="text" id="storeAddress" class="input-pdv w-full" value="${data.address || ''}">
                     </div>
-                    <div class="md:col-span-2">
-                        <label class="block text-xs text-gray-400 uppercase font-bold mb-1">Mensagem do Rodapé (Cupom)</label>
-                        <input type="text" id="storeFooterMsg" class="input-pdv w-full" value="${data.footerMessage || 'Obrigado pela preferência!'}" placeholder="Mensagem impressa no final da nota">
-                    </div>
                 </div>
             </div>
 
-            <div class="flex justify-end pt-4">
-                <button id="btnSaveEstablishment" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg flex items-center transition">
-                    <i class="fas fa-save mr-2"></i> Salvar Alterações
+            <div class="bg-gray-800 p-5 rounded-xl border border-gray-700">
+                <h4 class="text-green-400 font-bold text-lg mb-4 border-b border-gray-600 pb-2">Operacional & Links</h4>
+                
+                <div class="mb-4">
+                    <label class="block text-xs text-gray-400 uppercase font-bold mb-1">Horário de Funcionamento (Texto Livre)</label>
+                    <textarea id="storeHours" rows="3" class="input-pdv w-full" placeholder="Ex: Seg a Sex: 18h às 23h&#10;Sáb e Dom: 18h às 00h">${data.hours || ''}</textarea>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-xs text-gray-400 uppercase font-bold mb-1">Link do iFood / Delivery Externo</label>
+                    <input type="url" id="storeIfoodLink" class="input-pdv w-full" value="${data.ifoodLink || ''}" placeholder="https://www.ifood.com.br/delivery/...">
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-gray-700 pt-4 mt-2">
+                    <div>
+                        <label class="block text-xs text-gray-400 uppercase font-bold mb-1"><i class="fas fa-wifi mr-1"></i> Nome do Wi-Fi (SSID)</label>
+                        <input type="text" id="storeWifiSsid" class="input-pdv w-full" value="${data.wifiSsid || ''}" placeholder="Wi-Fi Clientes">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 uppercase font-bold mb-1"><i class="fas fa-key mr-1"></i> Senha do Wi-Fi</label>
+                        <input type="text" id="storeWifiPass" class="input-pdv w-full" value="${data.wifiPass || ''}" placeholder="senha123">
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <label class="block text-xs text-gray-400 uppercase font-bold mb-1">Mensagem do Rodapé (Cupom)</label>
+                    <input type="text" id="storeFooterMsg" class="input-pdv w-full" value="${data.footerMessage || 'Obrigado pela preferência!'}" placeholder="Mensagem impressa no final da nota">
+                </div>
+            </div>
+
+            <div class="flex justify-end pt-4 pb-8">
+                <button id="btnSaveEstablishment" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg flex items-center transition transform hover:scale-105">
+                    <i class="fas fa-save mr-2"></i> Salvar Tudo
                 </button>
             </div>
         </div>
     `;
 
+    // Preview Logo Logic
     document.getElementById('storeLogoUrl').addEventListener('input', (e) => {
         const img = document.getElementById('storeLogoPreview');
         const icon = document.getElementById('storeLogoIcon');
@@ -161,21 +200,29 @@ async function renderEstablishmentTab(container) {
         else { img.classList.add('hidden'); icon.classList.remove('hidden'); }
     });
 
+    // Save Logic (ATUALIZADO)
     document.getElementById('btnSaveEstablishment').onclick = async () => {
         const btn = document.getElementById('btnSaveEstablishment');
         toggleLoading(btn, true, 'Salvando...');
         
         const payload = {
             name: document.getElementById('storeName').value,
+            description: document.getElementById('storeDescription').value, // Novo
             phone: document.getElementById('storePhone').value,
             address: document.getElementById('storeAddress').value,
+            instagram: document.getElementById('storeInstagram').value, // Novo
+            hours: document.getElementById('storeHours').value, // Novo
+            ifoodLink: document.getElementById('storeIfoodLink').value, // Novo
+            wifiSsid: document.getElementById('storeWifiSsid').value, // Novo
+            wifiPass: document.getElementById('storeWifiPass').value, // Novo
             footerMessage: document.getElementById('storeFooterMsg').value,
-            logo: document.getElementById('storeLogoUrl').value,
+            logoUrl: document.getElementById('storeLogoUrl').value, // Padronizado para logoUrl
             updatedAt: serverTimestamp()
         };
 
         try {
-            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'store_info'), payload, { merge: true });
+            // Salva em 'settings/store' para alinhar com o app do cliente
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'store'), payload, { merge: true });
             showToast("Dados salvos com sucesso!");
         } catch (e) {
             console.error(e);
@@ -187,7 +234,7 @@ async function renderEstablishmentTab(container) {
 }
 
 // ==================================================================
-//           4. ABA: HIERARQUIA & KDS (SETORES)
+//            4. ABA: HIERARQUIA & KDS (SETORES)
 // ==================================================================
 
 window.filterSectors = (type) => {
@@ -279,7 +326,7 @@ async function renderSectorsTab(container) {
 }
 
 // ==================================================================
-//           5. MODAIS (NOVO, DETALHES & TIPOS)
+//            5. MODAIS (NOVO, DETALHES & TIPOS)
 // ==================================================================
 
 // --- Buscar Tipos de Operação do Banco ---
@@ -365,7 +412,7 @@ window.removeOpType = async (id) => {
     } catch(e) { console.error(e); showToast("Erro ao remover.", true); }
 };
 
-// --- Modal Simples de Novo Setor (Atualizado com Ícone e Lista Dinâmica) ---
+// --- Modal Simples de Novo Setor ---
 window.openSectorModal = async () => {
     const opTypes = await fetchOperationTypes();
     const optionsHtml = opTypes.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
@@ -426,7 +473,7 @@ window.saveSector = async () => {
 // --- Modal Avançado de Detalhes (Vínculos) ---
 window.openSectorDetails = async (sectorEncoded) => {
     const sector = JSON.parse(decodeURIComponent(sectorEncoded));
-    const opTypes = await fetchOperationTypes(); // Carrega tipos para o edit também
+    const opTypes = await fetchOperationTypes(); 
     
     let allCategories = [], allGroups = [];
     try {

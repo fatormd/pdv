@@ -1,6 +1,19 @@
-// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (FIX: ABERTURA + PEDIDO EM OPERAÇÃO ÚNICA) ---
+// --- CONTROLLERS/CLIENTORDERCONTROLLER.JS (COMPLETO E ATUALIZADO) ---
 
-import { db, auth, getQuickObsCollectionRef, appId, getTablesCollectionRef, getTableDocRef, getCustomersCollectionRef, getKdsCollectionRef } from "/services/firebaseService.js";
+import { 
+    db, 
+    auth, 
+    getQuickObsCollectionRef, 
+    appId, 
+    getTablesCollectionRef, 
+    getTableDocRef, 
+    getCustomersCollectionRef, 
+    getKdsCollectionRef,
+    getStoreSettingsDocRef,
+    getReservationsCollectionRef,
+    addDoc // <--- Importado corretamente agora
+} from "/services/firebaseService.js";
+
 import { formatCurrency, toggleLoading } from "/utils.js"; 
 import { getProducts, getCategories, fetchWooCommerceCategories, fetchWooCommerceProducts } from "/services/wooCommerceService.js?v=4";
 import { onSnapshot, doc, updateDoc, arrayUnion, setDoc, getDoc, getDocs, query, serverTimestamp, orderBy, where, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
@@ -26,7 +39,7 @@ let currentSearch = '';
 let searchTimeout = null;
 let loadMoreBtn;
 
-// Elementos UI
+// Elementos UI Gerais
 let clientMenuContainer, clientCategoryFilters, sendOrderBtn, clientCartCount;
 let associationModal, activateAndSendBtn, googleLoginBtn, activationForm;
 let activateTableNumber, activatePickupPin, btnCallMotoboy;
@@ -40,6 +53,10 @@ let regCustomerName, regCustomerEmail, regCustomerWhatsapp, regCustomerBirthday,
 
 // Elementos de Entrega
 let activateWhatsappEntrega, deliveryAddressStreet, deliveryAddressNumber, deliveryAddressNeighborhood, deliveryAddressComplement, deliveryAddressReference;
+
+// Elementos de Loja e Reserva
+let storeInfoModal, clientReservationModal, reservationForm;
+let btnStoreInfo, btnOpenReservation, closeReservationModalBtn;
 
 export const initClientOrderController = () => {
     if (orderControllerInitialized) return;
@@ -79,7 +96,15 @@ export const initClientOrderController = () => {
 
     btnCallMotoboy = document.getElementById('btnCallMotoboy');
 
-    // 3. Listeners
+    // 3. Mapeamento Loja e Reserva
+    storeInfoModal = document.getElementById('storeInfoModal');
+    clientReservationModal = document.getElementById('clientReservationModal');
+    reservationForm = document.getElementById('reservationForm');
+    btnStoreInfo = document.getElementById('btnStoreInfo'); 
+    btnOpenReservation = document.getElementById('btnOpenReservation');
+    closeReservationModalBtn = document.getElementById('closeReservationModalBtn');
+
+    // 4. Listeners Gerais
     const closeAssociationModalBtn = document.getElementById('closeAssociationModalBtn');
     if (closeAssociationModalBtn) closeAssociationModalBtn.addEventListener('click', closeAssociationModal);
 
@@ -94,6 +119,7 @@ export const initClientOrderController = () => {
         });
     }
 
+    // Lógica das Abas
     tabButtons = document.querySelectorAll('.assoc-tab-btn');
     tabContents = document.querySelectorAll('.assoc-tab-content');
     const defaultActionButtons = document.getElementById('defaultActionButtons');
@@ -126,7 +152,7 @@ export const initClientOrderController = () => {
 
     if (btnCallMotoboy) btnCallMotoboy.addEventListener('click', handleCallMotoboy);
 
-    // 4. Cadastro
+    // 5. Cadastro de Cliente
     customerRegistrationModal = document.getElementById('customerRegistrationModal');
     customerRegistrationForm = document.getElementById('customerRegistrationForm');
     saveRegistrationBtn = document.getElementById('saveRegistrationBtn');
@@ -138,7 +164,7 @@ export const initClientOrderController = () => {
 
     if(customerRegistrationForm) customerRegistrationForm.addEventListener('submit', handleNewCustomerRegistration);
     
-    // 5. Obs
+    // 6. Observações
     clientObsModal = document.getElementById('clientObsModal'); 
     clientObsText = document.getElementById('clientObsText'); 
     clientQuickObsButtons = document.getElementById('clientQuickObsButtons'); 
@@ -187,6 +213,25 @@ export const initClientOrderController = () => {
         }
     }
 
+    // 7. Listeners de Loja e Reserva
+    if (btnStoreInfo) btnStoreInfo.onclick = openStoreInfoModal;
+    
+    if (btnOpenReservation) {
+        btnOpenReservation.onclick = () => {
+            storeInfoModal.style.display = 'none';
+            openReservationModal();
+        };
+    }
+    
+    if (closeReservationModalBtn) {
+        closeReservationModalBtn.onclick = () => {
+            clientReservationModal.style.display = 'none';
+        };
+    }
+    
+    if (reservationForm) reservationForm.onsubmit = handleReservationSubmit;
+
+    // 8. Globais
     if (sendOrderBtn) sendOrderBtn.onclick = handleSendOrderClick;
     if (authActionBtn) authActionBtn.onclick = handleAuthActionClick;
     if (googleLoginBtn) googleLoginBtn.onclick = signInWithGoogle;
@@ -271,6 +316,198 @@ function resetClientSession(message) {
     setTimeout(() => { openAssociationModal(); }, 2000);
 }
 
+// --- Funções da Loja e Reserva (ATUALIZADA) ---
+async function openStoreInfoModal() {
+    if (!storeInfoModal) return;
+    
+    document.getElementById('modalStoreName').textContent = "Carregando...";
+    storeInfoModal.style.display = 'flex';
+
+    try {
+        const storeDocRef = getStoreSettingsDocRef();
+        const docSnap = await getDoc(storeDocRef);
+        
+        // Dados padrão (Fallback)
+        let data = {
+            name: "Nossa Loja",
+            description: "",
+            address: "Endereço não informado",
+            phone: "",
+            hours: "Consulte disponibilidade",
+            logoUrl: "",
+            instagram: "",
+            ifoodLink: "",    // Novo
+            wifiSsid: "",     // Novo
+            wifiPass: ""      // Novo
+        };
+
+        if (docSnap.exists()) {
+            data = { ...data, ...docSnap.data() };
+        }
+
+        // 1. Textos Básicos
+        document.getElementById('modalStoreName').textContent = data.name;
+        document.getElementById('modalStoreAddress').textContent = data.address;
+        document.getElementById('modalStoreHours').textContent = data.hours || "Horário não informado";
+        
+        // 2. Descrição / Slogan
+        const descEl = document.getElementById('modalStoreDescription');
+        if (data.description) {
+            descEl.textContent = data.description;
+            descEl.classList.remove('hidden');
+        } else {
+            descEl.classList.add('hidden');
+        }
+
+        // 3. Logo
+        const logoImg = document.getElementById('modalStoreLogo');
+        const defaultIcon = document.getElementById('modalStoreIconDefault');
+        if (data.logoUrl) {
+            logoImg.src = data.logoUrl;
+            logoImg.classList.remove('hidden');
+            defaultIcon.classList.add('hidden');
+        } else {
+            logoImg.classList.add('hidden');
+            defaultIcon.classList.remove('hidden');
+        }
+
+        // 4. WhatsApp / Telefone
+        const phoneEl = document.getElementById('modalStorePhone');
+        const whatsBtn = document.getElementById('modalStoreWhatsappBtn');
+        phoneEl.textContent = data.phone ? `Tel: ${data.phone}` : "";
+        phoneEl.href = data.phone ? `tel:${data.phone.replace(/\D/g, '')}` : '#';
+        
+        if (data.phone) {
+            const cleanPhone = data.phone.replace(/\D/g, '');
+            const fullPhone = cleanPhone.length <= 11 ? `55${cleanPhone}` : cleanPhone;
+            whatsBtn.href = `https://wa.me/${fullPhone}`;
+            whatsBtn.style.display = 'flex';
+        } else {
+            whatsBtn.style.display = 'none';
+        }
+
+        // 5. Instagram
+        const instaBtn = document.getElementById('modalStoreInstagramBtn');
+        if (data.instagram) {
+            let user = data.instagram.replace('@', '').replace('https://instagram.com/', '').replace(/\/$/, "").trim();
+            instaBtn.href = `https://instagram.com/${user}`;
+            instaBtn.classList.remove('hidden');
+            instaBtn.style.display = 'flex';
+        } else {
+            instaBtn.classList.add('hidden');
+        }
+
+        // 6. iFood (NOVO)
+        const ifoodBtn = document.getElementById('modalStoreIfoodBtn');
+        if (data.ifoodLink) {
+            ifoodBtn.href = data.ifoodLink;
+            ifoodBtn.classList.remove('hidden');
+            ifoodBtn.style.display = 'flex';
+        } else {
+            ifoodBtn.classList.add('hidden');
+        }
+
+        // 7. Wi-Fi (NOVO)
+        const wifiArea = document.getElementById('modalStoreWifiArea');
+        if (data.wifiSsid && data.wifiPass) {
+            document.getElementById('modalStoreWifiSsid').textContent = data.wifiSsid;
+            document.getElementById('modalStoreWifiPass').textContent = data.wifiPass;
+            wifiArea.classList.remove('hidden');
+        } else {
+            wifiArea.classList.add('hidden');
+        }
+
+    } catch (error) {
+        console.error("Erro ao carregar loja:", error);
+        document.getElementById('modalStoreName').textContent = "Erro ao carregar";
+    }
+}
+
+function openReservationModal() {
+    if (!clientReservationModal) return;
+    
+    if (localCurrentClientUser) {
+        const nameInput = document.getElementById('resName');
+        const phoneInput = document.getElementById('resPhone');
+        
+        if (nameInput) nameInput.value = localCurrentClientUser.displayName || tempUserData?.name || '';
+        if (phoneInput) phoneInput.value = localCurrentClientUser.phone || tempUserData?.phone || '';
+    }
+    
+    const dateInput = document.getElementById('resDate');
+    if (dateInput) {
+        const today = new Date().toISOString().split('T')[0];
+        dateInput.min = today;
+        dateInput.value = today;
+    }
+
+    clientReservationModal.style.display = 'flex';
+}
+
+async function handleReservationSubmit(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnSubmitReservation');
+    
+    toggleLoading(btn, true, 'Enviando...');
+
+    try {
+        const name = document.getElementById('resName').value.trim();
+        const phone = document.getElementById('resPhone').value.trim();
+        const date = document.getElementById('resDate').value;
+        const time = document.getElementById('resTime').value;
+        const people = document.getElementById('resPeople').value;
+        
+        // Novos Campos
+        const occasion = document.getElementById('resOccasion').value;
+        const environment = document.getElementById('resEnvironment').value;
+        const obs = document.getElementById('resObs').value.trim();
+
+        if (!name || !date || !time) {
+            showToast("Preencha os campos obrigatórios.", true);
+            toggleLoading(btn, false, 'CONFIRMAR SOLICITAÇÃO');
+            return;
+        }
+
+        const reservationData = {
+            clientName: name,
+            clientPhone: phone,
+            clientUid: localCurrentClientUser ? localCurrentClientUser.uid : null,
+            clientEmail: localCurrentClientUser ? localCurrentClientUser.email : null,
+            date: date,
+            time: time,
+            people: parseInt(people),
+            occasion: occasion, // Novo
+            environment: environment, // Novo
+            obs: obs,
+            status: 'pending',
+            createdAt: serverTimestamp(),
+            origin: 'app_cliente'
+        };
+
+        await addDoc(getReservationsCollectionRef(), reservationData);
+
+        showToast("Solicitação enviada com sucesso!", false);
+        clientReservationModal.style.display = 'none';
+        document.getElementById('reservationForm').reset();
+        
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                icon: 'success',
+                title: 'Reserva Solicitada!',
+                text: 'Aguarde a confirmação do restaurante pelo WhatsApp ou telefone.',
+                timer: 4000
+            });
+        }
+
+    } catch (error) {
+        console.error("Erro ao reservar:", error);
+        showToast("Erro ao enviar solicitação.", true);
+    } finally {
+        toggleLoading(btn, false, 'CONFIRMAR SOLICITAÇÃO');
+    }
+}
+
+// --- Outras Funções Auxiliares (Busca, Motoboy, KDS, Auth, Menu) ---
 const handleSearch = (e) => {
     currentSearch = e.target.value;
     currentPage = 1;
