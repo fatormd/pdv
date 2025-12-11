@@ -3,10 +3,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- MUDANÇA: Agrupamos tudo dentro de 'public' para compartilhar as funções ---
+    // --- BLOCO PRINCIPAL DO APP ---
     match /artifacts/{appId}/public {
 
-      // --- FUNÇÕES AUXILIARES (Globais para este App) ---
+      // --- FUNÇÕES AUXILIARES ---
       function isAuthenticated() {
         return request.auth != null;
       }
@@ -17,12 +17,12 @@ service cloud.firestore {
       }
 
       function isGerente() {
-        // Acesso ao role do gerente (assumindo que o email é o ID do doc de users)
+        // Acesso ao role do gerente
         return isStaff() && 
           get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.token.email)).data.role == 'gerente';
       }
 
-      // --- BLOCO DE DADOS PRINCIPAL ---
+      // --- BLOCO DE DADOS ---
       match /data {
         
         // 1. STATUS DO SISTEMA & CONFIGURAÇÕES GERAIS
@@ -31,7 +31,7 @@ service cloud.firestore {
           allow write: if isGerente(); 
         }
         
-        // Configurações da Loja (Nome, Logo, etc.)
+        // Configurações da Loja (Nome, Logo, Horários, etc.)
         match /settings/{docId} { 
           allow read: if isAuthenticated(); 
           allow write: if isGerente(); 
@@ -48,7 +48,7 @@ service cloud.firestore {
           allow write: if isGerente(); 
         }
 
-        // 3. KDS (PEDIDOS DA COZINHA) - FIX CRÍTICO: Leitura liberada para Staff e Cliente.
+        // 3. KDS (PEDIDOS DA COZINHA)
         match /kds_orders/{orderId} {
           allow read: if isAuthenticated(); // Libera leitura para o listener do Cliente e para o Staff
           allow write: if isStaff();       // Apenas Staff pode criar/alterar pedidos KDS
@@ -67,7 +67,7 @@ service cloud.firestore {
         // Sincronização de Produtos (Cache)
         match /products_cache/{productId} { 
           allow read: if isAuthenticated(); 
-          allow write: if isGerente(); // Apenas Admin/Functions escreve aqui
+          allow write: if isGerente(); 
         }
 
         // 5. VOUCHERS E OBSERVAÇÕES
@@ -86,16 +86,15 @@ service cloud.firestore {
           allow write: if false; // Apenas via Admin SDK (Functions)
         }
 
-        // 7. MESAS (CORE) - FIX CRÍTICO: Leitura liberada para todos autenticados.
+        // 7. MESAS (CORE)
         match /tables/{tableId} {
-          // Permissão de LEITURA: SIMPLIFICADO para resolver o erro do Staff (listar mesas) e Cliente (listener da mesa)
+          // Permissão de LEITURA: Aberta para clientes (verem sua mesa) e staff
           allow read: if isAuthenticated();
           
-          // Criação: Staff PODE criar OU Cliente PODE criar se vincular seu próprio UID no campo clientId
+          // Criação: Staff PODE criar OU Cliente PODE criar se vincular seu próprio UID
           allow create: if isStaff() || (isAuthenticated() && request.resource.data.clientId == request.auth.uid); 
           
           // Update: Staff PODE TUDO OU Cliente PODE APENAS SE FOR O CLIENTID DA MESA
-          // Nota: Removemos a verificação complexa de 'keys().hasOnly' para simplificar a regra e confiar na regra de 'clientId'
           allow update: if isStaff() || (isAuthenticated() && resource.data.clientId == request.auth.uid);
 
           allow delete: if isGerente();
@@ -104,7 +103,7 @@ service cloud.firestore {
         // 8. CLIENTES (CRM)
         match /customers/{customerId} {
           allow read, write: if isStaff();
-          // Cliente pode ler e escrever no seu próprio perfil
+          // Cliente pode ler e escrever no seu próprio perfil (auto-cadastro)
           allow read, write: if request.auth.uid == customerId;
         }
 
@@ -139,7 +138,7 @@ service cloud.firestore {
           allow write: if isGerente(); 
         }
 
-        // 14. BANCO DE TALENTOS (EXTRAS / MOTOBOYS)
+        // 14. BANCO DE TALENTOS
         match /external_candidates/{candidateId} { 
           allow read: if isAuthenticated(); 
           allow write: if isGerente(); 
@@ -162,31 +161,37 @@ service cloud.firestore {
           allow write: if isGerente(); 
         }
 
-        // 17. CATEGORIAS DE FORNECEDOR (AUXILIAR)
+        // 17. CATEGORIAS DE FORNECEDOR
         match /supplier_categories/{docId} { 
           allow read: if isAuthenticated(); 
           allow write: if isGerente(); 
         }
 
-        // 18. RESERVAS
+        // 18. RESERVAS (CORRIGIDO AQUI)
         match /reservations/{reservationId} { 
-          allow read: if isStaff(); 
-          allow write: if isStaff(); 
+          // PERMITIR CRIAÇÃO: Qualquer usuário autenticado (incluindo Cliente) pode solicitar
+          allow create: if isAuthenticated();
+          
+          // PERMITIR LEITURA: Staff vê tudo, Cliente vê apenas a dele
+          allow read: if isStaff() || (isAuthenticated() && resource.data.clientUid == request.auth.uid);
+          
+          // PERMITIR UPDATE: Apenas Staff (para confirmar/cancelar)
+          allow update, delete: if isStaff(); 
         }
         
-        // 19. LISTAS DE COMPRAS (NOVO)
+        // 19. LISTAS DE COMPRAS
         match /shopping_lists/{listId} { 
           allow read: if isStaff(); 
           allow write: if isGerente(); 
         }
         
-        // 20. COTAÇÕES DE PREÇO (NOVO)
+        // 20. COTAÇÕES DE PREÇO
         match /price_quotations/{quoteId} { 
           allow read: if isStaff(); 
           allow write: if isStaff(); 
         }
 
-        // Bloqueio padrão para qualquer outra coleção dentro de /data
+        // Bloqueio padrão para qualquer outra coleção não listada
         match /{document=**} {
           allow read, write: if false;
         }
